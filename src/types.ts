@@ -1,0 +1,52 @@
+import type { OpenAPI } from '@scalar/openapi-types';
+import type { ConvectionContext } from './context';
+import type { $isRouter } from './symbol';
+
+export type DeepPartial<T> = T extends object ? {
+    [P in keyof T]?: DeepPartial<T[P]>;
+} : T;
+
+export type MethodAPISpec = OpenAPI.Operation & Pick<Required<OpenAPI.Operation>, 'summary' | 'responses'>;
+export type RouterAPISpec = OpenAPI.Operation & Pick<Required<OpenAPI.Operation>, 'tags'> & { group: string; };
+
+export type ConvectionHandler = (ctx: ConvectionContext) => Promise<any> | any;
+export const HTTPMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "ALL"];
+export type Method = typeof HTTPMethods[number];
+export type NextFn = () => Promise<any>;
+export type Middleware = (ctx: ConvectionContext, next: NextFn) => Promise<any> | any;
+
+export type ConvectionRouteConfig = DeepPartial<{
+    openapi: DeepPartial<OpenAPI.Operation>;
+}>;
+
+export type ConvectionRoute = {
+    method: Method;
+    path: string;
+    regex: RegExp;
+    keys: string[];
+    handler: ConvectionHandler;
+};
+
+export type ConvectionConfig = DeepPartial<{
+    port: number;
+    hostname: string;
+    development: boolean;
+    logger: {
+        verbose: boolean;
+        info: (msg: string, props: Record<string, any>) => void;
+        debug: (msg: string, props: Record<string, any>) => void;
+        warning: (msg: string, props: Record<string, any>) => void;
+        error: (msg: string, props: Record<string, any>) => void;
+        /**
+         * Something fatally went wrong and the application cannot continue.
+         */
+        fatal: (msg: string, props: Record<string, any>) => void;
+    };
+    // Open for extension
+    [key: string]: any;
+}>;
+
+export type ConvectionController<T = any> = (new (...args: any[]) => T) & {
+    [$isRouter]?: undefined;
+};
+

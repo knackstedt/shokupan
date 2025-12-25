@@ -1,0 +1,346 @@
+
+import type { Convection } from './convect';
+import { $appRoot, $childControllers, $childRouters, $isApplication, $isMounted, $isRouter, $parent } from './symbol';
+import type { ConvectionRouteConfig, MethodAPISpec } from './types';
+import { HTTPMethods, type ConvectionController, type ConvectionHandler, type ConvectionRoute, type Method } from './types';
+
+export const RouterRegistry = new Map<string, ConvectionRouter>();
+
+export const ConvectionApplicationTree = {};
+
+export class ConvectionRouter {
+    // Internal marker to identify Router vs. Application
+    private [$isApplication]: boolean = false;
+    private [$isMounted]: boolean = false;
+    private [$isRouter]: true = true;
+    private [$appRoot]: Convection;
+
+    private [$parent]: ConvectionRouter | null = null;
+    private [$childRouters]: ConvectionRouter[] = [];
+    private [$childControllers]: ConvectionController[] = [];
+
+    get rootConfig() {
+        return this[$appRoot].applicationConfig;
+    }
+    get root() {
+        return this[$appRoot];
+    }
+
+    private routes: ConvectionRoute[] = [];
+
+    constructor(
+        private readonly config?: ConvectionRouteConfig
+    ) {
+    }
+
+    private isRouterInstance(target: ConvectionController | ConvectionRouter): target is ConvectionRouter {
+        // Check if it's an object and has your specific symbol
+        return typeof target === 'object' && target !== null && $isRouter in target;
+    }
+
+    /**
+     * Mounts a controller instance to a path prefix.
+     * 
+     * Controller can be a convection router or an arbitrary class.
+     * 
+     * Routes are derived from method names:
+     * - get(ctx) -> GET /prefix/
+     * - getUsers(ctx) -> GET /prefix/users
+     * - postCreate(ctx) -> POST /prefix/create
+     */
+    public mount(prefix: string, controller: ConvectionController | ConvectionRouter) {
+
+        if (this.isRouterInstance(controller)) {
+            if (controller[$isMounted]) {
+                throw new Error("Router is already mounted");
+            }
+
+            /**
+             * Descendants are defined first, then mounted backwards up to the application root.
+             * Thus, we have to recurse through the children and assign the root reference.
+             */
+            controller[$parent] = this;
+
+            const setRouterContext = (router: ConvectionRouter) => {
+                router[$appRoot] = this.root;
+                router[$childRouters].forEach((child) => setRouterContext(child));
+            };
+            setRouterContext(controller);
+
+
+            // If the controller is the root router
+            if (this[$appRoot]) {
+                // TODO:
+            }
+            controller[$appRoot] = this.root;
+            controller[$isMounted] = true;
+        }
+        // Controller is an arbitrary class
+        else {
+            // Get all method names from the prototype (for classes)
+            const proto = Object.getPrototypeOf(controller);
+            const methods = new Set<string>();
+
+            // Scan prototype chain
+            let current = proto;
+            while (current && current !== Object.prototype) {
+                Object.getOwnPropertyNames(current).forEach(name => methods.add(name));
+                current = Object.getPrototypeOf(current);
+            }
+            // Also scan own properties (for objects or bound methods)
+            Object.getOwnPropertyNames(controller).forEach(name => methods.add(name));
+
+            let routesAttached = 0;
+            for (const name of methods) {
+                if (name === "constructor") continue;
+
+                const handler = controller[name];
+                if (typeof handler !== "function") continue;
+
+                // Simple convention matching
+                let method: Method | undefined;
+                let subPath = "";
+
+                // Check if name starts with HTTP verb
+                for (const m of HTTPMethods) {
+                    if (name.toUpperCase().startsWith(m)) {
+                        method = m;
+                        // Extract remaining part as path
+                        // e.g. getUsers -> Users
+                        // e.g. get -> ""
+                        const rest = name.slice(m.length);
+                        if (rest.length === 0) {
+                            subPath = "/";
+                        }
+                        else {
+                            // CamelCase to kebab-case or just lower?
+                            // "Users" -> "users"
+                            // "UserProfile" -> "user-profile" or "userprofile"?
+                            // Let's do simple lowercase for now as per minimal complexity.
+                            subPath = "/" + rest.toLowerCase();
+                        }
+                        break;
+                    }
+                }
+
+                if (method) {
+                    routesAttached++;
+                    // Remove trailing slash from prefix if needed, combine with subPath
+                    const cleanPrefix = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
+                    const cleanSubPath = subPath === "/" ? "" : subPath;
+                    const fullPath = (cleanPrefix + cleanSubPath) || "/";
+
+                    this.add({ method, path: fullPath, handler: handler.bind(controller) });
+                }
+            }
+            if (routesAttached === 0) {
+                console.warn(`No routes attached to controller ${controller.constructor.name}`);
+            }
+            controller[$isMounted] = true;
+        }
+    }
+
+    // --- Route Matching ---
+
+    public find(method: string, path: string): { handler: ConvectionHandler; params: Record<string, string>; } | null {
+        for (const route of this.routes) {
+            if (route.method !== "ALL" && route.method !== method) continue;
+
+            const match = route.regex.exec(path);
+            if (match) {
+                const params: Record<string, string> = {};
+                route.keys.forEach((key, index) => {
+                    params[key] = match[index + 1];
+                });
+                return { handler: route.handler, params };
+            }
+        }
+        return null; // Not found
+    }
+
+    // --- Helpers ---
+
+    private parsePath(path: string): { regex: RegExp; keys: string[]; } {
+        const keys: string[] = [];
+        const pattern = path
+            .replace(/:([a-zA-Z0-9_]+)/g, (_, key) => {
+                keys.push(key);
+                return "([^/]+)";
+            })
+            .replace(/\*/g, ".*"); // Wildcard support
+
+        return {
+            regex: new RegExp(`^${pattern}$`),
+            keys
+        };
+    }
+
+    // --- Functional Routing ---
+
+    /**
+     * Adds a route to the router.
+     * 
+     * @param method - HTTP method
+     * @param path - URL path
+     * @param spec - OpenAPI specification for the route
+     * @param handler - Route handler function
+     */
+    public add({ method, path, spec, handler }: {
+        method: Method,
+        path: string,
+        spec?: MethodAPISpec,
+        handler: ConvectionHandler;
+    }) {
+
+        const { regex, keys } = this.parsePath(path);
+        this.routes.push({ method, path, regex, keys, handler });
+    }
+
+    /**
+     * Adds a GET route to the router.
+     * 
+     * @param path - URL path    
+     * @param handler - Route handler function 
+     */
+    public get(path: string, handler: ConvectionHandler);
+    /**
+     * Adds a GET route to the router.
+     
+     * @param path - URL path    
+     * @param spec - OpenAPI specification for the route
+     * @param handler - Route handler function 
+     */
+    public get(path: string, spec: MethodAPISpec, handler: ConvectionHandler);
+    public get(path: string, specOrHandler: MethodAPISpec | ConvectionHandler, handler?: ConvectionHandler) {
+        this.attachVerb("GET", path, specOrHandler, handler);
+    }
+
+    /**
+     * Adds a POST route to the router.
+     * 
+     * @param path - URL path    
+     * @param handler - Route handler function 
+     */
+    public post(path: string, handler: ConvectionHandler);
+    /**
+     * Adds a POST route to the router.
+     
+     * @param path - URL path    
+     * @param spec - OpenAPI specification for the route
+     * @param handler - Route handler function 
+     */
+    public post(path: string, spec: MethodAPISpec, handler: ConvectionHandler);
+    public post(path: string, specOrHandler: MethodAPISpec | ConvectionHandler, handler?: ConvectionHandler) {
+        this.attachVerb("POST", path, specOrHandler, handler);
+    }
+
+    /**
+     * Adds a PUT route to the router.
+     * 
+     * @param path - URL path    
+     * @param handler - Route handler function 
+     */
+    public put(path: string, handler: ConvectionHandler);
+    /**
+     * Adds a PUT route to the router.
+     
+     * @param path - URL path    
+     * @param spec - OpenAPI specification for the route
+     * @param handler - Route handler function 
+     */
+    public put(path: string, spec: MethodAPISpec, handler: ConvectionHandler);
+    public put(path: string, specOrHandler: MethodAPISpec | ConvectionHandler, handler?: ConvectionHandler) {
+        this.attachVerb("PUT", path, specOrHandler, handler);
+    }
+
+    /**
+     * Adds a DELETE route to the router.
+     * 
+     * @param path - URL path    
+     * @param handler - Route handler function 
+     */
+    public delete(path: string, handler: ConvectionHandler);
+    /**
+     * Adds a DELETE route to the router.
+     
+     * @param path - URL path    
+     * @param spec - OpenAPI specification for the route
+     * @param handler - Route handler function 
+     */
+    public delete(path: string, spec: MethodAPISpec, handler: ConvectionHandler);
+    public delete(path: string, specOrHandler: MethodAPISpec | ConvectionHandler, handler?: ConvectionHandler) {
+        this.attachVerb("DELETE", path, specOrHandler, handler);
+    }
+
+    /**
+     * Adds a PATCH route to the router.
+     * 
+     * @param path - URL path    
+     * @param handler - Route handler function 
+     */
+    public patch(path: string, handler: ConvectionHandler);
+    /**
+     * Adds a PATCH route to the router.
+     
+     * @param path - URL path    
+     * @param spec - OpenAPI specification for the route
+     * @param handler - Route handler function 
+     */
+    public patch(path: string, spec: MethodAPISpec, handler: ConvectionHandler);
+    public patch(path: string, specOrHandler: MethodAPISpec | ConvectionHandler, handler?: ConvectionHandler) {
+        this.attachVerb("PATCH", path, specOrHandler, handler);
+    }
+
+    /**
+     * Adds a OPTIONS route to the router.
+     * 
+     * @param path - URL path    
+     * @param handler - Route handler function 
+     */
+    public options(path: string, handler: ConvectionHandler);
+    /**
+     * Adds a OPTIONS route to the router.
+     
+     * @param path - URL path    
+     * @param spec - OpenAPI specification for the route
+     * @param handler - Route handler function 
+     */
+    public options(path: string, spec: MethodAPISpec, handler: ConvectionHandler);
+    public options(path: string, specOrHandler: MethodAPISpec | ConvectionHandler, handler?: ConvectionHandler) {
+        this.attachVerb("OPTIONS", path, specOrHandler, handler);
+    }
+
+    /**
+     * Adds a HEAD route to the router.
+     * 
+     * @param path - URL path    
+     * @param handler - Route handler function 
+     */
+    public head(path: string, handler: ConvectionHandler);
+    /**
+     * Adds a HEAD route to the router.
+     
+     * @param path - URL path    
+     * @param spec - OpenAPI specification for the route
+     * @param handler - Route handler function 
+     */
+    public head(path: string, spec: MethodAPISpec, handler: ConvectionHandler);
+    public head(path: string, specOrHandler: MethodAPISpec | ConvectionHandler, handler?: ConvectionHandler) {
+        this.attachVerb("HEAD", path, specOrHandler, handler);
+    }
+
+    /**
+     * Simple method to actually attach the verb routes with their overload signatures
+     */
+    private attachVerb(method: string, path: string, specOrHandler: MethodAPISpec | ConvectionHandler, handlerFn?: ConvectionHandler) {
+        const spec = typeof specOrHandler === "function" ? null : specOrHandler as MethodAPISpec;
+        const handler = typeof specOrHandler === "function" ? specOrHandler as ConvectionHandler : handlerFn as ConvectionHandler;
+
+        this.add({
+            method,
+            path,
+            spec,
+            handler
+        });
+    }
+}

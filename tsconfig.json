@@ -1,0 +1,35 @@
+{
+    "compilerOptions": {
+        "rootDir": "./src",
+        "outDir": "./dist",
+        "forceConsistentCasingInFileNames": true,
+        "strict": false,
+        "noImplicitOverride": true,
+        "noPropertyAccessFromIndexSignature": true,
+        "noImplicitReturns": true,
+        "noFallthroughCasesInSwitch": true,
+        "allowSyntheticDefaultImports": true,
+        "sourceMap": true,
+        "downlevelIteration": false,
+        "experimentalDecorators": true,
+        "resolveJsonModule": true,
+        "verbatimModuleSyntax": true,
+        "noEmit": true,
+        "allowImportingTsExtensions": true,
+        "moduleResolution": "bundler",
+        "moduleDetection": "force",
+        "importHelpers": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "allowJs": true,
+        "target": "esnext",
+        "module": "Preserve",
+        "lib": [
+            "ESNext"
+        ],
+        "typeRoots": [
+            "src/types",
+            "./node_modules/@types"
+        ]
+    }
+}

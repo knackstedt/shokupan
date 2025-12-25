@@ -1,0 +1,4 @@
+# bunfig.toml
+[test]
+preload = ["./src/test/@pretest.ts"]
+timeout = 30000 # 30 seconds
