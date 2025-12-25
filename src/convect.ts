@@ -1,8 +1,9 @@
 
 import { ConvectionContext } from "./context";
 import { compose } from "./middleware";
+import type { ConvectionRequest } from './request';
 import { ConvectionRouter } from "./router";
-import { $appRoot, $isApplication } from './symbol';
+import { $appRoot, $dispatch, $isApplication } from './symbol';
 import { asyncContext, getTracer } from "./telemetry";
 import type { ConvectionConfig, Middleware } from './types';
 
@@ -12,7 +13,7 @@ const defaults: ConvectionConfig = {
     development: process.env.NODE_ENV !== "production",
 };
 
-export class Convection extends ConvectionRouter {
+export class Convection<T = any> extends ConvectionRouter<T> {
     readonly applicationConfig: ConvectionConfig = {};
     private middleware: Middleware[] = [];
 
@@ -60,13 +61,17 @@ export class Convection extends ConvectionRouter {
         return server;
     }
 
+    public [$dispatch](req: ConvectionRequest<T>) {
+        return this.handleRequest(req);
+    }
+
     /**
      * Handles an incoming request.
      * 
      * @param req - The request to handle.
      * @returns The response to send.
      */
-    private async handleRequest(req: Request): Promise<Response> {
+    private async handleRequest(req: ConvectionRequest<T>): Promise<Response> {
         return asyncContext.run(new Map(), async () => {
             const ctx = new ConvectionContext(req);
             const tracer = getTracer();

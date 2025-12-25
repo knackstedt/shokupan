@@ -1,21 +1,21 @@
+import type { ConvectionRequest } from './request';
 
 // Shim for HeadersInit if not available globally in some envs
 type HeadersInit = Headers | Record<string, string> | [string, string][];
 
 export class ConvectionContext<State = any> {
-    public readonly request: Request;
     public readonly url: URL;
     public params: Record<string, string> = {};
     public state: State;
 
-    constructor(request: Request, state?: State) {
-        this.request = request;
+    constructor(public readonly request: ConvectionRequest<any>, state?: State) {
         this.url = new URL(request.url);
         this.state = state || {} as State;
     }
 
     // --- Request Helpers ---
 
+    get req() { return this.request; }
     get method() { return this.request.method; }
     get path() { return this.url.pathname; }
     get query() { return Object.fromEntries(this.url.searchParams); }

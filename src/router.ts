@@ -1,23 +1,28 @@
 
 import type { Convection } from './convect';
-import { $appRoot, $childControllers, $childRouters, $isApplication, $isMounted, $isRouter, $parent } from './symbol';
+import { ConvectionRequest } from './request';
+import { $appRoot, $childControllers, $childRouters, $dispatch, $isApplication, $isMounted, $isRouter, $mountPath, $parent } from './symbol';
 import type { ConvectionRouteConfig, MethodAPISpec } from './types';
 import { HTTPMethods, type ConvectionController, type ConvectionHandler, type ConvectionRoute, type Method } from './types';
 
-export const RouterRegistry = new Map<string, ConvectionRouter>();
+// Shim for HeadersInit if not available globally
+type HeadersInit = Headers | Record<string, string> | [string, string][];
+
+export const RouterRegistry = new Map<string, ConvectionRouter<any>>();
 
 export const ConvectionApplicationTree = {};
 
-export class ConvectionRouter {
+export class ConvectionRouter<T> {
     // Internal marker to identify Router vs. Application
     private [$isApplication]: boolean = false;
     private [$isMounted]: boolean = false;
     private [$isRouter]: true = true;
     private [$appRoot]: Convection;
+    private [$mountPath]: string = "/";
 
-    private [$parent]: ConvectionRouter | null = null;
-    private [$childRouters]: ConvectionRouter[] = [];
-    private [$childControllers]: ConvectionController[] = [];
+    private [$parent]: ConvectionRouter<T> | null = null;
+    public [$childRouters]: ConvectionRouter<T>[] = [];
+    public [$childControllers]: ConvectionController[] = [];
 
     get rootConfig() {
         return this[$appRoot].applicationConfig;
@@ -33,7 +38,7 @@ export class ConvectionRouter {
     ) {
     }
 
-    private isRouterInstance(target: ConvectionController | ConvectionRouter): target is ConvectionRouter {
+    private isRouterInstance(target: ConvectionController | ConvectionRouter<T>): target is ConvectionRouter<T> {
         // Check if it's an object and has your specific symbol
         return typeof target === 'object' && target !== null && $isRouter in target;
     }
@@ -48,12 +53,15 @@ export class ConvectionRouter {
      * - getUsers(ctx) -> GET /prefix/users
      * - postCreate(ctx) -> POST /prefix/create
      */
-    public mount(prefix: string, controller: ConvectionController | ConvectionRouter) {
+    public mount(prefix: string, controller: ConvectionController | ConvectionRouter<T>) {
 
         if (this.isRouterInstance(controller)) {
             if (controller[$isMounted]) {
                 throw new Error("Router is already mounted");
             }
+
+            controller[$mountPath] = prefix;
+            this[$childRouters].push(controller);
 
             /**
              * Descendants are defined first, then mounted backwards up to the application root.
@@ -61,7 +69,7 @@ export class ConvectionRouter {
              */
             controller[$parent] = this;
 
-            const setRouterContext = (router: ConvectionRouter) => {
+            const setRouterContext = (router: ConvectionRouter<T>) => {
                 router[$appRoot] = this.root;
                 router[$childRouters].forEach((child) => setRouterContext(child));
             };
@@ -77,6 +85,10 @@ export class ConvectionRouter {
         }
         // Controller is an arbitrary class
         else {
+            // @ts-ignore
+            controller[$mountPath] = prefix;
+            this[$childControllers].push(controller);
+
             // Get all method names from the prototype (for classes)
             const proto = Object.getPrototypeOf(controller);
             const methods = new Set<string>();
@@ -140,9 +152,61 @@ export class ConvectionRouter {
         }
     }
 
-    // --- Route Matching ---
+    /**
+     * Returns all routes attached to this router and its descendants.
+     */
+    public getRoutes(): { method: string, path: string, handler: ConvectionHandler; }[] {
+        const routes = this.routes.map(r => ({
+            method: r.method,
+            path: r.path,
+            handler: r.handler
+        }));
+
+        for (const child of this[$childRouters]) {
+            const childRoutes = child.getRoutes();
+            for (const route of childRoutes) {
+                const cleanPrefix = child[$mountPath].endsWith("/") ? child[$mountPath].slice(0, -1) : child[$mountPath];
+                const cleanPath = route.path.startsWith("/") ? route.path : "/" + route.path;
+                const fullPath = (cleanPrefix + cleanPath) || "/";
+
+                routes.push({
+                    method: route.method,
+                    path: fullPath,
+                    handler: route.handler
+                });
+            }
+        }
+        return routes;
+    }
+
+    public async subRequest(options: {
+        path: string;
+        method?: Method;
+        headers?: HeadersInit;
+        body?: any;
+    }): Promise<Response> {
+        let url = options.path;
+        // If path is relative, make it absolute (required by Request constructor)
+        if (!url.startsWith("http")) {
+            const base = `http://${this.rootConfig?.hostname || "localhost"}:${this.rootConfig.port || 3000}`;
+
+            // Ensure path starts with /
+            const path = url.startsWith("/") ? url : "/" + url;
+            url = base + path;
+        }
+
+        const req = new ConvectionRequest({
+            method: options.method || "GET",
+            url,
+            headers: options.headers as any,
+            body: options.body ? JSON.stringify(options.body) : undefined
+        });
+
+        return this.root[$dispatch](req);
+    }
 
     public find(method: string, path: string): { handler: ConvectionHandler; params: Record<string, string>; } | null {
+        // 1. Check local routes
         for (const route of this.routes) {
             if (route.method !== "ALL" && route.method !== method) continue;
 
@@ -155,6 +219,29 @@ export class ConvectionRouter {
                 return { handler: route.handler, params };
             }
         }
+
+        // 2. Check child routers
+        for (const child of this[$childRouters]) {
+            const prefix = child[$mountPath];
+            // Check if path starts with prefix
+            // We need to be careful with partial matches e.g. /api-v2 vs /api
+            // Valid matches: /api, /api/, /api/users
+
+            if (path === prefix || path.startsWith(prefix + "/")) {
+                const subPath = path.slice(prefix.length) || "/";
+                const match = child.find(method, subPath);
+                if (match) return match;
+            }
+            // Handle case where prefix ends with / (unlikely given mount logic but possible)
+            if (prefix.endsWith("/")) {
+                if (path.startsWith(prefix)) {
+                    const subPath = path.slice(prefix.length) || "/";
+                    const match = child.find(method, subPath);
+                    if (match) return match;
+                }
+            }
+        }
+
         return null; // Not found
     }
 

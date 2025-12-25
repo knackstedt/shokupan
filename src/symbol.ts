@@ -5,3 +5,5 @@ export const $isRouter = Symbol.for("@dotglitch/express.ts/router");
 export const $parent = Symbol.for("@dotglitch/express.ts/parent");
 export const $childRouters = Symbol.for("@dotglitch/express.ts/child-routers");
 export const $childControllers = Symbol.for("@dotglitch/express.ts/child-controllers");
+export const $mountPath = Symbol.for("@dotglitch/express.ts/mount-path");
+export const $dispatch = Symbol.for("@dotglitch/express.ts/dispatch");
