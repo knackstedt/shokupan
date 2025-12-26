@@ -4,7 +4,7 @@ import { Container } from './di';
 import { compose } from './middleware';
 import { ConvectionRequest } from './request';
 import { $appRoot, $childControllers, $childRouters, $controllerPath, $dispatch, $isApplication, $isMounted, $isRouter, $middleware, $mountPath, $parent, $routeArgs, $routeMethods } from './symbol';
-import type { ConvectionRouteConfig, MethodAPISpec, ProcessResult, RequestOptions } from './types';
+import type { ConvectionRouteConfig, GuardAPISpec, MethodAPISpec, ProcessResult, RequestOptions } from './types';
 import { HTTPMethods, RouteParamType, type ConvectionController, type ConvectionHandler, type ConvectionRoute, type Method } from './types';
 import { asyncContext } from './util/async-hooks';
 import { traceHandler } from './util/instrumentation';
@@ -36,6 +36,7 @@ export class ConvectionRouter<T> {
     }
 
     private routes: ConvectionRoute[] = [];
+    private currentGuards: { handler: ConvectionHandler; spec?: GuardAPISpec; }[] = [];
 
     constructor(
         private readonly config?: ConvectionRouteConfig
@@ -497,9 +498,65 @@ export class ConvectionRouter<T> {
         spec?: MethodAPISpec,
         handler: ConvectionHandler;
     }) {
-
         const { regex, keys } = this.parsePath(path);
-        this.routes.push({ method, path, regex, keys, handler });
+
+        // Wrap handler with current guards if any exist
+        let wrappedHandler = handler;
+        const routeGuards = [...this.currentGuards];
+
+        if (routeGuards.length > 0) {
+            wrappedHandler = async (ctx: ConvectionContext) => {
+                // Execute guards in order
+                for (const guard of routeGuards) {
+                    let guardPassed = false;
+                    let nextCalled = false;
+
+                    // Create next function for middleware-style guards
+                    const next = () => {
+                        nextCalled = true;
+                        return Promise.resolve();
+                    };
+
+                    try {
+                        const result = await guard.handler(ctx, next);
+
+                        // Check if guard explicitly returned true or called next()
+                        if (result === true || nextCalled) {
+                            guardPassed = true;
+                        }
+                        // If guard returned a response, return it (short-circuit)
+                        else if (result !== undefined && result !== null && result !== false) {
+                            return result;
+                        }
+                        // If guard returned false or nothing, block the request
+                        else {
+                            return ctx.json({ error: 'Forbidden' }, 403);
+                        }
+                    }
+                    catch (error) {
+                        // If guard throws, propagate the error to error handling
+                        throw error;
+                    }
+
+                    if (!guardPassed) {
+                        return ctx.json({ error: 'Forbidden' }, 403);
+                    }
+                }
+
+                // All guards passed, execute the actual handler
+                return handler(ctx);
+            };
+        }
+
+        this.routes.push({
+            method,
+            path,
+            regex,
+            keys,
+            handler: wrappedHandler,
+            handlerSpec: spec,
+            guards: routeGuards.length > 0 ? routeGuards : undefined
+        });
     }
 
     /**
@@ -633,6 +690,28 @@ export class ConvectionRouter<T> {
     public head(path: string, spec: MethodAPISpec, handler: ConvectionHandler);
     public head(path: string, specOrHandler: MethodAPISpec | ConvectionHandler, handler?: ConvectionHandler) {
         this.attachVerb("HEAD", path, specOrHandler, handler);
+    }
+
+    /**
+     * Adds a guard to the router that applies to all routes added **after** this point.
+     * Guards must return true or call `ctx.next()` to allow the request to continue.
+     * 
+     * @param handler - Guard handler function 
+     */
+    public guard(handler: ConvectionHandler): void;
+    /**
+     * Adds a guard to the router that applies to all routes added **after** this point.
+     * Guards must return true or call `ctx.next()` to allow the request to continue.
+     
+     * @param spec - OpenAPI specification for the guard
+     * @param handler - Guard handler function 
+     */
+    public guard(spec: GuardAPISpec, handler: ConvectionHandler): void;
+    public guard(specOrHandler: GuardAPISpec | ConvectionHandler, handler?: ConvectionHandler): void {
+        const spec = typeof specOrHandler === "function" ? undefined : specOrHandler as GuardAPISpec;
+        const guardHandler = typeof specOrHandler === "function" ? specOrHandler as ConvectionHandler : handler as ConvectionHandler;
+
+        this.currentGuards.push({ handler: guardHandler, spec });
     }
 
     /**

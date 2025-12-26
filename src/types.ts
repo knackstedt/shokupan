@@ -7,9 +7,10 @@ export type DeepPartial<T> = T extends object ? {
 } : T;
 
 export type MethodAPISpec = OpenAPI.Operation & Pick<Required<OpenAPI.Operation>, 'summary' | 'responses'>;
+export type GuardAPISpec = DeepPartial<OpenAPI.Operation>;
 export type RouterAPISpec = OpenAPI.Operation & Pick<Required<OpenAPI.Operation>, 'tags'> & { group: string; };
 
-export type ConvectionHandler = (ctx: ConvectionContext) => Promise<any> | any;
+export type ConvectionHandler = (ctx: ConvectionContext, next?: NextFn) => Promise<any> | any;
 export const HTTPMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "ALL"];
 export type Method = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "OPTIONS" | "HEAD" | "ALL";
 
@@ -35,6 +36,11 @@ export type ConvectionRoute = {
     regex: RegExp;
     keys: string[];
     handler: ConvectionHandler;
+    handlerSpec?: MethodAPISpec;
+    guards?: {
+        handler: ConvectionHandler;
+        spec?: GuardAPISpec;
+    }[];
 };
 
 export type ConvectionConfig = DeepPartial<{
