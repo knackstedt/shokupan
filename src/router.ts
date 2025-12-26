@@ -52,7 +52,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
     ) {
     }
 
-    private isRouterInstance(target: ConvectionController | ConvectionRouter<T>): target is ConvectionRouter<T> {
+    private isRouterInstance(target: ConvectionController | ConvectionController<T> | ConvectionRouter | ConvectionRouter<T>): target is ConvectionRouter<T> {
         // Check if it's an object and has your specific symbol
         return typeof target === 'object' && target !== null && $isRouter in target;
     }
@@ -67,7 +67,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
      * - getUsers(ctx) -> GET /prefix/users
      * - postCreate(ctx) -> POST /prefix/create
      */
-    public mount(prefix: string, controller: ConvectionController | ConvectionRouter<T>) {
+    public mount(prefix: string, controller: ConvectionController | ConvectionController<T> | ConvectionRouter | ConvectionRouter<T>) {
 
         if (this.isRouterInstance(controller)) {
             if (controller[$isMounted]) {

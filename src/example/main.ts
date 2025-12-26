@@ -3,9 +3,16 @@ import { ScalarPlugin } from '../plugins/scalar';
 import { UserController } from './controller';
 import { ServiceFetchRouter } from './service_fetch';
 
-const app = new Convection({
+type session = {
+    profile: any,
+    lastAccess: Date;
+};
+
+const app = new Convection<{
+    session: session;
+}>({
     port: 3001,
-    development: true
+    development: true,
 });
 
 app.get("/", (ctx) => {

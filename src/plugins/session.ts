@@ -1,4 +1,5 @@
 import { createHmac, randomUUID } from "crypto";
+import { EventEmitter } from "events";
 import { ConvectionContext } from "../context";
 import type { Middleware } from "../types";
 
@@ -100,7 +101,6 @@ class Cookie implements CookieOptions {
 
 // --- Memory Store ---
 
-import { EventEmitter } from "events";
 
 export class MemoryStore extends EventEmitter implements Store {
     private sessions: Record<string, string> = {};
