@@ -5,7 +5,7 @@ import { useExpress } from '../middleware';
 beforeAll(async () => {
 
     const app = new Convection({
-        port: 3000,
+        port: 0,
         development: true
     });
 
@@ -61,7 +61,8 @@ beforeAll(async () => {
 
     app.mount("/api/user", UserController);
 
-    app.listen();
+    const server = app.listen();
+    (global as any).port = server.port;
 
     (global as any).app = app;
 });
