@@ -6,6 +6,8 @@ import { ConvectionRequest } from './request';
 import { $appRoot, $childControllers, $childRouters, $controllerPath, $dispatch, $isApplication, $isMounted, $isRouter, $middleware, $mountPath, $parent, $routeArgs, $routeMethods } from './symbol';
 import type { ConvectionRouteConfig, MethodAPISpec, ProcessResult, RequestOptions } from './types';
 import { HTTPMethods, RouteParamType, type ConvectionController, type ConvectionHandler, type ConvectionRoute, type Method } from './types';
+import { asyncContext } from './util/async-hooks';
+import { traceHandler } from './util/instrumentation';
 
 // Shim for HeadersInit if not available globally
 type HeadersInit = Headers | Record<string, string> | [string, string][];
@@ -105,7 +107,6 @@ export class ConvectionRouter<T> {
                 }
             }
 
-            // @ts-ignore
             instance[$mountPath] = prefix;
             this[$childControllers].push(instance as any);
 
@@ -225,7 +226,7 @@ export class ConvectionRouter<T> {
                         // Resolve Arguments
                         let args: any[] = [ctx]; // Default to just context if no decorators
 
-                        if (routeArgs && routeArgs.length > 0) {
+                        if (routeArgs?.length > 0) {
                             args = [];
                             // Sort by index
                             const sortedArgs = [...routeArgs].sort((a, b) => a.index - b.index);
@@ -257,7 +258,8 @@ export class ConvectionRouter<T> {
                             }
                         }
 
-                        return originalHandler.apply(instance, args);
+                        const tracedOriginalHandler = traceHandler(originalHandler, normalizedPath);
+                        return tracedOriginalHandler.apply(instance, args);
                     };
 
                     // Apply Middleware wrapping
@@ -312,12 +314,17 @@ export class ConvectionRouter<T> {
      * @param options The request options.
      * @returns The response.
      */
-    public async subRequest(options: {
+    public async subRequest(arg: {
         path: string;
         method?: Method;
         headers?: HeadersInit;
         body?: any;
-    }): Promise<Response> {
+    } | string): Promise<Response> {
+        const options = typeof arg === "string" ? { path: arg } : arg;
+
+        const store = asyncContext.getStore();
+        const originalReq = store?.get("req") as ConvectionRequest<T>;
+
         let url = options.path;
         // If path is relative, make it absolute (required by Request constructor)
         if (!url.startsWith("http")) {

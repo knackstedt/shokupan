@@ -1,10 +1,13 @@
+import "./util/instrumentation";
+
+import { trace } from '@opentelemetry/api';
 import { ConvectionContext } from "./context";
 import { compose } from "./middleware";
 import { ConvectionRequest } from './request';
 import { ConvectionRouter } from "./router";
 import { $appRoot, $dispatch, $isApplication } from './symbol';
-import { asyncContext, getTracer } from "./telemetry";
 import type { ConvectionConfig, Method, Middleware, ProcessResult, RequestOptions } from './types';
+import { asyncContext } from "./util/async-hooks";
 
 const defaults: ConvectionConfig = {
     port: 3000,
@@ -12,6 +15,8 @@ const defaults: ConvectionConfig = {
     development: process.env.NODE_ENV !== "production",
     enableAsyncLocalStorage: false,
 };
+const tracer = trace.getTracer("convect.application");
+
 
 export class Convection<T = any> extends ConvectionRouter<T> {
     readonly applicationConfig: ConvectionConfig = {};
@@ -54,7 +59,36 @@ export class Convection<T = any> extends ConvectionRouter<T> {
             port: finalPort,
             hostname: this.applicationConfig.hostname,
             development: this.applicationConfig.development,
-            fetch: this.fetch.bind(this),
+            fetch: (req) => {
+                const attrs = {
+                    root: true,
+                    attributes: {
+                        "http.url": req.url,
+                        "http.method": req.method
+                    }
+                };
+
+                return tracer.startActiveSpan(`Incoming request`, attrs, span => {
+                    const ctxMap = new Map();
+                    ctxMap.set("span", span);
+                    ctxMap.set("request", req);
+
+                    return asyncContext.run(ctxMap, () => {
+                        return this.fetch(req as unknown as Request)
+                            .finally(() => span.end())
+                            .catch(err => {
+                                span.recordException(err);
+                                span.setStatus({ code: 2 }); // Error
+                                return new Response(JSON.stringify({ error: "Internal Server Error", message: err.message }), {
+                                    status: 500,
+                                    headers: {
+                                        "Content-Type": "application/json"
+                                    }
+                                });
+                            });
+                    });
+                });
+            },
         });
 
         console.log(`Convect server listening on http://${server.hostname}:${server.port}`);
@@ -102,7 +136,8 @@ export class Convection<T = any> extends ConvectionRouter<T> {
         let data: any;
         if (headers['content-type']?.includes('application/json')) {
             data = await res.json();
-        } else {
+        }
+        else {
             data = await res.text();
         }
 
@@ -121,17 +156,34 @@ export class Convection<T = any> extends ConvectionRouter<T> {
      * @returns The response to send.
      */
     public async fetch(req: Request): Promise<Response> {
-        // Cast to ConvectionRequest if needed, though at runtime it's just a Request
-        // But ConvectionContext expects ConvectionRequest.
-        const request = req as unknown as ConvectionRequest<T>;
+        const tracer = trace.getTracer("convect.application");
+        const store = asyncContext.getStore();
 
-        const handle = async () => {
-            const ctx = new ConvectionContext(request);
-            const tracer = getTracer();
+        const attrs = {
+            attributes: {
+                "http.url": req.url,
+                "http.method": req.method
+            }
+        };
 
-            return tracer.startActiveSpan(`${req.method} ${ctx.path}`, async (span) => {
+        // const parent = store?.get("span");
+        // const ctx = parent ? trace.setSpan(context.active(), parent) : undefined;
+        return tracer.startActiveSpan(`${req.method} ${req.url}`, attrs, span => {
+            const ctxMap = new Map();
+            ctxMap.set("span", span);
+            ctxMap.set("request", req);
+
+
+            // Cast to ConvectionRequest if needed, though at runtime it's just a Request
+            // But ConvectionContext expects ConvectionRequest.
+            const request = req as unknown as ConvectionRequest<T>;
+
+            const handle = async () => {
+                const ctx = new ConvectionContext(request);
+
                 // Compose middleware + router dispatch
                 const fn = compose(this.middleware);
+                // Object.defineProperty(fn, 'name', { value: "middleware chain", configurable: false });
 
                 try {
                     // The "next" at the end of the middleware chain is the router dispatch
@@ -145,20 +197,16 @@ export class Convection<T = any> extends ConvectionRouter<T> {
                     });
 
                     if (result instanceof Response) {
-                        span.end();
                         return result;
                     }
                     if (result === null || result === undefined) {
                         span.setAttribute("http.status_code", 404);
-                        span.end();
                         return ctx.text("Not Found", 404);
                     }
                     if (typeof result === "object") {
-                        span.end();
                         return ctx.json(result);
                     }
 
-                    span.end();
                     return ctx.text(String(result));
 
                 }
@@ -166,16 +214,12 @@ export class Convection<T = any> extends ConvectionRouter<T> {
                     console.error(err);
                     span.recordException(err);
                     span.setStatus({ code: 2 }); // Error
-                    span.end();
                     return ctx.json({ error: "Internal Server Error", message: err.message }, 500);
                 }
-            });
-        };
+            };
 
-        if (this.applicationConfig.enableAsyncLocalStorage) {
-            return asyncContext.run(new Map(), handle);
-        }
-
-        return handle();
+            return handle()
+                .finally(() => span.end());
+        });
     }
 }

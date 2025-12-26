@@ -1,3 +1,5 @@
+import "./util/instrumentation";
+
 export * from "./context";
 export * from "./convect";
 export * from "./middleware";

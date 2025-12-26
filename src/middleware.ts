@@ -1,33 +1,32 @@
-
 import type { ConvectionContext } from "./context";
 import type { Middleware, NextFn } from './types';
+import { traceMiddleware } from "./util/instrumentation";
 
 /**
  * Composes a list of middleware into a single function.
  * This is the onion model (Koa-style).
  */
-export function compose(middleware: Middleware[]) {
-    return function (context: ConvectionContext, next?: NextFn) {
-        let index = -1;
+export const compose = (middleware: Middleware[]) => {
+    function fn(context: ConvectionContext, next?: NextFn) {
+        let runner: NextFn = next || (async () => { });
 
-        function dispatch(i: number): Promise<any> {
-            if (i <= index) return Promise.reject(new Error("next() called multiple times"));
-            index = i;
-            let fn = middleware[i];
+        for (let i = middleware.length - 1; i >= 0; i--) {
+            const fn = traceMiddleware(middleware[i]);
+            const nextStep = runner;
+            let called = false;
 
-            if (i === middleware.length) fn = next as Middleware;
-            if (!fn) return Promise.resolve();
-
-            try {
-                return Promise.resolve(fn(context, dispatch.bind(null, i + 1)));
-            } catch (err) {
-                return Promise.reject(err);
-            }
+            runner = async () => {
+                if (called) throw new Error('next() called multiple times');
+                called = true;
+                return fn(context, nextStep);
+            };
         }
 
-        return dispatch(0);
+        return runner();
     };
-}
+
+    return fn;
+};
 
 /**
  * Adapter to use legacy Express middleware.
