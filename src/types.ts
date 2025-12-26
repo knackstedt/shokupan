@@ -1,6 +1,6 @@
 import type { OpenAPI } from '@scalar/openapi-types';
 import type { ConvectionContext } from './context';
-import type { $isRouter } from './symbol';
+import { $isRouter } from "./symbol";
 
 export type DeepPartial<T> = T extends object ? {
     [P in keyof T]?: DeepPartial<T[P]>;
@@ -47,7 +47,24 @@ export type ConvectionConfig = DeepPartial<{
     [key: string]: any;
 }>;
 
+
+export interface RequestOptions {
+    path?: string;
+    url?: string;
+    method?: string;
+    headers?: Record<string, string>;
+    body?: any;
+    query?: Record<string, string>;
+}
+
+export interface ProcessResult {
+    status: number;
+    headers: Record<string, string>;
+    data: any;
+}
+
 export type ConvectionController<T = any> = (new (...args: any[]) => T) & {
     [$isRouter]?: undefined;
 };
+
 

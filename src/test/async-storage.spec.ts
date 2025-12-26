@@ -13,7 +13,7 @@ describe("AsyncLocalStorage Configuration", () => {
             return "OK";
         });
 
-        const res = await app['handleRequest'](new Request("http://localhost/") as any);
+        const res = await app.fetch(new Request("http://localhost/") as any);
         expect(await res.text()).toBe("OK");
         expect(store).toBeUndefined();
     });
@@ -27,7 +27,7 @@ describe("AsyncLocalStorage Configuration", () => {
             return "OK";
         });
 
-        const res = await app['handleRequest'](new Request("http://localhost/") as any);
+        const res = await app.fetch(new Request("http://localhost/") as any);
         expect(await res.text()).toBe("OK");
         expect(store).toBeDefined();
         expect(store).toBeInstanceOf(Map);
@@ -42,7 +42,7 @@ describe("AsyncLocalStorage Configuration", () => {
             return "OK";
         });
 
-        const res = await app['handleRequest'](new Request("http://localhost/") as any);
+        const res = await app.fetch(new Request("http://localhost/") as any);
         expect(await res.text()).toBe("OK");
         expect(store).toBeUndefined();
     });
@@ -63,7 +63,7 @@ describe("AsyncLocalStorage Configuration", () => {
             return store?.get("requestId");
         });
 
-        const res = await app['handleRequest'](new Request("http://localhost/") as any);
+        const res = await app.fetch(new Request("http://localhost/") as any);
         expect(await res.text()).toBe("req-123");
     });
 
@@ -83,8 +83,8 @@ describe("AsyncLocalStorage Configuration", () => {
             return store?.get("id");
         });
 
-        const req1 = app['handleRequest'](new Request("http://localhost/?id=1") as any);
-        const req2 = app['handleRequest'](new Request("http://localhost/?id=2") as any);
+        const req1 = app.fetch(new Request("http://localhost/?id=1") as any);
+        const req2 = app.fetch(new Request("http://localhost/?id=2") as any);
 
         const [res1, res2] = await Promise.all([req1, req2]);
         expect(await res1.text()).toBe("1");

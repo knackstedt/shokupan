@@ -1,8 +1,9 @@
 
+import { ConvectionContext } from './context';
 import type { Convection } from './convect';
 import { ConvectionRequest } from './request';
 import { $appRoot, $childControllers, $childRouters, $dispatch, $isApplication, $isMounted, $isRouter, $mountPath, $parent } from './symbol';
-import type { ConvectionRouteConfig, MethodAPISpec } from './types';
+import type { ConvectionRouteConfig, MethodAPISpec, ProcessResult, RequestOptions } from './types';
 import { HTTPMethods, type ConvectionController, type ConvectionHandler, type ConvectionRoute, type Method } from './types';
 
 // Shim for HeadersInit if not available globally
@@ -25,7 +26,7 @@ export class ConvectionRouter<T> {
     public [$childControllers]: ConvectionController[] = [];
 
     get rootConfig() {
-        return this[$appRoot].applicationConfig;
+        return this[$appRoot]?.applicationConfig;
     }
     get root() {
         return this[$appRoot];
@@ -85,9 +86,15 @@ export class ConvectionRouter<T> {
         }
         // Controller is an arbitrary class
         else {
+            // If controller is a class constructor, instantiate it
+            if (typeof controller === 'function') {
+                // @ts-ignore
+                controller = new controller();
+            }
+
             // @ts-ignore
             controller[$mountPath] = prefix;
-            this[$childControllers].push(controller);
+            this[$childControllers].push(controller as any);
 
             // Get all method names from the prototype (for classes)
             const proto = Object.getPrototypeOf(controller);
@@ -126,11 +133,45 @@ export class ConvectionRouter<T> {
                             subPath = "/";
                         }
                         else {
-                            // CamelCase to kebab-case or just lower?
-                            // "Users" -> "users"
-                            // "UserProfile" -> "user-profile" or "userprofile"?
-                            // Let's do simple lowercase for now as per minimal complexity.
-                            subPath = "/" + rest.toLowerCase();
+                            // Parse "RestOfMethodName" -> "/rest/of/method/name"
+                            // Parse "$id" -> "/:id"
+                            // Parse "$idProfile" -> "/:id/profile"
+
+                            subPath = "";
+                            let buffer = "";
+
+                            const flush = () => {
+                                if (buffer.length > 0) {
+                                    subPath += "/" + buffer.toLowerCase();
+                                    buffer = "";
+                                }
+                            };
+
+                            for (let i = 0; i < rest.length; i++) {
+                                const char = rest[i];
+
+                                if (char === "$") {
+                                    flush();
+                                    // Start parameter
+                                    // e.g. $id -> /:id
+                                    // Look ahead for parameter name
+                                    // Convention: $paramName ends at next Uppercase or end
+                                    subPath += "/:";
+                                    continue;
+                                }
+                                // Revised simple loop
+                            }
+
+                            // Let's use regex replace sequence
+                            subPath = rest
+                                .replace(/\$/g, "/:") // $id -> /:id
+                                .replace(/([a-z0-9])([A-Z])/g, "$1/$2") // camelCase -> camel/Case
+                                .toLowerCase();
+
+                            // Ensure it starts with / (if not already from $ or replace)
+                            if (!subPath.startsWith("/")) {
+                                subPath = "/" + subPath;
+                            }
                         }
                         break;
                     }
@@ -212,13 +253,94 @@ export class ConvectionRouter<T> {
         return this.root[$dispatch](req);
     }
 
+    /**
+     * Processes a request directly.
+     */
+    public async processRequest(options: RequestOptions): Promise<ProcessResult> {
+        let url = options.url || options.path || "/";
+        if (!url.startsWith("http")) {
+            const base = `http://${this.rootConfig?.hostname || "localhost"}:${this.rootConfig?.port || 3000}`;
+            const path = url.startsWith("/") ? url : "/" + url;
+            url = base + path;
+        }
+
+        // Handle query params in options
+        if (options.query) {
+            const u = new URL(url);
+            for (const [k, v] of Object.entries(options.query)) {
+                u.searchParams.set(k, v);
+            }
+            url = u.toString();
+        }
+
+        const req = new ConvectionRequest({
+            method: options.method || "GET",
+            url,
+            headers: options.headers as any,
+            body: options.body && typeof options.body === "object" ? JSON.stringify(options.body) : options.body
+        });
+
+        // Basic Dispatch Logic (moved/duplicated from Convection.handleRequest but simpler for pure Router)
+        // Note: Pure Routers don't have global middleware usually, but if we call processRequest on them, 
+        // we just run their routing logic.
+        // HOWEVER, Convection.override will invoke middleware.
+
+        const ctx = new ConvectionContext(req);
+
+        let result: any = null;
+        let status = 200;
+        const headers: Record<string, string> = {};
+
+        const match = this.find(req.method, ctx.path);
+        if (match) {
+            ctx.params = match.params;
+            try {
+                result = await match.handler(ctx);
+            } catch (err: any) {
+                console.error(err);
+                status = 500;
+                result = { error: "Internal Server Error", message: err.message };
+            }
+        }
+        else {
+            status = 404;
+            result = "Not Found";
+        }
+
+        // Normalize Result
+        // If result is Response object, we need to read it back to ProcessResult?
+        // The user wants { status, headers, data }.
+        // If handler returns Response, we extract data.
+
+        if (result instanceof Response) {
+            status = result.status;
+            result.headers.forEach((v, k) => headers[k] = v);
+
+            if (headers['content-type']?.includes('application/json')) {
+                result = await result.json();
+            }
+            else {
+                result = await result.text();
+            }
+        }
+
+        return {
+            status,
+            headers,
+            data: result
+        };
+    }
+
     public find(method: string, path: string): { handler: ConvectionHandler; params: Record<string, string>; } | null {
+        // console.log(`[Router] find ${method} ${path} (routes: ${this.routes.length}, children: ${this[$childRouters].length})`);
+
         // 1. Check local routes
         for (const route of this.routes) {
             if (route.method !== "ALL" && route.method !== method) continue;
 
             const match = route.regex.exec(path);
             if (match) {
+                // console.log(`  -> Matched route ${route.path}`);
                 const params: Record<string, string> = {};
                 route.keys.forEach((key, index) => {
                     params[key] = match[index + 1];
@@ -230,16 +352,14 @@ export class ConvectionRouter<T> {
         // 2. Check child routers
         for (const child of this[$childRouters]) {
             const prefix = child[$mountPath];
-            // Check if path starts with prefix
-            // We need to be careful with partial matches e.g. /api-v2 vs /api
-            // Valid matches: /api, /api/, /api/users
+            // console.log(`  -> Checking child prefix ${prefix}`);
 
             if (path === prefix || path.startsWith(prefix + "/")) {
                 const subPath = path.slice(prefix.length) || "/";
                 const match = child.find(method, subPath);
                 if (match) return match;
             }
-            // Handle case where prefix ends with / (unlikely given mount logic but possible)
+            // Handle case where prefix ends with /
             if (prefix.endsWith("/")) {
                 if (path.startsWith(prefix)) {
                     const subPath = path.slice(prefix.length) || "/";

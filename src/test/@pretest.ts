@@ -26,6 +26,9 @@ beforeAll(async () => {
 
     // Route: Hello World
     app.get("/", (ctx) => {
+        // ctx.userId;
+        ctx.state.userId = "123";
+        ctx.state.tenant = "tenant1";
         return "Hello World";
     });
 

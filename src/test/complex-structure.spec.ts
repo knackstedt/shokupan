@@ -91,11 +91,11 @@ describe("Complex Router Structure", () => {
     app.mount("/api", new ApiRouter());
 
     const request = async (path: string) => {
-        const res = await app['handleRequest'](new Request(`http://localhost${path}`) as any);
-        if (res.status !== 200) {
-            throw new Error(`Request to ${path} failed with status ${res.status}: ${await res.text()}`);
+        const res = await app.fetch(new Request(`http://localhost${path}`) as any);
+        if (res.headers.get("content-type")?.includes("application/json")) {
+            return await res.json();
         }
-        return res.json();
+        return res;
     };
 
     test("should route to deeply nested UsersController (list)", async () => {
@@ -129,7 +129,7 @@ describe("Complex Router Structure", () => {
     });
 
     test("should return 404 for unknown routes", async () => {
-        const res = await app['handleRequest'](new Request("http://localhost/api/v1/unknown") as any);
+        const res = await app.fetch(new Request("http://localhost/api/v1/unknown") as any);
         expect(res.status).toBe(404);
     });
 });

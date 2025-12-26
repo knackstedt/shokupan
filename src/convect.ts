@@ -1,11 +1,10 @@
-
 import { ConvectionContext } from "./context";
 import { compose } from "./middleware";
-import type { ConvectionRequest } from './request';
+import { ConvectionRequest } from './request';
 import { ConvectionRouter } from "./router";
 import { $appRoot, $dispatch, $isApplication } from './symbol';
 import { asyncContext, getTracer } from "./telemetry";
-import type { ConvectionConfig, Middleware } from './types';
+import type { ConvectionConfig, Middleware, ProcessResult, RequestOptions } from './types';
 
 const defaults: ConvectionConfig = {
     port: 3000,
@@ -55,7 +54,7 @@ export class Convection<T = any> extends ConvectionRouter<T> {
             port: finalPort,
             hostname: this.applicationConfig.hostname,
             development: this.applicationConfig.development,
-            fetch: this.handleRequest.bind(this),
+            fetch: this.fetch.bind(this),
         });
 
         console.log(`Convect server listening on http://${server.hostname}:${server.port}`);
@@ -63,18 +62,71 @@ export class Convection<T = any> extends ConvectionRouter<T> {
     }
 
     public [$dispatch](req: ConvectionRequest<T>) {
-        return this.handleRequest(req);
+        return this.fetch(req as unknown as Request);
     }
 
     /**
-     * Handles an incoming request.
+     * Processes a request by wrapping the standard fetch method.
+     */
+    public override async processRequest(options: RequestOptions): Promise<ProcessResult> {
+        let url = options.url || options.path || "/";
+        if (!url.startsWith("http")) {
+            const base = `http://${this.applicationConfig.hostname || "localhost"}:${this.applicationConfig.port || 3000}`;
+            const path = url.startsWith("/") ? url : "/" + url;
+            url = base + path;
+        }
+
+        if (options.query) {
+            const u = new URL(url);
+            for (const [k, v] of Object.entries(options.query)) {
+                u.searchParams.set(k, v);
+            }
+            url = u.toString();
+        }
+
+        // Create Request to pass to fetch
+        const req = new ConvectionRequest({
+            method: options.method || "GET",
+            url,
+            headers: options.headers as any,
+            body: options.body && typeof options.body === "object" ? JSON.stringify(options.body) : options.body
+        }) as unknown as ConvectionRequest<T>;
+
+        const res = await this.fetch(req as unknown as Request);
+
+        // Convert Response to ProcessResult
+        const status = res.status;
+        const headers: Record<string, string> = {};
+        res.headers.forEach((v, k) => headers[k] = v);
+
+        let data: any;
+        if (headers['content-type']?.includes('application/json')) {
+            data = await res.json();
+        } else {
+            data = await res.text();
+        }
+
+        return {
+            status,
+            headers,
+            data
+        };
+    }
+
+    /**
+     * Handles an incoming request (Bun.serve interface).
+     * This logic contains the middleware chain and router dispatch.
      * 
      * @param req - The request to handle.
      * @returns The response to send.
      */
-    private async handleRequest(req: ConvectionRequest<T>): Promise<Response> {
+    public async fetch(req: Request): Promise<Response> {
+        // Cast to ConvectionRequest if needed, though at runtime it's just a Request
+        // But ConvectionContext expects ConvectionRequest.
+        const request = req as unknown as ConvectionRequest<T>;
+
         const handle = async () => {
-            const ctx = new ConvectionContext(req);
+            const ctx = new ConvectionContext(request);
             const tracer = getTracer();
 
             return tracer.startActiveSpan(`${req.method} ${ctx.path}`, async (span) => {
