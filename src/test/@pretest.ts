@@ -4,7 +4,7 @@ import { useExpress } from '../middleware';
 
 beforeAll(async () => {
 
-    const app = new Convection({
+    const app = new Convection<{ userId: string, tenant: string; }>({
         port: 0,
         development: true
     });
