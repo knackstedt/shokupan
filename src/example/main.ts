@@ -12,8 +12,18 @@ app.get("/", (ctx) => {
     throw new Error("test");
 });
 
-app.static("/static", {
+app.static("/assets", {
     root: __dirname + "/static",
+    listDirectory: true
+});
+
+app.static("/images", {
+    root: __dirname + "/static/images",
+    listDirectory: true
+});
+
+app.static("/files", {
+    root: __dirname + "/static/files",
     listDirectory: true
 });
 
