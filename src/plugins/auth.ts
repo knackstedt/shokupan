@@ -1,0 +1,336 @@
+
+import {
+    Apple, Auth0,
+    GitHub, Google, MicrosoftEntraId,
+    OAuth2Client,
+    Okta,
+    generateCodeVerifier,
+    generateState
+} from "arctic";
+import * as jose from "jose";
+import { ConvectionContext } from "../context";
+import { ConvectionRouter } from "../router";
+
+export interface AuthUser {
+    id: string;
+    email?: string;
+    name?: string;
+    picture?: string;
+    provider: string;
+    raw?: any;
+}
+
+export interface ProviderConfig {
+    clientId: string;
+    clientSecret: string;
+    redirectUri: string; // Must be absolute
+    scopes?: string[];
+    tenantId?: string; // For MS
+    domain?: string; // For Auth0, Okta
+    teamId?: string; // For Apple
+    keyId?: string; // For Apple
+    authUrl?: string; // For generic OAuth2
+    tokenUrl?: string; // For generic OAuth2
+    userInfoUrl?: string; // For generic OAuth2
+}
+
+export interface AuthConfig {
+    jwtSecret: string | Uint8Array;
+    jwtExpiration?: string; // e.g. "2h"
+    cookieOptions?: {
+        httpOnly?: boolean;
+        secure?: boolean;
+        sameSite?: "Strict" | "Lax" | "None";
+        path?: string;
+        maxAge?: number;
+    };
+    onSuccess?: (user: AuthUser, ctx: ConvectionContext) => Promise<any> | any;
+    providers: {
+        github?: ProviderConfig;
+        google?: ProviderConfig;
+        microsoft?: ProviderConfig;
+        apple?: ProviderConfig;
+        auth0?: ProviderConfig;
+        okta?: ProviderConfig;
+        oauth2?: ProviderConfig;
+        [key: string]: ProviderConfig | undefined;
+    };
+}
+
+export class AuthPlugin extends ConvectionRouter<any> {
+    private secret: Uint8Array;
+
+    constructor(private config: AuthConfig) {
+        super();
+        this.secret = typeof config.jwtSecret === 'string'
+            ? new TextEncoder().encode(config.jwtSecret)
+            : config.jwtSecret;
+
+        this.init();
+    }
+
+    private getProviderInstance(name: string, p: ProviderConfig) {
+        switch (name) {
+            case 'github':
+                return new GitHub(p.clientId, p.clientSecret, p.redirectUri);
+            case 'google':
+                return new Google(p.clientId, p.clientSecret, p.redirectUri);
+            case 'microsoft':
+                return new MicrosoftEntraId(p.tenantId!, p.clientId, p.clientSecret, p.redirectUri);
+            case 'apple':
+                return new Apple(
+                    p.clientId,
+                    p.teamId!,
+                    p.keyId!,
+                    p.clientSecret,
+                    p.redirectUri
+                );
+            case 'auth0':
+                return new Auth0(p.domain!, p.clientId, p.clientSecret, p.redirectUri);
+            case 'okta':
+                return new Okta(p.domain!, p.authUrl, p.clientId, p.clientSecret, p.redirectUri);
+            case 'oauth2':
+                return new OAuth2Client(p.clientId, p.clientSecret, p.redirectUri);
+            default:
+                return null;
+        }
+    }
+
+    private async createSession(user: AuthUser, ctx: ConvectionContext) {
+        const alg = 'HS256';
+        const jwt = await new jose.SignJWT({ ...user })
+            .setProtectedHeader({ alg })
+            .setIssuedAt()
+            .setExpirationTime(this.config.jwtExpiration || '24h')
+            .sign(this.secret);
+
+        // Set cookie
+        const opts = this.config.cookieOptions || {};
+        let cookie = `auth_token=${jwt}; Path=${opts.path || '/'}; HttpOnly`;
+        if (opts.secure) cookie += '; Secure';
+        if (opts.sameSite) cookie += `; SameSite=${opts.sameSite}`;
+        if (opts.maxAge) cookie += `; Max-Age=${opts.maxAge}`;
+
+        ctx.set('Set-Cookie', cookie);
+
+        return jwt;
+    }
+
+    private init() {
+        for (const [providerName, providerConfig] of Object.entries(this.config.providers)) {
+            if (!providerConfig) continue;
+
+            const provider = this.getProviderInstance(providerName, providerConfig);
+            if (!provider) {
+                // Try treating as generic oauth2 if it has configured urls? 
+                // But for now strict mapping based on key unless we add logic.
+                // We'll skip if unknown.
+                continue;
+            }
+
+            // Login Route
+            this.get(`/auth/${providerName}/login`, async (ctx) => {
+                const state = generateState();
+                const codeVerifier = (providerName === 'google' || providerName === 'microsoft' || providerName === 'auth0' || providerName === 'okta')
+                    ? generateCodeVerifier() : undefined; // PKCE for some
+
+                // Store state/verifier in cookie for verification
+                const scopes = providerConfig.scopes || [];
+                let url: URL;
+
+                if (provider instanceof GitHub) {
+                    url = await provider.createAuthorizationURL(state, scopes);
+                } else if (provider instanceof Google || provider instanceof MicrosoftEntraId || provider instanceof Auth0 || provider instanceof Okta) {
+                    // These all support PKCE in recent versions
+                    // Types might vary slightly but usually createAuthorizationURL(state, codeVerifier, scopes)
+                    url = await (provider as any).createAuthorizationURL(state, codeVerifier!, scopes);
+                } else if (provider instanceof Apple) {
+                    url = await provider.createAuthorizationURL(state, scopes);
+                } else if (provider instanceof OAuth2Client) {
+                    if (!providerConfig.authUrl) return ctx.text("Config error: authUrl required for oauth2", 500);
+                    url = await provider.createAuthorizationURL(providerConfig.authUrl, state, scopes);
+                } else {
+                    return ctx.text("Provider config error", 500);
+                }
+
+                ctx.res.headers.set("Set-Cookie", `oauth_state=${state}; Path=/; HttpOnly; Max-Age=600`);
+                if (codeVerifier) {
+                    ctx.res.headers.append("Set-Cookie", `oauth_verifier=${codeVerifier}; Path=/; HttpOnly; Max-Age=600`);
+                }
+
+                return ctx.redirect(url.toString());
+            });
+
+            // Callback Route
+            this.get(`/auth/${providerName}/callback`, async (ctx) => {
+                const url = new URL(ctx.req.url);
+                const code = url.searchParams.get("code");
+                const state = url.searchParams.get("state");
+
+                const cookieHeader = ctx.req.headers.get("Cookie");
+                const storedState = cookieHeader?.match(/oauth_state=([^;]+)/)?.[1];
+                const storedVerifier = cookieHeader?.match(/oauth_verifier=([^;]+)/)?.[1];
+
+                if (!code || !state || !storedState || state !== storedState) {
+                    return ctx.text("Invalid state or code", 400);
+                }
+
+                try {
+                    let tokens: any;
+                    let idToken: string | undefined;
+
+                    if (provider instanceof GitHub) {
+                        tokens = await provider.validateAuthorizationCode(code);
+                    } else if (provider instanceof Google || provider instanceof MicrosoftEntraId) {
+                        if (!storedVerifier) return ctx.text("Missing verifier", 400);
+                        tokens = await provider.validateAuthorizationCode(code, storedVerifier);
+                    } else if (provider instanceof Auth0 || provider instanceof Okta) {
+                        tokens = await (provider as any).validateAuthorizationCode(code, storedVerifier || "");
+                    } else if (provider instanceof Apple) {
+                        tokens = await provider.validateAuthorizationCode(code);
+                        idToken = tokens.idToken;
+                    } else if (provider instanceof OAuth2Client) {
+                        if (!providerConfig.tokenUrl) return ctx.text("Config error: tokenUrl required for oauth2", 500);
+                        tokens = await provider.validateAuthorizationCode(providerConfig.tokenUrl, code, null);
+                    }
+
+                    const accessToken = tokens.accessToken || tokens.access_token;
+                    const user = await this.fetchUser(providerName, accessToken, providerConfig, idToken);
+
+                    if (this.config.onSuccess) {
+                        const res = await this.config.onSuccess(user, ctx);
+                        if (res) return res; // Allow override response
+                    }
+
+                    // Default behavior: create encoded session and returning it or redirect
+                    const jwt = await this.createSession(user, ctx);
+                    return ctx.json({ token: jwt, user });
+
+                } catch (e: any) {
+                    console.error("Auth Error", e);
+                    return ctx.text("Authentication failed: " + e.message + "\n" + e.stack, 500);
+                }
+            });
+        }
+    }
+
+    private async fetchUser(provider: string, token: string, config: ProviderConfig, idToken?: string): Promise<AuthUser> {
+        let user: AuthUser = { id: 'unknown', provider };
+
+        if (provider === 'github') {
+            const res = await fetch("https://api.github.com/user", {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await res.json();
+            user = {
+                id: String(data.id),
+                name: data.name || data.login,
+                email: data.email,
+                picture: data.avatar_url,
+                provider,
+                raw: data
+            };
+        }
+        else if (provider === 'google') {
+            const res = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await res.json();
+            user = {
+                id: data.sub,
+                name: data.name,
+                email: data.email,
+                picture: data.picture,
+                provider,
+                raw: data
+            };
+        }
+        else if (provider === 'microsoft') {
+            const res = await fetch("https://graph.microsoft.com/v1.0/me", {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await res.json();
+            user = {
+                id: data.id,
+                name: data.displayName,
+                email: data.mail || data.userPrincipalName,
+                provider,
+                raw: data
+            };
+        }
+        else if (provider === 'auth0' || provider === 'okta') {
+            const domain = config.domain!.startsWith('http') ? config.domain! : `https://${config.domain}`;
+            const endpoint = provider === 'auth0' ? `${domain}/userinfo` : `${domain}/oauth2/v1/userinfo`;
+
+            const res = await fetch(endpoint, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await res.json();
+            user = {
+                id: data.sub,
+                name: data.name,
+                email: data.email,
+                picture: data.picture,
+                provider,
+                raw: data
+            };
+        }
+        else if (provider === 'apple') {
+            // Apple user info is in the ID Token
+            if (idToken) {
+                const payload = jose.decodeJwt(idToken);
+                user = {
+                    id: payload.sub!,
+                    email: payload.email as string,
+                    provider,
+                    raw: payload
+                };
+            }
+        }
+        else if (provider === 'oauth2') {
+            if (config.userInfoUrl) {
+                const res = await fetch(config.userInfoUrl, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                user = {
+                    id: data.id || data.sub || 'unknown',
+                    name: data.name,
+                    email: data.email,
+                    picture: data.picture,
+                    provider,
+                    raw: data
+                };
+            }
+        }
+
+        return user;
+    }
+
+    /**
+     * Middleware to verify JWT
+     */
+    public middleware() {
+        return async (ctx: ConvectionContext, next: () => Promise<any>) => {
+            const authHeader = ctx.req.headers.get("Authorization");
+            let token = authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : null;
+
+            if (!token) {
+                // Try cookie
+                const cookieHeader = ctx.req.headers.get("Cookie");
+                token = cookieHeader?.match(/auth_token=([^;]+)/)?.[1] || null;
+            }
+
+            if (token) {
+                try {
+                    const { payload } = await jose.jwtVerify(token, this.secret);
+                    (ctx as any).user = payload;
+                } catch {
+                    // Invalid token, just proceed without user or throw?
+                    // Usually proceed, let guard handle it if required
+                }
+            }
+            return next();
+        };
+    }
+}
