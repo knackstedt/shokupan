@@ -45,7 +45,7 @@ export class Convection<T = any> extends ConvectionRouter<T> {
      * @returns The server instance.
      */
     public listen(port?: number) {
-        const finalPort = port || this.applicationConfig.port || 3000;
+        const finalPort = port ?? this.applicationConfig.port ?? 3000;
 
         if (finalPort < 0 || finalPort > 65535) {
             throw new Error("Invalid port number");
