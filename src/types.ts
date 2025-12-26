@@ -6,9 +6,18 @@ export type DeepPartial<T> = T extends object ? {
     [P in keyof T]?: DeepPartial<T[P]>;
 } : T;
 
-export type MethodAPISpec = OpenAPI.Operation & Pick<Required<OpenAPI.Operation>, 'summary' | 'responses'>;
+export type MethodAPISpec = OpenAPI.Operation;
 export type GuardAPISpec = DeepPartial<OpenAPI.Operation>;
 export type RouterAPISpec = OpenAPI.Operation & Pick<Required<OpenAPI.Operation>, 'tags'> & { group: string; };
+
+export interface OpenAPIOptions {
+    info?: OpenAPI.Document['info'];
+    servers?: OpenAPI.Document['servers'];
+    components?: OpenAPI.Document['components'];
+    tags?: OpenAPI.Document['tags'];
+    externalDocs?: OpenAPI.Document['externalDocs'];
+}
+
 
 export type ConvectionHandler = (ctx: ConvectionContext, next?: NextFn) => Promise<any> | any;
 export const HTTPMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "ALL"];
@@ -27,6 +36,8 @@ export type NextFn = () => Promise<any>;
 export type Middleware = (ctx: ConvectionContext, next: NextFn) => Promise<any> | any;
 
 export type ConvectionRouteConfig = DeepPartial<{
+    name: string;
+    group: string;
     openapi: DeepPartial<OpenAPI.Operation>;
 }>;
 

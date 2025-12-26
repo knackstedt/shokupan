@@ -9,8 +9,13 @@ import { HTTPMethods, RouteParamType, type ConvectionController, type Convection
 import { asyncContext } from './util/async-hooks';
 import { traceHandler } from './util/instrumentation';
 
+import type { OpenAPI } from '@scalar/openapi-types';
+import type { OpenAPIOptions } from './types';
+import { deepMerge } from './util/deep-merge';
+
 // Shim for HeadersInit if not available globally
 type HeadersInit = Headers | Record<string, string> | [string, string][];
+
 
 export const RouterRegistry = new Map<string, ConvectionRouter<any>>();
 
@@ -272,7 +277,12 @@ export class ConvectionRouter<T> {
                         };
                     }
 
-                    this.add({ method, path: normalizedPath, handler: finalHandler });
+                    // Inject Controller Name as Tag
+                    const tagName = instance.constructor.name;
+                    // TODO: Merge with existing spec from decorator if available
+                    const spec = { tags: [tagName] };
+
+                    this.add({ method, path: normalizedPath, handler: finalHandler, spec });
                 }
             }
             if (routesAttached === 0) {
@@ -727,5 +737,205 @@ export class ConvectionRouter<T> {
             spec,
             handler
         });
+    }
+
+    /**
+     * Generates an OpenAPI 3.1 Document by recursing through the router and its descendants.
+     */
+    public generateApiSpec(options: OpenAPIOptions = {}): OpenAPI.Document {
+        const paths: OpenAPI.Document['paths'] = {};
+        const tagGroups = new Map<string, Set<string>>();
+
+        // Helper to collect routes
+        const collect = (router: ConvectionRouter<T>, prefix = "", currentGroup = "General", defaultTag = "General") => {
+            // Determine effective group and tag for this router
+            let group = currentGroup;
+            let tag = defaultTag;
+
+            // If explicit group name is provided, switch to that group
+            if (router.config?.group) {
+                group = router.config.group;
+            }
+
+            // If explicit name is provided, switch to that tag
+            // But if ONLY name is provided (no group), we interpret it as a Tag in the current Group (if we are nested)
+            // or should we interpret it as a Group if it's top level?
+            // The explicit `group` property solves ambiguity.
+            // If `name` is present, it updates the Tag.
+            // If explicit name is provided, switch to that tag
+            if (router.config?.name) {
+                tag = router.config.name;
+            } else {
+                // Infer from mountPath if name is missing
+                const mountPath = router[$mountPath];
+                if (mountPath && mountPath !== "/") {
+                    // Convert /path/to/something -> Something? Or PathToSomething?
+                    // Strategy: Take the last segment
+                    const segments = mountPath.split("/").filter(Boolean);
+                    if (segments.length > 0) {
+                        const lastSegment = segments[segments.length - 1];
+                        // Capitalize logic
+                        const humanized = lastSegment
+                            .replace(/[-_]/g, ' ')
+                            .replace(/\b\w/g, c => c.toUpperCase());
+
+                        tag = humanized;
+                    }
+                }
+            }
+
+            // Ensure group exists
+            if (!tagGroups.has(group)) {
+                tagGroups.set(group, new Set());
+            }
+
+            // 1. Local Routes
+            for (const route of router.routes) {
+                // Determine full path
+                const cleanPrefix = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
+                const cleanSubPath = route.path.startsWith("/") ? route.path : "/" + route.path;
+                let fullPath = (cleanPrefix + cleanSubPath) || "/";
+
+                // Convert path parameters from :param to {param} for OpenAPI
+                fullPath = fullPath.replace(/:([a-zA-Z0-9_]+)/g, "{$1}");
+
+                // Initialize path item if missing
+                if (!paths[fullPath]) {
+                    paths[fullPath] = {};
+                }
+
+                // Generate Operation Spec
+                const operation: OpenAPI.Operation = {
+                    responses: {
+                        200: { description: "OK" }
+                    },
+                    tags: [tag]
+                };
+
+                // Add Path Parameters from route keys
+                if (route.keys.length > 0) {
+                    operation.parameters = route.keys.map(key => ({
+                        name: key,
+                        in: "path",
+                        required: true,
+                        schema: { type: "string" }
+                    }));
+                }
+
+                // Merge Guard Specs
+                if (route.guards) {
+                    for (const guard of route.guards) {
+                        if (guard.spec) {
+                            deepMerge(operation, guard.spec);
+                        }
+                    }
+                }
+
+                // Merge Handler Spec
+                if (route.handlerSpec) {
+                    deepMerge(operation, route.handlerSpec);
+                }
+
+                // Deduplicate Tags
+                if (operation.tags) {
+                    operation.tags = Array.from(new Set(operation.tags));
+                    // Register tags to group
+                    for (const t of operation.tags) {
+                        tagGroups.get(group)?.add(t);
+                    }
+                }
+
+                // Assign to path item
+                const methodLower = route.method.toLowerCase();
+                if (methodLower === "all") {
+                    ["get", "post", "put", "delete", "patch"].forEach(m => {
+                        if (!(paths as any)[fullPath][m]) {
+                            (paths as any)[fullPath][m] = { ...operation };
+                        }
+                    });
+                } else {
+                    (paths as any)[fullPath][methodLower] = operation;
+                }
+            }
+
+            // 2. Child Controllers
+            for (const controller of router[$childControllers]) {
+                const mountPath = (controller as any)[$mountPath] || ""; // Should differ based on controller logic
+                // Re-calculate prefix for controller
+                const cleanPrefix = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
+                const cleanMount = mountPath.startsWith("/") ? mountPath : "/" + mountPath;
+                const nextPrefix = (cleanPrefix + cleanMount) || "/";
+
+                // Controller Name as Tag
+                const controllerName = controller.constructor.name || "UnknownController";
+                tagGroups.get(group)?.add(controllerName);
+
+                // We need to extract routes from controller similar to how we did in mount()
+                // But wait, the routes are not in `router.routes`? 
+                // Ah, looking at `mount()`, it calls `this.add()` which pushes to `this.routes`.
+                // SO `this.routes` ALREADY contains the controller routes!
+
+                // Wait, if `mount` adds routes to `this.routes`, then loop #1 (Local Routes) covers them.
+                // BUT, they are mixed in. We need to identify WHICH routes belong to WHICH controller to assign the correct tag.
+                // The current `ConvectionRoute` structure does not store "source controller".
+
+                // CRITICAL MISSING PIECE: We cannot distinguish controller routes from raw routes in `this.routes` 
+                // unless we store metadata on the route.
+
+                // However, `mount` logic:
+                // It calls `this.add({ ... })`.
+
+                // I should assume for now that if I can't distinguish, I might have to change `mount` to store metadata,
+                // OR `mount` logic for Controllers was:
+                // "this[$childControllers].push(instance)" AND "this.add(...)".
+
+                // Only `mount` adds to `childControllers`.
+                // So checking `childControllers` here is redundant if I iterate `routes`.
+                // BUT I need to know the tag.
+
+                // Strategy: Update `mount` to attach `tags` to the `spec` when adding the route.
+                // This seems cleaner than trying to reconstruct it here.
+            }
+
+            // 3. Child Routers
+            for (const child of router[$childRouters]) {
+                const mountPath = child[$mountPath];
+                const cleanPrefix = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
+                const cleanMount = mountPath.startsWith("/") ? mountPath : "/" + mountPath;
+                const nextPrefix = (cleanPrefix + cleanMount) || "/";
+
+                collect(child, nextPrefix, group, tag);
+            }
+        };
+
+        // If I update mount, I don't need to change `collect` significantly regarding controllers,
+        // because the routes will already have the tags in `handlerSpec`.
+        // BUT `collect` overrides/defaults tags.
+
+        collect(this);
+
+        // Build x-tagGroups
+        const xTagGroups: { name: string; tags: string[]; }[] = [];
+        for (const [name, tags] of tagGroups) {
+            xTagGroups.push({
+                name,
+                tags: Array.from(tags).sort()
+            });
+        }
+
+        return {
+            openapi: "3.1.0",
+            info: {
+                title: "Convection API",
+                version: "1.0.0",
+                ...options.info
+            },
+            paths,
+            components: options.components,
+            servers: options.servers,
+            tags: options.tags,
+            externalDocs: options.externalDocs,
+            "x-tagGroups": xTagGroups
+        } as OpenAPI.Document;
     }
 }
