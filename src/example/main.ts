@@ -1,5 +1,6 @@
 import { Convection } from '../convect';
 import { ScalarPlugin } from '../plugins/scalar';
+import { Session } from '../plugins/session';
 import { UserController } from './controller';
 import { ServiceFetchRouter } from './service_fetch';
 
@@ -18,6 +19,8 @@ const app = new Convection<{
 app.get("/", (ctx) => {
     throw new Error("test");
 });
+
+app.use(Session({ secret: "test" }));
 
 app.static("/assets", {
     root: __dirname + "/static",

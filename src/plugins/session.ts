@@ -202,7 +202,7 @@ declare module "../context" {
     }
 }
 
-export function session(options: SessionOptions): Middleware {
+export function Session(options: SessionOptions): Middleware {
     const store = options.store || new MemoryStore();
     const name = options.name || 'connect.sid';
     const secrets = Array.isArray(options.secret) ? options.secret : [options.secret];
