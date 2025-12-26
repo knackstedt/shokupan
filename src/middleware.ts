@@ -7,7 +7,7 @@ import { traceMiddleware } from "./util/instrumentation";
  * This is the onion model (Koa-style).
  */
 export const compose = (middleware: Middleware[]) => {
-    function fn(context: ConvectionContext, next?: NextFn) {
+    function fn(context: ConvectionContext<unknown>, next?: NextFn) {
         let runner: NextFn = next || (async () => { });
 
         for (let i = middleware.length - 1; i >= 0; i--) {

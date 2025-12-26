@@ -25,7 +25,7 @@ export const RouterRegistry = new Map<string, ConvectionRouter<any>>();
 
 export const ConvectionApplicationTree = {};
 
-export class ConvectionRouter<T> {
+export class ConvectionRouter<T extends Record<string, any> = Record<string, any>> {
     // Internal marker to identify Router vs. Application
     private [$isApplication]: boolean = false;
     private [$isMounted]: boolean = false;
@@ -45,7 +45,7 @@ export class ConvectionRouter<T> {
     }
 
     private routes: ConvectionRoute[] = [];
-    private currentGuards: { handler: ConvectionHandler; spec?: GuardAPISpec; }[] = [];
+    private currentGuards: { handler: ConvectionHandler<T>; spec?: GuardAPISpec; }[] = [];
 
     constructor(
         private readonly config?: ConvectionRouteConfig
@@ -232,7 +232,7 @@ export class ConvectionRouter<T> {
                     const routeArgs = decoratedArgs && decoratedArgs.get(name);
 
                     // Create Wrapper
-                    const wrappedHandler = async (ctx: ConvectionContext) => {
+                    const wrappedHandler = async (ctx: ConvectionContext<T>) => {
                         // Resolve Arguments
                         let args: any[] = [ctx]; // Default to just context if no decorators
 
@@ -301,7 +301,7 @@ export class ConvectionRouter<T> {
     /**
      * Returns all routes attached to this router and its descendants.
      */
-    public getRoutes(): { method: Method, path: string, handler: ConvectionHandler; }[] {
+    public getRoutes(): { method: Method, path: string, handler: ConvectionHandler<T>; }[] {
         const routes = this.routes.map(r => ({
             method: r.method,
             path: r.path,
@@ -394,7 +394,7 @@ export class ConvectionRouter<T> {
         // we just run their routing logic.
         // HOWEVER, Convection.override will invoke middleware.
 
-        const ctx = new ConvectionContext(req);
+        const ctx = new ConvectionContext<T>(req);
 
         let result: any = null;
         let status = 200;
@@ -441,7 +441,7 @@ export class ConvectionRouter<T> {
         };
     }
 
-    public find(method: string, path: string): { handler: ConvectionHandler; params: Record<string, string>; } | null {
+    public find(method: string, path: string): { handler: ConvectionHandler<T>; params: Record<string, string>; } | null {
         // console.log(`[Router] find ${method} ${path} (routes: ${this.routes.length}, children: ${this[$childRouters].length})`);
 
         // 1. Check local routes
@@ -511,7 +511,7 @@ export class ConvectionRouter<T> {
         method: Method,
         path: string,
         spec?: MethodAPISpec,
-        handler: ConvectionHandler;
+        handler: ConvectionHandler<T>;
         regex?: RegExp;
         group?: string;
     }) {
@@ -524,7 +524,7 @@ export class ConvectionRouter<T> {
         const routeGuards = [...this.currentGuards];
 
         if (routeGuards.length > 0) {
-            wrappedHandler = async (ctx: ConvectionContext) => {
+            wrappedHandler = async (ctx: ConvectionContext<T>) => {
                 // Execute guards in order
                 for (const guard of routeGuards) {
                     let guardPassed = false;
@@ -587,7 +587,7 @@ export class ConvectionRouter<T> {
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public get(path: string, ...handlers: ConvectionHandler[]);
+    public get(path: string, ...handlers: ConvectionHandler<T>[]);
     /**
      * Adds a GET route to the router.
      * 
@@ -595,8 +595,8 @@ export class ConvectionRouter<T> {
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public get(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler[]);
-    public get(path: string, ...args: (MethodAPISpec | ConvectionHandler)[]) {
+    public get(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler<T>[]);
+    public get(path: string, ...args: (MethodAPISpec | ConvectionHandler<T>)[]) {
         this.attachVerb("GET", path, ...args);
         return this;
     }
@@ -607,7 +607,7 @@ export class ConvectionRouter<T> {
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public post(path: string, ...handlers: ConvectionHandler[]);
+    public post(path: string, ...handlers: ConvectionHandler<T>[]);
     /**
      * Adds a POST route to the router.
      * 
@@ -615,8 +615,8 @@ export class ConvectionRouter<T> {
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public post(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler[]);
-    public post(path: string, ...args: (MethodAPISpec | ConvectionHandler)[]) {
+    public post(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler<T>[]);
+    public post(path: string, ...args: (MethodAPISpec | ConvectionHandler<T>)[]) {
         this.attachVerb("POST", path, ...args);
         return this;
     }
@@ -627,7 +627,7 @@ export class ConvectionRouter<T> {
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public put(path: string, ...handlers: ConvectionHandler[]);
+    public put(path: string, ...handlers: ConvectionHandler<T>[]);
     /**
      * Adds a PUT route to the router.
      * 
@@ -635,8 +635,8 @@ export class ConvectionRouter<T> {
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public put(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler[]);
-    public put(path: string, ...args: (MethodAPISpec | ConvectionHandler)[]) {
+    public put(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler<T>[]);
+    public put(path: string, ...args: (MethodAPISpec | ConvectionHandler<T>)[]) {
         this.attachVerb("PUT", path, ...args);
         return this;
     }
@@ -647,7 +647,7 @@ export class ConvectionRouter<T> {
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public delete(path: string, ...handlers: ConvectionHandler[]);
+    public delete(path: string, ...handlers: ConvectionHandler<T>[]);
     /**
      * Adds a DELETE route to the router.
      * 
@@ -655,8 +655,8 @@ export class ConvectionRouter<T> {
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public delete(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler[]);
-    public delete(path: string, ...args: (MethodAPISpec | ConvectionHandler)[]) {
+    public delete(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler<T>[]);
+    public delete(path: string, ...args: (MethodAPISpec | ConvectionHandler<T>)[]) {
         this.attachVerb("DELETE", path, ...args);
         return this;
     }
@@ -667,7 +667,7 @@ export class ConvectionRouter<T> {
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public patch(path: string, ...handlers: ConvectionHandler[]);
+    public patch(path: string, ...handlers: ConvectionHandler<T>[]);
     /**
      * Adds a PATCH route to the router.
      * 
@@ -675,8 +675,8 @@ export class ConvectionRouter<T> {
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public patch(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler[]);
-    public patch(path: string, ...args: (MethodAPISpec | ConvectionHandler)[]) {
+    public patch(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler<T>[]);
+    public patch(path: string, ...args: (MethodAPISpec | ConvectionHandler<T>)[]) {
         this.attachVerb("PATCH", path, ...args);
         return this;
     }
@@ -687,7 +687,7 @@ export class ConvectionRouter<T> {
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public options(path: string, ...handlers: ConvectionHandler[]);
+    public options(path: string, ...handlers: ConvectionHandler<T>[]);
     /**
      * Adds a OPTIONS route to the router.
      * 
@@ -695,8 +695,8 @@ export class ConvectionRouter<T> {
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public options(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler[]);
-    public options(path: string, ...args: (MethodAPISpec | ConvectionHandler)[]) {
+    public options(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler<T>[]);
+    public options(path: string, ...args: (MethodAPISpec | ConvectionHandler<T>)[]) {
         this.attachVerb("OPTIONS", path, ...args);
         return this;
     }
@@ -707,7 +707,7 @@ export class ConvectionRouter<T> {
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public head(path: string, ...handlers: ConvectionHandler[]);
+    public head(path: string, ...handlers: ConvectionHandler<T>[]);
     /**
      * Adds a HEAD route to the router.
      * 
@@ -715,8 +715,8 @@ export class ConvectionRouter<T> {
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public head(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler[]);
-    public head(path: string, ...args: (MethodAPISpec | ConvectionHandler)[]) {
+    public head(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler<T>[]);
+    public head(path: string, ...args: (MethodAPISpec | ConvectionHandler<T>)[]) {
         this.attachVerb("HEAD", path, ...args);
         return this;
     }
@@ -727,7 +727,7 @@ export class ConvectionRouter<T> {
      * 
      * @param handler - Guard handler function 
      */
-    public guard(handler: ConvectionHandler): void;
+    public guard(handler: ConvectionHandler<T>): void;
     /**
      * Adds a guard to the router that applies to all routes added **after** this point.
      * Guards must return true or call `ctx.next()` to allow the request to continue.
@@ -735,10 +735,10 @@ export class ConvectionRouter<T> {
      * @param spec - OpenAPI specification for the guard
      * @param handler - Guard handler function 
      */
-    public guard(spec: GuardAPISpec, handler: ConvectionHandler);
-    public guard(specOrHandler: GuardAPISpec | ConvectionHandler, handler?: ConvectionHandler) {
+    public guard(spec: GuardAPISpec, handler: ConvectionHandler<T>);
+    public guard(specOrHandler: GuardAPISpec | ConvectionHandler<T>, handler?: ConvectionHandler<T>) {
         const spec = typeof specOrHandler === "function" ? undefined : specOrHandler as GuardAPISpec;
-        const guardHandler = typeof specOrHandler === "function" ? specOrHandler as ConvectionHandler : handler as ConvectionHandler;
+        const guardHandler = typeof specOrHandler === "function" ? specOrHandler as ConvectionHandler<T> : handler as ConvectionHandler<T>;
 
         this.currentGuards.push({ handler: guardHandler, spec });
 
@@ -750,14 +750,14 @@ export class ConvectionRouter<T> {
      * @param uriPath URL path prefix
      * @param options Configuration options or root directory string
      */
-    public static(uriPath: string, options: string | StaticServeOptions) {
-        const config: StaticServeOptions = typeof options === 'string' ? { root: options } : options;
+    public static(uriPath: string, options: string | StaticServeOptions<T>) {
+        const config: StaticServeOptions<T> = typeof options === 'string' ? { root: options } : options;
         const rootPath = resolve(config.root || ".");
         // Normalize path prefix to ensure it has leading slash and no trailing slash for consistent matching
         const prefix = uriPath.startsWith('/') ? uriPath : '/' + uriPath;
         const normalizedPrefix = prefix.endsWith('/') && prefix !== '/' ? prefix.slice(0, -1) : prefix;
 
-        const handler = async (ctx: ConvectionContext) => {
+        const handler = async (ctx: ConvectionContext<T>) => {
             // 1. Calculate relative path
             // ctx.path is full path.
             // If prefix is /static, and path is /static/foo.css, relative is /foo.css
@@ -953,17 +953,17 @@ export class ConvectionRouter<T> {
      * Attach the verb routes with their overload signatures.
      * Use compose to handle multiple handlers (middleware).
      */
-    private attachVerb(method: Method, path: string, ...args: (MethodAPISpec | ConvectionHandler)[]) {
+    private attachVerb(method: Method, path: string, ...args: (MethodAPISpec | ConvectionHandler<T>)[]) {
         let spec: MethodAPISpec | undefined;
-        let handlers: ConvectionHandler[] = [];
+        let handlers: ConvectionHandler<T>[] = [];
 
         if (args.length > 0) {
             // Check if first arg is an object (Spec) and NOT a ConvectionHandler (function)
             if (typeof args[0] === 'object' && args[0] !== null) {
                 spec = args[0] as MethodAPISpec;
-                handlers = args.slice(1) as ConvectionHandler[];
+                handlers = args.slice(1) as ConvectionHandler<T>[];
             } else {
-                handlers = args as ConvectionHandler[];
+                handlers = args as ConvectionHandler<T>[];
             }
         }
 

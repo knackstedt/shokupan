@@ -21,7 +21,7 @@ export interface OpenAPIOptions {
 }
 
 
-export type ConvectionHandler = (ctx: ConvectionContext, next?: NextFn) => Promise<any> | any;
+export type ConvectionHandler<T extends Record<string, any> = Record<string, any>> = (ctx: ConvectionContext<T>, next?: NextFn) => Promise<any> | any;
 export const HTTPMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "ALL"];
 export type Method = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "OPTIONS" | "HEAD" | "ALL";
 
@@ -35,7 +35,7 @@ export enum RouteParamType {
 }
 
 export type NextFn = () => Promise<any>;
-export type Middleware = (ctx: ConvectionContext, next: NextFn) => Promise<any> | any;
+export type Middleware = (ctx: ConvectionContext<unknown>, next: NextFn) => Promise<any> | any;
 
 export type ConvectionRouteConfig = DeepPartial<{
     name: string;
@@ -57,12 +57,12 @@ export type ConvectionRoute = {
     }[];
 };
 
-export type ConvectionConfig = DeepPartial<{
+export type ConvectionConfig<T extends Record<string, any> = Record<string, any>> = DeepPartial<{
     port: number;
     hostname: string;
     development: boolean;
     enableAsyncLocalStorage: boolean;
-    httpLogger: (ctx: ConvectionContext) => void;
+    httpLogger: (ctx: ConvectionContext<T>) => void;
     logger: {
         verbose: boolean;
         info: (msg: string, props: Record<string, any>) => void;
@@ -98,14 +98,12 @@ export type ConvectionController<T = any> = (new (...args: any[]) => T) & {
     [$isRouter]?: undefined;
 };
 
-
-
-export interface StaticServeHooks {
-    onRequest?: (ctx: ConvectionContext) => Promise<Response | void> | Response | void;
-    onResponse?: (ctx: ConvectionContext, response: Response) => Promise<Response> | Response;
+export interface StaticServeHooks<T extends Record<string, any>> {
+    onRequest?: (ctx: ConvectionContext<T>) => Promise<Response | void> | Response | void;
+    onResponse?: (ctx: ConvectionContext<T>, response: Response) => Promise<Response> | Response;
 }
 
-export interface StaticServeOptions {
+export interface StaticServeOptions<T extends Record<string, any>> {
     /**
      * Root directory to serve files from.
      * Can be an absolute path or relative to the CWD.
@@ -124,7 +122,7 @@ export interface StaticServeOptions {
     /**
      * Hooks to intercept requests/responses.
      */
-    hooks?: StaticServeHooks;
+    hooks?: StaticServeHooks<T>;
     /**
      * How to treat dotfiles (files starting with .)
      * 'allow': Serve them

@@ -155,7 +155,7 @@ export class Convection<T = any> extends ConvectionRouter<T> {
                 const request = req as unknown as ConvectionRequest<T>;
 
                 const handle = async () => {
-                    const ctx = new ConvectionContext(request);
+                    const ctx = new ConvectionContext<T>(request);
 
                     // Compose middleware + router dispatch
                     const fn = compose(this.middleware);
