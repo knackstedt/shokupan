@@ -96,3 +96,51 @@ export type ConvectionController<T = any> = (new (...args: any[]) => T) & {
 };
 
 
+
+export interface StaticServeHooks {
+    onRequest?: (ctx: ConvectionContext) => Promise<Response | void> | Response | void;
+    onResponse?: (ctx: ConvectionContext, response: Response) => Promise<Response> | Response;
+}
+
+export interface StaticServeOptions {
+    /**
+     * Root directory to serve files from.
+     * Can be an absolute path or relative to the CWD.
+     */
+    root?: string;
+    /**
+     * Whether to list directory contents if no index file is found.
+     * @default false
+     */
+    listDirectory?: boolean;
+    /**
+     * Index file(s) to look for when a directory is requested.
+     * @default ['index.html', 'index.htm']
+     */
+    index?: string | string[];
+    /**
+     * Hooks to intercept requests/responses.
+     */
+    hooks?: StaticServeHooks;
+    /**
+     * How to treat dotfiles (files starting with .)
+     * 'allow': Serve them
+     * 'deny': Return 403
+     * 'ignore': Return 404
+     * @default 'ignore'
+     */
+    dotfiles?: 'allow' | 'deny' | 'ignore';
+    /**
+     * Regex or glob patterns to exclude
+     */
+    exclude?: (string | RegExp)[];
+    /**
+     * Try to append these extensions to the path if the file is not found.
+     * e.g. ['html', 'htm']
+     */
+    extensions?: string[];
+    /**
+     * OpenAPI specification for the static route.
+     */
+    openapi?: MethodAPISpec;
+}

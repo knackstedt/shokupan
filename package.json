@@ -2,7 +2,7 @@
     "name": "convect.ts",
     "version": "0.0.1",
     "scripts": {
-        "dev": "bun --watch --inspect src/examples/mixed/main.ts",
+        "dev": "bun --watch --inspect src/example/main.ts",
         "debug:otel": "sh scripts/debug-otel.sh"
     },
     "private": true,
@@ -15,6 +15,7 @@
         "@opentelemetry/semantic-conventions": "^1.38.0",
         "@scalar/api-reference": "^1.40.9",
         "@scalar/openapi-types": "^0.5.3",
+        "eta": "^4.5.0",
         "tslib": "^2.8.1"
     },
     "devDependencies": {

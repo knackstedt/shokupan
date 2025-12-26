@@ -1,11 +1,14 @@
 import type { ApiReferenceConfiguration } from '@scalar/api-reference';
 import type { OpenAPI } from '@scalar/openapi-types';
+import { Eta } from 'eta';
 import { ConvectionRouter } from '../router';
 import type { DeepPartial } from '../types';
 
+const eta = new Eta();
+
 export type ScalarPluginOptions = {
     baseDocument: DeepPartial<OpenAPI.Document>;
-    config: ApiReferenceConfiguration;
+    config: Partial<ApiReferenceConfiguration>;
 };
 
 export class ScalarPlugin extends ConvectionRouter<any> {
@@ -21,7 +24,7 @@ export class ScalarPlugin extends ConvectionRouter<any> {
             let path = ctx.url.toString();
             if (!path.endsWith("/")) path += "/";
 
-            return ctx.html(`<!doctype html>
+            return ctx.html(eta.renderString(`<!doctype html>
                 <html>
                 <head>
                     <title>API Reference</title>
@@ -32,16 +35,16 @@ export class ScalarPlugin extends ConvectionRouter<any> {
                 <body>
                     <div id="app"></div>
 
-                    <script src="${path}scalar.js"></script>
+                    <script src="<%= it.path %>scalar.js"></script>
                     <script>
-                        Scalar.createApiReference('#app', [{ ...${JSON.stringify(this.pluginOptions.baseDocument)},
-                            url: "${path}openapi.json",
+                        Scalar.createApiReference('#app', [{ ...<%~ JSON.stringify(it.config.baseDocument) %>,
+                            url: "<%= it.path %>openapi.json",
                         }
                     ])
                     </script>
                 </body>
 
-                </html>`);
+                </html>`, { path, config: this.pluginOptions }));
         });
         this.get("/scalar.js", (ctx) => {
             return ctx.file(__dirname + "/../../node_modules/@scalar/api-reference/dist/browser/standalone.js");
