@@ -2,7 +2,7 @@
 import { ConvectionContext } from './context';
 import type { Convection } from './convect';
 import { ConvectionRequest } from './request';
-import { $appRoot, $childControllers, $childRouters, $dispatch, $isApplication, $isMounted, $isRouter, $mountPath, $parent } from './symbol';
+import { $appRoot, $childControllers, $childRouters, $dispatch, $isApplication, $isMounted, $isRouter, $mountPath, $parent, $routeMethods } from './symbol';
 import type { ConvectionRouteConfig, MethodAPISpec, ProcessResult, RequestOptions } from './types';
 import { HTTPMethods, type ConvectionController, type ConvectionHandler, type ConvectionRoute, type Method } from './types';
 
@@ -109,6 +109,29 @@ export class ConvectionRouter<T> {
             // Also scan own properties (for objects or bound methods)
             Object.getOwnPropertyNames(controller).forEach(name => methods.add(name));
 
+            // Check if decorators were used
+            // Decorators write to prototype[$routeMethods] usually, or instance if bound?
+            // Since we instantiate controller, we check proto or instance.
+            // Actually, TS decorators on class methods write to prototype.
+            // So we check proto[$routeMethods].
+            // Note: If multiple levels of inheritance, we might need to crawl? 
+            // Our symbol is on the target (prototype).
+
+            // Let's check instance first (if undefined on instance, it checks proto) 
+            // BUT symbols aren't inherited via dot access if they are on proto? 
+            // Wait, yes they are if we cast to any.
+            // But let's look at the proto specifically to be safe or just access property.
+
+            // Re-read decorators.ts: target[$routeMethods] = new Map();
+            // In method decorator: target is Prototype (for instance members) or Constructor (for static).
+            // We assume instance members.
+
+            // We need to merge decorated routes AND convention routes?
+            // "If there's a method on a class called getToThing with a decorator Path and Method, it won't be automatically parsed as a base get method."
+            // So Decorator takes precedence.
+
+            const decoratedRoutes = (controller as any)[$routeMethods] || (proto && (proto as any)[$routeMethods]);
+
             let routesAttached = 0;
             for (const name of methods) {
                 if (name === "constructor") continue;
@@ -117,63 +140,56 @@ export class ConvectionRouter<T> {
                 const handler = controller[name];
                 if (typeof handler !== "function") continue;
 
-                // Simple convention matching
                 let method: Method | undefined;
                 let subPath = "";
 
-                // Check if name starts with HTTP verb
-                for (const m of HTTPMethods) {
-                    if (name.toUpperCase().startsWith(m)) {
-                        method = m;
-                        // Extract remaining part as path
-                        // e.g. getUsers -> Users
-                        // e.g. get -> ""
-                        const rest = name.slice(m.length);
-                        if (rest.length === 0) {
-                            subPath = "/";
-                        }
-                        else {
-                            // Parse "RestOfMethodName" -> "/rest/of/method/name"
-                            // Parse "$id" -> "/:id"
-                            // Parse "$idProfile" -> "/:id/profile"
-
-                            subPath = "";
-                            let buffer = "";
-
-                            const flush = () => {
-                                if (buffer.length > 0) {
-                                    subPath += "/" + buffer.toLowerCase();
-                                    buffer = "";
-                                }
-                            };
-
-                            for (let i = 0; i < rest.length; i++) {
-                                const char = rest[i];
-
-                                if (char === "$") {
-                                    flush();
-                                    // Start parameter
-                                    // e.g. $id -> /:id
-                                    // Look ahead for parameter name
-                                    // Convention: $paramName ends at next Uppercase or end
-                                    subPath += "/:";
-                                    continue;
-                                }
-                                // Revised simple loop
+                // 1. Check for Decorator Metadata
+                if (decoratedRoutes && decoratedRoutes.has(name)) {
+                    const config = decoratedRoutes.get(name);
+                    method = config.method;
+                    subPath = config.path;
+                }
+                // 2. Fallback to Convention
+                else {
+                    // Simple convention matching
+                    // Check if name starts with HTTP verb
+                    for (const m of HTTPMethods) {
+                        if (name.toUpperCase().startsWith(m)) {
+                            method = m;
+                            const rest = name.slice(m.length);
+                            if (rest.length === 0) {
+                                subPath = "/";
                             }
+                            else {
+                                // Existing parsing logic...
+                                subPath = "";
+                                let buffer = "";
+                                const flush = () => {
+                                    if (buffer.length > 0) {
+                                        subPath += "/" + buffer.toLowerCase();
+                                        buffer = "";
+                                    }
+                                };
+                                for (let i = 0; i < rest.length; i++) {
+                                    const char = rest[i];
+                                    if (char === "$") {
+                                        flush();
+                                        subPath += "/:";
+                                        continue;
+                                    }
+                                    // Revised simple loop
+                                }
+                                subPath = rest
+                                    .replace(/\$/g, "/:") // $id -> /:id
+                                    .replace(/([a-z0-9])([A-Z])/g, "$1/$2") // camelCase -> camel/Case
+                                    .toLowerCase();
 
-                            // Let's use regex replace sequence
-                            subPath = rest
-                                .replace(/\$/g, "/:") // $id -> /:id
-                                .replace(/([a-z0-9])([A-Z])/g, "$1/$2") // camelCase -> camel/Case
-                                .toLowerCase();
-
-                            // Ensure it starts with / (if not already from $ or replace)
-                            if (!subPath.startsWith("/")) {
-                                subPath = "/" + subPath;
+                                if (!subPath.startsWith("/")) {
+                                    subPath = "/" + subPath;
+                                }
                             }
+                            break;
                         }
-                        break;
                     }
                 }
 
@@ -182,9 +198,13 @@ export class ConvectionRouter<T> {
                     // Remove trailing slash from prefix if needed, combine with subPath
                     const cleanPrefix = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
                     const cleanSubPath = subPath === "/" ? "" : subPath;
-                    const fullPath = (cleanPrefix + cleanSubPath) || "/";
+                    // Ensure subPath matches simple slash if empty
+                    const fullPath = (cleanPrefix + (cleanSubPath.startsWith("/") ? cleanSubPath : "/" + cleanSubPath)) || "/";
 
-                    this.add({ method, path: fullPath, handler: handler.bind(controller) });
+                    // Fix double slash if prefix was "/" and subpath was "/" -> "//" -> "/"
+                    const normalizedPath = fullPath.replace(/\/+/g, "/");
+
+                    this.add({ method, path: normalizedPath, handler: handler.bind(controller) });
                 }
             }
             if (routesAttached === 0) {
