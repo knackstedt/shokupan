@@ -11,6 +11,7 @@ const defaults: ConvectionConfig = {
     port: 3000,
     hostname: "localhost",
     development: process.env.NODE_ENV !== "production",
+    enableAsyncLocalStorage: false,
 };
 
 export class Convection<T = any> extends ConvectionRouter<T> {
@@ -72,7 +73,7 @@ export class Convection<T = any> extends ConvectionRouter<T> {
      * @returns The response to send.
      */
     private async handleRequest(req: ConvectionRequest<T>): Promise<Response> {
-        return asyncContext.run(new Map(), async () => {
+        const handle = async () => {
             const ctx = new ConvectionContext(req);
             const tracer = getTracer();
 
@@ -117,6 +118,12 @@ export class Convection<T = any> extends ConvectionRouter<T> {
                     return ctx.json({ error: "Internal Server Error", message: err.message }, 500);
                 }
             });
-        });
+        };
+
+        if (this.applicationConfig.enableAsyncLocalStorage) {
+            return asyncContext.run(new Map(), handle);
+        }
+
+        return handle();
     }
 }

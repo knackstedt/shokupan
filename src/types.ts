@@ -31,6 +31,7 @@ export type ConvectionConfig = DeepPartial<{
     port: number;
     hostname: string;
     development: boolean;
+    enableAsyncLocalStorage: boolean;
     logger: {
         verbose: boolean;
         info: (msg: string, props: Record<string, any>) => void;

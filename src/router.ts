@@ -105,6 +105,7 @@ export class ConvectionRouter<T> {
             let routesAttached = 0;
             for (const name of methods) {
                 if (name === "constructor") continue;
+                if (["arguments", "caller", "callee"].includes(name)) continue;
 
                 const handler = controller[name];
                 if (typeof handler !== "function") continue;
@@ -179,6 +180,12 @@ export class ConvectionRouter<T> {
         return routes;
     }
 
+    /**
+     * Makes a sub request to this router.
+     * This is useful for triggering other methods or route handlers. 
+     * @param options The request options.
+     * @returns The response.
+     */
     public async subRequest(options: {
         path: string;
         method?: Method;

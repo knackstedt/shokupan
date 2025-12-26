@@ -13,8 +13,6 @@ export class ConvectionContext<State = any> {
         this.state = state || {} as State;
     }
 
-    // --- Request Helpers ---
-
     get req() { return this.request; }
     get method() { return this.request.method; }
     get path() { return this.url.pathname; }
