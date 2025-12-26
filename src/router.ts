@@ -870,7 +870,7 @@ export class ConvectionRouter<T> {
                                         <li><a href="../">../</a></li>
                                     <% } %>
                                     <% it.files.forEach(function(f) { %>
-                                        <li><a href="<%= it.join(it.relative === '/' ? '' : it.relative, f) %>"><%= f %></a></li>
+                                        <li><a href="<%= f %>"><%= f %></a></li>
                                     <% }) %>
                                 </ul>
                                 </body>
