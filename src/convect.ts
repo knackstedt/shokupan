@@ -4,7 +4,7 @@ import { ConvectionRequest } from './request';
 import { ConvectionRouter } from "./router";
 import { $appRoot, $dispatch, $isApplication } from './symbol';
 import { asyncContext, getTracer } from "./telemetry";
-import type { ConvectionConfig, Middleware, ProcessResult, RequestOptions } from './types';
+import type { ConvectionConfig, Method, Middleware, ProcessResult, RequestOptions } from './types';
 
 const defaults: ConvectionConfig = {
     port: 3000,
@@ -86,7 +86,7 @@ export class Convection<T = any> extends ConvectionRouter<T> {
 
         // Create Request to pass to fetch
         const req = new ConvectionRequest({
-            method: options.method || "GET",
+            method: (options.method || "GET") as Method,
             url,
             headers: options.headers as any,
             body: options.body && typeof options.body === "object" ? JSON.stringify(options.body) : options.body

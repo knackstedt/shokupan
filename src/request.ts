@@ -17,11 +17,14 @@ class ConvectionRequestBase {
     headers: Headers;
     body: any;
 
-    json(): Promise<any> { return JSON.parse(this.body); }
-    text(): Promise<string> { return this.body; }
+    async json(): Promise<any> { return JSON.parse(this.body); }
+    async text(): Promise<string> { return this.body; }
 
     constructor(props: ConvectionRequestProps) {
         Object.assign(this, props);
+        if (!(this.headers instanceof Headers)) {
+            this.headers = new Headers(this.headers);
+        }
     }
 }
 

@@ -1,10 +1,11 @@
-
 import { ConvectionContext } from './context';
 import type { Convection } from './convect';
+import { Container } from './di';
+import { compose } from './middleware';
 import { ConvectionRequest } from './request';
-import { $appRoot, $childControllers, $childRouters, $dispatch, $isApplication, $isMounted, $isRouter, $mountPath, $parent, $routeMethods } from './symbol';
+import { $appRoot, $childControllers, $childRouters, $controllerPath, $dispatch, $isApplication, $isMounted, $isRouter, $middleware, $mountPath, $parent, $routeArgs, $routeMethods } from './symbol';
 import type { ConvectionRouteConfig, MethodAPISpec, ProcessResult, RequestOptions } from './types';
-import { HTTPMethods, type ConvectionController, type ConvectionHandler, type ConvectionRoute, type Method } from './types';
+import { HTTPMethods, RouteParamType, type ConvectionController, type ConvectionHandler, type ConvectionRoute, type Method } from './types';
 
 // Shim for HeadersInit if not available globally
 type HeadersInit = Headers | Record<string, string> | [string, string][];
@@ -86,18 +87,35 @@ export class ConvectionRouter<T> {
         }
         // Controller is an arbitrary class
         else {
-            // If controller is a class constructor, instantiate it
+            let instance = controller;
             if (typeof controller === 'function') {
-                // @ts-ignore
-                controller = new controller();
+                // DI Resolution
+                instance = Container.resolve(controller);
+
+                // Controller Parameter Decorator (@Controller('prefix'))
+                const controllerPath = (controller as any)[$controllerPath];
+                if (controllerPath) {
+                    // Combine mount prefix + controller path
+                    // mount('/api', Ctrl) + @Controller('/users') -> /api/users
+                    const p1 = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
+                    const p2 = controllerPath.startsWith("/") ? controllerPath : "/" + controllerPath;
+                    prefix = (p1 + p2);
+                    // Normalize
+                    if (!prefix) prefix = "/";
+                }
             }
 
             // @ts-ignore
-            controller[$mountPath] = prefix;
-            this[$childControllers].push(controller as any);
+            instance[$mountPath] = prefix;
+            this[$childControllers].push(instance as any);
+
+            // Get Middleware for Controller
+            // It could be on the Constructor (if passed as class) or Instance (if passed as object and manually set?)
+            // Usually decorators set it on Constructor.
+            const controllerMiddleware = (typeof controller === 'function' ? (controller as any)[$middleware] : (instance as any)[$middleware]) || [];
 
             // Get all method names from the prototype (for classes)
-            const proto = Object.getPrototypeOf(controller);
+            const proto = Object.getPrototypeOf(instance);
             const methods = new Set<string>();
 
             // Scan prototype chain
@@ -107,38 +125,19 @@ export class ConvectionRouter<T> {
                 current = Object.getPrototypeOf(current);
             }
             // Also scan own properties (for objects or bound methods)
-            Object.getOwnPropertyNames(controller).forEach(name => methods.add(name));
+            Object.getOwnPropertyNames(instance).forEach(name => methods.add(name));
 
-            // Check if decorators were used
-            // Decorators write to prototype[$routeMethods] usually, or instance if bound?
-            // Since we instantiate controller, we check proto or instance.
-            // Actually, TS decorators on class methods write to prototype.
-            // So we check proto[$routeMethods].
-            // Note: If multiple levels of inheritance, we might need to crawl? 
-            // Our symbol is on the target (prototype).
-
-            // Let's check instance first (if undefined on instance, it checks proto) 
-            // BUT symbols aren't inherited via dot access if they are on proto? 
-            // Wait, yes they are if we cast to any.
-            // But let's look at the proto specifically to be safe or just access property.
-
-            // Re-read decorators.ts: target[$routeMethods] = new Map();
-            // In method decorator: target is Prototype (for instance members) or Constructor (for static).
-            // We assume instance members.
-
-            // We need to merge decorated routes AND convention routes?
-            // "If there's a method on a class called getToThing with a decorator Path and Method, it won't be automatically parsed as a base get method."
-            // So Decorator takes precedence.
-
-            const decoratedRoutes = (controller as any)[$routeMethods] || (proto && (proto as any)[$routeMethods]);
+            const decoratedRoutes = (instance as any)[$routeMethods] || (proto && (proto as any)[$routeMethods]);
+            const decoratedArgs = (instance as any)[$routeArgs] || (proto && (proto as any)[$routeArgs]);
+            const methodMiddlewareMap = (instance as any)[$middleware] || (proto && (proto as any)[$middleware]);
 
             let routesAttached = 0;
             for (const name of methods) {
                 if (name === "constructor") continue;
                 if (["arguments", "caller", "callee"].includes(name)) continue;
 
-                const handler = controller[name];
-                if (typeof handler !== "function") continue;
+                const originalHandler = (instance as any)[name];
+                if (typeof originalHandler !== "function") continue;
 
                 let method: Method | undefined;
                 let subPath = "";
@@ -155,7 +154,7 @@ export class ConvectionRouter<T> {
                     // Check if name starts with HTTP verb
                     for (const m of HTTPMethods) {
                         if (name.toUpperCase().startsWith(m)) {
-                            method = m;
+                            method = m as Method;
                             const rest = name.slice(m.length);
                             if (rest.length === 0) {
                                 subPath = "/";
@@ -198,26 +197,92 @@ export class ConvectionRouter<T> {
                     // Remove trailing slash from prefix if needed, combine with subPath
                     const cleanPrefix = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
                     const cleanSubPath = subPath === "/" ? "" : subPath;
-                    // Ensure subPath matches simple slash if empty
-                    const fullPath = (cleanPrefix + (cleanSubPath.startsWith("/") ? cleanSubPath : "/" + cleanSubPath)) || "/";
 
-                    // Fix double slash if prefix was "/" and subpath was "/" -> "//" -> "/"
+                    let joined: string;
+                    if (cleanSubPath.length === 0) {
+                        joined = cleanPrefix;
+                    }
+                    else if (cleanSubPath.startsWith("/")) {
+                        joined = cleanPrefix + cleanSubPath;
+                    }
+                    else {
+                        joined = cleanPrefix + "/" + cleanSubPath;
+                    }
+
+                    const fullPath = joined || "/";
                     const normalizedPath = fullPath.replace(/\/+/g, "/");
 
-                    this.add({ method, path: normalizedPath, handler: handler.bind(controller) });
+                    // -- Compose Handler with Middleware and Param Resolution --
+
+                    const methodMw = (methodMiddlewareMap instanceof Map) ? (methodMiddlewareMap.get(name) || []) : [];
+                    const allMiddleware = [...controllerMiddleware, ...methodMw];
+
+                    // Check for Args
+                    const routeArgs = decoratedArgs && decoratedArgs.get(name);
+
+                    // Create Wrapper
+                    const wrappedHandler = async (ctx: ConvectionContext) => {
+                        // Resolve Arguments
+                        let args: any[] = [ctx]; // Default to just context if no decorators
+
+                        if (routeArgs && routeArgs.length > 0) {
+                            args = [];
+                            // Sort by index
+                            const sortedArgs = [...routeArgs].sort((a, b) => a.index - b.index);
+
+                            // Fill args array
+                            for (const arg of sortedArgs) {
+                                switch (arg.type) {
+                                    case RouteParamType.BODY:
+                                        args[arg.index] = await ctx.req.json().catch(() => ({}));
+                                        break;
+                                    case RouteParamType.PARAM:
+                                        args[arg.index] = arg.name ? ctx.params[arg.name] : ctx.params;
+                                        break;
+                                    case RouteParamType.QUERY: {
+                                        const url = new URL(ctx.req.url);
+                                        args[arg.index] = arg.name ? url.searchParams.get(arg.name) : Object.fromEntries(url.searchParams);
+                                        break;
+                                    }
+                                    case RouteParamType.HEADER:
+                                        args[arg.index] = arg.name ? ctx.req.headers.get(arg.name) : ctx.req.headers;
+                                        break;
+                                    case RouteParamType.REQUEST:
+                                        args[arg.index] = ctx.req;
+                                        break;
+                                    case RouteParamType.CONTEXT:
+                                        args[arg.index] = ctx;
+                                        break;
+                                }
+                            }
+                        }
+
+                        return originalHandler.apply(instance, args);
+                    };
+
+                    // Apply Middleware wrapping
+                    let finalHandler = wrappedHandler;
+                    if (allMiddleware.length > 0) {
+                        const composed = compose(allMiddleware);
+                        finalHandler = async (ctx) => {
+                            return composed(ctx, () => wrappedHandler(ctx));
+                        };
+                    }
+
+                    this.add({ method, path: normalizedPath, handler: finalHandler });
                 }
             }
             if (routesAttached === 0) {
-                console.warn(`No routes attached to controller ${controller.constructor.name}`);
+                console.warn(`No routes attached to controller ${instance.constructor.name}`);
             }
-            controller[$isMounted] = true;
+            instance[$isMounted] = true;
         }
     }
 
     /**
      * Returns all routes attached to this router and its descendants.
      */
-    public getRoutes(): { method: string, path: string, handler: ConvectionHandler; }[] {
+    public getRoutes(): { method: Method, path: string, handler: ConvectionHandler; }[] {
         const routes = this.routes.map(r => ({
             method: r.method,
             path: r.path,
@@ -232,7 +297,7 @@ export class ConvectionRouter<T> {
                 const fullPath = (cleanPrefix + cleanPath) || "/";
 
                 routes.push({
-                    method: route.method,
+                    method: route.method as Method,
                     path: fullPath,
                     handler: route.handler
                 });
@@ -294,7 +359,7 @@ export class ConvectionRouter<T> {
         }
 
         const req = new ConvectionRequest({
-            method: options.method || "GET",
+            method: (options.method || "GET") as Method,
             url,
             headers: options.headers as any,
             body: options.body && typeof options.body === "object" ? JSON.stringify(options.body) : options.body
@@ -566,7 +631,7 @@ export class ConvectionRouter<T> {
     /**
      * Simple method to actually attach the verb routes with their overload signatures
      */
-    private attachVerb(method: string, path: string, specOrHandler: MethodAPISpec | ConvectionHandler, handlerFn?: ConvectionHandler) {
+    private attachVerb(method: Method, path: string, specOrHandler: MethodAPISpec | ConvectionHandler, handlerFn?: ConvectionHandler) {
         const spec = typeof specOrHandler === "function" ? null : specOrHandler as MethodAPISpec;
         const handler = typeof specOrHandler === "function" ? specOrHandler as ConvectionHandler : handlerFn as ConvectionHandler;
 

@@ -11,7 +11,17 @@ export type RouterAPISpec = OpenAPI.Operation & Pick<Required<OpenAPI.Operation>
 
 export type ConvectionHandler = (ctx: ConvectionContext) => Promise<any> | any;
 export const HTTPMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "ALL"];
-export type Method = typeof HTTPMethods[number];
+export type Method = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "OPTIONS" | "HEAD" | "ALL";
+
+export enum RouteParamType {
+    BODY = "BODY",
+    PARAM = "PARAM",
+    QUERY = "QUERY",
+    HEADER = "HEADER",
+    REQUEST = "REQUEST",
+    CONTEXT = "CONTEXT"
+}
+
 export type NextFn = () => Promise<any>;
 export type Middleware = (ctx: ConvectionContext, next: NextFn) => Promise<any> | any;
 
@@ -51,7 +61,7 @@ export type ConvectionConfig = DeepPartial<{
 export interface RequestOptions {
     path?: string;
     url?: string;
-    method?: string;
+    method?: Method;
     headers?: Record<string, string>;
     body?: any;
     query?: Record<string, string>;
