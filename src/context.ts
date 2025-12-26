@@ -43,4 +43,8 @@ export class ConvectionContext<State = any> {
     status(status: number) {
         return new Response(null, { status });
     }
+
+    file(path: string, options?: ResponseInit) {
+        return new Response(Bun.file(path), options);
+    }
 }
