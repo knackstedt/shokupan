@@ -6,6 +6,18 @@ import { ConvectionResponse } from './response';
 // Shim for HeadersInit if not available globally in some envs
 type HeadersInit = Headers | Record<string, string> | [string, string][];
 
+
+export interface CookieOptions {
+    maxAge?: number;
+    expires?: Date;
+    httpOnly?: boolean;
+    secure?: boolean;
+    domain?: string;
+    path?: string;
+    sameSite?: boolean | 'lax' | 'strict' | 'none';
+    priority?: 'low' | 'medium' | 'high';
+}
+
 export class ConvectionContext<State extends Record<string, any> = Record<string, any>> {
     public readonly url: URL;
     public params: Record<string, string> = {};
@@ -53,6 +65,41 @@ export class ConvectionContext<State extends Record<string, any> = Record<string
      */
     public set(key: string, value: string) {
         this.response.set(key, value);
+        return this;
+    }
+
+    /**
+     * Set a cookie
+     * @param name Cookie name
+     * @param value Cookie value
+     * @param options Cookie options
+     */
+    public setCookie(name: string, value: string, options: CookieOptions = {}) {
+        let cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}`;
+
+        if (options.maxAge) cookie += `; Max-Age=${Math.floor(options.maxAge)}`;
+        if (options.expires) cookie += `; Expires=${options.expires.toUTCString()}`;
+        if (options.httpOnly) cookie += `; HttpOnly`;
+        if (options.secure) cookie += `; Secure`;
+        if (options.domain) cookie += `; Domain=${options.domain}`;
+        if (options.path) cookie += `; Path=${options.path || '/'}`;
+        if (options.sameSite) {
+            const sameSite = typeof options.sameSite === 'string'
+                ? options.sameSite.toLowerCase()
+                : options.sameSite
+                    ? 'strict'
+                    : 'lax'; // Default logic if boolean true, though usually explicit string is better
+            // Ideally follow specific behavior: express-session/cookies uses boolean to mean strict/lax sometimes?
+            // Let's stick to standard strings mostly, but maybe map boolean to Strict/Lax?
+            // Standard: SameSite=Lax (default if missing but we are setting it only if present)
+            // If strictly boolean true -> Strict, false -> (don't set? or None? usually don't set)
+            cookie += `; SameSite=${typeof options.sameSite === 'boolean' ? 'Strict' : (options.sameSite.charAt(0).toUpperCase() + options.sameSite.slice(1))}`;
+        }
+        if (options.priority) {
+            cookie += `; Priority=${options.priority.charAt(0).toUpperCase() + options.priority.slice(1)}`;
+        }
+
+        this.response.append('Set-Cookie', cookie);
         return this;
     }
 
