@@ -56,6 +56,7 @@ export function useExpress(expressMiddleware: any): Middleware {
                 },
                 set(target, prop, value) {
                     reqStore[prop] = value;
+                    ctx.state[prop as string] = value;
                     return true;
                 }
             });
@@ -65,7 +66,10 @@ export function useExpress(expressMiddleware: any): Middleware {
                 locals: {},
                 statusCode: 200,
                 setHeader: (name: string, value: string) => {
-                    // No-op or store in ctx if needed
+                    ctx.response.headers.set(name, value);
+                },
+                set: (name: string, value: string) => {
+                    ctx.response.headers.set(name, value);
                 },
                 end: (chunk: any) => {
                     resolve(new Response(chunk, { status: res.statusCode }));
