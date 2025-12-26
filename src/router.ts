@@ -294,6 +294,8 @@ export class ConvectionRouter<T> {
             }
             instance[$isMounted] = true;
         }
+
+        return this;
     }
 
     /**
@@ -405,8 +407,9 @@ export class ConvectionRouter<T> {
                 result = await match.handler(ctx);
             } catch (err: any) {
                 console.error(err);
-                status = 500;
-                result = { error: "Internal Server Error", message: err.message };
+                status = err.status || err.statusCode || 500;
+                result = { error: err.message || "Internal Server Error" };
+                if (err.errors) result.errors = err.errors;
             }
         }
         else {
@@ -478,8 +481,6 @@ export class ConvectionRouter<T> {
 
         return null; // Not found
     }
-
-    // --- Helpers ---
 
     private parsePath(path: string): { regex: RegExp; keys: string[]; } {
         const keys: string[] = [];
@@ -576,6 +577,8 @@ export class ConvectionRouter<T> {
             group,
             guards: routeGuards.length > 0 ? routeGuards : undefined
         });
+
+        return this;
     }
 
     /**
@@ -584,17 +587,18 @@ export class ConvectionRouter<T> {
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public get(path: string, handler: ConvectionHandler);
+    public get(path: string, ...handlers: ConvectionHandler[]);
     /**
      * Adds a GET route to the router.
-     
+     * 
      * @param path - URL path    
      * @param spec - OpenAPI specification for the route
-     * @param handler - Route handler function 
+     * @param handlers - Route handler functions 
      */
-    public get(path: string, spec: MethodAPISpec, handler: ConvectionHandler);
-    public get(path: string, specOrHandler: MethodAPISpec | ConvectionHandler, handler?: ConvectionHandler) {
-        this.attachVerb("GET", path, specOrHandler, handler);
+    public get(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler[]);
+    public get(path: string, ...args: (MethodAPISpec | ConvectionHandler)[]) {
+        this.attachVerb("GET", path, ...args);
+        return this;
     }
 
     /**
@@ -603,17 +607,18 @@ export class ConvectionRouter<T> {
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public post(path: string, handler: ConvectionHandler);
+    public post(path: string, ...handlers: ConvectionHandler[]);
     /**
      * Adds a POST route to the router.
-     
+     * 
      * @param path - URL path    
      * @param spec - OpenAPI specification for the route
-     * @param handler - Route handler function 
+     * @param handlers - Route handler functions 
      */
-    public post(path: string, spec: MethodAPISpec, handler: ConvectionHandler);
-    public post(path: string, specOrHandler: MethodAPISpec | ConvectionHandler, handler?: ConvectionHandler) {
-        this.attachVerb("POST", path, specOrHandler, handler);
+    public post(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler[]);
+    public post(path: string, ...args: (MethodAPISpec | ConvectionHandler)[]) {
+        this.attachVerb("POST", path, ...args);
+        return this;
     }
 
     /**
@@ -622,17 +627,18 @@ export class ConvectionRouter<T> {
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public put(path: string, handler: ConvectionHandler);
+    public put(path: string, ...handlers: ConvectionHandler[]);
     /**
      * Adds a PUT route to the router.
-     
+     * 
      * @param path - URL path    
      * @param spec - OpenAPI specification for the route
-     * @param handler - Route handler function 
+     * @param handlers - Route handler functions 
      */
-    public put(path: string, spec: MethodAPISpec, handler: ConvectionHandler);
-    public put(path: string, specOrHandler: MethodAPISpec | ConvectionHandler, handler?: ConvectionHandler) {
-        this.attachVerb("PUT", path, specOrHandler, handler);
+    public put(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler[]);
+    public put(path: string, ...args: (MethodAPISpec | ConvectionHandler)[]) {
+        this.attachVerb("PUT", path, ...args);
+        return this;
     }
 
     /**
@@ -641,17 +647,18 @@ export class ConvectionRouter<T> {
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public delete(path: string, handler: ConvectionHandler);
+    public delete(path: string, ...handlers: ConvectionHandler[]);
     /**
      * Adds a DELETE route to the router.
-     
+     * 
      * @param path - URL path    
      * @param spec - OpenAPI specification for the route
-     * @param handler - Route handler function 
+     * @param handlers - Route handler functions 
      */
-    public delete(path: string, spec: MethodAPISpec, handler: ConvectionHandler);
-    public delete(path: string, specOrHandler: MethodAPISpec | ConvectionHandler, handler?: ConvectionHandler) {
-        this.attachVerb("DELETE", path, specOrHandler, handler);
+    public delete(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler[]);
+    public delete(path: string, ...args: (MethodAPISpec | ConvectionHandler)[]) {
+        this.attachVerb("DELETE", path, ...args);
+        return this;
     }
 
     /**
@@ -660,17 +667,18 @@ export class ConvectionRouter<T> {
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public patch(path: string, handler: ConvectionHandler);
+    public patch(path: string, ...handlers: ConvectionHandler[]);
     /**
      * Adds a PATCH route to the router.
-     
+     * 
      * @param path - URL path    
      * @param spec - OpenAPI specification for the route
-     * @param handler - Route handler function 
+     * @param handlers - Route handler functions 
      */
-    public patch(path: string, spec: MethodAPISpec, handler: ConvectionHandler);
-    public patch(path: string, specOrHandler: MethodAPISpec | ConvectionHandler, handler?: ConvectionHandler) {
-        this.attachVerb("PATCH", path, specOrHandler, handler);
+    public patch(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler[]);
+    public patch(path: string, ...args: (MethodAPISpec | ConvectionHandler)[]) {
+        this.attachVerb("PATCH", path, ...args);
+        return this;
     }
 
     /**
@@ -679,17 +687,18 @@ export class ConvectionRouter<T> {
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public options(path: string, handler: ConvectionHandler);
+    public options(path: string, ...handlers: ConvectionHandler[]);
     /**
      * Adds a OPTIONS route to the router.
-     
+     * 
      * @param path - URL path    
      * @param spec - OpenAPI specification for the route
-     * @param handler - Route handler function 
+     * @param handlers - Route handler functions 
      */
-    public options(path: string, spec: MethodAPISpec, handler: ConvectionHandler);
-    public options(path: string, specOrHandler: MethodAPISpec | ConvectionHandler, handler?: ConvectionHandler) {
-        this.attachVerb("OPTIONS", path, specOrHandler, handler);
+    public options(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler[]);
+    public options(path: string, ...args: (MethodAPISpec | ConvectionHandler)[]) {
+        this.attachVerb("OPTIONS", path, ...args);
+        return this;
     }
 
     /**
@@ -698,17 +707,18 @@ export class ConvectionRouter<T> {
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public head(path: string, handler: ConvectionHandler);
+    public head(path: string, ...handlers: ConvectionHandler[]);
     /**
      * Adds a HEAD route to the router.
-     
+     * 
      * @param path - URL path    
      * @param spec - OpenAPI specification for the route
-     * @param handler - Route handler function 
+     * @param handlers - Route handler functions 
      */
-    public head(path: string, spec: MethodAPISpec, handler: ConvectionHandler);
-    public head(path: string, specOrHandler: MethodAPISpec | ConvectionHandler, handler?: ConvectionHandler) {
-        this.attachVerb("HEAD", path, specOrHandler, handler);
+    public head(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler[]);
+    public head(path: string, ...args: (MethodAPISpec | ConvectionHandler)[]) {
+        this.attachVerb("HEAD", path, ...args);
+        return this;
     }
 
     /**
@@ -725,12 +735,14 @@ export class ConvectionRouter<T> {
      * @param spec - OpenAPI specification for the guard
      * @param handler - Guard handler function 
      */
-    public guard(spec: GuardAPISpec, handler: ConvectionHandler): void;
-    public guard(specOrHandler: GuardAPISpec | ConvectionHandler, handler?: ConvectionHandler): void {
+    public guard(spec: GuardAPISpec, handler: ConvectionHandler);
+    public guard(specOrHandler: GuardAPISpec | ConvectionHandler, handler?: ConvectionHandler) {
         const spec = typeof specOrHandler === "function" ? undefined : specOrHandler as GuardAPISpec;
         const guardHandler = typeof specOrHandler === "function" ? specOrHandler as ConvectionHandler : handler as ConvectionHandler;
 
         this.currentGuards.push({ handler: guardHandler, spec });
+
+        return this;
     }
 
     /**
@@ -932,21 +944,54 @@ export class ConvectionRouter<T> {
 
         this.add({ method: 'GET', path: displayPath, handler, spec, regex });
         this.add({ method: 'HEAD', path: displayPath, handler, spec, regex });
+
+        return this;
     }
 
 
     /**
-     * Simple method to actually attach the verb routes with their overload signatures
+     * Attach the verb routes with their overload signatures.
+     * Use compose to handle multiple handlers (middleware).
      */
-    private attachVerb(method: Method, path: string, specOrHandler: MethodAPISpec | ConvectionHandler, handlerFn?: ConvectionHandler) {
-        const spec = typeof specOrHandler === "function" ? null : specOrHandler as MethodAPISpec;
-        const handler = typeof specOrHandler === "function" ? specOrHandler as ConvectionHandler : handlerFn as ConvectionHandler;
+    private attachVerb(method: Method, path: string, ...args: (MethodAPISpec | ConvectionHandler)[]) {
+        let spec: MethodAPISpec | undefined;
+        let handlers: ConvectionHandler[] = [];
+
+        if (args.length > 0) {
+            // Check if first arg is an object (Spec) and NOT a ConvectionHandler (function)
+            if (typeof args[0] === 'object' && args[0] !== null) {
+                spec = args[0] as MethodAPISpec;
+                handlers = args.slice(1) as ConvectionHandler[];
+            } else {
+                handlers = args as ConvectionHandler[];
+            }
+        }
+
+        if (handlers.length === 0) {
+            // Should potentially throw or warn?
+            return;
+        }
+
+        let finalHandler = handlers[handlers.length - 1]; // Last handler is the main handler?
+        // Wait, compose logic: 
+        // If we have [m1, m2, h], we want m1 -> m2 -> h.
+        // compose([m1, m2, h]) does exactly that.
+        // However, middleware returns `Promise<any>`.
+        // If `handlers.length > 1`, we wrap them.
+
+        if (handlers.length > 1) {
+            // Since handlers are [ctx, next?], they fit Strict Middleware signature.
+            // compose takes Middleware[].
+            // We assume ALL provided handlers are valid middleware/handlers.
+            const fn = compose(handlers as any);
+            finalHandler = (ctx) => fn(ctx);
+        }
 
         this.add({
             method,
             path,
             spec,
-            handler
+            handler: finalHandler
         });
     }
 

@@ -40,6 +40,7 @@ export class Convection<T = any> extends ConvectionRouter<T> {
      */
     public use(middleware: Middleware) {
         this.middleware.push(middleware);
+        return this;
     }
 
     /**
@@ -189,7 +190,10 @@ export class Convection<T = any> extends ConvectionRouter<T> {
                         console.error(err);
                         span.recordException(err);
                         span.setStatus({ code: 2 }); // Error
-                        return ctx.json({ error: "Internal Server Error", message: err.message }, 500);
+                        const status = err.status || err.statusCode || 500;
+                        const body: any = { error: err.message || "Internal Server Error" };
+                        if (err.errors) body.errors = err.errors;
+                        return ctx.json(body, status);
                     }
                 };
 
