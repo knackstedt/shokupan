@@ -56,8 +56,8 @@ export function traceMiddleware(fn: Middleware, name?: string): Middleware {
 /**
  * Wraps a route handler with an OpenTelemetry span.
  */
-export function traceHandler(fn: ConvectionHandler, name: string): ConvectionHandler {
-    return async (ctx) => {
+export function traceHandler(fn: ConvectionHandler | ((...args: any[]) => any), name: string): ConvectionHandler {
+    return async function (this: any, ...args: any[]) {
         return tracer.startActiveSpan(`route handler - ${name}`, {
             kind: SpanKind.INTERNAL,
             attributes: {
@@ -66,7 +66,7 @@ export function traceHandler(fn: ConvectionHandler, name: string): ConvectionHan
             }
         }, async (span) => {
             try {
-                const result = await fn(ctx);
+                const result = await (fn as Function).apply(this, args);
                 return result;
             }
             catch (err: any) {

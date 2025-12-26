@@ -29,7 +29,7 @@ it("should generate full spec from ScalarPlugin mount", async () => {
 
     expect(spec.paths["/app-root"]).toBeDefined();
 });
-});
+
 import type { ConvectionContext } from "../context";
 import { Convection } from "../convect";
 import { ConvectionRouter } from "../router";

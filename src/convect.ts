@@ -22,6 +22,10 @@ export class Convection<T = any> extends ConvectionRouter<T> {
     readonly applicationConfig: ConvectionConfig = {};
     private middleware: Middleware[] = [];
 
+    get logger() {
+        return this.applicationConfig.logger;
+    }
+
     constructor(
         applicationConfig: ConvectionConfig = {}
     ) {
@@ -144,7 +148,7 @@ export class Convection<T = any> extends ConvectionRouter<T> {
             ctxMap.set("span", span);
             ctxMap.set("request", req);
 
-            return asyncContext.run(ctxMap, () => {
+            const runCallback = () => {
                 // Cast to ConvectionRequest if needed, though at runtime it's just a Request
                 // But ConvectionContext expects ConvectionRequest.
                 const request = req as unknown as ConvectionRequest<T>;
@@ -191,7 +195,14 @@ export class Convection<T = any> extends ConvectionRouter<T> {
 
                 return handle()
                     .finally(() => span.end());
-            });
+            };
+
+            if (this.applicationConfig.enableAsyncLocalStorage) {
+                return asyncContext.run(ctxMap, runCallback);
+            }
+            else {
+                return runCallback();
+            }
         });
     }
 }
