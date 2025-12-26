@@ -506,13 +506,17 @@ export class ConvectionRouter<T> {
      * @param spec - OpenAPI specification for the route
      * @param handler - Route handler function
      */
-    public add({ method, path, spec, handler }: {
+    public add({ method, path, spec, handler, regex: customRegex, group }: {
         method: Method,
         path: string,
         spec?: MethodAPISpec,
         handler: ConvectionHandler;
+        regex?: RegExp;
+        group?: string;
     }) {
-        const { regex, keys } = this.parsePath(path);
+        const { regex, keys } = customRegex
+            ? { regex: customRegex, keys: [] }
+            : this.parsePath(path);
 
         // Wrap handler with current guards if any exist
         let wrappedHandler = handler;
@@ -569,6 +573,7 @@ export class ConvectionRouter<T> {
             keys,
             handler: wrappedHandler,
             handlerSpec: spec,
+            group,
             guards: routeGuards.length > 0 ? routeGuards : undefined
         });
     }
@@ -900,21 +905,33 @@ export class ConvectionRouter<T> {
             return response;
         };
 
-        // Register routes 
-        // 1. Exact match for logic like /static -> check directory index
+        // Derive Group/Tag name from the path's last segment
+        // e.g. /assets -> Assets
+        // /static/images -> Images
+        let groupName = "Static";
+        const segments = normalizedPrefix.split('/').filter(Boolean);
+        if (segments.length > 0) {
+            const last = segments[segments.length - 1];
+            groupName = last.charAt(0).toUpperCase() + last.slice(1);
+        }
+
         const defaultSpec = {
             summary: "Static Content",
-            description: "Serves static files from " + normalizedPrefix
+            description: "Serves static files from " + normalizedPrefix,
+            tags: [groupName]
         };
         const spec = config.openapi ? config.openapi : defaultSpec;
+        if (!spec.tags) spec.tags = [groupName];
+        else if (!spec.tags.includes(groupName)) spec.tags.push(groupName);
 
-        this.add({ method: 'GET', path: normalizedPrefix, handler, spec });
-        this.add({ method: 'HEAD', path: normalizedPrefix, handler, spec });
+        const pattern = `^${normalizedPrefix}(/.*)?$`;
+        const regex = new RegExp(pattern);
 
-        // 2. Wildcard match for children
-        const wildcardPath = normalizedPrefix === '/' ? '/*' : normalizedPrefix + '/*';
-        this.add({ method: 'GET', path: wildcardPath, handler, spec });
-        this.add({ method: 'HEAD', path: wildcardPath, handler, spec });
+        // Display path in OpenAPI as /prefix/*
+        const displayPath = normalizedPrefix === '/' ? '/*' : normalizedPrefix + '/*';
+
+        this.add({ method: 'GET', path: displayPath, handler, spec, regex });
+        this.add({ method: 'HEAD', path: displayPath, handler, spec, regex });
     }
 
 
@@ -940,8 +957,11 @@ export class ConvectionRouter<T> {
         const paths: OpenAPI.Document['paths'] = {};
         const tagGroups = new Map<string, Set<string>>();
 
+        const defaultTagGroup = options.defaultTagGroup || "General";
+        const defaultTagName = options.defaultTag || "Application";
+
         // Helper to collect routes
-        const collect = (router: ConvectionRouter<T>, prefix = "", currentGroup = "General", defaultTag = "General") => {
+        const collect = (router: ConvectionRouter<T>, prefix = "", currentGroup = defaultTagGroup, defaultTag = defaultTagName) => {
             // Determine effective group and tag for this router
             let group = currentGroup;
             let tag = defaultTag;
@@ -985,6 +1005,9 @@ export class ConvectionRouter<T> {
 
             // 1. Local Routes
             for (const route of router.routes) {
+                // Determine effective group for this route
+                const routeGroup = route.group || group;
+
                 // Determine full path
                 const cleanPrefix = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
                 const cleanSubPath = route.path.startsWith("/") ? route.path : "/" + route.path;
@@ -1002,8 +1025,7 @@ export class ConvectionRouter<T> {
                 const operation: OpenAPI.Operation = {
                     responses: {
                         200: { description: "OK" }
-                    },
-                    tags: [tag]
+                    }
                 };
 
                 // Add Path Parameters from route keys
@@ -1030,12 +1052,21 @@ export class ConvectionRouter<T> {
                     deepMerge(operation, route.handlerSpec);
                 }
 
+                // Apply Default Tag if none exist
+                if (!operation.tags || operation.tags.length === 0) {
+                    operation.tags = [tag];
+                }
+
                 // Deduplicate Tags
                 if (operation.tags) {
                     operation.tags = Array.from(new Set(operation.tags));
                     // Register tags to group
                     for (const t of operation.tags) {
-                        tagGroups.get(group)?.add(t);
+                        // Ensure group exists if it was switched
+                        if (!tagGroups.has(routeGroup)) {
+                            tagGroups.set(routeGroup, new Set());
+                        }
+                        tagGroups.get(routeGroup)?.add(t);
                     }
                 }
 

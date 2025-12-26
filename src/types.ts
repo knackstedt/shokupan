@@ -16,6 +16,8 @@ export interface OpenAPIOptions {
     components?: OpenAPI.Document['components'];
     tags?: OpenAPI.Document['tags'];
     externalDocs?: OpenAPI.Document['externalDocs'];
+    defaultTagGroup?: string;
+    defaultTag?: string;
 }
 
 
@@ -48,6 +50,7 @@ export type ConvectionRoute = {
     keys: string[];
     handler: ConvectionHandler;
     handlerSpec?: MethodAPISpec;
+    group?: string;
     guards?: {
         handler: ConvectionHandler;
         spec?: GuardAPISpec;
