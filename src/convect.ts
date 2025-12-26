@@ -1,6 +1,6 @@
 import "./util/instrumentation";
 
-import { trace } from '@opentelemetry/api';
+import { context, trace } from '@opentelemetry/api';
 import { ConvectionContext } from "./context";
 import { compose } from "./middleware";
 import { ConvectionRequest } from './request';
@@ -59,36 +59,7 @@ export class Convection<T = any> extends ConvectionRouter<T> {
             port: finalPort,
             hostname: this.applicationConfig.hostname,
             development: this.applicationConfig.development,
-            fetch: (req) => {
-                const attrs = {
-                    root: true,
-                    attributes: {
-                        "http.url": req.url,
-                        "http.method": req.method
-                    }
-                };
-
-                return tracer.startActiveSpan(`Incoming request`, attrs, span => {
-                    const ctxMap = new Map();
-                    ctxMap.set("span", span);
-                    ctxMap.set("request", req);
-
-                    return asyncContext.run(ctxMap, () => {
-                        return this.fetch(req as unknown as Request)
-                            .finally(() => span.end())
-                            .catch(err => {
-                                span.recordException(err);
-                                span.setStatus({ code: 2 }); // Error
-                                return new Response(JSON.stringify({ error: "Internal Server Error", message: err.message }), {
-                                    status: 500,
-                                    headers: {
-                                        "Content-Type": "application/json"
-                                    }
-                                });
-                            });
-                    });
-                });
-            },
+            fetch: this.fetch.bind(this)
         });
 
         console.log(`Convect server listening on http://${server.hostname}:${server.port}`);
@@ -166,60 +137,61 @@ export class Convection<T = any> extends ConvectionRouter<T> {
             }
         };
 
-        // const parent = store?.get("span");
-        // const ctx = parent ? trace.setSpan(context.active(), parent) : undefined;
-        return tracer.startActiveSpan(`${req.method} ${req.url}`, attrs, span => {
+        const parent = store?.get("span");
+        const ctx = parent ? trace.setSpan(context.active(), parent) : undefined;
+        return tracer.startActiveSpan(`${req.method} ${new URL(req.url).pathname}`, attrs, ctx, span => {
             const ctxMap = new Map();
             ctxMap.set("span", span);
             ctxMap.set("request", req);
 
+            return asyncContext.run(ctxMap, () => {
+                // Cast to ConvectionRequest if needed, though at runtime it's just a Request
+                // But ConvectionContext expects ConvectionRequest.
+                const request = req as unknown as ConvectionRequest<T>;
 
-            // Cast to ConvectionRequest if needed, though at runtime it's just a Request
-            // But ConvectionContext expects ConvectionRequest.
-            const request = req as unknown as ConvectionRequest<T>;
+                const handle = async () => {
+                    const ctx = new ConvectionContext(request);
 
-            const handle = async () => {
-                const ctx = new ConvectionContext(request);
+                    // Compose middleware + router dispatch
+                    const fn = compose(this.middleware);
+                    // Object.defineProperty(fn, 'name', { value: "middleware chain", configurable: false });
 
-                // Compose middleware + router dispatch
-                const fn = compose(this.middleware);
-                // Object.defineProperty(fn, 'name', { value: "middleware chain", configurable: false });
+                    try {
+                        // The "next" at the end of the middleware chain is the router dispatch
+                        const result = await fn(ctx, async () => {
+                            const match = this.find(req.method, ctx.path);
+                            if (match) {
+                                ctx.params = match.params;
+                                return match.handler(ctx);
+                            }
+                            return null;
+                        });
 
-                try {
-                    // The "next" at the end of the middleware chain is the router dispatch
-                    const result = await fn(ctx, async () => {
-                        const match = this.find(req.method, ctx.path);
-                        if (match) {
-                            ctx.params = match.params;
-                            return match.handler(ctx);
+                        if (result instanceof Response) {
+                            return result;
                         }
-                        return null;
-                    });
+                        if (result === null || result === undefined) {
+                            span.setAttribute("http.status_code", 404);
+                            return ctx.text("Not Found", 404);
+                        }
+                        if (typeof result === "object") {
+                            return ctx.json(result);
+                        }
 
-                    if (result instanceof Response) {
-                        return result;
+                        return ctx.text(String(result));
+
                     }
-                    if (result === null || result === undefined) {
-                        span.setAttribute("http.status_code", 404);
-                        return ctx.text("Not Found", 404);
+                    catch (err: any) {
+                        console.error(err);
+                        span.recordException(err);
+                        span.setStatus({ code: 2 }); // Error
+                        return ctx.json({ error: "Internal Server Error", message: err.message }, 500);
                     }
-                    if (typeof result === "object") {
-                        return ctx.json(result);
-                    }
+                };
 
-                    return ctx.text(String(result));
-
-                }
-                catch (err: any) {
-                    console.error(err);
-                    span.recordException(err);
-                    span.setStatus({ code: 2 }); // Error
-                    return ctx.json({ error: "Internal Server Error", message: err.message }, 500);
-                }
-            };
-
-            return handle()
-                .finally(() => span.end());
+                return handle()
+                    .finally(() => span.end());
+            });
         });
     }
 }

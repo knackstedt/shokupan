@@ -1,9 +1,7 @@
 import { SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 import type { ConvectionHandler, Middleware } from "../types";
 
-import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
-import { registerInstrumentations } from '@opentelemetry/instrumentation';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
@@ -14,25 +12,14 @@ const provider = new NodeTracerProvider({
         [ATTR_SERVICE_NAME]: 'basic-service',
     }),
     spanProcessors: [
-        new SimpleSpanProcessor(new OTLPTraceExporter({
-            url: 'http://localhost:4318/v1/traces', // Default OTLP port
-        }))
+        new SimpleSpanProcessor(
+            new OTLPTraceExporter({
+                url: 'http://localhost:4318/v1/traces', // Default OTLP port
+            })
+        )
     ],
 });
 provider.register();
-
-registerInstrumentations({
-    instrumentations: [
-        getNodeAutoInstrumentations({
-            // load custom configuration for http instrumentation
-            '@opentelemetry/instrumentation-http': {
-                applyCustomAttributesOnSpan: (span) => {
-                    span.setAttribute('foo2', 'bar2');
-                },
-            },
-        }),
-    ],
-});
 
 const tracer = trace.getTracer("convect.middleware");
 
