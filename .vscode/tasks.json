@@ -1,0 +1,47 @@
+{
+    // For more information, visit: https://go.microsoft.com/fwlink/?LinkId=733558
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "▶ otel viewer",
+            "type": "shell",
+            "command": "docker",
+            "args": [
+                "run",
+                "--rm",
+                "-it",
+                "-p",
+                "18888:18888",
+                "-p",
+                "4317:18889",
+                "-p",
+                "4318:18890",
+                "-e",
+                "ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true",
+                "mcr.microsoft.com/dotnet/aspire-dashboard:latest"
+            ],
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "otel",
+                "pattern": [
+                    {
+                        "severity": 1,
+                        "message": 3,
+                        "file": 2,
+                        "kind": "file",
+                        "regexp": "^([^ ]+)  ([A-Z]+) ([^ ]+): (.+)$"
+                    }
+                ],
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": {
+                        "regexp": "Aspire.Dashboard.DashboardWebApplication"
+                    },
+                    "endsPattern": {
+                        "regexp": "AI is disabled because there isn't a debug session."
+                    }
+                }
+            }
+        },
+    ]
+}

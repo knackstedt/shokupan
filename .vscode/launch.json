@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Example",
+            "type": "bun",
+            "request": "launch",
+            "program": "src/example/main.ts",
+            "cwd": "${workspaceRoot}/",
+            "watchMode": false,
+            "stopOnEntry": false
+        }
+    ]
+}
