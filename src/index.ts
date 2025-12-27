@@ -13,6 +13,7 @@ export * from "./types";
 export * from "./plugins/auth";
 export * from "./plugins/compression";
 export * from "./plugins/cors";
+export * from "./plugins/express";
 export * from "./plugins/rate-limit";
 export * from "./plugins/scalar";
 export * from "./plugins/security-headers";
