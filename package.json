@@ -17,6 +17,21 @@
         "http"
     ],
     "type": "module",
+    "scripts": {
+        "dev": "bun --watch --inspect src/example/main.ts",
+        "debug:otel": "sh scripts/debug-otel.sh",
+        "build": "vite build"
+    },
+    "bin": {
+        "shokupan": "./dist/cli.js",
+        "skp": "./dist/cli.js"
+    },
+    "files": [
+        "dist",
+        "package.json",
+        "README.md",
+        "LICENSE"
+    ],
     "private": false,
     "main": "./dist/index.cjs",
     "module": "./dist/index.js",
@@ -32,15 +47,6 @@
             "import": "./dist/cli.js",
             "require": "./dist/cli.cjs"
         }
-    },
-    "scripts": {
-        "dev": "bun --watch --inspect src/example/main.ts",
-        "debug:otel": "sh scripts/debug-otel.sh",
-        "build": "vite build"
-    },
-    "bin": {
-        "shokupan": "./dist/cli.js",
-        "skp": "./dist/cli.js"
     },
     "dependencies": {
         "@clack/prompts": "^0.11.0",
