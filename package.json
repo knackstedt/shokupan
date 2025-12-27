@@ -1,7 +1,23 @@
 {
     "name": "shokupan",
     "version": "0.0.1",
+    "description": "Shokupan is a low-lift modern web framework for Bun.",
+    "author": "Andrew G. Knackstedt",
+    "repository": {
+        "url": "https://github.com/knackstedt/shokupan"
+    },
+    "license": "MIT",
+    "keywords": [
+        "bun",
+        "web",
+        "express",
+        "koa",
+        "elysia",
+        "nestjs",
+        "http"
+    ],
     "type": "module",
+    "private": false,
     "main": "./dist/index.cjs",
     "module": "./dist/index.js",
     "types": "./dist/index.d.ts",
@@ -26,7 +42,6 @@
         "shokupan": "./dist/cli.js",
         "skp": "./dist/cli.js"
     },
-    "private": true,
     "dependencies": {
         "@clack/prompts": "^0.11.0",
         "@opentelemetry/api": "^1.9.0",
