@@ -1,11 +1,11 @@
 
 import { describe, expect, test } from "bun:test";
-import { Convection } from '../convect';
-import { ConvectionRouter } from '../router';
+import { ShokupanRouter } from '../router';
+import { Shokupan } from '../shokupan';
 
-describe("Convection Direct Testing", () => {
-    test("ConvectionRouter.processRequest should return structured result", async () => {
-        const router = new ConvectionRouter();
+describe("Shokupan Direct Testing", () => {
+    test("ShokupanRouter.processRequest should return structured result", async () => {
+        const router = new ShokupanRouter();
         router.get("/direct", () => ({ msg: "direct" }));
         router.post("/data", async (ctx) => {
             const body = await ctx.req.json();
@@ -32,8 +32,8 @@ describe("Convection Direct Testing", () => {
         expect(res2.data).toEqual({ received: { foo: "bar" } });
     });
 
-    test("Convection.processRequest should handle middleware", async () => {
-        const app = new Convection();
+    test("Shokupan.processRequest should handle middleware", async () => {
+        const app = new Shokupan();
 
         // Middleware to add header
         app.use(async (ctx, next) => {
@@ -56,8 +56,8 @@ describe("Convection Direct Testing", () => {
         expect(res.data).toEqual({ wrapped: "original" });
     });
 
-    test("Convection.processRequest should handle 404", async () => {
-        const app = new Convection();
+    test("Shokupan.processRequest should handle 404", async () => {
+        const app = new Shokupan();
         const res = await app.processRequest({ path: "/missing" });
         expect(res.status).toBe(404);
     });

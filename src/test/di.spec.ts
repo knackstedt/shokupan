@@ -1,8 +1,8 @@
 
 import { describe, expect, test } from "bun:test";
-import { Convection } from '../convect';
 import { Controller, Get } from '../decorators';
 import { Container, Inject, Injectable } from '../di';
+import { Shokupan } from '../shokupan';
 
 // --- Test Fixtures ---
 
@@ -101,7 +101,7 @@ describe("Dependency Injection System", () => {
             }
         }
 
-        const app = new Convection();
+        const app = new Shokupan();
         app.mount("/api", TestController);
 
         const res = await app.processRequest({ path: "/api/di-test" });
@@ -126,7 +126,7 @@ describe("Dependency Injection System", () => {
             @Get("/") getVal() { return this.db.data.get("shared"); }
         }
 
-        const app = new Convection();
+        const app = new Shokupan();
         app.mount("/", ControllerOne);
         app.mount("/", ControllerTwo);
 

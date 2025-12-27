@@ -2,9 +2,9 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdir, rmdir, unlink, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { Convection } from '../convect';
+import { Shokupan } from '../shokupan';
 
-describe("Convection Static Serving with Eta", () => {
+describe("Shokupan Static Serving with Eta", () => {
     const testDir = join(process.cwd(), "test_static_eta");
 
     beforeAll(async () => {
@@ -20,7 +20,7 @@ describe("Convection Static Serving with Eta", () => {
     });
 
     test("should list directory contents formatted with Eta", async () => {
-        const app = new Convection();
+        const app = new Shokupan();
         // Use directory listing option
         app.static("/static", { root: testDir, listDirectory: true });
 

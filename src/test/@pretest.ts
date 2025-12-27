@@ -1,10 +1,10 @@
 import { beforeAll } from "bun:test";
-import { Convection } from '../convect';
 import { useExpress } from '../middleware';
+import { Shokupan } from '../shokupan';
 
 beforeAll(async () => {
 
-    const app = new Convection<{ userId: string, tenant: string; }>({
+    const app = new Shokupan<{ userId: string, tenant: string; }>({
         port: 0,
         development: true
     });

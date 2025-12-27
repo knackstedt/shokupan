@@ -1,11 +1,11 @@
 
 import { describe, expect, test } from "bun:test";
-import { Convection } from '../convect';
 import { ScalarPlugin } from '../plugins/scalar';
+import { Shokupan } from '../shokupan';
 
 describe("Scalar Plugin Rendering with Eta", () => {
     test("should render API reference HTML using Eta", async () => {
-        const app = new Convection();
+        const app = new Shokupan();
 
         // Convert to unknown then any to bypass type mismatch if specific versions differ, 
         // though they should match from package.json

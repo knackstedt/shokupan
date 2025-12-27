@@ -1,6 +1,6 @@
-import { Convection } from '../convect';
 import { ScalarPlugin } from '../plugins/scalar';
 import { Session } from '../plugins/session';
+import { Shokupan } from '../shokupan';
 import { UserController } from './controller';
 import { ServiceFetchRouter } from './service_fetch';
 
@@ -9,7 +9,7 @@ type session = {
     lastAccess: Date;
 };
 
-const app = new Convection<{
+const app = new Shokupan<{
     session: session;
 }>({
     port: 3001,

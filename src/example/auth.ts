@@ -1,8 +1,8 @@
 
-import { Convection } from '../convect';
 import { AuthPlugin } from '../plugins/auth';
+import { Shokupan } from '../shokupan';
 
-const app = new Convection({
+const app = new Shokupan({
     port: 3002
 });
 

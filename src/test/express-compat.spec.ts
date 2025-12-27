@@ -1,11 +1,11 @@
 
 import { describe, expect, it } from "bun:test";
-import { Convection } from '../convect';
 import { useExpress } from '../middleware';
+import { Shokupan } from '../shokupan';
 
 describe("Express Compatibility", () => { // Skipping initially until implementation is ready or to run manually
     it("should propagate req mutations to ctx.state", async () => {
-        const app = new Convection<{ testProp: string; }>({ port: 0 });
+        const app = new Shokupan<{ testProp: string; }>({ port: 0 });
 
         // Middleware that writes to req
         app.use(useExpress((req: any, res: any, next: any) => {
@@ -26,7 +26,7 @@ describe("Express Compatibility", () => { // Skipping initially until implementa
     });
 
     it("should redirect res.set to response headers", async () => {
-        const app = new Convection();
+        const app = new Shokupan();
 
         // Middleware that sets header
         app.use(useExpress((req: any, res: any, next: any) => {

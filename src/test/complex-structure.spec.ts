@@ -1,8 +1,8 @@
 
 import { describe, expect, test } from "bun:test";
-import { ConvectionContext } from "../context";
-import { Convection } from "../convect";
-import { ConvectionRouter } from "../router";
+import { ShokupanContext } from "../context";
+import { ShokupanRouter } from "../router";
+import { Shokupan } from "../shokupan";
 
 /**
  * Hierarchy:
@@ -25,50 +25,50 @@ import { ConvectionRouter } from "../router";
 
 class UsersController {
     // GET /
-    get(ctx: ConvectionContext) {
+    get(ctx: ShokupanContext) {
         return { action: "list", users: ["alice", "bob"] };
     }
 
     // GET /:id
-    get$id(ctx: ConvectionContext) {
+    get$id(ctx: ShokupanContext) {
         return { action: "get", id: ctx.params['id'] };
     }
 
     // GET /:id/profile
-    get$idProfile(ctx: ConvectionContext) {
+    get$idProfile(ctx: ShokupanContext) {
         return { action: "profile", id: ctx.params['id'] };
     }
 }
 
 class PostsController {
     // GET /
-    get(ctx: ConvectionContext) {
+    get(ctx: ShokupanContext) {
         return { action: "list_posts" };
     }
 }
 
 class SystemController {
     // GET /stats
-    getStats(ctx: ConvectionContext) {
+    getStats(ctx: ShokupanContext) {
         return { action: "stats", uptime: 999 };
     }
 
     // GET /logs/:level
-    getLogs$level(ctx: ConvectionContext) {
+    getLogs$level(ctx: ShokupanContext) {
         return { action: "logs", level: ctx.params['level'] };
     }
 }
 
 // --- Routers ---
 
-class AdminRouter extends ConvectionRouter<any> {
+class AdminRouter extends ShokupanRouter<any> {
     constructor() {
         super();
         this.mount("/system", SystemController);
     }
 }
 
-class V1Router extends ConvectionRouter<any> {
+class V1Router extends ShokupanRouter<any> {
     constructor() {
         super();
         this.mount("/users", UsersController);
@@ -77,7 +77,7 @@ class V1Router extends ConvectionRouter<any> {
     }
 }
 
-class ApiRouter extends ConvectionRouter<any> {
+class ApiRouter extends ShokupanRouter<any> {
     constructor() {
         super();
         this.mount("/v1", new V1Router());
@@ -87,7 +87,7 @@ class ApiRouter extends ConvectionRouter<any> {
 // --- Tests ---
 
 describe("Complex Router Structure", () => {
-    const app = new Convection();
+    const app = new Shokupan();
     app.mount("/api", new ApiRouter());
 
     const request = async (path: string) => {

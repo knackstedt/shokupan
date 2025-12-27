@@ -1,10 +1,10 @@
 import { describe, expect, it, jest } from "bun:test";
-import { Convection } from '../convect';
-import { MemoryStore, session } from '../plugins/session';
+import { MemoryStore, Session as session } from '../plugins/session';
+import { Shokupan } from '../shokupan';
 
 describe("Session Middleware", () => {
     it("should create a session and persist data", async () => {
-        const app = new Convection({ port: 0 });
+        const app = new Shokupan({ port: 0 });
 
         app.use(session({
             secret: 'secret',
@@ -45,7 +45,7 @@ describe("Session Middleware", () => {
     });
 
     it("should reload session data", async () => {
-        const app = new Convection({ port: 0 });
+        const app = new Shokupan({ port: 0 });
         app.use(session({ secret: 'secret', resave: false, saveUninitialized: true }));
 
         app.get('/count', (ctx) => {
@@ -77,7 +77,7 @@ describe("Session Middleware", () => {
     });
 
     it("should regenerate session", async () => {
-        const app = new Convection({ port: 0 });
+        const app = new Shokupan({ port: 0 });
         app.use(session({ secret: 'secret', resave: false, saveUninitialized: true }));
 
         app.get('/login', async (ctx) => {
@@ -132,7 +132,7 @@ describe("Session Middleware", () => {
     });
 
     it("should destroy session", async () => {
-        const app = new Convection({ port: 0 });
+        const app = new Shokupan({ port: 0 });
         app.use(session({ secret: 'secret', resave: false, saveUninitialized: true }));
 
         app.get('/set', (ctx) => {
@@ -178,7 +178,7 @@ describe("Session Middleware", () => {
     });
 
     it("should respect cookie options (signed, maxAge)", async () => {
-        const app = new Convection({ port: 0 });
+        const app = new Shokupan({ port: 0 });
         app.use(session({
             secret: 'mysecret',
             cookie: { maxAge: 10000, httpOnly: true, secure: true },
@@ -203,7 +203,7 @@ describe("Session Middleware", () => {
     });
 
     it("should use custom store", async () => {
-        const app = new Convection({ port: 0 });
+        const app = new Shokupan({ port: 0 });
 
         const mockStore = new MemoryStore();
         const spyGet = jest.spyOn(mockStore, 'get');
@@ -235,7 +235,7 @@ describe("Session Middleware", () => {
     });
 
     it("should not save if unmodified and resave=false", async () => {
-        const app = new Convection({ port: 0 });
+        const app = new Shokupan({ port: 0 });
         const mockStore = new MemoryStore();
         const spySet = jest.spyOn(mockStore, 'set');
 

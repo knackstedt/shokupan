@@ -1,8 +1,8 @@
 
 import { describe, expect, test } from "bun:test";
-import { Convection } from '../convect';
 import { Body, Controller, Ctx, Get, Headers, Param, Post, Query, Req, Use } from '../decorators';
 import { Inject, Injectable } from '../di';
+import { Shokupan } from '../shokupan';
 
 // 1. Dependency Injection Service
 @Injectable()
@@ -65,8 +65,8 @@ class UsersController {
 }
 
 // 4. Test Suite
-describe("Convection Advanced Features", () => {
-    const app = new Convection();
+describe("Shokupan Advanced Features", () => {
+    const app = new Shokupan();
     app.mount("/api", UsersController);
 
     test("Dependency Injection should resolve service", async () => {

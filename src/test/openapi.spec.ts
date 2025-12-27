@@ -1,10 +1,10 @@
 
 import { describe, expect, it } from "bun:test";
-import { ConvectionRouter } from "../router";
+import { ShokupanRouter } from "../router";
 
 describe("OpenAPI Generation", () => {
     it("should generate a basic spec for a router", () => {
-        const router = new ConvectionRouter();
+        const router = new ShokupanRouter();
         router.get("/users/:id", {
             summary: "Get User",
             responses: {
@@ -35,7 +35,7 @@ describe("OpenAPI Generation", () => {
     });
 
     it("should merge guard specs", () => {
-        const router = new ConvectionRouter();
+        const router = new ShokupanRouter();
 
         router.guard({
             security: [{ bearerAuth: [] }],
@@ -55,9 +55,9 @@ describe("OpenAPI Generation", () => {
     });
 
     it("should handle nested routers and path normalization", () => {
-        const root = new ConvectionRouter();
-        const api = new ConvectionRouter();
-        const users = new ConvectionRouter();
+        const root = new ShokupanRouter();
+        const api = new ShokupanRouter();
+        const users = new ShokupanRouter();
 
         users.get("/:userId/posts", (ctx) => []);
         api.mount("/users", users);

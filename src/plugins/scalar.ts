@@ -1,7 +1,7 @@
 import type { ApiReferenceConfiguration } from '@scalar/api-reference';
 import type { OpenAPI } from '@scalar/openapi-types';
 import { Eta } from 'eta';
-import { ConvectionRouter } from '../router';
+import { ShokupanRouter } from '../router';
 import type { DeepPartial } from '../types';
 
 const eta = new Eta();
@@ -11,7 +11,7 @@ export type ScalarPluginOptions = {
     config: Partial<ApiReferenceConfiguration>;
 };
 
-export class ScalarPlugin extends ConvectionRouter<any> {
+export class ScalarPlugin extends ShokupanRouter<any> {
     constructor(
         private readonly pluginOptions: ScalarPluginOptions
     ) {

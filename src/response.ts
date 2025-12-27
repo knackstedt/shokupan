@@ -3,7 +3,7 @@
  * Custom response class to handle response state (headers, status) 
  * before the actual Response object is created.
  */
-export class ConvectionResponse {
+export class ShokupanResponse {
     private _headers = new Headers();
     private _status = 200;
 

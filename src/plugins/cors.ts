@@ -1,8 +1,8 @@
-import type { ConvectionContext } from "../context";
+import type { ShokupanContext } from "../context";
 import type { Middleware, NextFn } from "../types";
 
 export interface CorsOptions {
-    origin?: string | string[] | ((ctx: ConvectionContext) => string | undefined | null | boolean);
+    origin?: string | string[] | ((ctx: ShokupanContext) => string | undefined | null | boolean);
     methods?: string | string[];
     allowedHeaders?: string | string[];
     exposedHeaders?: string | string[];
@@ -20,7 +20,7 @@ export function Cors(options: CorsOptions = {}): Middleware {
 
     const opts = { ...defaults, ...options };
 
-    return async (ctx: ConvectionContext, next: NextFn) => {
+    return async (ctx: ShokupanContext, next: NextFn) => {
         const headers = new Headers();
         const origin = ctx.headers.get("origin");
 

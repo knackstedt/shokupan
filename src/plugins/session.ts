@@ -1,6 +1,6 @@
 import { createHmac, randomUUID } from "crypto";
 import { EventEmitter } from "events";
-import { ConvectionContext } from "../context";
+import { ShokupanContext } from "../context";
 import type { Middleware } from "../types";
 
 // --- Types ---
@@ -26,7 +26,7 @@ export interface SessionOptions {
     name?: string;
     store?: Store;
     cookie?: CookieOptions;
-    genid?: (ctx: ConvectionContext) => string;
+    genid?: (ctx: ShokupanContext) => string;
     resave?: boolean;
     saveUninitialized?: boolean;
     rolling?: boolean;
@@ -193,9 +193,9 @@ export interface SessionContext {
     sessionStore: Store;
 }
 
-// Merge into ConvectionContext
+// Merge into ShokupanContext? TODO: Review.
 declare module "../context" {
-    interface ConvectionContext {
+    interface ShokupanContext {
         session: SessionContext['session'];
         sessionID: string;
         sessionStore: Store;
@@ -216,7 +216,7 @@ export function Session(options: SessionOptions): Middleware {
     const saveUninitialized = options.saveUninitialized === undefined ? true : options.saveUninitialized;
     const rolling = options.rolling || false;
 
-    return async (ctx: ConvectionContext, next) => {
+    return async (ctx: ShokupanContext, next) => {
         // 1. Get Session ID from Cookie
         let reqSessionId: string | null = null;
         let isSigned = false;
@@ -409,11 +409,7 @@ export function Session(options: SessionOptions): Middleware {
             const options = sess.cookie;
             // Serialize
             const str = options.serialize(name, val);
-            // ConvectionContext doesn't have appendHeader? It has set. 
-            // set replaces. We might want to append if multiple Set-Cookie.
-            // But ConvectionContext.res.headers is a Headers object.
-            // We can use ctx.res.headers.append if available (Bun/Node Headers has append)
-            ctx.res.headers.append("Set-Cookie", str);
+            ctx.set("Set-Cookie", str);
         }
 
         return result;

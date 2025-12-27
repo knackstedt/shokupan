@@ -1,4 +1,4 @@
-import type { ConvectionContext } from "../context";
+import type { ShokupanContext } from "../context";
 import type { Middleware, NextFn } from "../types";
 
 export interface CompressionOptions {
@@ -8,7 +8,7 @@ export interface CompressionOptions {
 export function Compression(options: CompressionOptions = {}): Middleware {
     const threshold = options.threshold ?? 1024; // 1KB default
 
-    return async (ctx: ConvectionContext, next: NextFn) => {
+    return async (ctx: ShokupanContext, next: NextFn) => {
         const acceptEncoding = ctx.headers.get("accept-encoding") || "";
 
         // Check if compression is supported

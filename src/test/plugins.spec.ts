@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { Convection } from "../convect";
 import { Compression } from "../plugins/compression";
 import { Cors } from "../plugins/cors";
 import { RateLimit } from "../plugins/rate-limit";
 import { SecurityHeaders } from "../plugins/security-headers";
+import { Shokupan } from "../shokupan";
 
 describe("Plugins", () => {
     test("CORS", async () => {
-        const app = new Convection();
+        const app = new Shokupan();
         app.use(Cors({
             origin: "http://example.com",
             methods: "GET,POST"
@@ -41,7 +41,7 @@ describe("Plugins", () => {
     });
 
     test("SecurityHeaders", async () => {
-        const app = new Convection();
+        const app = new Shokupan();
         app.use(SecurityHeaders());
 
         app.get("/", (ctx) => ctx.text("ok"));
@@ -57,7 +57,7 @@ describe("Plugins", () => {
     });
 
     test("Rate Limit", async () => {
-        const app = new Convection();
+        const app = new Shokupan();
         app.use(RateLimit({
             windowMs: 1000,
             max: 2
@@ -94,7 +94,7 @@ describe("Plugins", () => {
     });
 
     test("Compression", async () => {
-        const app = new Convection();
+        const app = new Shokupan();
         app.use(Compression({ threshold: 0 })); // Compress everything
 
         app.get("/", (ctx) => ctx.text("hello world"));
@@ -109,7 +109,7 @@ describe("Plugins", () => {
         // processRequest reads body as text/json.
         // If content-encoding is set, processRequest usually decodes it automatically if using native fetch client, 
         // OR returns the raw buffer if we didn't decode.
-        // In Convection `processRequest`:
+        // In Shokupan `processRequest`:
         // It calls `fetch`, then reads `res.json()` or `res.text()`.
         // Native Response.text() transparently decompresses if headers are standard? 
         // Actually, Bun/Node's Response logic handles decompression if content-encoding is gzip.
@@ -133,7 +133,7 @@ describe("Plugins", () => {
     });
 
     test("Compression (Brotli)", async () => {
-        const app = new Convection();
+        const app = new Shokupan();
         app.use(Compression({ threshold: 0 }));
 
         app.get("/", (ctx) => ctx.text("hello brotli"));

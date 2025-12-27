@@ -1,10 +1,10 @@
 
 import { describe, expect, test } from "bun:test";
-import { ConvectionRouter } from '../router';
+import { ShokupanRouter } from '../router';
 
 describe("OpenAPI Configurable Tags", () => {
     test("should use configured default tag group", () => {
-        const router = new ConvectionRouter();
+        const router = new ShokupanRouter();
         router.get("/hello", async () => "Hello");
 
         const spec = router.generateApiSpec({
@@ -20,7 +20,7 @@ describe("OpenAPI Configurable Tags", () => {
     });
 
     test("should use configured default tag", () => {
-        const router = new ConvectionRouter();
+        const router = new ShokupanRouter();
         router.get("/hello", async () => "Hello");
 
         const spec = router.generateApiSpec({
@@ -39,7 +39,7 @@ describe("OpenAPI Configurable Tags", () => {
     });
 
     test("should use both configured default group and tag", () => {
-        const router = new ConvectionRouter();
+        const router = new ShokupanRouter();
         router.get("/hello", async () => "Hello");
 
         const spec = router.generateApiSpec({
@@ -57,7 +57,7 @@ describe("OpenAPI Configurable Tags", () => {
     });
 
     test("should use default values if options not provided", () => {
-        const router = new ConvectionRouter();
+        const router = new ShokupanRouter();
         router.get("/hello", async () => "Hello");
 
         const spec = router.generateApiSpec();

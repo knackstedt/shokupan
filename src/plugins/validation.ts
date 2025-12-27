@@ -1,4 +1,4 @@
-import { ConvectionContext } from "../context";
+import { ShokupanContext } from "../context";
 import type { Middleware } from "../types";
 
 export interface ValidationConfig {
@@ -75,7 +75,7 @@ async function validateValibotWrapper(wrapper: any, data: any) {
 
 // --- Body Helper ---
 
-const safelyGetBody = async (ctx: ConvectionContext) => {
+const safelyGetBody = async (ctx: ShokupanContext) => {
     const req = ctx.req as any;
 
     // Check if already parsed
@@ -86,10 +86,11 @@ const safelyGetBody = async (ctx: ConvectionContext) => {
     try {
         let data: any;
         // Standard Request consumes stream
-        // ConvectionRequest (internal) has properties
+        // ShokupanRequest (internal) has properties
         if (typeof req.json === 'function') {
             data = await req.json();
-        } else {
+        }
+        else {
             // Fallback if req is plain object with body property (internal usage)
             data = req.body;
             if (typeof data === 'string') {
@@ -119,7 +120,7 @@ const safelyGetBody = async (ctx: ConvectionContext) => {
 // --- Main Middleware ---
 
 export function validate(config: ValidationConfig): Middleware {
-    return async (ctx: ConvectionContext, next) => {
+    return async (ctx: ShokupanContext, next) => {
         // Validate Params
         if (config.params) {
             ctx.params = await runValidation(config.params, ctx.params);

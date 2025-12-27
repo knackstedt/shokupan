@@ -8,8 +8,8 @@ import {
     generateState
 } from "arctic";
 import * as jose from "jose";
-import { ConvectionContext } from "../context";
-import { ConvectionRouter } from "../router";
+import { ShokupanContext } from "../context";
+import { ShokupanRouter } from "../router";
 
 export interface AuthUser {
     id: string;
@@ -44,7 +44,7 @@ export interface AuthConfig {
         path?: string;
         maxAge?: number;
     };
-    onSuccess?: (user: AuthUser, ctx: ConvectionContext) => Promise<any> | any;
+    onSuccess?: (user: AuthUser, ctx: ShokupanContext) => Promise<any> | any;
     providers: {
         github?: ProviderConfig;
         google?: ProviderConfig;
@@ -57,14 +57,14 @@ export interface AuthConfig {
     };
 }
 
-export class AuthPlugin extends ConvectionRouter<any> {
+export class AuthPlugin extends ShokupanRouter<any> {
     private secret: Uint8Array;
 
-    constructor(private config: AuthConfig) {
+    constructor(private authConfig: AuthConfig) {
         super();
-        this.secret = typeof config.jwtSecret === 'string'
-            ? new TextEncoder().encode(config.jwtSecret)
-            : config.jwtSecret;
+        this.secret = typeof authConfig.jwtSecret === 'string'
+            ? new TextEncoder().encode(authConfig.jwtSecret)
+            : authConfig.jwtSecret;
 
         this.init();
     }
@@ -96,16 +96,16 @@ export class AuthPlugin extends ConvectionRouter<any> {
         }
     }
 
-    private async createSession(user: AuthUser, ctx: ConvectionContext) {
+    private async createSession(user: AuthUser, ctx: ShokupanContext) {
         const alg = 'HS256';
         const jwt = await new jose.SignJWT({ ...user })
             .setProtectedHeader({ alg })
             .setIssuedAt()
-            .setExpirationTime(this.config.jwtExpiration || '24h')
+            .setExpirationTime(this.authConfig.jwtExpiration || '24h')
             .sign(this.secret);
 
         // Set cookie
-        const opts = this.config.cookieOptions || {};
+        const opts = this.authConfig.cookieOptions || {};
         let cookie = `auth_token=${jwt}; Path=${opts.path || '/'}; HttpOnly`;
         if (opts.secure) cookie += '; Secure';
         if (opts.sameSite) cookie += `; SameSite=${opts.sameSite}`;
@@ -117,7 +117,7 @@ export class AuthPlugin extends ConvectionRouter<any> {
     }
 
     private init() {
-        for (const [providerName, providerConfig] of Object.entries(this.config.providers)) {
+        for (const [providerName, providerConfig] of Object.entries(this.authConfig.providers)) {
             if (!providerConfig) continue;
 
             const provider = this.getProviderInstance(providerName, providerConfig);
@@ -197,8 +197,8 @@ export class AuthPlugin extends ConvectionRouter<any> {
                     const accessToken = tokens.accessToken || tokens.access_token;
                     const user = await this.fetchUser(providerName, accessToken, providerConfig, idToken);
 
-                    if (this.config.onSuccess) {
-                        const res = await this.config.onSuccess(user, ctx);
+                    if (this.authConfig.onSuccess) {
+                        const res = await this.authConfig.onSuccess(user, ctx);
                         if (res) return res; // Allow override response
                     }
 
@@ -311,7 +311,7 @@ export class AuthPlugin extends ConvectionRouter<any> {
      * Middleware to verify JWT
      */
     public middleware() {
-        return async (ctx: ConvectionContext, next: () => Promise<any>) => {
+        return async (ctx: ShokupanContext, next: () => Promise<any>) => {
             const authHeader = ctx.req.headers.get("Authorization");
             let token = authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : null;
 

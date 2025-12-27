@@ -1,5 +1,5 @@
 import type { OpenAPI } from '@scalar/openapi-types';
-import type { ConvectionContext } from './context';
+import type { ShokupanContext } from './context';
 import { $isRouter } from "./symbol";
 
 export type DeepPartial<T> = T extends object ? {
@@ -21,7 +21,7 @@ export interface OpenAPIOptions {
 }
 
 
-export type ConvectionHandler<T extends Record<string, any> = Record<string, any>> = (ctx: ConvectionContext<T>, next?: NextFn) => Promise<any> | any;
+export type ShokupanHandler<T extends Record<string, any> = Record<string, any>> = (ctx: ShokupanContext<T>, next?: NextFn) => Promise<any> | any;
 export const HTTPMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "ALL"];
 export type Method = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "OPTIONS" | "HEAD" | "ALL";
 
@@ -35,34 +35,34 @@ export enum RouteParamType {
 }
 
 export type NextFn = () => Promise<any>;
-export type Middleware = (ctx: ConvectionContext<unknown>, next: NextFn) => Promise<any> | any;
+export type Middleware = (ctx: ShokupanContext<unknown>, next: NextFn) => Promise<any> | any;
 
-export type ConvectionRouteConfig = DeepPartial<{
+export type ShokupanRouteConfig = DeepPartial<{
     name: string;
     group: string;
     openapi: DeepPartial<OpenAPI.Operation>;
 }>;
 
-export type ConvectionRoute = {
+export type ShokupanRoute = {
     method: Method;
     path: string;
     regex: RegExp;
     keys: string[];
-    handler: ConvectionHandler;
+    handler: ShokupanHandler;
     handlerSpec?: MethodAPISpec;
     group?: string;
     guards?: {
-        handler: ConvectionHandler;
+        handler: ShokupanHandler;
         spec?: GuardAPISpec;
     }[];
 };
 
-export type ConvectionConfig<T extends Record<string, any> = Record<string, any>> = DeepPartial<{
+export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> = DeepPartial<{
     port: number;
     hostname: string;
     development: boolean;
     enableAsyncLocalStorage: boolean;
-    httpLogger: (ctx: ConvectionContext<T>) => void;
+    httpLogger: (ctx: ShokupanContext<T>) => void;
     logger: {
         verbose: boolean;
         info: (msg: string, props: Record<string, any>) => void;
@@ -94,13 +94,13 @@ export interface ProcessResult {
     data: any;
 }
 
-export type ConvectionController<T = any> = (new (...args: any[]) => T) & {
+export type ShokupanController<T = any> = (new (...args: any[]) => T) & {
     [$isRouter]?: undefined;
 };
 
 export interface StaticServeHooks<T extends Record<string, any>> {
-    onRequest?: (ctx: ConvectionContext<T>) => Promise<Response | void> | Response | void;
-    onResponse?: (ctx: ConvectionContext<T>, response: Response) => Promise<Response> | Response;
+    onRequest?: (ctx: ShokupanContext<T>) => Promise<Response | void> | Response | void;
+    onResponse?: (ctx: ShokupanContext<T>, response: Response) => Promise<Response> | Response;
 }
 
 export interface StaticServeOptions<T extends Record<string, any>> {

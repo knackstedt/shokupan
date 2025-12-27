@@ -1,39 +1,39 @@
 import { describe, expect, it } from "bun:test";
+import type { ShokupanContext } from "../context";
 import { ScalarPlugin } from "../plugins/scalar";
-
+import { ShokupanRouter } from "../router";
+import { Shokupan } from "../shokupan";
+import { $controllerPath, $routeMethods } from "../symbol";
 // ... existing imports ...
 
 // ...
+describe("ScalarPlugin", () => {
+    it("should generate full spec from ScalarPlugin mount", async () => {
+        const app = new Shokupan();
+        app.get("/app-root", () => "root");
 
-it("should generate full spec from ScalarPlugin mount", async () => {
-    const app = new Convection();
-    app.get("/app-root", () => "root");
+        const plugin = new ScalarPlugin({
+            baseDocument: { info: { title: "Test", version: "1" } },
+            config: {}
+        });
 
-    const plugin = new ScalarPlugin({
-        baseDocument: { info: { title: "Test", version: "1" } }
+        app.mount("/docs", plugin);
+
+        // Access the /docs/openapi.json endpoint logic through the plugin instance
+        // We can simulate a request to the plugin's internal route handler or just 
+        // call the method that the route handler calls if we exposed it, but we modified
+        // the ROUTE HANDLER in scalar.ts.
+
+        // So we need to execute the route handler for "GET /openapi.json" on the plugin.
+        // Or we can just use `app.subRequest`.
+
+        const response = await app.subRequest("/docs/openapi.json");
+        expect(response.status).toBe(200);
+        const spec = await response.json();
+
+        expect(spec.paths["/app-root"]).toBeDefined();
     });
-
-    app.mount("/docs", plugin);
-
-    // Access the /docs/openapi.json endpoint logic through the plugin instance
-    // We can simulate a request to the plugin's internal route handler or just 
-    // call the method that the route handler calls if we exposed it, but we modified
-    // the ROUTE HANDLER in scalar.ts.
-
-    // So we need to execute the route handler for "GET /openapi.json" on the plugin.
-    // Or we can just use `app.subRequest`.
-
-    const response = await app.subRequest("/docs/openapi.json");
-    expect(response.status).toBe(200);
-    const spec = await response.json();
-
-    expect(spec.paths["/app-root"]).toBeDefined();
 });
-
-import type { ConvectionContext } from "../context";
-import { Convection } from "../convect";
-import { ConvectionRouter } from "../router";
-import { $controllerPath, $routeMethods } from "../symbol";
 
 // Mock Controller Decorator for testing "Bindings"
 function Controller(path: string) {
@@ -52,12 +52,12 @@ function Get(path: string) {
 @Controller("/users")
 class UserController {
     @Get("/")
-    async getUsers(ctx: ConvectionContext) {
+    async getUsers(ctx: ShokupanContext) {
         return [{ id: 1, name: "Alice" }];
     }
 
     @Get("/:id")
-    async getUser(ctx: ConvectionContext) {
+    async getUser(ctx: ShokupanContext) {
         return { id: ctx.params['id'], name: "Alice" };
     }
 }
@@ -65,25 +65,26 @@ class UserController {
 // Plain object binding
 const AuthBinding = {
     // Should map to GET /auth/login
-    async getLogin(ctx: ConvectionContext) {
+    async getLogin(ctx: ShokupanContext) {
         return "Login Page";
     },
     // Should map to POST /auth/login
-    async postLogin(ctx: ConvectionContext) {
+    async postLogin(ctx: ShokupanContext) {
         return { token: "abc" };
     }
 };
 
+
 describe("OpenAPI Comprehensive Repro", () => {
     it("should include all route types, guards, mounts, and bindings in OpenAPI spec", () => {
-        const app = new Convection();
+        const app = new Shokupan();
 
         // 1. Basic Routes
         app.get("/health", { summary: "Health Check", responses: { 200: { description: "OK" } } }, () => "OK");
         app.post("/submit", { summary: "Submit Data", responses: { 200: { description: "OK" } } }, () => "Received");
 
         // 2. Guards
-        const adminRouter = new ConvectionRouter();
+        const adminRouter = new ShokupanRouter();
         adminRouter.guard({
             description: "Admin Guard",
             security: [{ bearerAuth: [] }]
@@ -138,10 +139,10 @@ describe("OpenAPI Comprehensive Repro", () => {
     });
 
     it("should generate full spec even when called from a child router (like ScalarPlugin)", () => {
-        const app = new Convection();
+        const app = new Shokupan();
         app.get("/root", () => "root");
 
-        const plugin = new ConvectionRouter();
+        const plugin = new ShokupanRouter();
         plugin.get("/plugin-route", () => "plugin");
 
         // Emulate ScalarPlugin behavior where it exposes /openapi.json that calls generateApiSpec
@@ -169,7 +170,7 @@ describe("OpenAPI Comprehensive Repro", () => {
     });
 
     it("should generate full spec from ScalarPlugin mount", async () => {
-        const app = new Convection();
+        const app = new Shokupan();
         app.get("/app-root", () => "root");
 
         // We need to import ScalarPlugin dynamically or assume it's available if we add import at top

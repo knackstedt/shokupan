@@ -1,7 +1,7 @@
 
 import { describe, expect, test } from "bun:test";
-import { Convection } from '../convect';
 import { Get, Post } from '../decorators';
+import { Shokupan } from '../shokupan';
 
 // Example Controller with mixed usage
 class DecoratedController {
@@ -28,7 +28,7 @@ class DecoratedController {
 }
 
 describe("Decorator Routing", () => {
-    const app = new Convection();
+    const app = new Shokupan();
     app.mount("/base", DecoratedController);
 
     test("should support standard convention methods alongside decorators", async () => {

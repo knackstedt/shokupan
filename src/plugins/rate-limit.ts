@@ -1,4 +1,4 @@
-import type { ConvectionContext } from "../context";
+import type { ShokupanContext } from "../context";
 import type { Middleware, NextFn } from "../types";
 
 export interface RateLimitOptions {
@@ -7,8 +7,8 @@ export interface RateLimitOptions {
     message?: string | object;
     statusCode?: number;
     headers?: boolean;
-    keyGenerator?: (ctx: ConvectionContext) => string;
-    skip?: (ctx: ConvectionContext) => boolean;
+    keyGenerator?: (ctx: ShokupanContext) => string;
+    skip?: (ctx: ShokupanContext) => boolean;
 }
 
 interface HitRecord {
@@ -45,7 +45,7 @@ export function RateLimit(options: RateLimitOptions = {}): Middleware {
     // Ensure interval doesn't block process exit
     if (interval.unref) interval.unref();
 
-    return async (ctx: ConvectionContext, next: NextFn) => {
+    return async (ctx: ShokupanContext, next: NextFn) => {
         if (skip(ctx)) return next();
 
         const key = keyGenerator(ctx);

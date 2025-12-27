@@ -1,25 +1,25 @@
 import "./util/instrumentation";
 
 import { context, trace } from '@opentelemetry/api';
-import { ConvectionContext } from "./context";
+import { ShokupanContext } from "./context";
 import { compose } from "./middleware";
-import { ConvectionRequest } from './request';
-import { ConvectionRouter } from "./router";
+import { ShokupanRequest } from './request';
+import { ShokupanRouter } from "./router";
 import { $appRoot, $dispatch, $isApplication } from './symbol';
-import type { ConvectionConfig, Method, Middleware, ProcessResult, RequestOptions } from './types';
+import type { Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig } from './types';
 import { asyncContext } from "./util/async-hooks";
 
-const defaults: ConvectionConfig = {
+const defaults: ShokupanConfig = {
     port: 3000,
     hostname: "localhost",
     development: process.env.NODE_ENV !== "production",
     enableAsyncLocalStorage: false,
 };
-const tracer = trace.getTracer("convect.application");
+const tracer = trace.getTracer("shokupan.application");
 
 
-export class Convection<T = any> extends ConvectionRouter<T> {
-    readonly applicationConfig: ConvectionConfig = {};
+export class Shokupan<T = any> extends ShokupanRouter<T> {
+    readonly applicationConfig: ShokupanConfig = {};
     private middleware: Middleware[] = [];
 
     get logger() {
@@ -27,7 +27,7 @@ export class Convection<T = any> extends ConvectionRouter<T> {
     }
 
     constructor(
-        applicationConfig: ConvectionConfig = {}
+        applicationConfig: ShokupanConfig = {}
     ) {
         super();
         this[$isApplication] = true;
@@ -67,11 +67,11 @@ export class Convection<T = any> extends ConvectionRouter<T> {
             fetch: this.fetch.bind(this)
         });
 
-        console.log(`Convect server listening on http://${server.hostname}:${server.port}`);
+        console.log(`Shokupan server listening on http://${server.hostname}:${server.port}`);
         return server;
     }
 
-    public [$dispatch](req: ConvectionRequest<T>) {
+    public [$dispatch](req: ShokupanRequest<T>) {
         return this.fetch(req as unknown as Request);
     }
 
@@ -95,12 +95,12 @@ export class Convection<T = any> extends ConvectionRouter<T> {
         }
 
         // Create Request to pass to fetch
-        const req = new ConvectionRequest({
+        const req = new ShokupanRequest({
             method: (options.method || "GET") as Method,
             url,
             headers: options.headers as any,
             body: options.body && typeof options.body === "object" ? JSON.stringify(options.body) : options.body
-        }) as unknown as ConvectionRequest<T>;
+        }) as unknown as ShokupanRequest<T>;
 
         const res = await this.fetch(req as unknown as Request);
 
@@ -132,7 +132,7 @@ export class Convection<T = any> extends ConvectionRouter<T> {
      * @returns The response to send.
      */
     public async fetch(req: Request): Promise<Response> {
-        const tracer = trace.getTracer("convect.application");
+        const tracer = trace.getTracer("shokupan.application");
         const store = asyncContext.getStore();
 
         const attrs = {
@@ -150,12 +150,12 @@ export class Convection<T = any> extends ConvectionRouter<T> {
             ctxMap.set("request", req);
 
             const runCallback = () => {
-                // Cast to ConvectionRequest if needed, though at runtime it's just a Request
-                // But ConvectionContext expects ConvectionRequest.
-                const request = req as unknown as ConvectionRequest<T>;
+                // Cast to ShokupanRequest if needed, though at runtime it's just a Request
+                // But ShokupanContext expects ShokupanRequest.
+                const request = req as unknown as ShokupanRequest<T>;
 
                 const handle = async () => {
-                    const ctx = new ConvectionContext<T>(request);
+                    const ctx = new ShokupanContext<T>(request);
 
                     // Compose middleware + router dispatch
                     const fn = compose(this.middleware);

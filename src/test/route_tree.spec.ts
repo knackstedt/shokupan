@@ -1,26 +1,26 @@
 
 import { describe, expect, test } from "bun:test";
-import { ConvectionContext } from '../context';
-import { Convection } from '../convect';
-import { ConvectionRouter } from '../router';
+import { ShokupanContext } from '../context';
+import { ShokupanRouter } from '../router';
+import { Shokupan } from '../shokupan';
 
 // Mock controller
 class UserController {
-    get(ctx: ConvectionContext) { return "getAll"; }
-    getProfile(ctx: ConvectionContext) { return "getProfile"; }
-    postCreate(ctx: ConvectionContext) { return "create"; }
+    get(ctx: ShokupanContext) { return "getAll"; }
+    getProfile(ctx: ShokupanContext) { return "getProfile"; }
+    postCreate(ctx: ShokupanContext) { return "create"; }
 }
 
 describe("Routing Tree Structure", () => {
     test("should correctly build and expose the routing tree", () => {
-        const app = new Convection();
+        const app = new Shokupan();
 
         // Level 1 Router
-        const apiRouter = new ConvectionRouter();
+        const apiRouter = new ShokupanRouter();
         apiRouter.get("/status", () => "ok");
 
         // Level 2 Router
-        const v1Router = new ConvectionRouter();
+        const v1Router = new ShokupanRouter();
         v1Router.get("/version", () => "v1");
 
         // Mount logic

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { Convection } from '../convect';
+import { Shokupan } from '../shokupan';
 
 describe("Cookie Support", () => {
     it("should set a simple cookie", async () => {
-        const app = new Convection({ port: 0 });
+        const app = new Shokupan({ port: 0 });
 
         app.get("/cookie", (ctx) => {
             ctx.setCookie("foo", "bar");
@@ -18,7 +18,7 @@ describe("Cookie Support", () => {
     });
 
     it("should set a complex cookie with options", async () => {
-        const app = new Convection({ port: 0 });
+        const app = new Shokupan({ port: 0 });
 
         app.get("/complex-cookie", (ctx) => {
             ctx.setCookie("user", "alice", {

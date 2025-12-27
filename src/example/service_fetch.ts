@@ -1,6 +1,6 @@
-import { ConvectionRouter } from '../router';
+import { ShokupanRouter } from '../router';
 
-const router = new ConvectionRouter();
+const router = new ShokupanRouter();
 
 router.get("/service_fetch", async (ctx) => {
     const [data, data2] = await Promise.all([

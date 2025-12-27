@@ -2,14 +2,14 @@ import type { OpenAPI } from '@scalar/openapi-types';
 import { Eta } from 'eta';
 import { readdir, stat } from 'fs/promises';
 import { basename, join, resolve } from 'path';
-import { ConvectionContext } from './context';
-import type { Convection } from './convect';
+import { ShokupanContext } from './context';
 import { Container } from './di';
 import { compose } from './middleware';
-import { ConvectionRequest } from './request';
+import { ShokupanRequest } from './request';
+import type { Shokupan } from './shokupan';
 import { $appRoot, $childControllers, $childRouters, $controllerPath, $dispatch, $isApplication, $isMounted, $isRouter, $middleware, $mountPath, $parent, $routeArgs, $routeMethods } from './symbol';
-import type { ConvectionRouteConfig, GuardAPISpec, MethodAPISpec, OpenAPIOptions, ProcessResult, RequestOptions, StaticServeOptions } from './types';
-import { HTTPMethods, RouteParamType, type ConvectionController, type ConvectionHandler, type ConvectionRoute, type Method } from './types';
+import type { GuardAPISpec, MethodAPISpec, OpenAPIOptions, ProcessResult, RequestOptions, ShokupanRouteConfig, StaticServeOptions } from './types';
+import { HTTPMethods, RouteParamType, type Method, type ShokupanController, type ShokupanHandler, type ShokupanRoute } from './types';
 import { asyncContext } from './util/async-hooks';
 import { deepMerge } from './util/deep-merge';
 import { traceHandler } from './util/instrumentation';
@@ -21,21 +21,21 @@ const eta = new Eta();
 type HeadersInit = Headers | Record<string, string> | [string, string][];
 
 
-export const RouterRegistry = new Map<string, ConvectionRouter<any>>();
+export const RouterRegistry = new Map<string, ShokupanRouter<any>>();
 
-export const ConvectionApplicationTree = {};
+export const ShokupanApplicationTree = {};
 
-export class ConvectionRouter<T extends Record<string, any> = Record<string, any>> {
+export class ShokupanRouter<T extends Record<string, any> = Record<string, any>> {
     // Internal marker to identify Router vs. Application
     private [$isApplication]: boolean = false;
     private [$isMounted]: boolean = false;
     private [$isRouter]: true = true;
-    private [$appRoot]: Convection;
+    private [$appRoot]: Shokupan;
     private [$mountPath]: string = "/";
 
-    private [$parent]: ConvectionRouter<T> | null = null;
-    public [$childRouters]: ConvectionRouter<T>[] = [];
-    public [$childControllers]: ConvectionController[] = [];
+    private [$parent]: ShokupanRouter<T> | null = null;
+    public [$childRouters]: ShokupanRouter<T>[] = [];
+    public [$childControllers]: ShokupanController[] = [];
 
     get rootConfig() {
         return this[$appRoot]?.applicationConfig;
@@ -44,15 +44,15 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
         return this[$appRoot];
     }
 
-    private routes: ConvectionRoute[] = [];
-    private currentGuards: { handler: ConvectionHandler<T>; spec?: GuardAPISpec; }[] = [];
+    private routes: ShokupanRoute[] = [];
+    private currentGuards: { handler: ShokupanHandler<T>; spec?: GuardAPISpec; }[] = [];
 
     constructor(
-        private readonly config?: ConvectionRouteConfig
+        private readonly config?: ShokupanRouteConfig
     ) {
     }
 
-    private isRouterInstance(target: ConvectionController | ConvectionController<T> | ConvectionRouter | ConvectionRouter<T>): target is ConvectionRouter<T> {
+    private isRouterInstance(target: ShokupanController | ShokupanController<T> | ShokupanRouter | ShokupanRouter<T>): target is ShokupanRouter<T> {
         // Check if it's an object and has your specific symbol
         return typeof target === 'object' && target !== null && $isRouter in target;
     }
@@ -67,7 +67,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
      * - getUsers(ctx) -> GET /prefix/users
      * - postCreate(ctx) -> POST /prefix/create
      */
-    public mount(prefix: string, controller: ConvectionController | ConvectionController<T> | ConvectionRouter | ConvectionRouter<T>) {
+    public mount(prefix: string, controller: ShokupanController | ShokupanController<T> | ShokupanRouter | ShokupanRouter<T>) {
 
         if (this.isRouterInstance(controller)) {
             if (controller[$isMounted]) {
@@ -83,7 +83,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
              */
             controller[$parent] = this;
 
-            const setRouterContext = (router: ConvectionRouter<T>) => {
+            const setRouterContext = (router: ShokupanRouter<T>) => {
                 router[$appRoot] = this.root;
                 router[$childRouters].forEach((child) => setRouterContext(child));
             };
@@ -232,7 +232,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
                     const routeArgs = decoratedArgs && decoratedArgs.get(name);
 
                     // Create Wrapper
-                    const wrappedHandler = async (ctx: ConvectionContext<T>) => {
+                    const wrappedHandler = async (ctx: ShokupanContext<T>) => {
                         // Resolve Arguments
                         let args: any[] = [ctx]; // Default to just context if no decorators
 
@@ -301,7 +301,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
     /**
      * Returns all routes attached to this router and its descendants.
      */
-    public getRoutes(): { method: Method, path: string, handler: ConvectionHandler<T>; }[] {
+    public getRoutes(): { method: Method, path: string, handler: ShokupanHandler<T>; }[] {
         const routes = this.routes.map(r => ({
             method: r.method,
             path: r.path,
@@ -340,7 +340,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
         const options = typeof arg === "string" ? { path: arg } : arg;
 
         const store = asyncContext.getStore();
-        const originalReq = store?.get("req") as ConvectionRequest<T>;
+        const originalReq = store?.get("req") as ShokupanRequest<T>;
 
         let url = options.path;
         // If path is relative, make it absolute (required by Request constructor)
@@ -352,7 +352,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
             url = base + path;
         }
 
-        const req = new ConvectionRequest({
+        const req = new ShokupanRequest({
             method: options.method || "GET",
             url,
             headers: options.headers as any,
@@ -382,19 +382,19 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
             url = u.toString();
         }
 
-        const req = new ConvectionRequest({
+        const req = new ShokupanRequest({
             method: (options.method || "GET") as Method,
             url,
             headers: options.headers as any,
             body: options.body && typeof options.body === "object" ? JSON.stringify(options.body) : options.body
         });
 
-        // Basic Dispatch Logic (moved/duplicated from Convection.handleRequest but simpler for pure Router)
+        // Basic Dispatch Logic (moved/duplicated from Shokupan.handleRequest but simpler for pure Router)
         // Note: Pure Routers don't have global middleware usually, but if we call processRequest on them, 
         // we just run their routing logic.
-        // HOWEVER, Convection.override will invoke middleware.
+        // HOWEVER, Shokupan.override will invoke middleware.
 
-        const ctx = new ConvectionContext<T>(req);
+        const ctx = new ShokupanContext<T>(req);
 
         let result: any = null;
         let status = 200;
@@ -441,7 +441,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
         };
     }
 
-    public find(method: string, path: string): { handler: ConvectionHandler<T>; params: Record<string, string>; } | null {
+    public find(method: string, path: string): { handler: ShokupanHandler<T>; params: Record<string, string>; } | null {
         // console.log(`[Router] find ${method} ${path} (routes: ${this.routes.length}, children: ${this[$childRouters].length})`);
 
         // 1. Check local routes
@@ -511,7 +511,9 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
         method: Method,
         path: string,
         spec?: MethodAPISpec,
-        handler: ConvectionHandler<T>;
+        path: string,
+        spec?: MethodAPISpec,
+        handler: ShokupanHandler<T>;
         regex?: RegExp;
         group?: string;
     }) {
@@ -524,7 +526,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
         const routeGuards = [...this.currentGuards];
 
         if (routeGuards.length > 0) {
-            wrappedHandler = async (ctx: ConvectionContext<T>) => {
+            wrappedHandler = async (ctx: ShokupanContext<T>) => {
                 // Execute guards in order
                 for (const guard of routeGuards) {
                     let guardPassed = false;
@@ -587,7 +589,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public get(path: string, ...handlers: ConvectionHandler<T>[]);
+    public get(path: string, ...handlers: ShokupanHandler<T>[]);
     /**
      * Adds a GET route to the router.
      * 
@@ -595,8 +597,8 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public get(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler<T>[]);
-    public get(path: string, ...args: (MethodAPISpec | ConvectionHandler<T>)[]) {
+    public get(path: string, spec: MethodAPISpec, ...handlers: ShokupanHandler<T>[]);
+    public get(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
         this.attachVerb("GET", path, ...args);
         return this;
     }
@@ -607,7 +609,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public post(path: string, ...handlers: ConvectionHandler<T>[]);
+    public post(path: string, ...handlers: ShokupanHandler<T>[]);
     /**
      * Adds a POST route to the router.
      * 
@@ -615,8 +617,8 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public post(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler<T>[]);
-    public post(path: string, ...args: (MethodAPISpec | ConvectionHandler<T>)[]) {
+    public post(path: string, spec: MethodAPISpec, ...handlers: ShokupanHandler<T>[]);
+    public post(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
         this.attachVerb("POST", path, ...args);
         return this;
     }
@@ -627,7 +629,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public put(path: string, ...handlers: ConvectionHandler<T>[]);
+    public put(path: string, ...handlers: ShokupanHandler<T>[]);
     /**
      * Adds a PUT route to the router.
      * 
@@ -635,8 +637,8 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public put(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler<T>[]);
-    public put(path: string, ...args: (MethodAPISpec | ConvectionHandler<T>)[]) {
+    public put(path: string, spec: MethodAPISpec, ...handlers: ShokupanHandler<T>[]);
+    public put(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
         this.attachVerb("PUT", path, ...args);
         return this;
     }
@@ -647,7 +649,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public delete(path: string, ...handlers: ConvectionHandler<T>[]);
+    public delete(path: string, ...handlers: ShokupanHandler<T>[]);
     /**
      * Adds a DELETE route to the router.
      * 
@@ -655,8 +657,8 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public delete(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler<T>[]);
-    public delete(path: string, ...args: (MethodAPISpec | ConvectionHandler<T>)[]) {
+    public delete(path: string, spec: MethodAPISpec, ...handlers: ShokupanHandler<T>[]);
+    public delete(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
         this.attachVerb("DELETE", path, ...args);
         return this;
     }
@@ -667,7 +669,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public patch(path: string, ...handlers: ConvectionHandler<T>[]);
+    public patch(path: string, ...handlers: ShokupanHandler<T>[]);
     /**
      * Adds a PATCH route to the router.
      * 
@@ -675,8 +677,8 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public patch(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler<T>[]);
-    public patch(path: string, ...args: (MethodAPISpec | ConvectionHandler<T>)[]) {
+    public patch(path: string, spec: MethodAPISpec, ...handlers: ShokupanHandler<T>[]);
+    public patch(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
         this.attachVerb("PATCH", path, ...args);
         return this;
     }
@@ -687,7 +689,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public options(path: string, ...handlers: ConvectionHandler<T>[]);
+    public options(path: string, ...handlers: ShokupanHandler<T>[]);
     /**
      * Adds a OPTIONS route to the router.
      * 
@@ -695,8 +697,8 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public options(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler<T>[]);
-    public options(path: string, ...args: (MethodAPISpec | ConvectionHandler<T>)[]) {
+    public options(path: string, spec: MethodAPISpec, ...handlers: ShokupanHandler<T>[]);
+    public options(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
         this.attachVerb("OPTIONS", path, ...args);
         return this;
     }
@@ -707,7 +709,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
      * @param path - URL path    
      * @param handler - Route handler function 
      */
-    public head(path: string, ...handlers: ConvectionHandler<T>[]);
+    public head(path: string, ...handlers: ShokupanHandler<T>[]);
     /**
      * Adds a HEAD route to the router.
      * 
@@ -715,8 +717,8 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public head(path: string, spec: MethodAPISpec, ...handlers: ConvectionHandler<T>[]);
-    public head(path: string, ...args: (MethodAPISpec | ConvectionHandler<T>)[]) {
+    public head(path: string, spec: MethodAPISpec, ...handlers: ShokupanHandler<T>[]);
+    public head(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
         this.attachVerb("HEAD", path, ...args);
         return this;
     }
@@ -727,7 +729,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
      * 
      * @param handler - Guard handler function 
      */
-    public guard(handler: ConvectionHandler<T>): void;
+    public guard(handler: ShokupanHandler<T>): void;
     /**
      * Adds a guard to the router that applies to all routes added **after** this point.
      * Guards must return true or call `ctx.next()` to allow the request to continue.
@@ -735,10 +737,10 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
      * @param spec - OpenAPI specification for the guard
      * @param handler - Guard handler function 
      */
-    public guard(spec: GuardAPISpec, handler: ConvectionHandler<T>);
-    public guard(specOrHandler: GuardAPISpec | ConvectionHandler<T>, handler?: ConvectionHandler<T>) {
+    public guard(spec: GuardAPISpec, handler: ShokupanHandler<T>);
+    public guard(specOrHandler: GuardAPISpec | ShokupanHandler<T>, handler?: ShokupanHandler<T>) {
         const spec = typeof specOrHandler === "function" ? undefined : specOrHandler as GuardAPISpec;
-        const guardHandler = typeof specOrHandler === "function" ? specOrHandler as ConvectionHandler<T> : handler as ConvectionHandler<T>;
+        const guardHandler = typeof specOrHandler === "function" ? specOrHandler as ShokupanHandler<T> : handler as ShokupanHandler<T>;
 
         this.currentGuards.push({ handler: guardHandler, spec });
 
@@ -757,7 +759,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
         const prefix = uriPath.startsWith('/') ? uriPath : '/' + uriPath;
         const normalizedPrefix = prefix.endsWith('/') && prefix !== '/' ? prefix.slice(0, -1) : prefix;
 
-        const handler = async (ctx: ConvectionContext<T>) => {
+        const handler = async (ctx: ShokupanContext<T>) => {
             // 1. Calculate relative path
             // ctx.path is full path.
             // If prefix is /static, and path is /static/foo.css, relative is /foo.css
@@ -953,17 +955,17 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
      * Attach the verb routes with their overload signatures.
      * Use compose to handle multiple handlers (middleware).
      */
-    private attachVerb(method: Method, path: string, ...args: (MethodAPISpec | ConvectionHandler<T>)[]) {
+    private attachVerb(method: Method, path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
         let spec: MethodAPISpec | undefined;
-        let handlers: ConvectionHandler<T>[] = [];
+        let handlers: ShokupanHandler<T>[] = [];
 
         if (args.length > 0) {
-            // Check if first arg is an object (Spec) and NOT a ConvectionHandler (function)
+            // Check if first arg is an object (Spec) and NOT a ShokupanHandler (function)
             if (typeof args[0] === 'object' && args[0] !== null) {
                 spec = args[0] as MethodAPISpec;
-                handlers = args.slice(1) as ConvectionHandler<T>[];
+                handlers = args.slice(1) as ShokupanHandler<T>[];
             } else {
-                handlers = args as ConvectionHandler<T>[];
+                handlers = args as ShokupanHandler<T>[];
             }
         }
 
@@ -1006,7 +1008,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
         const defaultTagName = options.defaultTag || "Application";
 
         // Helper to collect routes
-        const collect = (router: ConvectionRouter<T>, prefix = "", currentGroup = defaultTagGroup, defaultTag = defaultTagName) => {
+        const collect = (router: ShokupanRouter<T>, prefix = "", currentGroup = defaultTagGroup, defaultTag = defaultTagName) => {
             // Determine effective group and tag for this router
             let group = currentGroup;
             let tag = defaultTag;
@@ -1147,7 +1149,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
 
                 // Wait, if `mount` adds routes to `this.routes`, then loop #1 (Local Routes) covers them.
                 // BUT, they are mixed in. We need to identify WHICH routes belong to WHICH controller to assign the correct tag.
-                // The current `ConvectionRoute` structure does not store "source controller".
+                // The current `ShokupanRoute` structure does not store "source controller".
 
                 // CRITICAL MISSING PIECE: We cannot distinguish controller routes from raw routes in `this.routes` 
                 // unless we store metadata on the route.
@@ -1196,7 +1198,7 @@ export class ConvectionRouter<T extends Record<string, any> = Record<string, any
         return {
             openapi: "3.1.0",
             info: {
-                title: "Convection API",
+                title: "Shokupan API",
                 version: "1.0.0",
                 ...options.info
             },

@@ -1,6 +1,6 @@
 import type { Method } from './types';
 
-export type ConvectionRequestProps = {
+export type ShokupanRequestProps = {
     method: Method;
     url: string;
     headers: Headers;
@@ -11,7 +11,7 @@ export type ConvectionRequestProps = {
  * This class is used to create a request object.
  * It is used to make requests to the router.
  */
-class ConvectionRequestBase {
+class ShokupanRequestBase {
     method: Method;
     url: string;
     headers: Headers;
@@ -26,7 +26,7 @@ class ConvectionRequestBase {
         return new Response(this.body, { headers: this.headers }).formData() as any;
     }
 
-    constructor(props: ConvectionRequestProps) {
+    constructor(props: ShokupanRequestProps) {
         Object.assign(this, props);
         if (!(this.headers instanceof Headers)) {
             this.headers = new Headers(this.headers);
@@ -37,14 +37,14 @@ class ConvectionRequestBase {
 /**
  * This type is used to add properties to the request object.
  */
-export type ConvectionRequest<T> = ConvectionRequestBase & T;
+export type ShokupanRequest<T> = ShokupanRequestBase & T;
 
-interface ConvectionConstructor {
-    new <T extends Record<string, any>>(props: ConvectionRequestProps): ConvectionRequest<T>;
+interface ShokupanConstructor {
+    new <T extends Record<string, any>>(props: ShokupanRequestProps): ShokupanRequest<T>;
 }
 
 /**
  * This class is used to create a request object.
  * It is used to make requests to the router.
  */
-export const ConvectionRequest = ConvectionRequestBase as ConvectionConstructor;
+export const ShokupanRequest = ShokupanRequestBase as ShokupanConstructor;

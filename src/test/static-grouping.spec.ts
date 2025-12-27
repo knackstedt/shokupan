@@ -2,8 +2,8 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdir, rmdir, unlink, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { Convection } from '../convect';
-import { ConvectionRouter } from '../router';
+import { ShokupanRouter } from '../router';
+import { Shokupan } from '../shokupan';
 
 describe("Static Route Grouping", () => {
     const testDir = join(process.cwd(), "test_static_grouping");
@@ -21,7 +21,7 @@ describe("Static Route Grouping", () => {
     });
 
     test("should handle root and child paths with single registration", async () => {
-        const app = new Convection();
+        const app = new Shokupan();
         app.static("/assets", { root: testDir });
         app.static("/images", { root: testDir });
         app.static("/files", { root: testDir });
@@ -46,7 +46,7 @@ describe("Static Route Grouping", () => {
     });
 
     test("should generate correct OpenAPI spec", () => {
-        const router = new ConvectionRouter();
+        const router = new ShokupanRouter();
         router.static("/assets", { root: testDir });
 
         const spec = router.generateApiSpec();
@@ -69,7 +69,7 @@ describe("Static Route Grouping", () => {
     });
 
     test("should group multiple static routes correctly under General", () => {
-        const router = new ConvectionRouter();
+        const router = new ShokupanRouter();
         router.static("/assets", { root: testDir });
         router.static("/images", { root: testDir });
         router.static("/files", { root: testDir });

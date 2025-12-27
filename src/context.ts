@@ -1,7 +1,7 @@
 
 import type { BodyInit } from 'bun';
-import type { ConvectionRequest } from './request';
-import { ConvectionResponse } from './response';
+import type { ShokupanRequest } from './request';
+import { ShokupanResponse } from './response';
 
 // Shim for HeadersInit if not available globally in some envs
 type HeadersInit = Headers | Record<string, string> | [string, string][];
@@ -18,20 +18,20 @@ export interface CookieOptions {
     priority?: 'low' | 'medium' | 'high';
 }
 
-export class ConvectionContext<State extends Record<string, any> = Record<string, any>> {
+export class ShokupanContext<State extends Record<string, any> = Record<string, any>> {
     public readonly url: URL;
     public params: Record<string, string> = {};
     public state: State;
 
-    public readonly response: ConvectionResponse;
+    public readonly response: ShokupanResponse;
 
     constructor(
-        public readonly request: ConvectionRequest<any>,
+        public readonly request: ShokupanRequest<any>,
         state?: State
     ) {
         this.url = new URL(request.url);
         this.state = state || {} as State;
-        this.response = new ConvectionResponse();
+        this.response = new ShokupanResponse();
     }
 
     /**

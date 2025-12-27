@@ -1,10 +1,10 @@
 
 import { describe, expect, it } from 'bun:test';
-import { Convection } from '../convect';
+import { Shokupan } from '../shokupan';
 
 describe('Multipart Support', () => {
     it('should parse multipart/form-data', async () => {
-        const app = new Convection();
+        const app = new Shokupan();
         app.post('/upload', async (ctx) => {
             const body = await ctx.body<FormData>();
             return ctx.json({

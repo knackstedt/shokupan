@@ -1,4 +1,4 @@
-import type { ConvectionContext } from "../context";
+import type { ShokupanContext } from "../context";
 import type { Middleware, NextFn } from "../types";
 
 export interface SecurityHeadersOptions {
@@ -20,7 +20,7 @@ export interface SecurityHeadersOptions {
 }
 
 export function SecurityHeaders(options: SecurityHeadersOptions = {}): Middleware {
-    return async (ctx: ConvectionContext, next: NextFn) => {
+    return async (ctx: ShokupanContext, next: NextFn) => {
         const headers: Record<string, string> = {};
 
         // Helper to set header if not already set or force it
@@ -94,7 +94,7 @@ export function SecurityHeaders(options: SecurityHeadersOptions = {}): Middlewar
         }
 
         if (options.hidePoweredBy !== false) {
-            // Note: Convection doesn't set X-Powered-By by default, so we usually don't need to remove it.
+            // Note: Shokupan doesn't set X-Powered-By by default, so we usually don't need to remove it.
             // But we can ensure it's not there.
             // We can't delete from response easily before it's created, but we can try to suppress it if we had a hook.
             // Here we might just do nothing as we don't add it.
@@ -102,8 +102,8 @@ export function SecurityHeaders(options: SecurityHeadersOptions = {}): Middlewar
 
         // Apply headers to context response
         // We need to apply these to the response *after* it's generated, or *before* if we use `ctx.headers` mutation?
-        // `ctx.headers` is currently read-only wrapper around `req.headers` in `ConvectionContext`?
-        // Wait, `ctx.headers` in `ConvectionContext` getter is `this.request.headers`.
+        // `ctx.headers` is currently read-only wrapper around `req.headers` in `ShokupanContext`?
+        // Wait, `ctx.headers` in `ShokupanContext` getter is `this.request.headers`.
         // We cannot set response headers on the request object.
         // We need to intercept the response.
 

@@ -1,5 +1,5 @@
 import { SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
-import type { ConvectionHandler, Middleware } from "../types";
+import type { Middleware, ShokupanHandler } from "../types";
 
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
 import { resourceFromAttributes } from '@opentelemetry/resources';
@@ -21,7 +21,7 @@ const provider = new NodeTracerProvider({
 });
 provider.register();
 
-const tracer = trace.getTracer("convect.middleware");
+const tracer = trace.getTracer("shokupan.middleware");
 
 /**
  * Wraps a middleware function with an OpenTelemetry span.
@@ -34,7 +34,7 @@ export function traceMiddleware(fn: Middleware, name?: string): Middleware {
             kind: SpanKind.INTERNAL,
             attributes: {
                 "code.function": middlewareName,
-                "component": "convection.middleware"
+                "component": "shokupan.middleware"
             }
         }, async (span) => {
             try {
@@ -56,13 +56,13 @@ export function traceMiddleware(fn: Middleware, name?: string): Middleware {
 /**
  * Wraps a route handler with an OpenTelemetry span.
  */
-export function traceHandler(fn: ConvectionHandler | ((...args: any[]) => any), name: string): ConvectionHandler {
+export function traceHandler(fn: ShokupanHandler | ((...args: any[]) => any), name: string): ShokupanHandler {
     return async function (this: any, ...args: any[]) {
         return tracer.startActiveSpan(`route handler - ${name}`, {
             kind: SpanKind.INTERNAL,
             attributes: {
                 "http.route": name,
-                "component": "convection.route"
+                "component": "shokupan.route"
             }
         }, async (span) => {
             try {

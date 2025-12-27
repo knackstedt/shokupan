@@ -1,7 +1,7 @@
 
 import { describe, expect, it } from 'bun:test';
 import { Controller, Get } from '../decorators';
-import { ConvectionRouter } from '../router';
+import { ShokupanRouter } from '../router';
 
 // Mock classes for testing hierarchy
 @Controller('/auth')
@@ -24,13 +24,13 @@ class UsersController {
 
 describe('OpenAPI x-tagGroups Generation', () => {
     it('should generate x-tagGroups with default group for unnamed routers', () => {
-        const root = new ConvectionRouter({
+        const root = new ShokupanRouter({
             openapi: {
                 info: { title: 'Test API', version: '1.0.0' }
             }
         });
 
-        const apiRouter = new ConvectionRouter();
+        const apiRouter = new ShokupanRouter();
 
         root.mount('/auth', AuthController);
 
@@ -54,7 +54,7 @@ describe('OpenAPI x-tagGroups Generation', () => {
     });
 
     it('should generate separated x-tagGroups for named routers with explicit group', () => {
-        const root = new ConvectionRouter({
+        const root = new ShokupanRouter({
             name: "Core Services",
             group: "Core Services",
             openapi: {
@@ -62,7 +62,7 @@ describe('OpenAPI x-tagGroups Generation', () => {
             }
         });
 
-        const apiRouter = new ConvectionRouter({
+        const apiRouter = new ShokupanRouter({
             name: "Content API",
             group: "Content API"
         });
@@ -91,11 +91,11 @@ describe('OpenAPI x-tagGroups Generation', () => {
     });
 
     it('should group nested routers as tags within parent group if name is set but group is not', () => {
-        const root = new ConvectionRouter({
+        const root = new ShokupanRouter({
             group: "Main API"
         });
 
-        const userRouter = new ConvectionRouter({
+        const userRouter = new ShokupanRouter({
             name: "Users" // Name only -> Should be a Tag in "Main API"
         });
         // Add a route to userRouter manually to verify tag assignment
@@ -116,11 +116,11 @@ describe('OpenAPI x-tagGroups Generation', () => {
     });
 
     it('should automatically infer tag name from mount path if name is missing', () => {
-        const root = new ConvectionRouter({
+        const root = new ShokupanRouter({
             group: "Auto Grouping"
         });
 
-        const adminRouter = new ConvectionRouter(); // No name provided
+        const adminRouter = new ShokupanRouter(); // No name provided
         adminRouter.get('/dashboard', () => { });
 
         // Mount at /admin -> Should infer tag "Admin"

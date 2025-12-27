@@ -1,11 +1,11 @@
 
 import { describe, expect, test } from "bun:test";
-import { Convection } from "../convect";
+import { Shokupan } from "../shokupan";
 import { asyncContext } from "../util/async-hooks";
 
 describe("AsyncLocalStorage Configuration", () => {
     test("should be disabled by default", async () => {
-        const app = new Convection();
+        const app = new Shokupan();
         let store: any;
 
         app.get("/", () => {
@@ -19,7 +19,7 @@ describe("AsyncLocalStorage Configuration", () => {
     });
 
     test("should be enabled when configured", async () => {
-        const app = new Convection({ enableAsyncLocalStorage: true });
+        const app = new Shokupan({ enableAsyncLocalStorage: true });
         let store: any;
 
         app.get("/", () => {
@@ -34,7 +34,7 @@ describe("AsyncLocalStorage Configuration", () => {
     });
 
     test("should remain disabled if explicitly set to false", async () => {
-        const app = new Convection({ enableAsyncLocalStorage: false });
+        const app = new Shokupan({ enableAsyncLocalStorage: false });
         let store: any;
 
         app.get("/", () => {
@@ -48,7 +48,7 @@ describe("AsyncLocalStorage Configuration", () => {
     });
 
     test("should persist state across async boundaries", async () => {
-        const app = new Convection({ enableAsyncLocalStorage: true });
+        const app = new Shokupan({ enableAsyncLocalStorage: true });
 
         app.use(async (ctx, next) => {
             const store = asyncContext.getStore();
@@ -68,7 +68,7 @@ describe("AsyncLocalStorage Configuration", () => {
     });
 
     test("should isolate state between concurrent requests", async () => {
-        const app = new Convection({ enableAsyncLocalStorage: true });
+        const app = new Shokupan({ enableAsyncLocalStorage: true });
 
         app.use(async (ctx, next) => {
             const store = asyncContext.getStore();
