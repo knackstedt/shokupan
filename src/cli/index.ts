@@ -79,6 +79,7 @@ async function main() {
                 validate: (value) => {
                     if (!value) return 'Name is required';
                     if (!/^[A-Z][a-zA-Z0-9]*$/.test(value)) return 'Please use PascalCase';
+                    return undefined;
                 },
             }),
             dir: () => p.text({

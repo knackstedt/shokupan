@@ -78,11 +78,12 @@ export class AuthPlugin extends ShokupanRouter<any> {
             case 'microsoft':
                 return new MicrosoftEntraId(p.tenantId!, p.clientId, p.clientSecret, p.redirectUri);
             case 'apple':
+                // TODO: There is a type issue, requires testing.
                 return new Apple(
                     p.clientId,
                     p.teamId!,
                     p.keyId!,
-                    p.clientSecret,
+                    p.clientSecret as any,
                     p.redirectUri
                 );
             case 'auth0':
@@ -221,7 +222,7 @@ export class AuthPlugin extends ShokupanRouter<any> {
             const res = await fetch("https://api.github.com/user", {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            const data = await res.json();
+            const data = await res.json() as any;
             user = {
                 id: String(data.id),
                 name: data.name || data.login,
@@ -235,7 +236,7 @@ export class AuthPlugin extends ShokupanRouter<any> {
             const res = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            const data = await res.json();
+            const data = await res.json() as any;
             user = {
                 id: data.sub,
                 name: data.name,
@@ -249,7 +250,7 @@ export class AuthPlugin extends ShokupanRouter<any> {
             const res = await fetch("https://graph.microsoft.com/v1.0/me", {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            const data = await res.json();
+            const data = await res.json() as any;
             user = {
                 id: data.id,
                 name: data.displayName,
@@ -265,7 +266,7 @@ export class AuthPlugin extends ShokupanRouter<any> {
             const res = await fetch(endpoint, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            const data = await res.json();
+            const data = await res.json() as any;
             user = {
                 id: data.sub,
                 name: data.name,
@@ -281,7 +282,7 @@ export class AuthPlugin extends ShokupanRouter<any> {
                 const payload = jose.decodeJwt(idToken);
                 user = {
                     id: payload.sub!,
-                    email: payload.email as string,
+                    email: payload['email'] as string,
                     provider,
                     raw: payload
                 };
@@ -292,7 +293,7 @@ export class AuthPlugin extends ShokupanRouter<any> {
                 const res = await fetch(config.userInfoUrl, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                const data = await res.json();
+                const data = await res.json() as any;
                 user = {
                     id: data.id || data.sub || 'unknown',
                     name: data.name,
