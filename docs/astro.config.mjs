@@ -3,6 +3,8 @@ import { defineConfig } from 'astro/config';
 
 // https://astro.build/config
 export default defineConfig({
+    site: 'https://knackstedt.github.io',
+    base: '/shokupan',
     integrations: [
         starlight({
             title: 'Shokupan',
