@@ -127,8 +127,12 @@ export class ConvectionContext<State extends Record<string, any> = Record<string
      * Read request body
      */
     async body<T = any>(): Promise<T> {
-        if (this.request.headers.get("content-type")?.includes("application/json")) {
+        const contentType = this.request.headers.get("content-type");
+        if (contentType?.includes("application/json")) {
             return this.request.json() as any;
+        }
+        if (contentType?.includes("multipart/form-data") || contentType?.includes("application/x-www-form-urlencoded")) {
+            return this.request.formData() as any;
         }
         return this.request.text() as any;
     }
