@@ -441,6 +441,12 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         };
     }
 
+    /**
+     * Find a route matching the given method and path.
+     * @param method HTTP method
+     * @param path Request path
+     * @returns Route handler and parameters if found, otherwise null
+     */
     public find(method: string, path: string): { handler: ShokupanHandler<T>; params: Record<string, string>; } | null {
         // console.log(`[Router] find ${method} ${path} (routes: ${this.routes.length}, children: ${this[$childRouters].length})`);
 

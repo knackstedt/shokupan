@@ -177,9 +177,9 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     /**
      * Respond with a file
      */
-    file(path: string, options?: ResponseInit) {
-        const headers = this.mergeHeaders(options?.headers as any);
-        const status = options?.status ?? this.response.status;
-        return new Response(Bun.file(path), { status, headers });
+    file(path: string, fileOptions?: BlobPropertyBag, responseOptions?: ResponseInit) {
+        const headers = this.mergeHeaders(responseOptions?.headers as any);
+        const status = responseOptions?.status ?? this.response.status;
+        return new Response(Bun.file(path, fileOptions), { status, headers });
     }
 }
