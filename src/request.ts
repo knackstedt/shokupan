@@ -19,7 +19,12 @@ class ConvectionRequestBase {
 
     async json(): Promise<any> { return JSON.parse(this.body); }
     async text(): Promise<string> { return this.body; }
-    async formData(): Promise<FormData> { return this.body; }
+    async formData(): Promise<FormData> {
+        if (this.body instanceof FormData) {
+            return this.body;
+        }
+        return new Response(this.body, { headers: this.headers }).formData() as any;
+    }
 
     constructor(props: ConvectionRequestProps) {
         Object.assign(this, props);
