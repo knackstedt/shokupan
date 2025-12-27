@@ -1,22 +1,11 @@
 
 import type { BodyInit } from 'bun';
+import type { CookieOptions } from './main';
 import type { ShokupanRequest } from './request';
 import { ShokupanResponse } from './response';
 
 // Shim for HeadersInit if not available globally in some envs
 type HeadersInit = Headers | Record<string, string> | [string, string][];
-
-
-export interface CookieOptions {
-    maxAge?: number;
-    expires?: Date;
-    httpOnly?: boolean;
-    secure?: boolean;
-    domain?: string;
-    path?: string;
-    sameSite?: boolean | 'lax' | 'strict' | 'none';
-    priority?: 'low' | 'medium' | 'high';
-}
 
 export class ShokupanContext<State extends Record<string, any> = Record<string, any>> {
     public readonly url: URL;

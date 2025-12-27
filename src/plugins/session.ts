@@ -19,6 +19,7 @@ export interface CookieOptions {
     domain?: string;
     secure?: boolean | 'auto';
     sameSite?: boolean | 'lax' | 'strict' | 'none';
+    priority?: 'low' | 'medium' | 'high';
 }
 
 export interface SessionOptions {

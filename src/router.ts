@@ -511,8 +511,6 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         method: Method,
         path: string,
         spec?: MethodAPISpec,
-        path: string,
-        spec?: MethodAPISpec,
         handler: ShokupanHandler<T>;
         regex?: RegExp;
         group?: string;
