@@ -10,7 +10,7 @@ export interface SessionData {
     [key: string]: any;
 }
 
-export interface CookieOptions {
+export interface SessionCookieOptions {
     maxAge?: number;
     signed?: boolean;
     expires?: Date;
@@ -26,7 +26,7 @@ export interface SessionOptions {
     secret: string | string[];
     name?: string;
     store?: Store;
-    cookie?: CookieOptions;
+    cookie?: SessionCookieOptions;
     genid?: (ctx: ShokupanContext) => string;
     resave?: boolean;
     saveUninitialized?: boolean;
@@ -48,7 +48,7 @@ export interface Store extends EventEmitter {
 
 // --- Cookie Helper ---
 
-class Cookie implements CookieOptions {
+class Cookie implements SessionCookieOptions {
     maxAge?: number;
     signed?: boolean;
     expires?: Date;
@@ -59,7 +59,7 @@ class Cookie implements CookieOptions {
     sameSite?: boolean | 'lax' | 'strict' | 'none';
     originalMaxAge: number | undefined;
 
-    constructor(options: CookieOptions = {}) {
+    constructor(options: SessionCookieOptions = {}) {
         this.path = options.path || '/';
         this.httpOnly = options.httpOnly !== undefined ? options.httpOnly : true;
         this.secure = options.secure;

@@ -20,6 +20,17 @@ export interface OpenAPIOptions {
     defaultTag?: string;
 }
 
+export interface CookieOptions {
+    maxAge?: number;
+    expires?: Date;
+    httpOnly?: boolean;
+    secure?: boolean;
+    domain?: string;
+    path?: string;
+    sameSite?: boolean | 'lax' | 'strict' | 'none' | 'Lax' | 'Strict' | 'None';
+    priority?: 'low' | 'medium' | 'high' | 'Low' | 'Medium' | 'High';
+}
+
 
 export type ShokupanHandler<T extends Record<string, any> = Record<string, any>> = (ctx: ShokupanContext<T>, next?: NextFn) => Promise<any> | any;
 export const HTTPMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "ALL"];

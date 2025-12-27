@@ -1,8 +1,8 @@
 
 import type { BodyInit } from 'bun';
-import type { CookieOptions } from './main';
 import type { ShokupanRequest } from './request';
 import { ShokupanResponse } from './response';
+import type { CookieOptions } from './types';
 
 // Shim for HeadersInit if not available globally in some envs
 type HeadersInit = Headers | Record<string, string> | [string, string][];

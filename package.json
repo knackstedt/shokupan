@@ -1,12 +1,30 @@
 {
     "name": "shokupan",
     "version": "0.0.1",
+    "type": "module",
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js",
+            "require": "./dist/index.cjs"
+        },
+        "./cli": {
+            "types": "./dist/cli/index.d.ts",
+            "import": "./dist/cli.js",
+            "require": "./dist/cli.cjs"
+        }
+    },
     "scripts": {
         "dev": "bun --watch --inspect src/example/main.ts",
-        "debug:otel": "sh scripts/debug-otel.sh"
+        "debug:otel": "sh scripts/debug-otel.sh",
+        "build": "vite build"
     },
     "bin": {
-        "skp": "./src/cli/index.ts"
+        "shokupan": "./dist/cli.js",
+        "skp": "./dist/cli.js"
     },
     "private": true,
     "dependencies": {
@@ -36,6 +54,8 @@
         "supertest": "^7.1.4",
         "typescript": "~5.9.3",
         "valibot": "^1.2.0",
+        "vite": "^7.3.0",
+        "vite-plugin-dts": "^4.5.4",
         "zod": "^4.2.1"
     }
 }
