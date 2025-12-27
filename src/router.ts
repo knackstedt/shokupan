@@ -1,4 +1,3 @@
-import type { OpenAPI } from '@scalar/openapi-types';
 import { ShokupanContext } from './context';
 import { Container } from './di';
 import { compose } from './middleware';
@@ -862,8 +861,9 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
     /**
      * Generates an OpenAPI 3.1 Document by recursing through the router and its descendants.
+     * Now includes runtime analysis of handler functions to infer request/response types.
      */
-    public generateApiSpec(options: OpenAPIOptions = {}): OpenAPI.Document {
+    public generateApiSpec(options: OpenAPIOptions = {}): any {
         return generateOpenApi(this, options);
     }
 }

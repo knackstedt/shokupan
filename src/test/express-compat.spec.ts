@@ -1,6 +1,6 @@
 
 import { describe, expect, it } from "bun:test";
-import { useExpress } from '../middleware';
+import { useExpress } from '../plugins/express';
 import { Shokupan } from '../shokupan';
 
 describe("Express Compatibility", () => { // Skipping initially until implementation is ready or to run manually

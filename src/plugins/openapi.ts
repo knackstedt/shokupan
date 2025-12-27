@@ -1,84 +1,182 @@
-import type { OpenAPI } from '@scalar/openapi-types';
 import type { ShokupanRouter } from '../router';
 import { $childControllers, $childRouters, $mountPath, $routes } from '../symbol';
-import type { OpenAPIOptions } from '../types';
+import type { OpenAPIOptions, ShokupanHandler } from '../types';
 import { deepMerge } from '../util/deep-merge';
 
-export function generateOpenApi<T extends Record<string, any>>(rootRouter: ShokupanRouter<T>, options: OpenAPIOptions = {}): OpenAPI.Document {
-    const paths: OpenAPI.Document['paths'] = {};
+/**
+ * Analyze a handler function to infer request/response types
+ */
+function analyzeHandler(handler: ShokupanHandler): { inferredSpec?: any; } {
+    const handlerSource = handler.toString();
+    const inferredSpec: any = {};
+
+    // Detect request body
+    if (handlerSource.includes('ctx.body') || handlerSource.includes('await ctx.req.json()')) {
+        inferredSpec.requestBody = {
+            content: { 'application/json': { schema: { type: 'object' } } }
+        };
+    }
+
+    // Detect query parameters with type detection
+    const queryParams = new Map<string, { type: string; format?: string; }>();
+
+    const queryIntMatch = handlerSource.match(/parseInt\(ctx\.query\.(\w+)\)/g);
+    if (queryIntMatch) {
+        queryIntMatch.forEach(match => {
+            const paramName = match.match(/ctx\.query\.(\w+)/)?.[1];
+            if (paramName) queryParams.set(paramName, { type: 'integer', format: 'int32' });
+        });
+    }
+
+    const queryFloatMatch = handlerSource.match(/parseFloat\(ctx\.query\.(\w+)\)/g);
+    if (queryFloatMatch) {
+        queryFloatMatch.forEach(match => {
+            const paramName = match.match(/ctx\.query\.(\w+)/)?.[1];
+            if (paramName) queryParams.set(paramName, { type: 'number', format: 'float' });
+        });
+    }
+
+    const queryNumberMatch = handlerSource.match(/Number\(ctx\.query\.(\w+)\)/g);
+    if (queryNumberMatch) {
+        queryNumberMatch.forEach(match => {
+            const paramName = match.match(/ctx\.query\.(\w+)/)?.[1];
+            if (paramName && !queryParams.has(paramName)) {
+                queryParams.set(paramName, { type: 'number' });
+            }
+        });
+    }
+
+    const queryBoolMatch = handlerSource.match(/(?:Boolean\(ctx\.query\.(\w+)\)|!+ctx\.query\.(\w+))/g);
+    if (queryBoolMatch) {
+        queryBoolMatch.forEach(match => {
+            const paramName = match.match(/ctx\.query\.(\w+)/)?.[1];
+            if (paramName && !queryParams.has(paramName)) {
+                queryParams.set(paramName, { type: 'boolean' });
+            }
+        });
+    }
+
+    const queryMatch = handlerSource.match(/ctx\.query\.(\w+)/g);
+    if (queryMatch) {
+        queryMatch.forEach(match => {
+            const paramName = match.split('.')[2];
+            if (paramName && !queryParams.has(paramName)) {
+                queryParams.set(paramName, { type: 'string' });
+            }
+        });
+    }
+
+    if (queryParams.size > 0) {
+        if (!inferredSpec.parameters) inferredSpec.parameters = [];
+        queryParams.forEach((schema, paramName) => {
+            inferredSpec.parameters.push({
+                name: paramName,
+                in: 'query',
+                schema: { type: schema.type, ...(schema.format ? { format: schema.format } : {}) }
+            });
+        });
+    }
+
+    // Detect path parameters
+    const pathParams = new Map<string, { type: string; format?: string; }>();
+
+    const paramIntMatch = handlerSource.match(/parseInt\(ctx\.params\.(\w+)\)/g);
+    if (paramIntMatch) {
+        paramIntMatch.forEach(match => {
+            const paramName = match.match(/ctx\.params\.(\w+)/)?.[1];
+            if (paramName) pathParams.set(paramName, { type: 'integer', format: 'int32' });
+        });
+    }
+
+    const paramFloatMatch = handlerSource.match(/parseFloat\(ctx\.params\.(\w+)\)/g);
+    if (paramFloatMatch) {
+        paramFloatMatch.forEach(match => {
+            const paramName = match.match(/ctx\.params\.(\w+)/)?.[1];
+            if (paramName) pathParams.set(paramName, { type: 'number', format: 'float' });
+        });
+    }
+
+    if (pathParams.size > 0) {
+        if (!inferredSpec.parameters) inferredSpec.parameters = [];
+        pathParams.forEach((schema, paramName) => {
+            inferredSpec.parameters.push({
+                name: paramName,
+                in: 'path',
+                required: true,
+                schema: { type: schema.type, ...(schema.format ? { format: schema.format } : {}) }
+            });
+        });
+    }
+
+    // Detect headers
+    const headerMatch = handlerSource.match(/ctx\.get\(['"](\w+)['"]\)/g);
+    if (headerMatch) {
+        if (!inferredSpec.parameters) inferredSpec.parameters = [];
+        headerMatch.forEach(match => {
+            const headerName = match.match(/['"](\w+)['"]/)?.[1];
+            if (headerName) {
+                inferredSpec.parameters.push({
+                    name: headerName,
+                    in: 'header',
+                    schema: { type: 'string' }
+                });
+            }
+        });
+    }
+
+    // Detect response
+    if (handlerSource.includes('ctx.json(')) {
+        inferredSpec.responses = {
+            '200': {
+                description: 'Successful response',
+                content: { 'application/json': { schema: { type: 'object' } } }
+            }
+        };
+    }
+
+    return { inferredSpec };
+}
+
+export function generateOpenApi<T extends Record<string, any>>(rootRouter: ShokupanRouter<T>, options: OpenAPIOptions = {}): any {
+    const paths: Record<string, any> = {};
     const tagGroups = new Map<string, Set<string>>();
 
     const defaultTagGroup = options.defaultTagGroup || "General";
     const defaultTagName = options.defaultTag || "Application";
 
-    // Helper to collect routes
     const collect = (router: ShokupanRouter<T>, prefix = "", currentGroup = defaultTagGroup, defaultTag = defaultTagName) => {
-        // Determine effective group and tag for this router
         let group = currentGroup;
         let tag = defaultTag;
 
-        // If explicit group name is provided, switch to that group
-        if (router.config?.group) {
-            group = router.config.group;
-        }
-
-        // If explicit name is provided, switch to that tag
-        // If name is present, it updates the Tag.
+        if (router.config?.group) group = router.config.group;
         if (router.config?.name) {
             tag = router.config.name;
         } else {
-            // Infer from mountPath if name is missing
             const mountPath = router[$mountPath];
             if (mountPath && mountPath !== "/") {
-                // Convert /path/to/something -> Something? Or PathToSomething?
-                // Strategy: Take the last segment
                 const segments = mountPath.split("/").filter(Boolean);
                 if (segments.length > 0) {
                     const lastSegment = segments[segments.length - 1];
-                    // Capitalize logic
-                    const humanized = lastSegment
-                        .replace(/[-_]/g, ' ')
-                        .replace(/\b\w/g, c => c.toUpperCase());
-
-                    tag = humanized;
+                    tag = lastSegment.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                 }
             }
         }
 
-        // Ensure group exists
-        if (!tagGroups.has(group)) {
-            tagGroups.set(group, new Set());
-        }
+        if (!tagGroups.has(group)) tagGroups.set(group, new Set());
 
-        // 1. Local Routes
-        // Accessing routes via Symbol as per refactor plan
         const routes = (router as any)[$routes] || [];
 
         for (const route of routes) {
-            // Determine effective group for this route
             const routeGroup = route.group || group;
-
-            // Determine full path
             const cleanPrefix = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
             const cleanSubPath = route.path.startsWith("/") ? route.path : "/" + route.path;
             let fullPath = (cleanPrefix + cleanSubPath) || "/";
-
-            // Convert path parameters from :param to {param} for OpenAPI
             fullPath = fullPath.replace(/:([a-zA-Z0-9_]+)/g, "{$1}");
 
-            // Initialize path item if missing
-            if (!paths[fullPath]) {
-                paths[fullPath] = {};
-            }
+            if (!paths[fullPath]) paths[fullPath] = {};
 
-            // Generate Operation Spec
-            const operation: OpenAPI.Operation = {
-                responses: {
-                    200: { description: "OK" }
-                }
-            };
+            const operation: any = { responses: { '200': { description: "OK" } } };
 
-            // Add Path Parameters from route keys
             if (route.keys.length > 0) {
                 operation.parameters = route.keys.map((key: string) => ({
                     name: key,
@@ -88,102 +186,81 @@ export function generateOpenApi<T extends Record<string, any>>(rootRouter: Shoku
                 }));
             }
 
-            // Merge Guard Specs
-            if (route.guards) {
-                for (const guard of route.guards) {
-                    if (guard.spec) {
-                        deepMerge(operation, guard.spec);
-                    }
+            // Runtime analysis
+            const { inferredSpec } = analyzeHandler(route.handler);
+            if (inferredSpec) {
+                if (inferredSpec.parameters && operation.parameters) {
+                    const paramMap = new Map<string, any>();
+                    operation.parameters.forEach((p: any) => paramMap.set(`${p.in}:${p.name}`, p));
+                    inferredSpec.parameters.forEach((p: any) => paramMap.set(`${p.in}:${p.name}`, p));
+                    operation.parameters = Array.from(paramMap.values());
+                    const { parameters, ...restInferred } = inferredSpec;
+                    deepMerge(operation, restInferred);
+                } else {
+                    deepMerge(operation, inferredSpec);
                 }
             }
 
-            // Merge Handler Spec
-            if (route.handlerSpec) {
-                deepMerge(operation, route.handlerSpec);
+            if (route.guards) {
+                for (const guard of route.guards) {
+                    if (guard.spec) deepMerge(operation, guard.spec);
+                }
             }
 
-            // Apply Default Tag if none exist
-            if (!operation.tags || operation.tags.length === 0) {
-                operation.tags = [tag];
-            }
+            if (route.handlerSpec) deepMerge(operation, route.handlerSpec);
 
-            // Deduplicate Tags
+            if (!operation.tags || operation.tags.length === 0) operation.tags = [tag];
+
             if (operation.tags) {
                 operation.tags = Array.from(new Set(operation.tags));
-                // Register tags to group
                 for (const t of operation.tags) {
-                    // Ensure group exists if it was switched
-                    if (!tagGroups.has(routeGroup)) {
-                        tagGroups.set(routeGroup, new Set());
-                    }
+                    if (!tagGroups.has(routeGroup)) tagGroups.set(routeGroup, new Set());
                     tagGroups.get(routeGroup)?.add(t);
                 }
             }
 
-            // Assign to path item
             const methodLower = route.method.toLowerCase();
             if (methodLower === "all") {
                 ["get", "post", "put", "delete", "patch"].forEach(m => {
-                    if (!(paths as any)[fullPath][m]) {
-                        (paths as any)[fullPath][m] = { ...operation };
-                    }
+                    if (!paths[fullPath][m]) paths[fullPath][m] = { ...operation };
                 });
             } else {
-                (paths as any)[fullPath][methodLower] = operation;
+                paths[fullPath][methodLower] = operation;
             }
         }
 
-        // 2. Child Controllers
         for (const controller of router[$childControllers]) {
-            const mountPath = (controller as any)[$mountPath] || ""; // Should differ based on controller logic
-            // Re-calculate prefix for controller
+            const mountPath = (controller as any)[$mountPath] || "";
             const cleanPrefix = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
             const cleanMount = mountPath.startsWith("/") ? mountPath : "/" + mountPath;
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const nextPrefix = (cleanPrefix + cleanMount) || "/";
-
-            // Controller Name as Tag
             const controllerName = controller.constructor.name || "UnknownController";
             tagGroups.get(group)?.add(controllerName);
-
-            // Note: Controller routes are also added to `routes` via `mount()`, so they are processed in loop #1.
-            // Tagging logic for controller-based routes should ideally be handled within the route metadata itself.
         }
 
-        // 3. Child Routers
         for (const child of router[$childRouters]) {
             const mountPath = child[$mountPath];
             const cleanPrefix = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
             const cleanMount = mountPath.startsWith("/") ? mountPath : "/" + mountPath;
             const nextPrefix = (cleanPrefix + cleanMount) || "/";
-
             collect(child, nextPrefix, group, tag);
         }
     };
 
     collect(rootRouter);
 
-    // Build x-tagGroups
     const xTagGroups: { name: string; tags: string[]; }[] = [];
     for (const [name, tags] of tagGroups) {
-        xTagGroups.push({
-            name,
-            tags: Array.from(tags).sort()
-        });
+        xTagGroups.push({ name, tags: Array.from(tags).sort() });
     }
 
     return {
         openapi: "3.1.0",
-        info: {
-            title: "Shokupan API",
-            version: "1.0.0",
-            ...options.info
-        },
+        info: { title: "Shokupan API", version: "1.0.0", ...options.info },
         paths,
         components: options.components,
         servers: options.servers,
         tags: options.tags,
         externalDocs: options.externalDocs,
         "x-tagGroups": xTagGroups
-    } as OpenAPI.Document;
+    };
 }

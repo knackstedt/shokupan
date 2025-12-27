@@ -3,6 +3,7 @@ import * as p from '@clack/prompts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { setTimeout } from 'node:timers/promises';
+import { analyzeDirectory } from './openapi-analyzer';
 
 const templates = {
     controller: (name: string) => `import { Controller, Get, Ctx } from 'shokupan';
@@ -55,7 +56,7 @@ export class ${name}Plugin extends ShokupanRouter {
 `
 };
 
-async function main() {
+async function scaffold() {
     console.clear();
     p.intro(`Shokupan CLI Scaffolder`);
 
@@ -146,7 +147,86 @@ Make sure to register it in your main application file if necessary.`;
 
     p.note(nextSteps, 'Next steps');
 
-    p.outro(`Problems? Open an issue at https://github.com/dotglitch/express.ts`);
+    p.outro(`Problems? Open an issue at https://github.com/dotglitch/shokupan`);
 }
 
-main().catch(console.error);;
+async function analyze() {
+    console.clear();
+    p.intro(`Shokupan OpenAPI Analyzer`);
+
+    const args = process.argv.slice(2);
+    let directory = process.cwd();
+    let outputPath = 'openapi.json';
+
+    // Parse command line arguments
+    // analyze [directory] [--output file.json]
+    const analyzeIndex = args.indexOf('analyze');
+    if (analyzeIndex !== -1 && args.length > analyzeIndex + 1) {
+        const nextArg = args[analyzeIndex + 1];
+        if (!nextArg.startsWith('--')) {
+            directory = path.resolve(nextArg);
+        }
+    }
+
+    const outputIndex = args.indexOf('--output');
+    if (outputIndex !== -1 && args.length > outputIndex + 1) {
+        outputPath = args[outputIndex + 1];
+    }
+
+    // Verify directory exists
+    if (!fs.existsSync(directory)) {
+        p.cancel(`Directory not found: ${directory}`);
+        process.exit(1);
+    }
+
+    const s = p.spinner();
+    s.start(`Analyzing directory: ${directory}`);
+
+    try {
+        const spec = await analyzeDirectory(directory);
+
+        s.stop('Analysis complete');
+
+        // Write to file
+        const fullOutputPath = path.resolve(outputPath);
+        fs.writeFileSync(fullOutputPath, JSON.stringify(spec, null, 2));
+
+        p.note(`OpenAPI spec written to: ${fullOutputPath}`, 'Success');
+
+        // Show summary
+        const pathCount = Object.keys(spec.paths || {}).length;
+        p.note(`Found ${pathCount} unique paths`, 'Summary');
+
+        p.outro('Done!');
+    } catch (error: any) {
+        s.stop('Analysis failed');
+        p.cancel(`Error: ${error.message}`);
+        console.error(error);
+        process.exit(1);
+    }
+}
+
+async function main() {
+    const args = process.argv.slice(2);
+    const command = args[0];
+
+    if (command === 'analyze') {
+        await analyze();
+    } else if (command === 'scaffold' || !command) {
+        // Default to scaffold for backwards compatibility
+        await scaffold();
+    } else {
+        console.log('Shokupan CLI');
+        console.log('');
+        console.log('Commands:');
+        console.log('  scaffold (default) - Scaffold controllers, middleware, or plugins');
+        console.log('  analyze <directory> - Analyze a Shokupan application and generate OpenAPI spec');
+        console.log('');
+        console.log('Usage:');
+        console.log('  shokupan scaffold');
+        console.log('  shokupan analyze <directory> [--output openapi.json]');
+        process.exit(0);
+    }
+}
+
+main().catch(console.error);
