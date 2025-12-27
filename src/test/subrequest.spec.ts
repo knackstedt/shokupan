@@ -1,13 +1,13 @@
 
 import { describe, expect, test } from "bun:test";
-import { Convection } from '../convect';
-import { ConvectionRouter } from '../router';
+import { ShokupanRouter } from '../router';
+import { Shokupan } from '../shokupan';
 import { $dispatch } from '../symbol';
 
 describe("SubRequest (Forking)", () => {
     // Setup app and router once
-    const app = new Convection();
-    const router = new ConvectionRouter();
+    const app = new Shokupan();
+    const router = new ShokupanRouter();
 
     // Define a target route that handles ANY method
     const targetHandler = (ctx: any) => {
