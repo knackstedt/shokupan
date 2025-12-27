@@ -1,0 +1,344 @@
+---
+title: Sessions
+description: Session management with connect-style store support
+---
+
+Shokupan provides session management compatible with connect/express-session stores.
+
+## Basic Usage
+
+```typescript
+import { Shokupan, Session } from 'shokupan';
+
+const app = new Shokupan();
+
+app.use(Session({
+    secret: 'your-secret-key'
+}));
+
+app.get('/login', (ctx) => {
+    ctx.session.user = { id: '123', name: 'Alice' };
+    return { message: 'Logged in' };
+});
+
+app.get('/profile', (ctx) => {
+    if (!ctx.session.user) {
+        return ctx.json({ error: 'Not authenticated' }, 401);
+    }
+    return ctx.session.user;
+});
+
+app.get('/logout', (ctx) => {
+    ctx.session.destroy();
+    return { message: 'Logged out' };
+});
+
+app.listen();
+```
+
+## Configuration
+
+```typescript
+app.use(Session({
+    secret: 'your-secret-key',  // Required
+    name: 'sessionId',          // Cookie name (default: 'connect.sid')
+    resave: false,              // Don't save unchanged sessions
+    saveUninitialized: false,   // Don't create sessions until needed
+    
+    cookie: {
+        httpOnly: true,
+        secure: true,                 // HTTPS only
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        sameSite: 'lax'
+    }
+}));
+```
+
+## Session Stores
+
+### Memory Store (Development)
+
+The default memory store is for development only:
+
+```typescript
+app.use(Session({
+    secret: 'dev-secret'
+    // Uses memory store by default
+}));
+```
+
+:::caution[Production Warning]
+Memory store doesn't scale and loses data on restart. Use a persistent store in production.
+:::
+
+### Redis Store
+
+```bash
+bun add connect-redis redis
+```
+
+```typescript
+import { Session } from 'shokupan';
+import RedisStore from 'connect-redis';
+import { createClient } from 'redis';
+
+const redisClient = createClient();
+await redisClient.connect();
+
+app.use(Session({
+    secret: process.env.SESSION_SECRET!,
+    store: new RedisStore({ client: redisClient }),
+    cookie: {
+        maxAge: 24 * 60 * 60 * 1000
+    }
+}));
+```
+
+### MongoDB Store
+
+```bash
+bun add connect-mongo
+```
+
+```typescript
+import MongoStore from 'connect-mongo';
+
+app.use(Session({
+    secret: process.env.SESSION_SECRET!,
+    store: MongoStore.create({
+        mongoUrl: process.env.MONGODB_URL!
+    })
+}));
+```
+
+### SQLite Store
+
+```bash
+bun add connect-sqlite3
+```
+
+```typescript
+import SQLiteStore from 'connect-sqlite3';
+
+const SQLiteSession = SQLiteStore(Session);
+
+app.use(Session({
+    secret: process.env.SESSION_SECRET!,
+    store: new SQLiteSession({
+        db: 'sessions.db',
+        dir: './data'
+    })
+}));
+```
+
+## Session Methods
+
+### Set Data
+
+```typescript
+app.post('/cart/add', async (ctx) => {
+    const { productId } = await ctx.body();
+    
+    if (!ctx.session.cart) {
+        ctx.session.cart = [];
+    }
+    
+    ctx.session.cart.push(productId);
+    
+    return { cart: ctx.session.cart };
+});
+```
+
+### Get Data
+
+```typescript
+app.get('/cart', (ctx) => {
+    return {
+        cart: ctx.session.cart || []
+    };
+});
+```
+
+### Delete Data
+
+```typescript
+app.post('/cart/clear', (ctx) => {
+    delete ctx.session.cart;
+    return { message: 'Cart cleared' };
+});
+```
+
+### Destroy Session
+
+```typescript
+app.post('/logout', (ctx) => {
+    ctx.session.destroy();
+    return { message: 'Logged out' };
+});
+```
+
+### Regenerate Session
+
+```typescript
+app.post('/login', async (ctx) => {
+    const { username, password } = await ctx.body();
+    
+    // Validate credentials
+    const user = await validateUser(username, password);
+    
+    if (user) {
+        // Regenerate session ID (security best practice)
+        await ctx.session.regenerate();
+        
+        ctx.session.user = user;
+        return { message: 'Logged in' };
+    }
+    
+    return ctx.json({ error: 'Invalid credentials' }, 401);
+});
+```
+
+## Common Patterns
+
+### Authentication
+
+```typescript
+// Login
+app.post('/login', async (ctx) => {
+    const { email, password } = await ctx.body();
+    
+    const user = await authenticateUser(email, password);
+    
+    if (!user) {
+        return ctx.json({ error: 'Invalid credentials' }, 401);
+    }
+    
+    ctx.session.userId = user.id;
+    ctx.session.email = user.email;
+    
+    return { user };
+});
+
+// Protected route
+const requireAuth = async (ctx, next) => {
+    if (!ctx.session.userId) {
+        return ctx.json({ error: 'Unauthorized' }, 401);
+    }
+    
+    ctx.state.user = await getUserById(ctx.session.userId);
+    return next();
+};
+
+app.get('/profile', requireAuth, (ctx) => {
+    return ctx.state.user;
+});
+
+// Logout
+app.post('/logout', (ctx) => {
+    ctx.session.destroy();
+    return { message: 'Logged out' };
+});
+```
+
+### Shopping Cart
+
+```typescript
+app.get('/cart', (ctx) => {
+    return { items: ctx.session.cart || [] };
+});
+
+app.post('/cart', async (ctx) => {
+    const { productId, quantity } = await ctx.body();
+    
+    if (!ctx.session.cart) {
+        ctx.session.cart = [];
+    }
+    
+    ctx.session.cart.push({ productId, quantity });
+    
+    return { cart: ctx.session.cart };
+});
+```
+
+### Flash Messages
+
+```typescript
+app.post('/submit', async (ctx) => {
+    // Process form
+    
+    ctx.session.flash = { 
+        type: 'success', 
+        message: 'Form submitted successfully' 
+    };
+    
+    return ctx.redirect('/dashboard');
+});
+
+app.get('/dashboard', (ctx) => {
+    const flash = ctx.session.flash;
+    delete ctx.session.flash;  // Remove after reading
+    
+    return { flash };
+});
+```
+
+## Security Best Practices
+
+:::tip[Security]
+- Use HTTPS in production
+- Set `httpOnly: true` to prevent XSS
+- Set `secure: true` in production
+- Use strong session secrets
+- Regenerate sessions after login
+- Set appropriate expiration times
+:::
+
+```typescript
+app.use(Session({
+    secret: process.env.SESSION_SECRET!,  // Strong, random secret
+    
+    resave: false,
+    saveUninitialized: false,
+    
+    cookie: {
+        httpOnly: true,              // Prevent XSS
+        secure: process.env.NODE_ENV === 'production',  // HTTPS only
+        sameSite: 'strict',          // CSRF protection
+        maxAge: 60 * 60 * 1000      // 1 hour
+    }
+}));
+```
+
+## TypeScript Types
+
+Type your session data:
+
+```typescript
+import { ShokupanContext } from 'shokupan';
+
+interface SessionData {
+    userId?: string;
+    email?: string;
+    cart?: Array<{ productId: string; quantity: number }>;
+}
+
+declare module 'shokupan' {
+    interface ShokupanContext {
+        session: SessionData & {
+            destroy: () => void;
+            regenerate: () => Promise<void>;
+        };
+    }
+}
+
+// Now you have type safety
+app.get('/profile', (ctx) => {
+    const userId = ctx.session.userId;  // Typed as string | undefined
+});
+```
+
+## Next Steps
+
+- [Authentication](/plugins/authentication/) - OAuth2 support
+- [Rate Limiting](/plugins/rate-limiting/) - Protect login endpoints
+- [Security Headers](/plugins/security-headers/) - Add security headers

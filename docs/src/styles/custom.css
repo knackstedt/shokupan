@@ -1,0 +1,20 @@
+/* Custom styles for Shokupan documentation */
+
+:root {
+  --sl-hue-accent: 280;
+  --sl-color-accent-low: #2d1b69;
+  --sl-color-accent: #7c3aed;
+  --sl-color-accent-high: #a78bfa;
+}
+
+/* Dark mode adjustments */
+:root[data-theme='dark'] {
+  --sl-color-accent-low: #1e1b4b;
+  --sl-color-accent: #8b5cf6;
+  --sl-color-accent-high: #c4b5fd;
+}
+
+/* Code block improvements */
+.expressive-code {
+  margin: 1.5rem 0;
+}

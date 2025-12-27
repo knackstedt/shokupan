@@ -1,0 +1,65 @@
+---
+title: Deployment
+description: Deploy your Shokupan application
+---
+
+## Using Bun
+
+```bash
+bun run src/index.ts
+```
+
+## Docker
+
+```dockerfile
+FROM oven/bun:1
+
+WORKDIR /app
+
+COPY package.json bun.lock ./
+RUN bun install --production
+
+COPY . .
+
+EXPOSE 3000
+
+CMD ["bun", "run", "src/index.ts"]
+```
+
+Build and run:
+
+```bash
+docker build -t my-app .
+docker run -p 3000:3000 my-app
+```
+
+## Environment Variables
+
+Create a `.env` file:
+
+```bash
+PORT=3000
+NODE_ENV=production
+DATABASE_URL=postgresql://...
+JWT_SECRET=your-secret
+```
+
+Load in your app:
+
+```typescript
+const app = new Shokupan({
+    port: parseInt(process.env.PORT || '3000'),
+    development: process.env.NODE_ENV !== 'production'
+});
+```
+
+## Production Checklist
+
+- [ ] Use environment variables for secrets
+- [ ] Enable HTTPS
+- [ ] Set security headers
+- [ ] Configure CORS properly
+- [ ] Add rate limiting
+- [ ] Use production database
+- [ ] Set up logging
+- [ ] Configure monitoring
