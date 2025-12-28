@@ -14,10 +14,14 @@ const app = new Shokupan<{
 }>({
     port: 3001,
     development: true,
+    enableOpenApiGen: true,
 });
 
-app.get("/", (ctx) => {
-    throw new Error("test");
+app.get("/", {
+    summary: "Home",
+    description: "Worldstar"
+}, (ctx) => {
+    return ctx.json({ msg: "Hello World" });
 });
 
 app.use(Session({ secret: "test" }));
@@ -38,17 +42,18 @@ app.static("/files", {
 });
 
 // Mount Scalar OpenAPI Viewer
-app.mount("/scalar", new ScalarPlugin({
+// Import generated spec
+
+app.mount('/scalar', new ScalarPlugin({
+    enableStaticAnalysis: false,
     baseDocument: {
         info: {
-            title: "Mixed Example",
-            version: "1.0.0"
+            title: 'Shokupan API',
+            version: '1.0.0'
         }
     },
-    config: {
-    }
+    config: {}
 }));
-
 app.mount("/api/user", UserController);
 app.mount("/api/service_fetch", ServiceFetchRouter);
 
