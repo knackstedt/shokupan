@@ -12,6 +12,7 @@
         "sourceMap": true,
         "downlevelIteration": false,
         "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
         "resolveJsonModule": true,
         "verbatimModuleSyntax": true,
         "noEmit": true,

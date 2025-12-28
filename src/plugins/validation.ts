@@ -1,3 +1,5 @@
+import { plainToInstance } from "class-transformer";
+import { validateOrReject } from "class-validator";
 import { ShokupanContext } from "../context";
 import type { Middleware } from "../types";
 
@@ -70,6 +72,48 @@ async function validateValibotWrapper(wrapper: any, data: any) {
         throw new ValidationError(result.issues);
     }
     return result.output;
+}
+
+function isClass(schema: any): boolean {
+    // Check if it's a constructor for a class
+    // Usually classes have names and are functions, but plain functions are also functions.
+    // A robust check for a class constructor (especially with decorators) is tricky but checking for prototype 
+    // and if it looks like a constructor is a start.
+    // However, for class-validator/transformer usages, compiling consumers typically pass the class Constructor.
+    try {
+        if (typeof schema === 'function' && /^\s*class\s+/.test(schema.toString())) {
+            return true;
+        }
+        // Fallback for some complied outputs or if it just has a name and prototype
+        // But we want to avoid treating `z.string()` (which might yield a function?) 
+        // actually Zod schemas are objects. Custom validation functions are functions.
+        // We can assume if the user passes a class constructor it intends for class-validator.
+        return typeof schema === 'function' && schema.prototype && schema.name;
+    } catch {
+        return false;
+    }
+}
+
+async function validateClassValidator(schema: any, data: any) {
+    // Transform plain object to class instance
+    const object = plainToInstance(schema, data);
+    try {
+        await validateOrReject(object as any);
+        return object;
+    } catch (errors: any) {
+        // Flatten errors or just return them
+        // class-validator returns Array<ValidationError>
+        // We'll wrap in our ValidationError
+        const formattedErrors = Array.isArray(errors)
+            ? errors.map((err: any) => ({
+                property: err.property,
+                constraints: err.constraints,
+                children: err.children
+            }))
+            : errors;
+
+        throw new ValidationError(formattedErrors);
+    }
 }
 
 
@@ -170,6 +214,23 @@ export function validate(config: ValidationConfig): Middleware {
 async function runValidation(schema: any, data: any): Promise<any> {
     if (isZod(schema)) {
         return validateZod(schema, data);
+    }
+    if (isTypeBox(schema)) {
+        return validateTypeBox(schema, data);
+    }
+    if (isAjv(schema)) {
+        return validateAjv(schema, data);
+    }
+    if (isValibotWrapper(schema)) {
+        return validateValibotWrapper(schema, data);
+    }
+
+    // Check custom function first? Or check Class first?
+    // isClass might yield true for simple functions if our check is loose.
+    // But if we use class-syntax check it's safer.
+    // Let's try isClass specific check.
+    if (isClass(schema)) {
+        return validateClassValidator(schema, data);
     }
     if (isTypeBox(schema)) {
         return validateTypeBox(schema, data);
