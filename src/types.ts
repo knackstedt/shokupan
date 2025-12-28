@@ -69,12 +69,44 @@ export type ShokupanRoute = {
 };
 
 export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> = DeepPartial<{
+    /**
+     * The port to be used for the server.
+     * @default 3000
+     */
     port: number;
+    /**
+     * The hostname to be used for the server.
+     * @default "localhost"
+     */
     hostname: string;
+    /**
+     * Whether to run in development mode.
+     * @default process.env.NODE_ENV !== "production"
+     */
     development: boolean;
+    /**
+     * Whether to enable AsyncLocalStorage.
+     * (Request local storage)
+     * @default false
+     */
     enableAsyncLocalStorage: boolean;
+    /**
+     * Whether to enable OpenAPI generation.
+     * @default true
+     */
     enableOpenApiGen: boolean;
+    /**
+     * Whether to reuse the port.
+     * @default false
+     */
+    reusePort: boolean;
+    /**
+     * HTTP logger function.
+     */
     httpLogger: (ctx: ShokupanContext<T>) => void;
+    /**
+     * Logger object.
+     */
     logger: {
         verbose: boolean;
         info: (msg: string, props: Record<string, any>) => void;

@@ -15,6 +15,7 @@ const defaults: ShokupanConfig = {
     hostname: "localhost",
     development: process.env.NODE_ENV !== "production",
     enableAsyncLocalStorage: false,
+    reusePort: false,
 };
 const tracer = trace.getTracer("shokupan.application");
 
@@ -85,7 +86,8 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             port: finalPort,
             hostname: this.applicationConfig.hostname,
             development: this.applicationConfig.development,
-            fetch: this.fetch.bind(this)
+            fetch: this.fetch.bind(this),
+            reusePort: this.applicationConfig.reusePort
         });
 
         console.log(`Shokupan server listening on http://${server.hostname}:${server.port}`);
