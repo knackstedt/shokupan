@@ -40,10 +40,47 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
      * Request query params
      */
     get query() { return Object.fromEntries(this.url.searchParams); }
+
+    /**
+     * Client IP address
+     */
+    get ip() { return this.server?.requestIP(this.request as unknown as Request); }
+
+    /**
+     * Request hostname (e.g. "localhost")
+     */
+    get hostname() { return this.url.hostname; }
+
+    /**
+     * Request host (e.g. "localhost:3000")
+     */
+    get host() { return this.url.host; }
+
+    /**
+     * Request protocol (e.g. "http:", "https:")
+     */
+    get protocol() { return this.url.protocol; }
+
+    /**
+     * Whether request is secure (https)
+     */
+    get secure() { return this.url.protocol === 'https:'; }
+
+    /**
+     * Request origin (e.g. "http://localhost:3000")
+     */
+    get origin() { return this.url.origin; }
+
     /**
      * Request headers
      */
     get headers() { return this.request.headers; }
+
+    /**
+     * Get a request header
+     * @param name Header name
+     */
+    public get(name: string) { return this.request.headers.get(name); }
 
     /**
      * Base response object
@@ -52,6 +89,8 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
 
     /**
      * Helper to set a header on the response
+     * @param key Header key
+     * @param value Header value
      */
     public set(key: string, value: string) {
         this.response.set(key, value);
