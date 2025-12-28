@@ -2,7 +2,7 @@
 import type { BodyInit, Server } from 'bun';
 import type { ShokupanRequest } from './request';
 import { ShokupanResponse } from './response';
-import type { CookieOptions } from './types';
+import type { CookieOptions, JSXRenderer } from './types';
 
 // Shim for HeadersInit if not available globally in some envs
 type HeadersInit = Headers | Record<string, string> | [string, string][];
@@ -217,9 +217,29 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     /**
      * Respond with a file
      */
-    file(path: string, fileOptions?: BlobPropertyBag, responseOptions?: ResponseInit) {
+    public file(path: string, fileOptions?: BlobPropertyBag, responseOptions?: ResponseInit) {
         const headers = this.mergeHeaders(responseOptions?.headers as any);
         const status = responseOptions?.status ?? this.response.status;
         return new Response(Bun.file(path, fileOptions), { status, headers });
+    }
+
+    /**
+     * JSX Rendering Function
+     */
+    public renderer?: JSXRenderer;
+
+    /**
+     * Render a JSX element
+     * @param element JSX Element
+     * @param status HTTP Status
+     * @param headers HTTP Headers
+     */
+    public async jsx(element: any, args?: Parameters<JSXRenderer>[1], status?: number, headers?: HeadersInit) {
+        if (!this.renderer) {
+            throw new Error("No JSX renderer configured");
+        }
+
+        const html = await this.renderer(element, args);
+        return this.html(html, status, headers);
     }
 }

@@ -2,7 +2,7 @@ import type { OpenAPI } from '@scalar/openapi-types';
 import type { ShokupanContext } from './context';
 import { $isRouter } from "./symbol";
 
-export type DeepPartial<T> = T extends object ? {
+export type DeepPartial<T> = T extends Function ? T : T extends object ? {
     [P in keyof T]?: DeepPartial<T[P]>;
 } : T;
 
@@ -47,6 +47,7 @@ export enum RouteParamType {
 
 export type NextFn = () => Promise<any>;
 export type Middleware = (ctx: ShokupanContext<unknown>, next: NextFn) => Promise<any> | any;
+export type JSXRenderer = (element: any, args?: unknown) => string | Promise<string>;
 
 export type ShokupanRouteConfig = DeepPartial<{
     name: string;
@@ -56,6 +57,10 @@ export type ShokupanRouteConfig = DeepPartial<{
      */
     requestTimeout: number;
     openapi: DeepPartial<OpenAPI.Operation>;
+    /**
+     * Custom renderer for this route.
+     */
+    renderer: JSXRenderer;
 }>;
 
 export type ShokupanRoute = {
@@ -71,6 +76,7 @@ export type ShokupanRoute = {
         spec?: GuardAPISpec;
     }[];
     requestTimeout?: number;
+    renderer?: JSXRenderer;
 };
 
 export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> = DeepPartial<{
@@ -140,6 +146,11 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      * Not currently supported by Bun.serve natively.
      */
     writeTimeout: number;
+
+    /**
+     * JSX Rendering function.
+     */
+    renderer: JSXRenderer;
 
     // Open for extension
     [key: string]: any;

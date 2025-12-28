@@ -7,7 +7,7 @@ import { ShokupanRequest } from './request';
 import type { Shokupan } from './shokupan';
 import { $appRoot, $childControllers, $childRouters, $controllerPath, $dispatch, $isApplication, $isMounted, $isRouter, $middleware, $mountPath, $parent, $routeArgs, $routeMethods, $routes, $routeSpec } from './symbol';
 import type { GuardAPISpec, MethodAPISpec, OpenAPIOptions, ProcessResult, RequestOptions, ShokupanRouteConfig, StaticServeOptions } from './types';
-import { HTTPMethods, RouteParamType, type Method, type ShokupanController, type ShokupanHandler, type ShokupanRoute } from './types';
+import { HTTPMethods, RouteParamType, type JSXRenderer, type Method, type ShokupanController, type ShokupanHandler, type ShokupanRoute } from './types';
 import { asyncContext } from './util/async-hooks';
 import { traceHandler } from './util/instrumentation';
 
@@ -537,7 +537,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * @param handler - Route handler function
      * @param requestTimeout - Timeout for this route in milliseconds
      */
-    public add({ method, path, spec, handler, regex: customRegex, group, requestTimeout }: {
+    public add({ method, path, spec, handler, regex: customRegex, group, requestTimeout, renderer }: {
         method: Method,
         path: string,
         spec?: MethodAPISpec,
@@ -545,6 +545,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         regex?: RegExp;
         group?: string;
         requestTimeout?: number;
+        renderer?: JSXRenderer;
     }) {
         const { regex, keys } = customRegex
             ? { regex: customRegex, keys: [] }
@@ -616,6 +617,16 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                 }
 
                 // All guards passed, execute the actual handler
+                return innerHandler(ctx);
+            };
+        }
+
+        // Inject Renderer
+        const effectiveRenderer = renderer ?? this.config?.renderer ?? this.rootConfig?.renderer;
+        if (effectiveRenderer) {
+            const innerHandler = wrappedHandler;
+            wrappedHandler = async (ctx: ShokupanContext<T>) => {
+                ctx.renderer = effectiveRenderer;
                 return innerHandler(ctx);
             };
         }
