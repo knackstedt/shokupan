@@ -1,7 +1,7 @@
 
 import { describe, expect, test } from "bun:test";
-import { ScalarPlugin } from '../plugins/scalar';
-import { Shokupan } from '../shokupan';
+import { ScalarPlugin } from '../../plugins/scalar';
+import { Shokupan } from '../../shokupan';
 
 describe("Scalar Plugin Rendering with Eta", () => {
     test("should render API reference HTML using Eta", async () => {

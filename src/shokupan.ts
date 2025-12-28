@@ -3,6 +3,7 @@ import "./util/instrumentation";
 import { context, trace } from '@opentelemetry/api';
 import { ShokupanContext } from "./context";
 import { compose } from "./middleware";
+import { generateOpenApi } from "./plugins/openapi";
 import { ShokupanRequest } from './request';
 import { ShokupanRouter } from "./router";
 import { $appRoot, $dispatch, $isApplication } from './symbol';
@@ -20,6 +21,7 @@ const tracer = trace.getTracer("shokupan.application");
 
 export class Shokupan<T = any> extends ShokupanRouter<T> {
     readonly applicationConfig: ShokupanConfig = {};
+    public openApiSpec?: any;
     private middleware: Middleware[] = [];
 
     get logger() {
@@ -43,17 +45,36 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         return this;
     }
 
+    private startupHooks: (() => Promise<void> | void)[] = [];
+
+    /**
+     * Registers a callback to be executed before the server starts listening.
+     */
+    public onStart(callback: () => Promise<void> | void) {
+        this.startupHooks.push(callback);
+        return this;
+    }
+
     /**
      * Starts the application server.
      * 
      * @param port - The port to listen on. If not specified, the port from the configuration is used. If that is not specified, port 3000 is used.
      * @returns The server instance.
      */
-    public listen(port?: number) {
+    public async listen(port?: number) {
         const finalPort = port ?? this.applicationConfig.port ?? 3000;
 
         if (finalPort < 0 || finalPort > 65535) {
             throw new Error("Invalid port number");
+        }
+
+        // Run startup hooks
+        for (const hook of this.startupHooks) {
+            await hook();
+        }
+
+        if (this.applicationConfig.enableOpenApiGen) {
+            this.openApiSpec = await generateOpenApi(this);
         }
 
         if (port === 0 && process.platform === "linux") {

@@ -12,3 +12,4 @@ export const $childControllers = Symbol.for("Shokupan.child-controllers");
 export const $mountPath = Symbol.for("Shokupan.mount-path");
 export const $dispatch = Symbol.for("Shokupan.dispatch");
 export const $routes = Symbol.for("Shokupan.routes");
+export const $routeSpec = Symbol.for("Shokupan.routeSpec");

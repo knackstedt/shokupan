@@ -1,4 +1,5 @@
-import { $controllerPath, $middleware, $routeArgs, $routeMethods } from "./symbol";
+import { $controllerPath, $middleware, $routeArgs, $routeMethods, $routeSpec } from "./symbol";
+import type { GuardAPISpec, MethodAPISpec } from "./types";
 import { type Method, type Middleware, RouteParamType } from "./types";
 
 /**
@@ -58,9 +59,21 @@ export const Headers = createParamDecorator(RouteParamType.HEADER);
 export const Req = createParamDecorator(RouteParamType.REQUEST);
 export const Ctx = createParamDecorator(RouteParamType.CONTEXT);
 
+
+/**
+ * Decorator: Overrides the OpenAPI specification for a route.
+ */
+export function Spec(spec: MethodAPISpec | GuardAPISpec) {
+    return (target: any, propertyKey: string, descriptor: PropertyDescriptor) => {
+        if (!target[$routeSpec]) {
+            target[$routeSpec] = new Map();
+        }
+        target[$routeSpec].set(propertyKey, spec);
+    };
+}
+
 /**
  * Creates a method decorator for a specific HTTP verb.
- * @param method HTTP Method
  */
 function createMethodDecorator(method: Method) {
     return (path: string = "/") => {

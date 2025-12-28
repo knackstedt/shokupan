@@ -73,6 +73,7 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
     hostname: string;
     development: boolean;
     enableAsyncLocalStorage: boolean;
+    enableOpenApiGen: boolean;
     httpLogger: (ctx: ShokupanContext<T>) => void;
     logger: {
         verbose: boolean;

@@ -1,9 +1,8 @@
-
 import { describe, expect, it } from "bun:test";
-import { ShokupanRouter } from "../router";
+import { ShokupanRouter } from "../../router";
 
 describe("OpenAPI Generation", () => {
-    it("should generate a basic spec for a router", () => {
+    it("should generate a basic spec for a router", async () => {
         const router = new ShokupanRouter();
         router.get("/users/:id", {
             summary: "Get User",
@@ -12,7 +11,7 @@ describe("OpenAPI Generation", () => {
             }
         }, (ctx) => ({ id: ctx.params['id'] }));
 
-        const spec = router.generateApiSpec({
+        const spec = await router.generateApiSpec({
             info: { title: "Test API", version: "1.0.0" }
         });
 
@@ -27,6 +26,7 @@ describe("OpenAPI Generation", () => {
         // Check params
         expect(getOp.parameters).toBeDefined();
         expect(getOp.parameters).toHaveLength(1);
+        // Wait, parsePath detects params. 
         expect(getOp.parameters![0]).toMatchObject({
             name: "id",
             in: "path",
@@ -34,7 +34,7 @@ describe("OpenAPI Generation", () => {
         });
     });
 
-    it("should merge guard specs", () => {
+    it("should merge guard specs", async () => {
         const router = new ShokupanRouter();
 
         router.guard({
@@ -46,7 +46,7 @@ describe("OpenAPI Generation", () => {
 
         router.post("/secure", (ctx) => "ok");
 
-        const spec = router.generateApiSpec();
+        const spec = await router.generateApiSpec();
         const postOp = spec.paths!["/secure"].post!;
 
         expect(postOp.security).toEqual([{ bearerAuth: [] }]);
@@ -54,7 +54,7 @@ describe("OpenAPI Generation", () => {
         expect(postOp.responses["200"]).toBeDefined(); // Default
     });
 
-    it("should handle nested routers and path normalization", () => {
+    it("should handle nested routers and path normalization", async () => {
         const root = new ShokupanRouter();
         const api = new ShokupanRouter();
         const users = new ShokupanRouter();
@@ -63,7 +63,7 @@ describe("OpenAPI Generation", () => {
         api.mount("/users", users);
         root.mount("/api/v1", api);
 
-        const spec = root.generateApiSpec();
+        const spec = await root.generateApiSpec();
 
         // expected: /api/v1/users/:userId/posts -> /api/v1/users/{userId}/posts
         expect(spec.paths!["/api/v1/users/{userId}/posts"]).toBeDefined();

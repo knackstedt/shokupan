@@ -5,7 +5,7 @@ import { generateOpenApi } from './plugins/openapi';
 import { serveStatic } from './plugins/serve-static';
 import { ShokupanRequest } from './request';
 import type { Shokupan } from './shokupan';
-import { $appRoot, $childControllers, $childRouters, $controllerPath, $dispatch, $isApplication, $isMounted, $isRouter, $middleware, $mountPath, $parent, $routeArgs, $routeMethods, $routes } from './symbol';
+import { $appRoot, $childControllers, $childRouters, $controllerPath, $dispatch, $isApplication, $isMounted, $isRouter, $middleware, $mountPath, $parent, $routeArgs, $routeMethods, $routes, $routeSpec } from './symbol';
 import type { GuardAPISpec, MethodAPISpec, OpenAPIOptions, ProcessResult, RequestOptions, ShokupanRouteConfig, StaticServeOptions } from './types';
 import { HTTPMethods, RouteParamType, type Method, type ShokupanController, type ShokupanHandler, type ShokupanRoute } from './types';
 import { asyncContext } from './util/async-hooks';
@@ -109,6 +109,17 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                     const p2 = controllerPath.startsWith("/") ? controllerPath : "/" + controllerPath;
                     prefix = (p1 + p2);
                     // Normalize
+                    if (!prefix) prefix = "/";
+                }
+            }
+            else {
+                // Controller is an instance, read metadata from constructor
+                const ctor = instance.constructor;
+                const controllerPath = (ctor as any)[$controllerPath];
+                if (controllerPath) {
+                    const p1 = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
+                    const p2 = controllerPath.startsWith("/") ? controllerPath : "/" + controllerPath;
+                    prefix = (p1 + p2);
                     if (!prefix) prefix = "/";
                 }
             }
@@ -277,10 +288,21 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                         };
                     }
 
+                    // Expose original handler for OpenAPI analysis
+                    (finalHandler as any).originalHandler = originalHandler;
+                    if (finalHandler !== wrappedHandler) {
+                        (wrappedHandler as any).originalHandler = originalHandler;
+                    }
+
                     // Inject Controller Name as Tag
                     const tagName = instance.constructor.name;
-                    // TODO: Merge with existing spec from decorator if available
-                    const spec = { tags: [tagName] };
+
+                    // Retrieve @Spec metadata
+                    const decoratedSpecs = (instance as any)[$routeSpec] || (proto && (proto as any)[$routeSpec]);
+                    const userSpec = decoratedSpecs && decoratedSpecs.get(name);
+
+                    // Merge with existing spec from decorator if available
+                    const spec = { tags: [tagName], ...userSpec };
 
                     this.add({ method, path: normalizedPath, handler: finalHandler, spec });
                 }
@@ -850,6 +872,13 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             const fn = compose(handlers as any);
             finalHandler = (ctx) => fn(ctx);
         }
+
+        // if (spec) {
+        //     console.log(`[Router] attachVerb ${method} ${path} has spec:`, spec);
+        // } 
+        // else {
+        //     console.log(`[Router] attachVerb ${method} ${path} NO SPEC`);
+        // }
 
         this.add({
             method,

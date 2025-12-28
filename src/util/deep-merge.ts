@@ -23,11 +23,28 @@ export function deepMerge<T extends Record<string, any>>(target: T, ...sources: 
                 deepMerge(target[key], source[key]);
             } else if (Array.isArray(source[key])) {
                 if (!target[key]) Object.assign(target, { [key]: [] });
-                // Concatenate arrays? Or overwrite? 
-                // For OpenAPI, often appending is good (e.g. tags, security). 
-                // But for things like 'servers', maybe we want overwrite or union?
-                // Let's go with concatenation for now as a safe default for lists like parameters.
-                (target as any)[key] = (target as any)[key].concat(source[key]);
+
+                if (key === 'tags') {
+                    // Start fresh if tags are provided in source (overwrite)
+                    (target as any)[key] = source[key];
+                    continue;
+                }
+
+                // Concat then deduplicate primitives
+                const mergedArray = (target as any)[key].concat(source[key]);
+
+                // If all items are primitives, unique them
+                const isPrimitive = (item: any) =>
+                    typeof item === 'string' ||
+                    typeof item === 'number' ||
+                    typeof item === 'boolean';
+
+                if (mergedArray.every(isPrimitive)) {
+                    (target as any)[key] = Array.from(new Set(mergedArray));
+                }
+                else {
+                    (target as any)[key] = mergedArray;
+                }
             } else {
                 Object.assign(target, { [key]: source[key] });
             }
