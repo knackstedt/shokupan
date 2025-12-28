@@ -87,7 +87,8 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             hostname: this.applicationConfig.hostname,
             development: this.applicationConfig.development,
             fetch: this.fetch.bind(this),
-            reusePort: this.applicationConfig.reusePort
+            reusePort: this.applicationConfig.reusePort,
+            idleTimeout: this.applicationConfig.readTimeout ? this.applicationConfig.readTimeout / 1000 : undefined,
         });
 
         console.log(`Shokupan server listening on http://${server.hostname}:${server.port}`);
@@ -152,9 +153,10 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
      * This logic contains the middleware chain and router dispatch.
      * 
      * @param req - The request to handle.
+     * @param server - The server instance.
      * @returns The response to send.
      */
-    public async fetch(req: Request): Promise<Response> {
+    public async fetch(req: Request, server?: import("bun").Server): Promise<Response> {
         const tracer = trace.getTracer("shokupan.application");
         const store = asyncContext.getStore();
 
@@ -178,7 +180,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 const request = req as unknown as ShokupanRequest<T>;
 
                 const handle = async () => {
-                    const ctx = new ShokupanContext<T>(request);
+                    const ctx = new ShokupanContext<T>(request, server);
 
                     // Compose middleware + router dispatch
                     const fn = compose(this.middleware);

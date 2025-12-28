@@ -46,6 +46,9 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     constructor(
         public readonly config?: ShokupanRouteConfig
     ) {
+        if (config?.requestTimeout) {
+            this.requestTimeout = config.requestTimeout;
+        }
     }
 
     private isRouterInstance(target: ShokupanController | ShokupanController<T> | ShokupanRouter | ShokupanRouter<T>): target is ShokupanRouter<T> {
@@ -523,6 +526,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
     // --- Functional Routing ---
 
+    public requestTimeout?: number;
+
     /**
      * Adds a route to the router.
      * 
@@ -530,14 +535,16 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * @param path - URL path
      * @param spec - OpenAPI specification for the route
      * @param handler - Route handler function
+     * @param requestTimeout - Timeout for this route in milliseconds
      */
-    public add({ method, path, spec, handler, regex: customRegex, group }: {
+    public add({ method, path, spec, handler, regex: customRegex, group, requestTimeout }: {
         method: Method,
         path: string,
         spec?: MethodAPISpec,
         handler: ShokupanHandler<T>;
         regex?: RegExp;
         group?: string;
+        requestTimeout?: number;
     }) {
         const { regex, keys } = customRegex
             ? { regex: customRegex, keys: [] }
@@ -547,7 +554,29 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         let wrappedHandler = handler;
         const routeGuards = [...this.currentGuards];
 
+        // Wrap for Timeout
+        // Logic: specific route timeout > router timeout > global config timeout
+        // 0 means disabled, but undefined means "inherit".
+        // Actually, 0 usually means "no timeout" (infinite).
+        // Let's assume if explicit 0 is passed, it disables.
+        // If undefined, fallback.
+        const effectiveTimeout = requestTimeout ?? this.requestTimeout ?? this.rootConfig?.requestTimeout;
+
+        if (effectiveTimeout !== undefined && effectiveTimeout > 0) {
+            const originalHandler = wrappedHandler;
+            wrappedHandler = async (ctx: ShokupanContext<T>) => {
+                if (ctx.server) {
+                    // Bun.server.timeout takes seconds
+                    ctx.server.timeout(ctx.req as unknown as Request, effectiveTimeout / 1000);
+                }
+                return originalHandler(ctx);
+            };
+            // Preserve original handler reference for analysis if needed
+            (wrappedHandler as any).originalHandler = (originalHandler as any).originalHandler || originalHandler;
+        }
+
         if (routeGuards.length > 0) {
+            const innerHandler = wrappedHandler;
             wrappedHandler = async (ctx: ShokupanContext<T>) => {
                 // Execute guards in order
                 for (const guard of routeGuards) {
@@ -587,7 +616,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                 }
 
                 // All guards passed, execute the actual handler
-                return handler(ctx);
+                return innerHandler(ctx);
             };
         }
 
@@ -599,7 +628,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             handler: wrappedHandler,
             handlerSpec: spec,
             group,
-            guards: routeGuards.length > 0 ? routeGuards : undefined
+            guards: routeGuards.length > 0 ? routeGuards : undefined,
+            requestTimeout: effectiveTimeout // Save for inspection? Or just relying on closure
         });
 
         return this;

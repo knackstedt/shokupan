@@ -51,6 +51,10 @@ export type Middleware = (ctx: ShokupanContext<unknown>, next: NextFn) => Promis
 export type ShokupanRouteConfig = DeepPartial<{
     name: string;
     group: string;
+    /**
+     * Timeout for this specific route (milliseconds).
+     */
+    requestTimeout: number;
     openapi: DeepPartial<OpenAPI.Operation>;
 }>;
 
@@ -66,6 +70,7 @@ export type ShokupanRoute = {
         handler: ShokupanHandler;
         spec?: GuardAPISpec;
     }[];
+    requestTimeout?: number;
 };
 
 export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> = DeepPartial<{
@@ -118,6 +123,24 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
          */
         fatal: (msg: string, props: Record<string, any>) => void;
     };
+    /**
+     * Timeout for reading the request body (milliseconds).
+     * Maps to Bun's `idleTimeout`.
+     * @default 30000
+     */
+    readTimeout: number;
+    /**
+     * Timeout for processing the request (milliseconds).
+     * Maps to `server.timeout(req, seconds)`.
+     * @default 0 (disabled)
+     */
+    requestTimeout: number;
+    /**
+     * Timeout for writing the response (milliseconds).
+     * Not currently supported by Bun.serve natively.
+     */
+    writeTimeout: number;
+
     // Open for extension
     [key: string]: any;
 }>;
