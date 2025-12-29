@@ -1,4 +1,5 @@
 import type { OpenAPI } from '@scalar/openapi-types';
+import type { Server } from 'bun';
 import type { ShokupanContext } from './context';
 import { $isRouter } from "./symbol";
 
@@ -43,6 +44,10 @@ export enum RouteParamType {
     HEADER = "HEADER",
     REQUEST = "REQUEST",
     CONTEXT = "CONTEXT"
+}
+
+export interface ServerFactory {
+    (options: any): Server | Promise<Server>;
 }
 
 export type NextFn = () => Promise<any>;
@@ -151,6 +156,13 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      * JSX Rendering function.
      */
     renderer: JSXRenderer;
+
+    /**
+     * Factory function to create the server instance.
+     * Defaults to Bun.serve.
+     */
+    serverFactory: ServerFactory;
+
 
     // Open for extension
     [key: string]: any;

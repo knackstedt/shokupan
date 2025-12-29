@@ -82,14 +82,18 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
         }
 
-        const server = Bun.serve({
+        const serveOptions = {
             port: finalPort,
             hostname: this.applicationConfig.hostname,
             development: this.applicationConfig.development,
             fetch: this.fetch.bind(this),
             reusePort: this.applicationConfig.reusePort,
             idleTimeout: this.applicationConfig.readTimeout ? this.applicationConfig.readTimeout / 1000 : undefined,
-        });
+        };
+
+        const server = this.applicationConfig.serverFactory
+            ? await this.applicationConfig.serverFactory(serveOptions)
+            : Bun.serve(serveOptions);
 
         console.log(`Shokupan server listening on http://${server.hostname}:${server.port}`);
         return server;
