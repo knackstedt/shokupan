@@ -51,7 +51,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         }
     }
 
-    private isRouterInstance(target: ShokupanController | ShokupanController<T> | ShokupanRouter | ShokupanRouter<T>): target is ShokupanRouter<T> {
+    private isRouterInstance(target: any): target is ShokupanRouter<T> {
         // Check if it's an object and has your specific symbol
         return typeof target === 'object' && target !== null && $isRouter in target;
     }
@@ -66,7 +66,15 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * - getUsers(ctx) -> GET /prefix/users
      * - postCreate(ctx) -> POST /prefix/create
      */
-    public mount(prefix: string, controller: ShokupanController | ShokupanController<T> | ShokupanRouter | ShokupanRouter<T>) {
+    public mount(prefix: string, controller: ShokupanController | ShokupanController<T> | ShokupanRouter | ShokupanRouter<T> | Record<string, any>) {
+        // strict controller check
+        const isRouter = this.isRouterInstance(controller);
+        const isFunction = typeof controller === 'function';
+        const controllersOnly = this.config?.controllersOnly ?? this.rootConfig?.controllersOnly ?? false;
+
+        if (controllersOnly && !isFunction && !isRouter) {
+            throw new Error(`[Shokupan] strict controller check failed: ${controller.constructor.name || typeof controller} is not a class constructor.`);
+        }
 
         if (this.isRouterInstance(controller)) {
             if (controller[$isMounted]) {
@@ -101,7 +109,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             let instance = controller;
             if (typeof controller === 'function') {
                 // DI Resolution
-                instance = Container.resolve(controller);
+                instance = Container.resolve(controller as any);
 
                 // Controller Parameter Decorator (@Controller('prefix'))
                 const controllerPath = (controller as any)[$controllerPath];
