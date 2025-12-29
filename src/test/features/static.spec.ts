@@ -1,8 +1,8 @@
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdir, rmdir, unlink, writeFile } from 'fs/promises';
+import { mkdir, rmdir, unlink, writeFile } from "node:fs/promises";
 import { join } from 'path';
-import { Shokupan } from '../shokupan';
+import { Shokupan } from '../../shokupan';
 
 describe("Shokupan Static Serving with Eta", () => {
     const testDir = join(process.cwd(), "test_static_eta");

@@ -46,7 +46,7 @@ const AuthBinding = {
 };
 
 describe("OpenAPI Integration", () => {
-    it("should include all route types, guards, mounts, and bindings in OpenAPI spec", () => {
+    it("should include all route types, guards, mounts, and bindings in OpenAPI spec", async () => {
         const app = new Shokupan();
 
         // 1. Basic Routes
@@ -69,7 +69,7 @@ describe("OpenAPI Integration", () => {
         // 4. Mounted Bindings (Object)
         app.mount("/auth", AuthBinding as any);
 
-        const spec = app.generateApiSpec({
+        const spec = await app.generateApiSpec({
             info: { title: "Complete API", version: "1.0.0" }
         });
 

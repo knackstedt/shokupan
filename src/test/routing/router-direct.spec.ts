@@ -1,7 +1,7 @@
 
 import { describe, expect, test } from "bun:test";
-import { ShokupanRouter } from '../router';
-import { Shokupan } from '../shokupan';
+import { ShokupanRouter } from '../../router';
+import { Shokupan } from '../../shokupan';
 
 describe("Shokupan Direct Testing", () => {
     test("ShokupanRouter.processRequest should return structured result", async () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { createHttpServer } from "../plugins/server-adapter";
-import { Shokupan } from "../shokupan";
+import { createHttpServer } from "../../plugins/server-adapter";
+import { Shokupan } from "../../shokupan";
 
 describe("Server Adapters", () => {
     it("should support swapping the server engine to node:http", async () => {

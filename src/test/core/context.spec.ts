@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
-import { ShokupanContext } from "../context";
-import { ShokupanRequest } from "../request";
+import { ShokupanContext } from "../../context";
+import { ShokupanRequest } from "../../request";
 
 describe('ShokupanContext Additions', () => {
     const mockRequest = new ShokupanRequest({

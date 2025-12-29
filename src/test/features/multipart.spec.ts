@@ -1,6 +1,6 @@
 
 import { describe, expect, it } from 'bun:test';
-import { Shokupan } from '../shokupan';
+import { Shokupan } from '../../shokupan';
 
 describe('Multipart Support', () => {
     it('should parse multipart/form-data', async () => {
@@ -17,7 +17,7 @@ describe('Multipart Support', () => {
         formData.append('field', 'value');
         formData.append('file', new Blob(['content']), 'test.txt');
 
-        const server = app.listen(0);
+        const server = await app.listen(0);
         const res = await fetch(`http://localhost:${server.port}/upload`, {
             method: 'POST',
             body: formData

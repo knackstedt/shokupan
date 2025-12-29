@@ -1,7 +1,7 @@
 
 import { describe, expect, it } from "bun:test";
-import { useExpress } from '../plugins/express';
-import { Shokupan } from '../shokupan';
+import { useExpress } from '../../plugins/express';
+import { Shokupan } from '../../shokupan';
 
 describe("Express Compatibility", () => { // Skipping initially until implementation is ready or to run manually
     it("should propagate req mutations to ctx.state", async () => {
@@ -17,7 +17,7 @@ describe("Express Compatibility", () => { // Skipping initially until implementa
             return { prop: ctx.state.testProp };
         });
 
-        const server = app.listen();
+        const server = await app.listen();
         const res = await fetch(`http://localhost:${server.port}/test-mutation`);
         const data = await res.json();
 
@@ -39,7 +39,7 @@ describe("Express Compatibility", () => { // Skipping initially until implementa
             return "ok";
         });
 
-        const server = app.listen();
+        const server = await app.listen();
         const res = await fetch(`http://localhost:${server.port}/test-headers`);
 
         expect(res.headers.get("x-custom-header")).toBe("custom-value");

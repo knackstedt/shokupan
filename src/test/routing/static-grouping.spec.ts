@@ -1,9 +1,9 @@
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdir, rmdir, unlink, writeFile } from 'fs/promises';
+import { mkdir, rmdir, unlink, writeFile } from "node:fs/promises";
 import { join } from 'path';
-import { ShokupanRouter } from '../router';
-import { Shokupan } from '../shokupan';
+import { ShokupanRouter } from '../../router';
+import { Shokupan } from '../../shokupan';
 
 describe("Static Route Grouping", () => {
     const testDir = join(process.cwd(), "test_static_grouping");
@@ -45,11 +45,11 @@ describe("Static Route Grouping", () => {
         expect(res404.status).toBe(404);
     });
 
-    test("should generate correct OpenAPI spec", () => {
+    test("should generate correct OpenAPI spec", async () => {
         const router = new ShokupanRouter();
         router.static("/assets", { root: testDir });
 
-        const spec = router.generateApiSpec();
+        const spec = await router.generateApiSpec();
 
         // Check for merged path
         expect(spec.paths!["/assets/*"]).toBeDefined();
@@ -68,13 +68,13 @@ describe("Static Route Grouping", () => {
         // I need to add /images and /files to THIS router to verify the "All in General" theory.
     });
 
-    test("should group multiple static routes correctly under General", () => {
+    test("should group multiple static routes correctly under General", async () => {
         const router = new ShokupanRouter();
         router.static("/assets", { root: testDir });
         router.static("/images", { root: testDir });
         router.static("/files", { root: testDir });
 
-        const spec = router.generateApiSpec();
+        const spec = await router.generateApiSpec();
 
         const tagGroups = spec["x-tagGroups"] as any[];
         const generalGroup = tagGroups.find(g => g.name === "General");

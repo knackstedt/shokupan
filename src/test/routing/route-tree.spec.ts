@@ -1,8 +1,8 @@
 
 import { describe, expect, test } from "bun:test";
-import { ShokupanContext } from '../context';
-import { ShokupanRouter } from '../router';
-import { Shokupan } from '../shokupan';
+import { ShokupanContext } from '../../context';
+import { ShokupanRouter } from '../../router';
+import { Shokupan } from '../../shokupan';
 
 // Mock controller
 class UserController {

@@ -1,7 +1,7 @@
 
 import { describe, expect, test } from "bun:test";
-import { Shokupan } from "../shokupan";
-import { asyncContext } from "../util/async-hooks";
+import { Shokupan } from "../../shokupan";
+import { asyncContext } from "../../util/async-hooks";
 
 describe("AsyncLocalStorage Configuration", () => {
     test("should be disabled by default", async () => {

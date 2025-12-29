@@ -1,8 +1,8 @@
 
 import { describe, expect, test } from "bun:test";
-import { Body, Controller, Ctx, Get, Headers, Param, Post, Query, Req, Use } from '../decorators';
-import { Inject, Injectable } from '../di';
-import { Shokupan } from '../shokupan';
+import { Body, Controller, Ctx, Get, Headers, Param, Post, Query, Req, Use } from '../../decorators';
+import { Inject, Injectable } from '../../di';
+import { Shokupan } from '../../shokupan';
 
 // 1. Dependency Injection Service
 @Injectable()

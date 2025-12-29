@@ -1,7 +1,7 @@
 
 import { describe, expect, it, mock } from "bun:test";
-import { ShokupanRouter } from "../router";
-import { Shokupan } from "../shokupan";
+import { ShokupanRouter } from "../../router";
+import { Shokupan } from "../../shokupan";
 
 describe("Timeouts", () => {
     it("should use global requestTimeout", async () => {

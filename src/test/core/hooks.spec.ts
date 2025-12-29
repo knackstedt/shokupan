@@ -1,8 +1,8 @@
 import { describe, expect, mock, test } from "bun:test";
 import { z } from "zod";
-import { validate } from "../plugins/validation";
-import { ShokupanRouter } from "../router";
-import { Shokupan } from "../shokupan";
+import { validate } from "../../plugins/validation";
+import { ShokupanRouter } from "../../router";
+import { Shokupan } from "../../shokupan";
 
 describe("Event Hooks", () => {
 

@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { Compression } from "../plugins/compression";
-import { Cors } from "../plugins/cors";
-import { RateLimit } from "../plugins/rate-limit";
-import { SecurityHeaders } from "../plugins/security-headers";
-import { Shokupan } from "../shokupan";
+import { Compression } from "../../plugins/compression";
+import { Cors } from "../../plugins/cors";
+import { RateLimit } from "../../plugins/rate-limit";
+import { SecurityHeaders } from "../../plugins/security-headers";
+import { Shokupan } from "../../shokupan";
 
 describe("Plugins", () => {
     test("CORS", async () => {

@@ -1,8 +1,8 @@
 
 import { describe, expect, test } from "bun:test";
-import { Get } from '../decorators';
-import { ShokupanRouter } from '../router';
-import { Shokupan } from '../shokupan';
+import { Get } from '../../decorators';
+import { ShokupanRouter } from '../../router';
+import { Shokupan } from '../../shokupan';
 
 class MyController {
     @Get('/hello')

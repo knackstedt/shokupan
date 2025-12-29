@@ -1,6 +1,6 @@
 
 import { describe, expect, it } from 'bun:test';
-import { Shokupan } from '../shokupan';
+import { Shokupan } from '../../shokupan';
 
 describe('Multipart Support (Simulation)', () => {
     it('should parse multipart/form-data in processRequest', async () => {

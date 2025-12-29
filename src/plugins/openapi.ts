@@ -350,20 +350,7 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                 tags: [tag]
             };
 
-            // Merge metadata from runtime route definition
-            if (route.handlerSpec) {
-                const spec = route.handlerSpec;
-                if (spec.summary) operation.summary = spec.summary;
-                if (spec.description) operation.description = spec.description;
-                if (spec.operationId) operation.operationId = spec.operationId;
-                if (spec.tags) operation.tags = spec.tags;
-                if (spec.security) operation.security = spec.security;
 
-                // Merge responses
-                if (spec.responses) {
-                    operation.responses = { ...operation.responses, ...spec.responses };
-                }
-            }
 
             // Merge metadata from guards (if any)
             if (route.guards) {
@@ -562,7 +549,37 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
             // Let's treat `analyzeHandler` as part of Step 5 (Runtime/Decorator logic) or just merge it in.
             const { inferredSpec } = analyzeHandler(route.handler);
             if (inferredSpec) {
+                if (inferredSpec.parameters) {
+                    const existingParams = operation.parameters || [];
+                    const mergedParams = [...existingParams];
+
+                    for (const p of inferredSpec.parameters) {
+                        const idx = mergedParams.findIndex((ep: any) => ep.name === p.name && ep.in === p.in);
+                        if (idx >= 0) {
+                            mergedParams[idx] = deepMerge(mergedParams[idx], p);
+                        } else {
+                            mergedParams.push(p);
+                        }
+                    }
+                    operation.parameters = mergedParams;
+                    delete inferredSpec.parameters;
+                }
                 deepMerge(operation, inferredSpec);
+            }
+
+            // Merge metadata from runtime route definition (Manual override)
+            if (route.handlerSpec) {
+                const spec = route.handlerSpec;
+                if (spec.summary) operation.summary = spec.summary;
+                if (spec.description) operation.description = spec.description;
+                if (spec.operationId) operation.operationId = spec.operationId;
+                if (spec.tags) operation.tags = spec.tags;
+                if (spec.security) operation.security = spec.security;
+
+                // Merge responses
+                if (spec.responses) {
+                    operation.responses = { ...operation.responses, ...spec.responses };
+                }
             }
 
             // Apply tags

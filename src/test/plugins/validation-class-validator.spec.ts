@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { IsInt, IsString, Min } from "class-validator";
-import { validate } from "../plugins/validation";
-import { Shokupan } from "../shokupan";
+import { validate } from "../../plugins/validation";
+import { Shokupan } from "../../shokupan";
 
 // Define a validation class
 class UserDto {

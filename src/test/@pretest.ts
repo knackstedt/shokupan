@@ -61,7 +61,7 @@ beforeAll(async () => {
 
     app.mount("/api/user", UserController);
 
-    const server = app.listen();
+    const server = await app.listen();
     (global as any).port = server.port;
 
     (global as any).app = app;

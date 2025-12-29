@@ -1,6 +1,6 @@
 import { describe, expect, it, jest } from "bun:test";
-import { MemoryStore, Session as session } from '../plugins/session';
-import { Shokupan } from '../shokupan';
+import { MemoryStore, Session as session } from '../../plugins/session';
+import { Shokupan } from '../../shokupan';
 
 describe("Session Middleware", () => {
     it("should create a session and persist data", async () => {
@@ -21,7 +21,7 @@ describe("Session Middleware", () => {
             return { user: ctx.session.user };
         });
 
-        const server = app.listen();
+        const server = await app.listen();
         const baseUrl = `http://localhost:${server.port}`;
 
         // 1. Set session
@@ -53,7 +53,7 @@ describe("Session Middleware", () => {
             return { count: ctx.session.count };
         });
 
-        const server = app.listen();
+        const server = await app.listen();
         const baseUrl = `http://localhost:${server.port}`;
 
         let cookie: string;
@@ -95,7 +95,7 @@ describe("Session Middleware", () => {
             return { id: ctx.session.id, user: ctx.session.user };
         });
 
-        const server = app.listen();
+        const server = await app.listen();
         const baseUrl = `http://localhost:${server.port}`;
 
         // 1. Start session
@@ -154,7 +154,7 @@ describe("Session Middleware", () => {
             return { val: ctx.session.val };
         });
 
-        const server = app.listen();
+        const server = await app.listen();
         const baseUrl = `http://localhost:${server.port}`;
 
         // Set
@@ -188,7 +188,7 @@ describe("Session Middleware", () => {
 
         app.get('/', (ctx) => "ok");
 
-        const server = app.listen();
+        const server = await app.listen();
         const res = await fetch(`http://localhost:${server.port}/`);
         const cookie = res.headers.get("set-cookie")!;
 
@@ -221,7 +221,7 @@ describe("Session Middleware", () => {
             return "ok";
         });
 
-        const server = app.listen();
+        const server = await app.listen();
         const res = await fetch(`http://localhost:${server.port}/`);
         const cookie = res.headers.get("set-cookie")!;
 
@@ -248,7 +248,7 @@ describe("Session Middleware", () => {
 
         app.get('/', (ctx) => "ok");
 
-        const server = app.listen();
+        const server = await app.listen();
         // 1. Request - empty session, not modified, saveUninitialized=false -> NO SET
         const res1 = await fetch(`http://localhost:${server.port}/`);
         expect(res1.headers.get("set-cookie")).toBeFalsy();

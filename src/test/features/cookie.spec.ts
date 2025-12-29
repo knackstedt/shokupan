@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { Shokupan } from '../shokupan';
+import { Shokupan } from '../../shokupan';
 
 describe("Cookie Support", () => {
     it("should set a simple cookie", async () => {
@@ -10,7 +10,7 @@ describe("Cookie Support", () => {
             return "ok";
         });
 
-        const server = app.listen();
+        const server = await app.listen();
         const res = await fetch(`http://localhost:${server.port}/cookie`);
 
         expect(res.headers.get("set-cookie")).toBe("foo=bar");
@@ -31,7 +31,7 @@ describe("Cookie Support", () => {
             return "ok";
         });
 
-        const server = app.listen();
+        const server = await app.listen();
         const res = await fetch(`http://localhost:${server.port}/complex-cookie`);
         const setCookie = res.headers.get("set-cookie");
 

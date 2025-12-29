@@ -1,7 +1,7 @@
 
 import { describe, expect, it } from "bun:test";
-import { ShokupanRouter } from "../router";
-import { Shokupan } from "../shokupan";
+import { ShokupanRouter } from "../../router";
+import { Shokupan } from "../../shokupan";
 
 const mockRenderer = (element: any) => {
     if (typeof element === "string") return element;

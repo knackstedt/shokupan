@@ -1,7 +1,7 @@
 
 import { describe, expect, test } from "bun:test";
-import { Get, Post } from '../decorators';
-import { Shokupan } from '../shokupan';
+import { Get, Post } from '../../decorators';
+import { Shokupan } from '../../shokupan';
 
 // Example Controller with mixed usage
 class DecoratedController {
