@@ -1,3 +1,5 @@
+import "./otel";
+
 import { Compression } from '../plugins/compression';
 import { Cors } from '../plugins/cors';
 import { RateLimit } from '../plugins/rate-limit';

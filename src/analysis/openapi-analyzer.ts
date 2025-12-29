@@ -165,13 +165,13 @@ export class OpenAPIAnalyzer {
         if (this.entrypoint) {
             // If entrypoint is provided, let TypeScript resolve dependencies
             fileNames = [this.entrypoint];
-            console.log(`[Analyzer] Using entrypoint: ${this.entrypoint}`);
+            // console.log(`[Analyzer] Using entrypoint: ${this.entrypoint}`);
         } else {
             // Otherwise, scan the directory manually
             await this.scanDirectory(this.rootDir);
             const tsFiles = this.files.filter(f => f.type === 'ts' || f.type === 'js');
             fileNames = tsFiles.map(f => f.path);
-            console.log(`[Analyzer] Scanning directory, found ${fileNames.length} files`);
+            // console.log(`[Analyzer] Scanning directory, found ${fileNames.length} files`);
         }
 
         // Create TypeScript program
@@ -207,7 +207,7 @@ export class OpenAPIAnalyzer {
             if (sourceFile.isDeclarationFile) continue;
             if (sourceFile.fileName.includes('.test.ts') || sourceFile.fileName.includes('.spec.ts')) continue;
 
-            console.log(`[Analyzer] Visiting file: ${sourceFile.fileName}`);
+            // console.log(`[Analyzer] Visiting file: ${sourceFile.fileName}`);
             ts.forEachChild(sourceFile, (node) => {
                 this.visitNode(node, sourceFile, typeChecker);
             });

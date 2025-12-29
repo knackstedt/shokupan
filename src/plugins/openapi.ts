@@ -325,7 +325,7 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
         if (!tagGroups.has(group)) tagGroups.set(group, new Set());
 
         const routes = (router as any)[$routes] || [];
-        console.log(`[OpenAPI] Visiting router with ${routes.length} routes. Config:`, router.config, "Prefix:", prefix);
+        // console.log(`[OpenAPI] Visiting router with ${routes.length} routes. Config:`, router.config, "Prefix:", prefix);
         // Debug symbols
         // console.log('[OpenAPI] Router keys:', Reflect.ownKeys(router).map(k => k.toString()));
         // console.log('[OpenAPI] Local $routes symbol:', $routes.toString());
@@ -412,7 +412,7 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                 });
 
                 if (astMatch) {
-                    console.log(`[OpenAPI] MATCHED via source!`);
+                    // console.log(`[OpenAPI] MATCHED via source!`);
                 }
             }
 
@@ -430,7 +430,7 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
 
             if (potentialMatches.length > 1) {
                 const runtimeHandlerSrc = route.handler.toString().replace(/\s+/g, ' ');
-                console.log(`[OpenAPI] Disambiguating ${potentialMatches.length} matches for ${fullPath}...`);
+                // console.log(`[OpenAPI] Disambiguating ${potentialMatches.length} matches for ${fullPath}...`);
 
                 // Try to find the best match by checking if AST handler snippet is in Runtime handler source
                 const preciseMatch = potentialMatches.find(r => {
@@ -441,7 +441,7 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                     const match = runtimeHandlerSrc.includes(astHandlerSrc) || astHandlerSrc.includes(runtimeHandlerSrc) ||
                         (r.handlerSource && runtimeHandlerSrc.includes(r.handlerSource.substring(0, 50))); /* Fallback to prefix match */
 
-                    console.log(`- comparing with AST source: "${astHandlerSrc.substring(0, 50)}..."`);
+                    // console.log(`- comparing with AST source: "${astHandlerSrc.substring(0, 50)}..."`);
                     // console.log(`  MATCH: ${match}`);
                     return match;
                 });
