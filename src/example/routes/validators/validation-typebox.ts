@@ -114,7 +114,7 @@ export class TypeBoxValidationRouter extends ShokupanRouter {
                         Type.Object({
                             productId: Type.String(),
                             quantity: Type.Integer({ minimum: 1 }),
-                            price: Type.Number({ minimum: 0, exclusiveMinimum: true })
+                            price: Type.Number({ minimum: 0, exclusiveMinimum: 0 })
                         }),
                         { minItems: 1 }
                     ),

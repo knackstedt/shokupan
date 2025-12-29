@@ -121,7 +121,7 @@ export class ValibotValidationRouter extends ShokupanRouter {
                                 v.object({
                                     productId: v.string(),
                                     quantity: v.pipe(v.number(), v.integer(), v.minValue(1)),
-                                    price: v.pipe(v.number(), v.minValue(0, { exclusive: true }))
+                                    price: v.pipe(v.number(), v.minValue(0))
                                 })
                             ),
                             v.minLength(1)
