@@ -1628,21 +1628,21 @@ Container.clear();
 - ✅ **OpenTelemetry** - Built-in [OpenTelemetry](https://opentelemetry.io/) traces
 - ✅ **OAuth2** - Built-in [OAuth2](https://oauth.net/2/) support
 - ✅ **Request-Scoped Globals** - Request-scoped values via [AsyncLocalStorage](https://docs.deno.com/api/node/async_hooks/~/AsyncLocalStorage)
-
+- ✅ **Runtime Compatibility** - Support for [Deno](https://deno.com/) and [Node.js](https://nodejs.org/)
+- ✅ **Deep Introspection** - Type analysis for enhanced OpenAPI generation
+- ✅ **Controller Mode** - Option for controller-only mode
+- ✅ **Supports Node/Deno** - Shokupan can run on Node.js or Deno
 
 ### Future Features
 
-- 🔄 **Runtime Compatibility** - Support for [Deno](https://deno.com/) and [Node.js](https://nodejs.org/)
-- 🔌 **Framework Plugins** - Drop-in adapters for [Express](https://expressjs.com/), [Koa](https://koajs.com/), and [Elysia](https://elysiajs.com/)
-- 📡 **Enhanced WebSockets** - Event support and HTTP simulation
-- 🔍 **Deep Introspection** - Type analysis for enhanced OpenAPI generation
-- 📊 **Benchmarks** - Comprehensive performance comparisons
-- ⚖️ **Scaling** - Automatic clustering support
-- 🔗 **RPC Support** - [tRPC](https://trpc.io/) and [gRPC](https://grpc.io/) integration
-- 📦 **Binary Formats** - [Protobuf](https://protobuf.dev/) and [MessagePack](https://msgpack.org/) support
-- 🛡️ **Reliability** - Circuit breaker pattern for resilience
-- 👮 **Strict Mode** - Enforced controller patterns
-- ⚠️ **Standardized Errors** - Consistent 4xx/5xx error formats
+- 🚧 **Framework Plugins** - Drop-in adapters for [Express](https://expressjs.com/), [Koa](https://koajs.com/), and [Elysia](https://elysiajs.com/)
+- 🚧 **Enhanced WebSockets** - Event support and HTTP simulation
+- 🚧 **Benchmarks** - Comprehensive performance comparisons
+- 🚧 **Scaling** - Automatic clustering support
+- 🚧 **RPC Support** - [tRPC](https://trpc.io/) and [gRPC](https://grpc.io/) integration
+- 🚧 **Binary Formats** - [Protobuf](https://protobuf.dev/) and [MessagePack](https://msgpack.org/) support
+- 🚧 **Reliability** - Circuit breaker pattern for resilience
+- 🚧 **Standardized Errors** - Consistent 4xx/5xx error formats
 
 ## 🤝 Contributing
 
