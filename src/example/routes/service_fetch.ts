@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { ShokupanRouter } from '../router';
+import { ShokupanRouter } from '../../router';
 
 const router = new ShokupanRouter();
 
