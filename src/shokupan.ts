@@ -183,17 +183,25 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 // But ShokupanContext expects ShokupanRequest.
                 const request = req as unknown as ShokupanRequest<T>;
 
-                const handle = async () => {
-                    const ctx = new ShokupanContext<T>(request, server);
+                const ctx = new ShokupanContext<T>(request, server, undefined, this);
 
-                    // Compose middleware + router dispatch
-                    const fn = compose(this.middleware);
-                    // Object.defineProperty(fn, 'name', { value: "middleware chain", configurable: false });
+                const handle = async () => {
 
                     try {
+                        // Request Start Hook
+                        if (this.applicationConfig.hooks?.onRequestStart) {
+                            await this.applicationConfig.hooks.onRequestStart(ctx);
+                        }
+
+                        // Compose middleware + router dispatch
+                        const fn = compose(this.middleware);
+                        // Object.defineProperty(fn, 'name', { value: "middleware chain", configurable: false });
+
                         // The "next" at the end of the middleware chain is the router dispatch
                         const result = await fn(ctx, async () => {
                             const match = this.find(req.method, ctx.path);
+                            // TODO: Execute router-level hooks from match?
+                            // For now, only app-level hooks are fully supported here.
                             if (match) {
                                 ctx.params = match.params;
                                 return match.handler(ctx);
@@ -201,18 +209,32 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                             return null;
                         });
 
+                        let response: Response;
                         if (result instanceof Response) {
-                            return result;
+                            response = result;
                         }
-                        if (result === null || result === undefined) {
+                        else if (result === null || result === undefined) {
                             span.setAttribute("http.status_code", 404);
-                            return ctx.text("Not Found", 404);
+                            response = ctx.text("Not Found", 404);
                         }
-                        if (typeof result === "object") {
-                            return ctx.json(result);
+                        else if (typeof result === "object") {
+                            response = ctx.json(result);
+                        }
+                        else {
+                            response = ctx.text(String(result));
                         }
 
-                        return ctx.text(String(result));
+                        // Request End Hook - Processing finished, response ready
+                        if (this.applicationConfig.hooks?.onRequestEnd) {
+                            await this.applicationConfig.hooks.onRequestEnd(ctx);
+                        }
+
+                        // Response Start Hook - About to send response
+                        if (this.applicationConfig.hooks?.onResponseStart) {
+                            await this.applicationConfig.hooks.onResponseStart(ctx, response);
+                        }
+
+                        return response;
 
                     }
                     catch (err: any) {
@@ -222,11 +244,58 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                         const status = err.status || err.statusCode || 500;
                         const body: any = { error: err.message || "Internal Server Error" };
                         if (err.errors) body.errors = err.errors;
+
+                        // Error Hook
+                        if (this.applicationConfig.hooks?.onError) {
+                            try {
+                                await this.applicationConfig.hooks.onError(err, ctx as any);
+                            } catch (hookErr) {
+                                console.error("Error in onError hook:", hookErr);
+                            }
+                        }
+
                         return ctx.json(body, status);
                     }
                 };
 
-                return handle()
+                // Timeout Logic
+                let executionPromise = handle();
+                const timeoutMs = this.applicationConfig.requestTimeout;
+
+                if (timeoutMs && timeoutMs > 0 && this.applicationConfig.hooks?.onRequestTimeout) {
+                    let timeoutId: any;
+                    const timeoutPromise = new Promise<Response>((_, reject) => {
+                        timeoutId = setTimeout(async () => {
+                            try {
+                                if (this.applicationConfig.hooks?.onRequestTimeout) {
+                                    await this.applicationConfig.hooks.onRequestTimeout(ctx);
+                                }
+                            } catch (e) { console.error("Error in onRequestTimeout hook:", e); }
+
+                            reject(new Error("Request Timeout"));
+                        }, timeoutMs);
+                    });
+
+                    executionPromise = Promise.race([executionPromise, timeoutPromise])
+                        .finally(() => clearTimeout(timeoutId));
+                }
+
+                return executionPromise
+                    .catch((err) => {
+                        if (err.message === "Request Timeout") {
+                            return ctx.text("Request Timeout", 408);
+                        }
+                        console.error("Unexpected error in request execution:", err);
+                        return ctx.text("Internal Server Error", 500);
+                    })
+                    .then(async (res) => {
+                        // Response End Hook - Response returned
+                        // Note: We can't guarantee it's fully sent to client here, but it's handed off to Bun
+                        if (this.applicationConfig.hooks?.onResponseEnd) {
+                            await this.applicationConfig.hooks.onResponseEnd(ctx as any, res);
+                        }
+                        return res;
+                    })
                     .finally(() => span.end());
             };
 

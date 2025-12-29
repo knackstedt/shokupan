@@ -21,6 +21,19 @@ export interface OpenAPIOptions {
     defaultTag?: string;
 }
 
+export interface ShokupanHooks<T = any> {
+    onError?: (error: unknown, ctx: ShokupanContext<T>) => void | Promise<void>;
+    onRequestStart?: (ctx: ShokupanContext<T>) => void | Promise<void>;
+    onRequestEnd?: (ctx: ShokupanContext<T>) => void | Promise<void>;
+    onResponseStart?: (ctx: ShokupanContext<T>, response: Response) => void | Promise<void>;
+    onResponseEnd?: (ctx: ShokupanContext<T>, response: Response) => void | Promise<void>;
+    beforeValidate?: (ctx: ShokupanContext<T>, data: any) => void | Promise<void>;
+    afterValidate?: (ctx: ShokupanContext<T>, data: any) => void | Promise<void>;
+    onReadTimeout?: (ctx: ShokupanContext<T>) => void | Promise<void>;
+    onWriteTimeout?: (ctx: ShokupanContext<T>) => void | Promise<void>;
+    onRequestTimeout?: (ctx: ShokupanContext<T>) => void | Promise<void>;
+}
+
 export interface CookieOptions {
     maxAge?: number;
     expires?: Date;
@@ -66,6 +79,11 @@ export type ShokupanRouteConfig = DeepPartial<{
      * Custom renderer for this route.
      */
     renderer: JSXRenderer;
+
+    /**
+     * Hooks for this route/router.
+     */
+    hooks: ShokupanHooks;
 }>;
 
 export type ShokupanRoute = {
@@ -82,6 +100,10 @@ export type ShokupanRoute = {
     }[];
     requestTimeout?: number;
     renderer?: JSXRenderer;
+    /**
+     * Hooks from the router/route definition
+     */
+    hooks?: ShokupanHooks;
 };
 
 export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> = DeepPartial<{
@@ -162,6 +184,11 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      * Defaults to Bun.serve.
      */
     serverFactory: ServerFactory;
+
+    /**
+     * Lifecycle hooks.
+     */
+    hooks: ShokupanHooks<T>;
 
 
     // Open for extension

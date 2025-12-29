@@ -1,7 +1,7 @@
-
 import type { BodyInit, Server } from 'bun';
 import type { ShokupanRequest } from './request';
 import { ShokupanResponse } from './response';
+import type { Shokupan } from './shokupan';
 import type { CookieOptions, JSXRenderer } from './types';
 
 // Shim for HeadersInit if not available globally in some envs
@@ -17,7 +17,8 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     constructor(
         public readonly request: ShokupanRequest<any>,
         public readonly server?: Server,
-        state?: State
+        state?: State,
+        public readonly app?: Shokupan
     ) {
         this.url = new URL(request.url);
         this.state = state || {} as State;

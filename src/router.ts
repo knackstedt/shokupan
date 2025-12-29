@@ -462,6 +462,35 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         };
     }
 
+    private applyHooks(match: { handler: ShokupanHandler<T>; params: Record<string, string>; }) {
+        if (!this.config?.hooks) return match;
+
+        const hooks = this.config.hooks;
+        const originalHandler = match.handler;
+
+        match.handler = async (ctx: ShokupanContext<T>) => {
+            if (hooks.onRequestStart) await hooks.onRequestStart(ctx);
+            try {
+                const result = await originalHandler(ctx);
+                if (hooks.onRequestEnd) await hooks.onRequestEnd(ctx);
+                return result;
+            } catch (err) {
+                if (hooks.onError) {
+                    try {
+                        await hooks.onError(err, ctx);
+                    } catch (e) {
+                        console.error("Error in router onError hook:", e);
+                    }
+                }
+                throw err;
+            }
+        };
+        // Preserve original handler reference for analysis if needed
+        (match.handler as any).originalHandler = (originalHandler as any).originalHandler || originalHandler;
+
+        return match;
+    }
+
     /**
      * Find a route matching the given method and path.
      * @param method HTTP method
@@ -482,7 +511,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                 route.keys.forEach((key, index) => {
                     params[key] = match[index + 1];
                 });
-                return { handler: route.handler, params };
+                return this.applyHooks({ handler: route.handler, params });
             }
         }
 
@@ -494,14 +523,14 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             if (path === prefix || path.startsWith(prefix + "/")) {
                 const subPath = path.slice(prefix.length) || "/";
                 const match = child.find(method, subPath);
-                if (match) return match;
+                if (match) return this.applyHooks(match);
             }
             // Handle case where prefix ends with /
             if (prefix.endsWith("/")) {
                 if (path.startsWith(prefix)) {
                     const subPath = path.slice(prefix.length) || "/";
                     const match = child.find(method, subPath);
-                    if (match) return match;
+                    if (match) return this.applyHooks(match);
                 }
             }
         }

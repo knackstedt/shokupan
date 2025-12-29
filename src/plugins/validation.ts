@@ -165,16 +165,37 @@ const safelyGetBody = async (ctx: ShokupanContext) => {
 
 export function validate(config: ValidationConfig): Middleware {
     return async (ctx: ShokupanContext, next) => {
+        // Prepare data for beforeValidate hook
+        const dataToValidate: any = {};
+        if (config.params) dataToValidate.params = ctx.params;
+        let queryObj: Record<string, string> | undefined;
+        if (config.query) {
+            const url = new URL(ctx.req.url);
+            queryObj = Object.fromEntries(url.searchParams.entries());
+            dataToValidate.query = queryObj;
+        }
+        if (config.headers) dataToValidate.headers = Object.fromEntries(ctx.req.headers.entries());
+
+        let body: any;
+        if (config.body) {
+            body = await safelyGetBody(ctx);
+            dataToValidate.body = body;
+        }
+
+        // Call beforeValidate Hook
+        if (ctx.app?.applicationConfig.hooks?.beforeValidate) {
+            await ctx.app.applicationConfig.hooks.beforeValidate(ctx, dataToValidate);
+        }
+
         // Validate Params
         if (config.params) {
             ctx.params = await runValidation(config.params, ctx.params);
         }
 
         // Validate Query
-        if (config.query) {
-            const url = new URL(ctx.req.url);
-            const queryObj = Object.fromEntries(url.searchParams.entries());
-            const validQuery = await runValidation(config.query, queryObj);
+        let validQuery: any;
+        if (config.query && queryObj) {
+            validQuery = await runValidation(config.query, queryObj);
             // We can't easily replace ctx.query as it is likely a getter wrapping URL
             // But we can store it in state
             // Or try to update URL search params?
@@ -190,9 +211,11 @@ export function validate(config: ValidationConfig): Middleware {
         }
 
         // Validate Body
+        let validBody: any;
         if (config.body) {
-            const body = await safelyGetBody(ctx);
-            const validBody = await runValidation(config.body, body);
+            // Re-use body accessed above or get again (it's cached)
+            const b = body ?? await safelyGetBody(ctx);
+            validBody = await runValidation(config.body, b);
 
             // Update cached body with validated/sanitized version
             const req = ctx.req as any;
@@ -205,6 +228,17 @@ export function validate(config: ValidationConfig): Middleware {
             });
 
             (ctx as any).body = validBody; // Legacy/Convenience
+        }
+
+        // Call afterValidate Hook
+        if (ctx.app?.applicationConfig.hooks?.afterValidate) {
+            const validatedData: any = { ...dataToValidate };
+            if (config.params) validatedData.params = ctx.params;
+            if (config.query) validatedData.query = validQuery;
+            if (config.body) validatedData.body = validBody;
+            // headers not easily updated on ctx in a way we can retrieve as "validated object" unless we return it
+
+            await ctx.app.applicationConfig.hooks.afterValidate(ctx, validatedData);
         }
 
         return next();
