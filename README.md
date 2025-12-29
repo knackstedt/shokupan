@@ -1632,6 +1632,7 @@ Container.clear();
 - ✅ **Deep Introspection** - Type analysis for enhanced OpenAPI generation
 - ✅ **Controller Mode** - Option for controller-only mode
 - ✅ **Supports Node/Deno** - Shokupan can run on Node.js or Deno
+- ✅ **OpenAPI Validation** - Built-in [OpenAPI](https://www.openapis.org/) validation
 
 ### Future Features
 

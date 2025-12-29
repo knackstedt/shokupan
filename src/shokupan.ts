@@ -239,7 +239,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                     }
                     catch (err: any) {
                         console.error(err);
-                        span.recordException(err);
                         span.setStatus({ code: 2 }); // Error
                         const status = err.status || err.statusCode || 500;
                         const body: any = { error: err.message || "Internal Server Error" };
