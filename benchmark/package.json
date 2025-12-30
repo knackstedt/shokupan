@@ -1,0 +1,43 @@
+{
+    "name": "shokupan-benchmark",
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "test": "bun runner.ts"
+    },
+    "private": false,
+    "dependencies": {
+        "@grpc/grpc-js": "^1.14.3",
+        "@grpc/proto-loader": "^0.8.0",
+        "@hapi/hapi": "^21.4.4",
+        "@koa/router": "^15.1.1",
+        "@nestjs/common": "^11.1.11",
+        "@nestjs/core": "^11.1.11",
+        "@nestjs/microservices": "^11.1.11",
+        "@nestjs/platform-express": "^11.1.11",
+        "@nestjs/platform-socket.io": "^11.1.11",
+        "@nestjs/websockets": "^11.1.11",
+        "@tsconfig/bun": "^1.0.8",
+        "@types/axios": "^0.9.36",
+        "@types/bun": "^1.2.23",
+        "@types/express": "^5.0.6",
+        "@types/koa": "^3.0.1",
+        "@types/koa__router": "^12.0.5",
+        "amqp-connection-manager": "^5.0.0",
+        "amqplib": "^0.10.9",
+        "autocannon": "^8.0.0",
+        "axios": "^1.13.2",
+        "express": "^5.2.1",
+        "fastify": "^5.6.2",
+        "get-port": "^7.1.0",
+        "ioredis": "^5.8.2",
+        "kafkajs": "^2.2.4",
+        "koa": "^3.1.1",
+        "mqtt": "^5.14.1",
+        "nats": "^2.29.3",
+        "rxjs": "^7.8.2",
+        "shokupan": "^0.1.0",
+        "tslib": "^2.8.1",
+        "typescript": "~5.9.3"
+    }
+}

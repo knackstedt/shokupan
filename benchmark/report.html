@@ -1,0 +1,337 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Benchmark Results</title>
+    <style>
+        body { font-family: system-ui, sans-serif; padding: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        h2 { margin-top: 30px; }
+    </style>
+</head>
+<body>
+    <h1>Benchmark Results</h1>
+    <p>Generated on 12/29/2025, 9:27:18 PM</p>
+    <h2>shokupan</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Runtime</th>
+                    <th>Endpoint</th>
+                    <th>Req/s (Avg)</th>
+                    <th>Latency (Avg ms)</th>
+                    <th>Throughput (Avg bytes/s)</th>
+                </tr>
+            </thead>
+            <tbody>
+                        <tr>
+                            <td>bun</td>
+                            <td>static</td>
+                            <td>252659.20</td>
+                            <td>0.01</td>
+                            <td>27.23 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>bun</td>
+                            <td>json</td>
+                            <td>242060.80</td>
+                            <td>0.01</td>
+                            <td>121.66 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>bun</td>
+                            <td>dynamic/123</td>
+                            <td>249766.40</td>
+                            <td>0.01</td>
+                            <td>29.78 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>node</td>
+                            <td>static</td>
+                            <td>74665.61</td>
+                            <td>1.06</td>
+                            <td>12.68 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>node</td>
+                            <td>json</td>
+                            <td>72492.80</td>
+                            <td>1.02</td>
+                            <td>40.99 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>node</td>
+                            <td>dynamic/123</td>
+                            <td>76473.61</td>
+                            <td>1.00</td>
+                            <td>13.93 MB/s</td>
+                        </tr></tbody></table><h2>fastify</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Runtime</th>
+                    <th>Endpoint</th>
+                    <th>Req/s (Avg)</th>
+                    <th>Latency (Avg ms)</th>
+                    <th>Throughput (Avg bytes/s)</th>
+                </tr>
+            </thead>
+            <tbody>
+                        <tr>
+                            <td>bun</td>
+                            <td>static</td>
+                            <td>206963.20</td>
+                            <td>0.02</td>
+                            <td>25.26 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>bun</td>
+                            <td>json</td>
+                            <td>183948.80</td>
+                            <td>0.02</td>
+                            <td>95.07 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>bun</td>
+                            <td>dynamic/123</td>
+                            <td>209523.20</td>
+                            <td>0.01</td>
+                            <td>27.97 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>node</td>
+                            <td>static</td>
+                            <td>165568.00</td>
+                            <td>0.03</td>
+                            <td>27.79 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>node</td>
+                            <td>json</td>
+                            <td>148134.40</td>
+                            <td>0.03</td>
+                            <td>83.34 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>node</td>
+                            <td>dynamic/123</td>
+                            <td>157350.40</td>
+                            <td>0.02</td>
+                            <td>28.22 MB/s</td>
+                        </tr></tbody></table><h2>express</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Runtime</th>
+                    <th>Endpoint</th>
+                    <th>Req/s (Avg)</th>
+                    <th>Latency (Avg ms)</th>
+                    <th>Throughput (Avg bytes/s)</th>
+                </tr>
+            </thead>
+            <tbody>
+                        <tr>
+                            <td>bun</td>
+                            <td>static</td>
+                            <td>147622.40</td>
+                            <td>0.07</td>
+                            <td>26.89 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>bun</td>
+                            <td>json</td>
+                            <td>133286.40</td>
+                            <td>0.09</td>
+                            <td>77.27 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>bun</td>
+                            <td>dynamic/123</td>
+                            <td>142681.60</td>
+                            <td>0.07</td>
+                            <td>27.76 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>node</td>
+                            <td>static</td>
+                            <td>30219.20</td>
+                            <td>2.75</td>
+                            <td>6.86 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>node</td>
+                            <td>json</td>
+                            <td>29691.20</td>
+                            <td>3.02</td>
+                            <td>18.55 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>node</td>
+                            <td>dynamic/123</td>
+                            <td>30430.40</td>
+                            <td>2.90</td>
+                            <td>7.28 MB/s</td>
+                        </tr></tbody></table><h2>koa</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Runtime</th>
+                    <th>Endpoint</th>
+                    <th>Req/s (Avg)</th>
+                    <th>Latency (Avg ms)</th>
+                    <th>Throughput (Avg bytes/s)</th>
+                </tr>
+            </thead>
+            <tbody>
+                        <tr>
+                            <td>bun</td>
+                            <td>static</td>
+                            <td>138252.80</td>
+                            <td>0.08</td>
+                            <td>16.88 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>bun</td>
+                            <td>json</td>
+                            <td>125632.00</td>
+                            <td>0.10</td>
+                            <td>64.92 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>bun</td>
+                            <td>dynamic/123</td>
+                            <td>135078.40</td>
+                            <td>0.08</td>
+                            <td>18.04 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>node</td>
+                            <td>static</td>
+                            <td>118841.60</td>
+                            <td>0.08</td>
+                            <td>19.84 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>node</td>
+                            <td>json</td>
+                            <td>109472.00</td>
+                            <td>0.11</td>
+                            <td>61.50 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>node</td>
+                            <td>dynamic/123</td>
+                            <td>116768.00</td>
+                            <td>0.08</td>
+                            <td>20.82 MB/s</td>
+                        </tr></tbody></table><h2>hapi</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Runtime</th>
+                    <th>Endpoint</th>
+                    <th>Req/s (Avg)</th>
+                    <th>Latency (Avg ms)</th>
+                    <th>Throughput (Avg bytes/s)</th>
+                </tr>
+            </thead>
+            <tbody>
+                        <tr>
+                            <td>bun</td>
+                            <td>static</td>
+                            <td>105273.60</td>
+                            <td>0.26</td>
+                            <td>17.47 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>bun</td>
+                            <td>json</td>
+                            <td>104249.60</td>
+                            <td>0.25</td>
+                            <td>58.55 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>bun</td>
+                            <td>dynamic/123</td>
+                            <td>107884.80</td>
+                            <td>0.21</td>
+                            <td>19.14 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>node</td>
+                            <td>static</td>
+                            <td>100307.20</td>
+                            <td>0.30</td>
+                            <td>21.14 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>node</td>
+                            <td>json</td>
+                            <td>97350.40</td>
+                            <td>0.50</td>
+                            <td>59.04 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>node</td>
+                            <td>dynamic/123</td>
+                            <td>104684.80</td>
+                            <td>0.23</td>
+                            <td>23.26 MB/s</td>
+                        </tr></tbody></table><h2>nest</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Runtime</th>
+                    <th>Endpoint</th>
+                    <th>Req/s (Avg)</th>
+                    <th>Latency (Avg ms)</th>
+                    <th>Throughput (Avg bytes/s)</th>
+                </tr>
+            </thead>
+            <tbody>
+                        <tr>
+                            <td>bun</td>
+                            <td>static</td>
+                            <td>119980.80</td>
+                            <td>0.12</td>
+                            <td>21.86 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>bun</td>
+                            <td>json</td>
+                            <td>109830.40</td>
+                            <td>0.17</td>
+                            <td>63.68 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>bun</td>
+                            <td>dynamic/123</td>
+                            <td>108716.80</td>
+                            <td>0.17</td>
+                            <td>21.15 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>node</td>
+                            <td>static</td>
+                            <td>28852.80</td>
+                            <td>3.18</td>
+                            <td>6.55 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>node</td>
+                            <td>json</td>
+                            <td>28305.60</td>
+                            <td>3.14</td>
+                            <td>17.68 MB/s</td>
+                        </tr>
+                        <tr>
+                            <td>node</td>
+                            <td>dynamic/123</td>
+                            <td>27441.60</td>
+                            <td>3.20</td>
+                            <td>6.57 MB/s</td>
+                        </tr></tbody></table>
+</body>
+</html>
