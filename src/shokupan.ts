@@ -128,6 +128,20 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             fetch: this.fetch.bind(this),
             reusePort: this.applicationConfig.reusePort,
             idleTimeout: this.applicationConfig.readTimeout ? this.applicationConfig.readTimeout / 1000 : undefined,
+            websocket: {
+                open(ws) {
+                    if (ws.data?.handler?.open) ws.data.handler.open(ws);
+                },
+                message(ws, message) {
+                    if (ws.data?.handler?.message) ws.data.handler.message(ws, message);
+                },
+                drain(ws) {
+                    if (ws.data?.handler?.drain) ws.data.handler.drain(ws);
+                },
+                close(ws, code, reason) {
+                    if (ws.data?.handler?.close) ws.data.handler.close(ws, code, reason);
+                },
+            }
         };
 
         const server = this.applicationConfig.serverFactory
