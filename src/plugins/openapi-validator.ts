@@ -159,7 +159,7 @@ export function openApiValidator(): Middleware {
     };
 }
 
-function compileValidators(spec: any): ValidatorCache {
+export function compileValidators(spec: any): ValidatorCache {
     const cache: ValidatorCache = new Map();
 
     for (const [path, pathItem] of Object.entries(spec.paths || {})) {
@@ -230,4 +230,26 @@ function compileValidators(spec: any): ValidatorCache {
     }
 
     return cache;
+}
+
+/**
+ * Pre-compiles validators for the application using the provided spec.
+ * Should be called when the spec is available.
+ */
+export function precompileValidators(app: any, spec: any) {
+    const cache = compileValidators(spec);
+    compiledValidators.set(app, cache);
+}
+
+/**
+ * Enables OpenAPI validation for the application.
+ * This registers the middleware and the hook to pre-compile validators when the spec is generated.
+ * 
+ * @param app The Shokupan application instance
+ */
+export function enableOpenApiValidation(app: import("../shokupan").Shokupan) {
+    app.use(openApiValidator());
+    app.onSpecAvailable((spec) => {
+        precompileValidators(app, spec);
+    });
 }

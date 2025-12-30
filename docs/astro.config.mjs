@@ -44,6 +44,7 @@ export default defineConfig({
                         { label: 'Sessions', link: '/plugins/sessions/' },
                         { label: 'Authentication', link: '/plugins/authentication/' },
                         { label: 'Validation', link: '/plugins/validation/' },
+                        { label: 'OpenAPI Validation', link: '/plugins/openapi-validation/' },
                         { label: 'Scalar (OpenAPI)', link: '/plugins/scalar/' },
                     ],
                 },

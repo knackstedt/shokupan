@@ -96,6 +96,17 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         return this;
     }
 
+    private specAvailableHooks: ((spec: any) => void | Promise<void>)[] = [];
+
+    /**
+     * Registers a callback to be executed when the OpenAPI spec is available.
+     * This happens after generateOpenApi() but before the server starts listening (or at least before it finishes startup if async).
+     */
+    public onSpecAvailable(callback: (spec: any) => void | Promise<void>) {
+        this.specAvailableHooks.push(callback);
+        return this;
+    }
+
     /**
      * Starts the application server.
      * 
@@ -116,6 +127,10 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
         if (this.applicationConfig.enableOpenApiGen) {
             this.openApiSpec = await generateOpenApi(this);
+            // Run spec available hooks
+            for (const hook of this.specAvailableHooks) {
+                await hook(this.openApiSpec);
+            }
         }
 
         if (port === 0 && process.platform === "linux") {
