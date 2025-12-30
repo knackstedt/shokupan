@@ -1,4 +1,4 @@
-import { Shokupan } from "shokupan";
+import { Shokupan } from "../../shokupan";
 import { MEDIUM_JSON } from "../data";
 
 export async function start(port: number) {

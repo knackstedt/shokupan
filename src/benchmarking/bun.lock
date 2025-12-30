@@ -34,7 +34,7 @@
         "mqtt": "^5.14.1",
         "nats": "^2.29.3",
         "rxjs": "^7.8.2",
-        "shokupan": "^0.1.0",
+        "shokupan": "^0.2.0",
         "tslib": "^2.8.1",
         "typescript": "~5.9.3",
       },
@@ -334,6 +334,10 @@
     "@scalar/workspace-store": ["@scalar/workspace-store@0.24.1", "", { "dependencies": { "@scalar/code-highlight": "0.2.2", "@scalar/helpers": "0.2.4", "@scalar/json-magic": "0.8.8", "@scalar/object-utils": "1.2.18", "@scalar/openapi-upgrader": "0.1.6", "@scalar/snippetz": "0.6.1", "@scalar/themes": "0.13.26", "@scalar/typebox": "0.1.1", "@scalar/types": "0.5.4", "github-slugger": "^2.0.0", "type-fest": "5.0.0", "vue": "^3.5.21", "yaml": "^2.8.0" } }, "sha512-Dpp20iKzD2rp1zQix1ZFhrh/ZuSpKT0HvA9xMlhZVdyQV2CFwDMChfeL2C4IaGuQKJhTMYs0q3cNnCfO4gJhbA=="],
 
     "@socket.io/component-emitter": ["@socket.io/component-emitter@3.1.2", "", {}, "sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA=="],
+
+    "@surrealdb/cbor": ["@surrealdb/cbor@2.0.0-alpha.4", "", {}, "sha512-l/hNZ3ZCOJq8rzwx1y5ZV/8b2bYCWdhGqRVY33Pu50NAHyAW5qLsMn3ZBkZow77mAKwNCsbDsRGnyYEuU95mjw=="],
+
+    "@surrealdb/node": ["@surrealdb/node@2.4.0", "", { "peerDependencies": { "surrealdb": "^2.0.0-0" } }, "sha512-or/ezuVe5AtD6mMYEeDyjvmw2QD3gK5Rumq+2EVnLKfg23TP1tFOMU0pYBP2Cihr+SG6apxmtNO8vxk717Ab8w=="],
 
     "@swc/helpers": ["@swc/helpers@0.5.18", "", { "dependencies": { "tslib": "^2.8.0" } }, "sha512-TXTnIcNJQEKwThMMqBXsZ4VGAza6bvN4pa41Rkqoio6QBKMvo+5lexeTMScGCIxtzgQJzElcvIltani+adC5PQ=="],
 
@@ -1095,7 +1099,7 @@
 
     "shell-quote": ["shell-quote@1.8.3", "", {}, "sha512-ObmnIF4hXNg1BqhnHmgbDETF8dLPCggZWBjkQfhZpbszZnYur5DUljTcCHii5LC3J5E0yeO/1LIMyH+UvHQgyw=="],
 
-    "shokupan": ["shokupan@0.1.0", "", { "dependencies": { "@clack/prompts": "^0.11.0", "@opentelemetry/api": "^1.9.0", "@opentelemetry/exporter-trace-otlp-proto": "^0.208.0", "@opentelemetry/resources": "^2.2.0", "@opentelemetry/sdk-trace-base": "^2.2.0", "@opentelemetry/sdk-trace-node": "^2.2.0", "@opentelemetry/semantic-conventions": "^1.38.0", "@scalar/api-reference": "^1.40.9", "@scalar/openapi-types": "^0.5.3", "arctic": "^3.7.0", "class-transformer": "^0.5.1", "class-validator": "^0.14.3", "eta": "^4.5.0", "jose": "^6.1.3", "reflect-metadata": "^0.2.2", "tslib": "^2.8.1" }, "bin": { "shokupan": "dist/cli.js", "skp": "dist/cli.js" } }, "sha512-fV12c8y93wB89NGo7To150CdofYNKL19S6GDune+LcRoCocyISCc8wsH6ZB3CxzcT3aKFpZpgGrx86LXbJ9hzw=="],
+    "shokupan": ["shokupan@0.2.0", "", { "dependencies": { "@clack/prompts": "^0.11.0", "@opentelemetry/api": "^1.9.0", "@opentelemetry/exporter-trace-otlp-proto": "^0.208.0", "@opentelemetry/resources": "^2.2.0", "@opentelemetry/sdk-trace-base": "^2.2.0", "@opentelemetry/sdk-trace-node": "^2.2.0", "@opentelemetry/semantic-conventions": "^1.38.0", "@scalar/api-reference": "^1.40.9", "@scalar/openapi-types": "^0.5.3", "@surrealdb/node": "^2.4.0", "ajv": "^8.17.1", "ajv-formats": "^3.0.1", "arctic": "^3.7.0", "class-transformer": "^0.5.1", "class-validator": "^0.14.3", "eta": "^4.5.0", "jose": "^6.1.3", "reflect-metadata": "^0.2.2", "surrealdb": "^2.0.0-alpha.14", "tslib": "^2.8.1" }, "bin": { "shokupan": "dist/cli.js", "skp": "dist/cli.js" } }, "sha512-coA+wo4mVB9evnyUnkMJ3PYOAnfj4LPaBpqT12evaE1D7OFZCOkE4uPx2Ioen1c7xNRgF6lRQuk7WtrBh+B50g=="],
 
     "side-channel": ["side-channel@1.1.0", "", { "dependencies": { "es-errors": "^1.3.0", "object-inspect": "^1.13.3", "side-channel-list": "^1.0.0", "side-channel-map": "^1.0.1", "side-channel-weakmap": "^1.0.2" } }, "sha512-ZX99e6tRweoUXqR+VBrslhda51Nh5MTQwou5tnUDgbtyM0dBgmhEDtWGP/xbKn6hqfPRHujUNwz5fy/wbbhnpw=="],
 
@@ -1146,6 +1150,8 @@
     "style-mod": ["style-mod@4.1.3", "", {}, "sha512-i/n8VsZydrugj3Iuzll8+x/00GH2vnYsk1eomD8QiRrSAeW6ItbCQDtfXCeJHd0iwiNagqjQkvpvREEPtW3IoQ=="],
 
     "supports-color": ["supports-color@7.2.0", "", { "dependencies": { "has-flag": "^4.0.0" } }, "sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw=="],
+
+    "surrealdb": ["surrealdb@2.0.0-alpha.14", "", { "dependencies": { "@surrealdb/cbor": "2.0.0-alpha.4", "uuidv7": "^1.0.1" }, "peerDependencies": { "tslib": "^2.6.3", "typescript": "^5.0.0" } }, "sha512-9j9LDCv8r6WLzH8M2K8i1NshnnTi9GkuEq9PoqlRbNx+yR8B4pjEX4/sjiP/5LkaDvzncdo6SYYAw9sAKCiUsQ=="],
 
     "tabbable": ["tabbable@6.3.0", "", {}, "sha512-EIHvdY5bPLuWForiR/AN2Bxngzpuwn1is4asboytXtpTgsArc+WmSJKVLlhdh71u7jFcryDqB2A8lQvj78MkyQ=="],
 
@@ -1216,6 +1222,8 @@
     "uuid": ["uuid@8.3.2", "", { "bin": { "uuid": "dist/bin/uuid" } }, "sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg=="],
 
     "uuid-parse": ["uuid-parse@1.1.0", "", {}, "sha512-OdmXxA8rDsQ7YpNVbKSJkNzTw2I+S5WsbMDnCtIWSQaosNAcWtFuI/YK1TjzUI6nbkgiqEyh8gWngfcv8Asd9A=="],
+
+    "uuidv7": ["uuidv7@1.1.0", "", { "bin": { "uuidv7": "cli.js" } }, "sha512-2VNnOC0+XQlwogChUDzy6pe8GQEys9QFZBGOh54l6qVfwoCUwwRvk7rDTgaIsRgsF5GFa5oiNg8LqXE3jofBBg=="],
 
     "validator": ["validator@13.15.26", "", {}, "sha512-spH26xU080ydGggxRyR1Yhcbgx+j3y5jbNXk/8L+iRvdIEQ4uTRH2Sgf2dokud6Q4oAtsbNvJ1Ft+9xmm6IZcA=="],
 
