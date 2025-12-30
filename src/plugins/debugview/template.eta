@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shokupan Debug Dashboard</title>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent: #3b82f6;
+            --success: #22c55e;
+            --error: #ef4444;
+            --card-border: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(to right, var(--accent), #8b5cf6);
+            -webkit-background-clip: text;
+            color: transparent;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--card-border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+        }
+
+        .card-title {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .card-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+
+        .text-success {
+            color: var(--success);
+        }
+
+        .text-error {
+            color: var(--error);
+        }
+
+        #chart-container,
+        #table-container {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--card-border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        /* Tabulator Dark Theme Overrides */
+        .tabulator {
+            background-color: transparent !important;
+            border: none !important;
+        }
+
+        .tabulator-header {
+            background-color: var(--bg-primary) !important;
+            border-bottom: 1px solid var(--card-border) !important;
+            color: var(--text-secondary) !important;
+        }
+
+        .tabulator-row {
+            background-color: transparent !important;
+            color: var(--text-primary) !important;
+            border-bottom: 1px solid var(--card-border) !important;
+        }
+
+        .tabulator-row:hover {
+            background-color: rgba(255, 255, 255, 0.05) !important;
+        }
+
+        .tabulator-row.tabulator-selected {
+            background-color: var(--accent) !important;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet">
+    <script type="text/javascript" src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
+    <style>
+        .tabulator {
+            height: 100%;
+            width: 100%;
+            background-color: #0f1322;
+        }
+
+        .tabulator .tabulator-tableholder .tabulator-table {
+            color: #ccc;
+            background-color: #0f1322;
+        }
+
+        .tabulator .tabulator-header {
+            color: #ddd;
+            background-color: #0f1322;
+            border-top-color: #0b0b18;
+            border-bottom-color: #0b0b18;
+        }
+
+        .tabulator .tabulator-header .tabulator-col {
+            border-right-color: #15162f;
+            background-color: #0f1322;
+        }
+
+        .tabulator .tabulator-header .tabulator-col.tabulator-sortable[aria-sort=none] .tabulator-col-content .tabulator-col-sorter {
+            color: #0d0f20;
+        }
+
+        .tabulator .tabulator-header .tabulator-col.tabulator-sortable.tabulator-col-sorter-element:hover {
+            background-color: #111427;
+        }
+
+        .tabulator .tabulator-row {
+            border-bottom-color: #0c0d23;
+            transition: background-color 100ms ease;
+        }
+
+        .tabulator .tabulator-row .tabulator-cell {
+            border-right-color: #11152c;
+            align-content: center;
+        }
+
+        .tabulator .tabulator-row:hover {
+            background-color: #202540 !important;
+        }
+
+        .tabulator .tabulator-row.tabulator-row-even {
+            background-color: #1c1e2c;
+        }
+
+        .tabulator .tabulator-row.tabulator-row-odd {
+            background-color: #171824;
+        }
+
+        .tabulator .tabulator-row.tabulator-selected {
+            background-color: #252a43;
+        }
+
+        .tabulator input {
+            outline: 0;
+            background-color: #2f2f39;
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: 1px solid #15162f;
+            color: #ccc;
+        }
+
+        .tabulator input:focus {
+            outline: 0;
+            background-color: #2f2f39;
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: 1px solid #15162f;
+            color: #ccc;
+        }
+    </style>
+    <style>
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+            background-color: #22355a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            border-radius: 10px;
+            background-color: #2a406a;
+            box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+        }
+
+        *:hover::-webkit-scrollbar-thumb {
+            background-color: #22468a;
+        }
+
+        ::-webkit-scrollbar-track {
+            border-radius: 10px;
+            background-color: #0b0f17;
+        }
+
+        ::-webkit-scrollbar-corner {
+            box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Debug Dashboard</h1>
+            <div style="color: var(--text-secondary)">Uptime: <span id="uptime">
+                    <%= it.uptime %>
+                </span></div>
+        </header>
+
+        <div class="metrics-grid">
+            <div class="card">
+                <div class="card-title">Total Requests</div>
+                <div class="card-value" id="total-requests">
+                    <%= it.metrics.totalRequests %>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Active Requests</div>
+                <div class="card-value" style="color: var(--accent)" id="active-requests">
+                    <%= it.metrics.activeRequests %>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Success Rate</div>
+                <div class="card-value text-success">
+                    <span id="success-rate">
+                        <%= (it.metrics.totalRequests - it.metrics.activeRequests) ?
+                            Math.round((it.metrics.successfulRequests / (it.metrics.totalRequests -
+                            it.metrics.activeRequests)) * 100) : 100 %>%
+                    </span>
+                </div>
+                <div style="color: var(--text-secondary); margin-top: 0.5rem">
+                    <span id="successful-requests">
+                        <%= it.metrics.successfulRequests %>
+                    </span> successful
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Fail Rate</div>
+                <div class="card-value text-error">
+                    <span id="fail-rate">
+                        <%= (it.metrics.totalRequests - it.metrics.activeRequests) ?
+                            Math.round((it.metrics.failedRequests / (it.metrics.totalRequests -
+                            it.metrics.activeRequests)) * 100) : 0 %>%
+                    </span>
+                </div>
+                <div style="color: var(--text-secondary); margin-top: 0.5rem">
+                    <span id="failed-requests">
+                        <%= it.metrics.failedRequests %>
+                    </span> failed
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Avg Latency</div>
+                <div class="card-value">
+                    <span id="avg-latency">
+                        <%= it.metrics.averageTotalTime_ms.toFixed(2) %>
+                    </span> <span style="font-size: 1rem; color: var(--text-secondary)">ms</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="chart-container">
+            <canvas id="latencyChart"></canvas>
+        </div>
+
+        <div id="table-container" style="padding: 0">
+            <div id="requests-table"></div>
+        </div>
+    </div>
+
+    <script>
+        // Injected function from server config
+        const getRequestHeaders = <% ~it.getRequestHeaders || "undefined" %>;
+
+        // --- Chart.js Setup ---
+        const ctx = document.getElementById('latencyChart').getContext('2d');
+        const latencyChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Response Time (ms)',
+                    data: [],
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#94a3b8' }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#94a3b8' },
+                        grid: { color: '#334155' }
+                    },
+                    y: {
+                        ticks: { color: '#94a3b8' },
+                        grid: { color: '#334155' },
+                        beginAtZero: true
+                    }
+                },
+                animation: {
+                    duration: 0
+                }
+            }
+        });
+
+        // --- Tabulator Setup ---
+        const table = new Tabulator("#requests-table", {
+            layout: "fitColumns",
+            height: "400px",
+            placeholder: "No requests yet...",
+            data: [], // Initial data (empty until first fetch)
+            columns: [
+                {
+                    title: "Status", field: "status", width: 90, formatter: function (cell) {
+                        const status = cell.getValue();
+                        const color = status >= 400 ? '#ef4444' : '#22c55e';
+                        return `<span style="color: ${color}; font-weight: bold;">${status}</span>`;
+                    }
+                },
+                { title: "Method", field: "method", width: 100, headerFilter: "input" },
+                { title: "URL", field: "url", headerFilter: "input" },
+                { title: "Duration (ms)", field: "duration", width: 150, formatter: (cell) => cell.getValue().toFixed(2) },
+                {
+                    title: "Time", field: "timestamp", width: 200, formatter: function (cell) {
+                        return new Date(cell.getValue()).toLocaleTimeString();
+                    }
+                },
+            ],
+            initialSort: [
+                { column: "timestamp", dir: "desc" } // Sort by newest first
+            ]
+        });
+
+        async function updateDashboard() {
+            try {
+                const headers = getRequestHeaders ? getRequestHeaders() : {};
+                // Handle relative path issue when accessing /admin without trailing slash
+                const metricsUrl = window.location.pathname.endsWith('/') ? 'metrics' : window.location.pathname + '/metrics';
+                const res = await fetch(metricsUrl, { headers });
+                if (!res.ok) return;
+
+                const data = await res.json();
+                const metrics = data.metrics;
+
+                document.getElementById('uptime').innerText = data.uptime;
+                document.getElementById('total-requests').innerText = metrics.totalRequests;
+                document.getElementById('active-requests').innerText = metrics.activeRequests;
+                document.getElementById('successful-requests').innerText = metrics.successfulRequests;
+                document.getElementById('failed-requests').innerText = metrics.failedRequests;
+                document.getElementById('avg-latency').innerText = metrics.averageTotalTime_ms.toFixed(2);
+
+                // Recalc rates
+                const finishedRequests = metrics.totalRequests - metrics.activeRequests;
+                const successRate = finishedRequests ? Math.round((metrics.successfulRequests / finishedRequests) * 100) : 100;
+                const failRate = finishedRequests ? Math.round((metrics.failedRequests / finishedRequests) * 100) : 0;
+
+                document.getElementById('success-rate').innerText = successRate + '%';
+                document.getElementById('fail-rate').innerText = failRate + '%';
+
+                // --- Update Chart ---
+                // We'll limit to last 50 points
+                const recentLogs = metrics.logs.slice(-50);
+                const labels = recentLogs.map(log => new Date(log.timestamp).toLocaleTimeString());
+                const points = recentLogs.map(log => log.duration);
+
+                latencyChart.data.labels = labels;
+                latencyChart.data.datasets[0].data = points;
+                latencyChart.update();
+
+                // --- Update Table ---
+                // Tabulator replaceData method efficiently updates the table
+                table.replaceData(metrics.logs);
+
+            } catch (err) {
+                console.error("Failed to update dashboard", err);
+            }
+        }
+
+        // Auto-refresh every 2 seconds
+        setInterval(updateDashboard, 2000);
+        // Initial load
+        updateDashboard();
+    </script>
+</body>
+
+</html>
