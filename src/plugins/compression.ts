@@ -6,20 +6,26 @@ export interface CompressionOptions {
 }
 
 export function Compression(options: CompressionOptions = {}): Middleware {
-    const threshold = options.threshold ?? 1024; // 1KB default
+    const threshold = options.threshold ?? 512; // 1KB default
 
     return async (ctx: ShokupanContext, next: NextFn) => {
         const acceptEncoding = ctx.headers.get("accept-encoding") || "";
 
         // Check if compression is supported
-        let method: 'br' | 'gzip' | 'deflate' | null = null;
+        let method: 'br' | 'gzip' | 'zstd' | 'deflate' | null = null;
         if (acceptEncoding.includes("br")) method = "br";
+        else if (acceptEncoding.includes("zstd")) method = "zstd";
         else if (acceptEncoding.includes("gzip")) method = "gzip";
         else if (acceptEncoding.includes("deflate")) method = "deflate";
 
         if (!method) return next();
 
-        const response = await next();
+        let response = await next();
+
+        // Check for implicit return stored in context
+        if (!(response instanceof Response) && ctx._finalResponse instanceof Response) {
+            response = ctx._finalResponse;
+        }
 
         if (response instanceof Response) {
             // Don't compress if already compressed
@@ -37,34 +43,56 @@ export function Compression(options: CompressionOptions = {}): Middleware {
             const body = await response.arrayBuffer();
 
             if (body.byteLength < threshold) {
+                const headers = new Headers(response.headers);
+                headers.set("Content-Encoding", method);
+                headers.set("Content-Length", String(body.byteLength));
+
                 // Return new response with original body because we consumed it
                 return new Response(body, {
                     status: response.status,
                     statusText: response.statusText,
-                    headers: response.headers
+                    headers: headers
                 });
             }
 
             let compressed: Uint8Array;
-            if (method === "br") {
-                // Configurable params could be added later
-                compressed = require("node:zlib").brotliCompressSync(body);
-            } else if (method === "gzip") {
-                compressed = Bun.gzipSync(body);
-            } else {
-                compressed = Bun.deflateSync(body);
+            switch (method) {
+                case "br":
+                    // Configurable params could be added later
+                    const zlib = require("node:zlib");
+                    compressed = await new Promise((res, rej) => zlib.brotliCompress(body, {
+                        params: {
+                            [zlib.constants.BROTLI_PARAM_QUALITY]: 4,
+                        }
+                    }, (err, data) => {
+                        if (err) return rej(err);
+                        res(data);
+                    }));
+                    break;
+                case "gzip":
+                    compressed = Bun.gzipSync(body);
+                    break;
+                case "zstd":
+                    compressed = await Bun.zstdCompress(body);
+                    break;
+                default:
+                    compressed = Bun.deflateSync(body);
+                    break;
             }
 
             const headers = new Headers(response.headers);
             headers.set("Content-Encoding", method);
             headers.set("Content-Length", String(compressed.length));
-            headers.delete("Content-Length"); // Remove original length if present
 
             return new Response(compressed, {
                 status: response.status,
                 statusText: response.statusText,
                 headers
             });
+        }
+        else {
+            // Pass through non-Response values (e.g. undefined, or raw objects)
+            // The application or other middleware might handle them.
         }
 
         return response;

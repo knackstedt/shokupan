@@ -611,6 +611,11 @@ export class OpenAPIAnalyzer {
                     analyzeReturnExpression(node.body as ts.Expression);
                 }
 
+                // Implicit Return call (e.g. ctx.json(...) as a statement without return)
+                if (ts.isExpressionStatement(node)) {
+                    analyzeReturnExpression(node.expression);
+                }
+
                 ts.forEachChild(node, visit);
             };
 

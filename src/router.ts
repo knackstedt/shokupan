@@ -508,19 +508,31 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     public find(method: string, path: string): { handler: ShokupanHandler<T>; params: Record<string, string>; } | null {
         // console.log(`[Router] find ${method} ${path} (routes: ${this.routes.length}, children: ${this[$childRouters].length})`);
 
-        // 1. Check local routes
-        for (const route of this[$routes]) {
-            if (route.method !== "ALL" && route.method !== method) continue;
 
-            const match = route.regex.exec(path);
-            if (match) {
-                // console.log(`  -> Matched route ${route.path}`);
-                const params: Record<string, string> = {};
-                route.keys.forEach((key, index) => {
-                    params[key] = match[index + 1];
-                });
-                return this.applyHooks({ handler: route.handler, params });
+        // Helper to search specific routes
+        const findInRoutes = (routes: any[], m: string) => {
+            for (const route of routes) {
+                if (route.method !== "ALL" && route.method !== m) continue;
+                const match = route.regex.exec(path);
+                if (match) {
+                    const params: Record<string, string> = {};
+                    route.keys.forEach((key: string, index: number) => {
+                        params[key] = match[index + 1];
+                    });
+                    return this.applyHooks({ handler: route.handler, params });
+                }
             }
+            return null;
+        };
+
+        // 1. Check local routes
+        let result = findInRoutes(this[$routes], method);
+        if (result) return result;
+
+        // Fallback: If HEAD not found, try GET
+        if (method === "HEAD") {
+            result = findInRoutes(this[$routes], "GET");
+            if (result) return result;
         }
 
         // 2. Check child routers

@@ -213,6 +213,10 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                         if (result instanceof Response) {
                             response = result;
                         }
+                        // Check explicit void return but response set in context
+                        else if ((result === null || result === undefined) && ctx._finalResponse instanceof Response) {
+                            response = ctx._finalResponse;
+                        }
                         else if (result === null || result === undefined) {
                             span.setAttribute("http.status_code", 404);
                             response = ctx.text("Not Found", 404);

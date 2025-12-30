@@ -42,8 +42,9 @@ export function RateLimit(options: RateLimitOptions = {}): Middleware {
             }
         }
     }, windowMs);
+
     // Ensure interval doesn't block process exit
-    if (interval.unref) interval.unref();
+    interval.unref?.();
 
     return async (ctx: ShokupanContext, next: NextFn) => {
         if (skip(ctx)) return next();

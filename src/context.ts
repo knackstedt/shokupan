@@ -13,6 +13,7 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     public state: State;
 
     public readonly response: ShokupanResponse;
+    public _finalResponse?: Response;
 
     constructor(
         public readonly request: ShokupanRequest<any>,
@@ -150,7 +151,8 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     public send(body?: BodyInit, options?: ResponseInit) {
         const headers = this.mergeHeaders(options?.headers as any);
         const status = options?.status ?? this.response.status;
-        return new Response(body, { status, headers });
+        this._finalResponse = new Response(body, { status, headers });
+        return this._finalResponse;
     }
 
     /**
@@ -174,7 +176,15 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
         const finalHeaders = this.mergeHeaders(headers);
         finalHeaders.set("content-type", "application/json");
         const finalStatus = status ?? this.response.status;
-        return new Response(JSON.stringify(data), { status: finalStatus, headers: finalHeaders });
+
+        const d = Date.now();
+        const jsonString = JSON.stringify(data);
+        const e = Date.now();
+
+        console.log(`JSON.stringify took ${e - d}ms`);
+
+        this._finalResponse = new Response(jsonString, { status: finalStatus, headers: finalHeaders });
+        return this._finalResponse;
     }
 
     /**
@@ -184,7 +194,8 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
         const finalHeaders = this.mergeHeaders(headers);
         finalHeaders.set("content-type", "text/plain");
         const finalStatus = status ?? this.response.status;
-        return new Response(data, { status: finalStatus, headers: finalHeaders });
+        this._finalResponse = new Response(data, { status: finalStatus, headers: finalHeaders });
+        return this._finalResponse;
     }
 
     /**
@@ -194,7 +205,8 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
         const finalHeaders = this.mergeHeaders(headers);
         finalHeaders.set("content-type", "text/html");
         const finalStatus = status ?? this.response.status;
-        return new Response(html, { status: finalStatus, headers: finalHeaders });
+        this._finalResponse = new Response(html, { status: finalStatus, headers: finalHeaders });
+        return this._finalResponse;
     }
 
     /**
@@ -203,7 +215,8 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     redirect(url: string, status = 302) {
         const headers = this.mergeHeaders();
         headers.set('Location', url);
-        return new Response(null, { status, headers });
+        this._finalResponse = new Response(null, { status, headers });
+        return this._finalResponse;
     }
 
     /**
@@ -212,7 +225,8 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
      */
     status(status: number) {
         const headers = this.mergeHeaders();
-        return new Response(null, { status, headers });
+        this._finalResponse = new Response(null, { status, headers });
+        return this._finalResponse;
     }
 
     /**
@@ -221,7 +235,8 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     public file(path: string, fileOptions?: BlobPropertyBag, responseOptions?: ResponseInit) {
         const headers = this.mergeHeaders(responseOptions?.headers as any);
         const status = responseOptions?.status ?? this.response.status;
-        return new Response(Bun.file(path, fileOptions), { status, headers });
+        this._finalResponse = new Response(Bun.file(path, fileOptions), { status, headers });
+        return this._finalResponse;
     }
 
     /**
