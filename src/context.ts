@@ -7,10 +7,19 @@ import type { CookieOptions, JSXRenderer } from './types';
 // Shim for HeadersInit if not available globally in some envs
 type HeadersInit = Headers | Record<string, string> | [string, string][];
 
+
+export interface HandlerStackItem {
+    name: string;
+    file: string;
+    line: number;
+    stateChanges?: Record<string, any>;
+}
+
 export class ShokupanContext<State extends Record<string, any> = Record<string, any>> {
     public readonly url: URL;
     public params: Record<string, string> = {};
     public state: State;
+    public handlerStack: HandlerStackItem[] = [];
 
     public readonly response: ShokupanResponse;
     public _finalResponse?: Response;
@@ -19,10 +28,25 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
         public readonly request: ShokupanRequest<any>,
         public readonly server?: Server,
         state?: State,
-        public readonly app?: Shokupan
+        public readonly app?: Shokupan,
+        enableMiddlewareTracking: boolean = false
     ) {
         this.url = new URL(request.url);
         this.state = state || {} as State;
+        if (enableMiddlewareTracking) {
+            const self = this;
+            this.state = new Proxy(this.state, {
+                set(target, p, newValue, receiver) {
+                    const result = Reflect.set(target, p, newValue, receiver);
+                    const currentHandler = self.handlerStack[self.handlerStack.length - 1];
+                    if (currentHandler) {
+                        if (!currentHandler.stateChanges) currentHandler.stateChanges = {};
+                        currentHandler.stateChanges[p as string] = newValue;
+                    }
+                    return result;
+                }
+            });
+        }
         this.response = new ShokupanResponse();
     }
 

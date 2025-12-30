@@ -42,7 +42,46 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
      * Adds middleware to the application.
      */
     public use(middleware: Middleware) {
-        this.middleware.push(middleware);
+        let trackedMiddleware = middleware;
+
+        // --- Middleware Tracking Logic ---
+        let file = 'unknown';
+        let line = 0;
+        try {
+            const err = new Error();
+            const stack = err.stack?.split('\n') || [];
+            const callerLine = stack.find(l =>
+                l.includes(':') &&
+                !l.includes('shokupan.ts') &&
+                !l.includes('router.ts') && // In case called from router?
+                !l.includes('node_modules') &&
+                !l.includes('bun:main')
+            );
+
+            if (callerLine) {
+                const match = callerLine.match(/\((.*):(\d+):(\d+)\)/) || callerLine.match(/at (.*):(\d+):(\d+)/);
+                if (match) {
+                    file = match[1];
+                    line = parseInt(match[2], 10);
+                }
+            }
+        } catch (e) { }
+
+        trackedMiddleware = async (ctx, next) => {
+            // Cast to any to access handlerStack if types are strict, but ShokupanContext should have it.
+            const c = ctx as any;
+            if (c.handlerStack && c.app?.applicationConfig.enableMiddlewareTracking) {
+                c.handlerStack.push({
+                    name: middleware.name || 'middleware',
+                    file,
+                    line
+                });
+            }
+            return middleware(ctx, next);
+        };
+        // ---------------------------------
+
+        this.middleware.push(trackedMiddleware);
         return this;
     }
 
@@ -183,7 +222,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 // But ShokupanContext expects ShokupanRequest.
                 const request = req as unknown as ShokupanRequest<T>;
 
-                const ctx = new ShokupanContext<T>(request, server, undefined, this);
+                const ctx = new ShokupanContext<T>(request, server, undefined, this, this.applicationConfig.enableMiddlewareTracking);
 
                 const handle = async () => {
 

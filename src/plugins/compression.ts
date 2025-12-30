@@ -23,6 +23,7 @@ export function Compression(options: CompressionOptions = {}): Middleware {
         let response = await next();
 
         // Check for implicit return stored in context
+        // This handles cases where handlers use ctx.text() / ctx.json() but return void
         if (!(response instanceof Response) && ctx._finalResponse instanceof Response) {
             response = ctx._finalResponse;
         }
@@ -43,15 +44,12 @@ export function Compression(options: CompressionOptions = {}): Middleware {
             const body = await response.arrayBuffer();
 
             if (body.byteLength < threshold) {
-                const headers = new Headers(response.headers);
-                headers.set("Content-Encoding", method);
-                headers.set("Content-Length", String(body.byteLength));
-
                 // Return new response with original body because we consumed it
+                // Do NOT set Content-Encoding as we are not compressing
                 return new Response(body, {
                     status: response.status,
                     statusText: response.statusText,
-                    headers: headers
+                    headers: response.headers
                 });
             }
 
@@ -97,4 +95,4 @@ export function Compression(options: CompressionOptions = {}): Middleware {
 
         return response;
     };
-}
+};

@@ -2,7 +2,7 @@ import "./otel";
 
 import { Compression } from '../plugins/compression';
 import { Cors } from '../plugins/cors';
-import { RateLimit } from '../plugins/rate-limit';
+import { DebugDashboard } from '../plugins/debugview/plugin';
 import { ScalarPlugin } from '../plugins/scalar';
 import { SecurityHeaders } from '../plugins/security-headers';
 import { Session } from '../plugins/session';
@@ -12,6 +12,7 @@ import { UserController } from './controllers/implicit-controller';
 import { appLevelHooks, HooksExampleRouter, PerRouteHooksRouter } from './routes/hooks-example';
 import { JSXExampleRouter } from './routes/jsx-example';
 import { ServiceFetchRouter } from './routes/service_fetch';
+import { TrackingDemoRouter } from './routes/tracking';
 import { AjvValidationRouter } from './routes/validators/validation-ajv';
 import { ClassValidatorRouter } from './routes/validators/validation-class-validator';
 import { TypeBoxValidationRouter } from './routes/validators/validation-typebox';
@@ -38,6 +39,12 @@ type session = {
  * - Timeouts: Request, read, and write timeouts
  */
 
+const dashboard = new DebugDashboard({
+    getRequestHeaders: () => ({
+        "Authorization": "Bearer my-secret-token"
+    })
+});
+
 const app = new Shokupan<{
     session: session;
 }>({
@@ -52,8 +59,15 @@ const app = new Shokupan<{
     // Enable AsyncLocalStorage for better request context tracking
     enableAsyncLocalStorage: true,
 
+    // Enable Middleware Tracking for Demo
+    enableMiddlewareTracking: true,
+
     // Event Hooks (app-level)
-    hooks: appLevelHooks
+    hooks: {
+        ...appLevelHooks,
+        ...dashboard.getHooks()
+    },
+
 });
 
 // ============================================================================
@@ -74,12 +88,12 @@ app.use(Compression({
 }));
 
 // Rate Limiting: Prevent abuse
-app.use(RateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: 100, // 100 requests per minute
-    message: { error: 'Too many requests, please try again later.' },
-    headers: true
-}));
+// app.use(RateLimit({
+//     windowMs: 60 * 1000, // 1 minute
+//     max: 100, // 100 requests per minute
+//     message: { error: 'Too many requests, please try again later.' },
+//     headers: true
+// }));
 
 // Security Headers: Set secure HTTP headers
 app.use(SecurityHeaders({
@@ -153,6 +167,11 @@ app.get("/", {
     });
 });
 
+app.get("/implicit", ctx => {
+    ctx.text("Implicit");
+});
+
+
 // Health check endpoint
 app.get("/health", {
     summary: "Health Check",
@@ -220,6 +239,8 @@ app.mount('/jsx', new JSXExampleRouter());
 
 app.mount("/api/user", UserController);
 app.mount("/api/service_fetch", ServiceFetchRouter);
+app.mount("/api/tracking", new TrackingDemoRouter());
+app.mount("/admin", dashboard);
 
 // ============================================================================
 // OPENAPI DOCUMENTATION
@@ -312,7 +333,13 @@ console.log(`
    • Request: 30s
    • Read: 10s
 
-🌐 Starting on http://localhost:3001
+🌐 Starting server...
 `);
 
-app.listen();
+app.listen().then(() => {
+    console.log(`
+    🍞 Shokupan Comprehensive Example Server 🍞
+    
+    Access the debug dashboard at http://localhost:3001/admin
+    `);
+});

@@ -148,6 +148,13 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      */
     controllersOnly: boolean;
     /**
+     * Whether to enable middleware and handler tracking.
+     * When enabled, `ctx.handlerStack` will be populated with the handlers the request has passed through.
+     * Also, `ctx.state` will be a Proxy that tracks changes made by each handler.
+     * @default false
+     */
+    enableMiddlewareTracking: boolean;
+    /**
      * HTTP logger function.
      */
     httpLogger: (ctx: ShokupanContext<T>) => void;

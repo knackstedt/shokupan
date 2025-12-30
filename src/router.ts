@@ -680,6 +680,48 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             };
         }
 
+        // --- Middleware Tracking Logic ---
+        // Capture Caller Info
+        // identifying the file and line number of the handler definition
+        let file = 'unknown';
+        let line = 0;
+
+        try {
+            const err = new Error();
+            const stack = err.stack?.split('\n') || [];
+            // Find the first line that is outside of router.ts, shokupan.ts, and internal/node_modules
+            // This is a heuristic and might need refinement.
+            const callerLine = stack.find(l =>
+                l.includes(':') &&
+                !l.includes('router.ts') &&
+                !l.includes('shokupan.ts') &&
+                !l.includes('node_modules') &&
+                !l.includes('bun:main')
+            );
+
+            if (callerLine) {
+                const match = callerLine.match(/\((.*):(\d+):(\d+)\)/) || callerLine.match(/at (.*):(\d+):(\d+)/);
+                if (match) {
+                    file = match[1];
+                    line = parseInt(match[2], 10);
+                }
+            }
+        } catch (e) { /* ignore stack trace errors */ }
+
+        const trackedHandler = wrappedHandler;
+        wrappedHandler = async (ctx: ShokupanContext<T>) => {
+            if (ctx.app?.applicationConfig.enableMiddlewareTracking) {
+                ctx.handlerStack.push({
+                    name: handler.name || 'anonymous',
+                    file,
+                    line
+                });
+            }
+            return trackedHandler(ctx);
+        };
+        (wrappedHandler as any).originalHandler = (trackedHandler as any).originalHandler || trackedHandler;
+        // ---------------------------------
+
         this[$routes].push({
             method,
             path,
@@ -854,7 +896,42 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         const spec = typeof specOrHandler === "function" ? undefined : specOrHandler as GuardAPISpec;
         const guardHandler = typeof specOrHandler === "function" ? specOrHandler as ShokupanHandler<T> : handler as ShokupanHandler<T>;
 
-        this.currentGuards.push({ handler: guardHandler, spec });
+        // --- Middleware Tracking Logic ---
+        let file = 'unknown';
+        let line = 0;
+        try {
+            const err = new Error();
+            const stack = err.stack?.split('\n') || [];
+            const callerLine = stack.find(l =>
+                l.includes(':') &&
+                !l.includes('router.ts') &&
+                !l.includes('shokupan.ts') &&
+                !l.includes('node_modules') &&
+                !l.includes('bun:main')
+            );
+            if (callerLine) {
+                const match = callerLine.match(/\((.*):(\d+):(\d+)\)/) || callerLine.match(/at (.*):(\d+):(\d+)/);
+                if (match) {
+                    file = match[1];
+                    line = parseInt(match[2], 10);
+                }
+            }
+        } catch (e) { }
+
+        const trackedGuard = async (ctx: ShokupanContext<T>, next?: any) => {
+            if (ctx.app?.applicationConfig.enableMiddlewareTracking) {
+                ctx.handlerStack.push({
+                    name: guardHandler.name || 'guard',
+                    file,
+                    line
+                });
+            }
+            return guardHandler(ctx, next);
+        };
+        (trackedGuard as any).originalHandler = (guardHandler as any).originalHandler || guardHandler;
+        // ---------------------------------
+
+        this.currentGuards.push({ handler: trackedGuard, spec });
 
         return this;
     }
