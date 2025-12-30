@@ -7,6 +7,14 @@ export type DeepPartial<T> = T extends Function ? T : T extends object ? {
     [P in keyof T]?: DeepPartial<T[P]>;
 } : T;
 
+export interface RouteMetadata {
+    file: string;
+    line: number;
+    name?: string;
+    isBuiltin?: boolean;
+    pluginName?: string;
+}
+
 export type MethodAPISpec = OpenAPI.Operation;
 export type GuardAPISpec = DeepPartial<OpenAPI.Operation>;
 export type RouterAPISpec = OpenAPI.Operation & Pick<Required<OpenAPI.Operation>, 'tags'> & { group: string; };
@@ -64,7 +72,10 @@ export interface ServerFactory {
 }
 
 export type NextFn = () => Promise<any>;
-export type Middleware = (ctx: ShokupanContext<unknown>, next: NextFn) => Promise<any> | any;
+export type Middleware = ((ctx: ShokupanContext<unknown>, next: NextFn) => Promise<any> | any) & {
+    isBuiltin?: boolean;
+    pluginName?: string;
+};
 export type JSXRenderer = (element: any, args?: unknown) => string | Promise<string>;
 
 export type ShokupanRouteConfig = DeepPartial<{
@@ -144,6 +155,10 @@ export type ShokupanRoute = {
      * Hooks from the router/route definition
      */
     hooks?: ShokupanHooks;
+    /**
+     * Source metadata
+     */
+    metadata?: RouteMetadata;
 };
 
 export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> = DeepPartial<{

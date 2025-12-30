@@ -6,10 +6,11 @@ import { serveStatic } from './plugins/serve-static';
 import { ShokupanRequest } from './request';
 import type { Shokupan } from './shokupan';
 import { $appRoot, $childControllers, $childRouters, $controllerPath, $dispatch, $isApplication, $isMounted, $isRouter, $middleware, $mountPath, $parent, $routeArgs, $routeMethods, $routes, $routeSpec } from './symbol';
-import type { GuardAPISpec, MethodAPISpec, OpenAPIOptions, ProcessResult, RequestOptions, ShokupanRouteConfig, StaticServeOptions } from './types';
-import { HTTPMethods, RouteParamType, type JSXRenderer, type Method, type ShokupanController, type ShokupanHandler, type ShokupanRoute } from './types';
+
+import { type GuardAPISpec, HTTPMethods, type JSXRenderer, type Method, type MethodAPISpec, type OpenAPIOptions, type ProcessResult, type RequestOptions, RouteParamType, type ShokupanController, type ShokupanHandler, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions, type RouteMetadata } from './types';
 import { asyncContext } from './util/async-hooks';
 import { traceHandler } from './util/instrumentation';
+import { getCallerInfo } from './util/stack';
 
 
 // Shim for HeadersInit if not available globally
@@ -40,8 +41,56 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     }
 
     public [$routes]: ShokupanRoute[] = []; // Public via Symbol for OpenAPI generator
+    public metadata?: RouteMetadata; // Metadata for the router itself
 
     private currentGuards: { handler: ShokupanHandler<T>; spec?: GuardAPISpec; }[] = [];
+
+    // Registry Accessor
+    public getComponentRegistry() {
+        // Collect local routes
+        const routes = this[$routes].map(r => ({
+            type: 'route',
+            path: r.path,
+            method: r.method,
+            metadata: r.metadata,
+            handlerName: r.handler.name
+        }));
+
+        // Collect middleware (if exists, e.g. on Shokupan app)
+        const mw = (this as any).middleware as any[] | undefined;
+        const middleware = mw ? mw.map(m => ({
+            name: m.name || 'middleware',
+            metadata: m.metadata
+        })) : [];
+
+        // Collect child routers
+        const routers = this[$childRouters].map(r => ({
+            type: 'router',
+            path: r[$mountPath],
+            metadata: r.metadata,
+            children: r.getComponentRegistry()
+        }));
+
+        // Collect child controllers
+        const controllers = this[$childControllers].map(c => {
+            // Controllers attached via instance... 
+            // We might need to store metadata on instance during mount?
+            return {
+                type: 'controller',
+                path: (c as any)[$mountPath] || '/',
+                name: c.constructor.name,
+                metadata: (c as any).metadata // Check if we can store this
+            };
+        });
+
+        return {
+            metadata: this.metadata,
+            middleware,
+            routes,
+            routers,
+            controllers
+        };
+    }
 
     constructor(
         public readonly config?: ShokupanRouteConfig
@@ -82,6 +131,16 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             }
 
             controller[$mountPath] = prefix;
+
+            // Capture mount location if not already present (create new router usually has it? no)
+            if (!controller.metadata) {
+                const info = getCallerInfo();
+                controller.metadata = {
+                    file: info.file,
+                    line: info.line,
+                    name: 'MountedRouter'
+                };
+            }
             this[$childRouters].push(controller);
 
             /**
@@ -136,6 +195,15 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             }
 
             instance[$mountPath] = prefix;
+
+            // Capture metadata for controller instance
+            const info = getCallerInfo();
+            (instance as any).metadata = {
+                file: info.file,
+                line: info.line,
+                name: instance.constructor.name
+            };
+
             this[$childControllers].push(instance as any);
 
             // Get Middleware for Controller
@@ -609,23 +677,16 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         const routeGuards = [...this.currentGuards];
 
         // Wrap for Timeout
-        // Logic: specific route timeout > router timeout > global config timeout
-        // 0 means disabled, but undefined means "inherit".
-        // Actually, 0 usually means "no timeout" (infinite).
-        // Let's assume if explicit 0 is passed, it disables.
-        // If undefined, fallback.
         const effectiveTimeout = requestTimeout ?? this.requestTimeout ?? this.rootConfig?.requestTimeout;
 
         if (effectiveTimeout !== undefined && effectiveTimeout > 0) {
             const originalHandler = wrappedHandler;
             wrappedHandler = async (ctx: ShokupanContext<T>) => {
                 if (ctx.server) {
-                    // Bun.server.timeout takes seconds
                     ctx.server.timeout(ctx.req as unknown as Request, effectiveTimeout / 1000);
                 }
                 return originalHandler(ctx);
             };
-            // Preserve original handler reference for analysis if needed
             (wrappedHandler as any).originalHandler = (originalHandler as any).originalHandler || originalHandler;
         }
 
@@ -636,8 +697,6 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                 for (const guard of routeGuards) {
                     let guardPassed = false;
                     let nextCalled = false;
-
-                    // Create next function for middleware-style guards
                     const next = () => {
                         nextCalled = true;
                         return Promise.resolve();
@@ -645,22 +704,14 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
                     try {
                         const result = await guard.handler(ctx, next);
-
-                        // Check if guard explicitly returned true or called next()
                         if (result === true || nextCalled) {
                             guardPassed = true;
-                        }
-                        // If guard returned a response, return it (short-circuit)
-                        else if (result !== undefined && result !== null && result !== false) {
+                        } else if (result !== undefined && result !== null && result !== false) {
                             return result;
-                        }
-                        // If guard returned false or nothing, block the request
-                        else {
+                        } else {
                             return ctx.json({ error: 'Forbidden' }, 403);
                         }
-                    }
-                    catch (error) {
-                        // If guard throws, propagate the error to error handling
+                    } catch (error) {
                         throw error;
                     }
 
@@ -668,8 +719,6 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                         return ctx.json({ error: 'Forbidden' }, 403);
                     }
                 }
-
-                // All guards passed, execute the actual handler
                 return innerHandler(ctx);
             };
         }
@@ -685,34 +734,9 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         }
 
         // --- Middleware Tracking Logic ---
-        // Capture Caller Info
-        // identifying the file and line number of the handler definition
-        let file = 'unknown';
-        let line = 0;
+        const { file, line } = getCallerInfo();
 
-        try {
-            const err = new Error();
-            const stack = err.stack?.split('\n') || [];
-            // Find the first line that is outside of router.ts, shokupan.ts, and internal/node_modules
-            // This is a heuristic and might need refinement.
-            const callerLine = stack.find(l =>
-                l.includes(':') &&
-                !l.includes('router.ts') &&
-                !l.includes('shokupan.ts') &&
-                !l.includes('node_modules') &&
-                !l.includes('bun:main')
-            );
-
-            if (callerLine) {
-                const match = callerLine.match(/\((.*):(\d+):(\d+)\)/) || callerLine.match(/at (.*):(\d+):(\d+)/);
-                if (match) {
-                    file = match[1];
-                    line = parseInt(match[2], 10);
-                }
-            }
-        } catch (e) { /* ignore stack trace errors */ }
-
-        const trackedHandler = wrappedHandler;
+        const trackingHandler = wrappedHandler;
         wrappedHandler = async (ctx: ShokupanContext<T>) => {
             if (ctx.app?.applicationConfig.enableMiddlewareTracking) {
                 ctx.handlerStack.push({
@@ -721,9 +745,9 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                     line
                 });
             }
-            return trackedHandler(ctx);
+            return trackingHandler(ctx);
         };
-        (wrappedHandler as any).originalHandler = (trackedHandler as any).originalHandler || trackedHandler;
+        (wrappedHandler as any).originalHandler = (trackingHandler as any).originalHandler || trackingHandler;
         // ---------------------------------
 
         this[$routes].push({
@@ -735,7 +759,14 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             handlerSpec: spec,
             group,
             guards: routeGuards.length > 0 ? routeGuards : undefined,
-            requestTimeout: effectiveTimeout // Save for inspection? Or just relying on closure
+            requestTimeout: effectiveTimeout,
+            metadata: {
+                file,
+                line,
+                name: handler.name || 'anonymous',
+                isBuiltin: (handler as any).isBuiltin,
+                pluginName: (handler as any).pluginName
+            }
         });
 
         return this;

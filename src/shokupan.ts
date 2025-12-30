@@ -10,6 +10,8 @@ import { $appRoot, $dispatch, $isApplication } from './symbol';
 import type { Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig } from './types';
 import { asyncContext } from "./util/async-hooks";
 
+import { getCallerInfo } from './util/stack';
+
 const defaults: ShokupanConfig = {
     port: 3000,
     hostname: "localhost",
@@ -23,7 +25,7 @@ const tracer = trace.getTracer("shokupan.application");
 export class Shokupan<T = any> extends ShokupanRouter<T> {
     readonly applicationConfig: ShokupanConfig = {};
     public openApiSpec?: any;
-    private middleware: Middleware[] = [];
+    public middleware: Middleware[] = [];
     private composedMiddleware?: Middleware;
 
     get logger() {
@@ -37,6 +39,14 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         this[$isApplication] = true;
         this[$appRoot] = this;
         Object.assign(this.applicationConfig, defaults, applicationConfig);
+
+        // Capture metadata for the application instance
+        const { file, line } = getCallerInfo();
+        this.metadata = {
+            file,
+            line,
+            name: 'ShokupanApplication'
+        };
     }
 
     /**
@@ -46,36 +56,29 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         let trackedMiddleware = middleware;
 
         // --- Middleware Tracking Logic ---
-        let file = 'unknown';
-        let line = 0;
-        try {
-            const err = new Error();
-            const stack = err.stack?.split('\n') || [];
-            const callerLine = stack.find(l =>
-                l.includes(':') &&
-                !l.includes('shokupan.ts') &&
-                !l.includes('router.ts') && // In case called from router?
-                !l.includes('node_modules') &&
-                !l.includes('bun:main')
-            );
+        const { file, line } = getCallerInfo();
 
-            if (callerLine) {
-                const match = callerLine.match(/\((.*):(\d+):(\d+)\)/) || callerLine.match(/at (.*):(\d+):(\d+)/);
-                if (match) {
-                    file = match[1];
-                    line = parseInt(match[2], 10);
-                }
-            }
-        } catch (e) { }
+        // Store metadata on the original middleware function if possible
+        if (!(middleware as any).metadata) {
+            (middleware as any).metadata = {
+                file,
+                line,
+                name: middleware.name || 'middleware',
+                isBuiltin: (middleware as any).isBuiltin,
+                pluginName: (middleware as any).pluginName
+            };
+        }
 
         trackedMiddleware = async (ctx, next) => {
             // Cast to any to access handlerStack if types are strict, but ShokupanContext should have it.
             const c = ctx as any;
             if (c.handlerStack && c.app?.applicationConfig.enableMiddlewareTracking) {
+                const metadata = (middleware as any).metadata || {};
                 c.handlerStack.push({
-                    name: middleware.name || 'middleware',
-                    file,
-                    line
+                    name: metadata.pluginName ? `${metadata.pluginName} (${metadata.name})` : metadata.name || middleware.name || 'middleware',
+                    file: metadata.file || file,
+                    line: metadata.line || line,
+                    isBuiltin: metadata.isBuiltin
                 });
             }
             return middleware(ctx, next);
@@ -240,7 +243,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
      * @param server - The server instance.
      * @returns The response to send.
      */
-    public async fetch(req: Request, server?: import("bun").Server): Promise<Response> {
+    public async fetch(req: Request, server?: import("bun").Server<any>): Promise<Response> {
         if (this.applicationConfig.enableTracing) {
             const tracer = trace.getTracer("shokupan.application");
             const store = asyncContext.getStore();
@@ -273,7 +276,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         return this.handleRequest(req, server);
     }
 
-    private async handleRequest(req: Request, server?: import("bun").Server): Promise<Response> {
+    private async handleRequest(req: Request, server?: import("bun").Server<any>): Promise<Response> {
         // Cast to ShokupanRequest if needed, though at runtime it's just a Request
         // But ShokupanContext expects ShokupanRequest.
         const request = req as unknown as ShokupanRequest<T>;

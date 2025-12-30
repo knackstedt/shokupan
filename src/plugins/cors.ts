@@ -20,7 +20,7 @@ export function Cors(options: CorsOptions = {}): Middleware {
 
     const opts = { ...defaults, ...options };
 
-    return async (ctx: ShokupanContext, next: NextFn) => {
+    const corsMiddleware: Middleware = async (ctx: ShokupanContext, next: NextFn) => {
         const headers = new Headers();
         const origin = ctx.headers.get("origin");
 
@@ -101,4 +101,8 @@ export function Cors(options: CorsOptions = {}): Middleware {
 
         return response;
     };
+    (corsMiddleware as any).isBuiltin = true;
+    (corsMiddleware as any).pluginName = 'Cors';
+
+    return corsMiddleware;
 }

@@ -43,10 +43,7 @@ export function RateLimit(options: RateLimitOptions = {}): Middleware {
         }
     }, windowMs);
 
-    // Ensure interval doesn't block process exit
-    interval.unref?.();
-
-    return async (ctx: ShokupanContext, next: NextFn) => {
+    const rateLimitMiddleware: Middleware = async (ctx: ShokupanContext, next: NextFn) => {
         if (skip(ctx)) return next();
 
         const key = keyGenerator(ctx);
@@ -95,4 +92,8 @@ export function RateLimit(options: RateLimitOptions = {}): Middleware {
 
         return response;
     };
+    (rateLimitMiddleware as any).isBuiltin = true;
+    (rateLimitMiddleware as any).pluginName = 'RateLimit';
+
+    return rateLimitMiddleware;
 }

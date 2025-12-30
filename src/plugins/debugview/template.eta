@@ -301,7 +301,172 @@
         <div id="table-container" style="padding: 0">
             <div id="requests-table"></div>
         </div>
+
+        <div id="registry-container" class="card" style="margin-top: 2rem;">
+            <div class="card-title">Component Registry</div>
+            <div id="registry-tree" style="margin-top: 1rem; font-family: monospace; font-size: 0.9rem;"></div>
+        </div>
     </div>
+
+    <style>
+        .tree-node {
+            margin-left: 1rem;
+            border-left: 1px solid #334155;
+            padding-left: 0.5rem;
+        }
+        .tree-item {
+            margin: 0.25rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .tree-icon {
+            color: var(--text-secondary);
+            font-size: 0.8em;
+        }
+        .tree-label {
+            color: var(--text-primary);
+        }
+        .tree-meta {
+            color: var(--text-secondary);
+            font-size: 0.8em;
+            margin-left: 0.5rem;
+            font-style: italic;
+        }
+        .badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7em;
+            font-weight: bold;
+        }
+        .badge-GET { background: #0f172a; color: #3b82f6; border: 1px solid #3b82f6; }
+        .badge-POST { background: #0f172a; color: #22c55e; border: 1px solid #22c55e; }
+        .badge-PUT { background: #0f172a; color: #eab308; border: 1px solid #eab308; }
+        .badge-DELETE { background: #0f172a; color: #ef4444; border: 1px solid #ef4444; }
+        .badge-ROUTER { background: #334155; color: #f8fafc; }
+        .badge-CONTROLLER { background: #475569; color: #f8fafc; }
+    </style>
+
+    <script>
+        // Registry Data
+        const registryData = <%~ JSON.stringify(it.registry) %>;
+
+        function renderRegistry(node, container) {
+            if (!node) {
+                container.innerHTML = '<div style="color: var(--text-secondary)">No registry data available</div>';
+                return;
+            }
+
+            const wrapper = document.createElement('div');
+            
+            // Render middleware
+            if (node.middleware && node.middleware.length > 0) {
+                const div = document.createElement('div');
+                div.innerHTML = `<div class="tree-item"><span class="badge" style="background: #9333ea; color: white;">MIDDLEWARE</span></div>`;
+                
+                const mwContainer = document.createElement('div');
+                mwContainer.className = 'tree-node';
+                
+                node.middleware.forEach(mw => {
+                    const mwDiv = document.createElement('div');
+                    mwDiv.className = 'tree-item';
+                    
+                    let meta = '';
+                    if (mw.metadata) {
+                        const file = mw.metadata.file ? mw.metadata.file.split('/').pop() : 'unknown';
+                        const name = mw.metadata.name || mw.name;
+                        const builtin = mw.metadata.isBuiltin ? `<span class="badge" style="background: #059669; margin-left:10px;">BUILTIN</span>` : '';
+                        const pluginName = mw.metadata.pluginName ? `<span style="color: #6ee7b7; margin-left: 5px;">[${mw.metadata.pluginName}]</span>` : '';
+                        
+                        meta = `<span class="tree-meta">${file}:${mw.metadata.line}</span> ${builtin} ${pluginName}`;
+                    }
+
+                    mwDiv.innerHTML = `
+                        <span class="tree-label">${mw.name}</span>
+                        ${meta}
+                    `;
+                    mwContainer.appendChild(mwDiv);
+                });
+                div.appendChild(mwContainer);
+                wrapper.appendChild(div);
+            }
+
+            // Render root container (Routes)
+            if (node.routes) {
+                node.routes.forEach(route => {
+                    const div = document.createElement('div');
+                    div.className = 'tree-item';
+                    
+                    const method = route.method.toUpperCase();
+                    const badgeClass = `badge-${method}`;
+                    
+                    let meta = '';
+                    if (route.metadata && route.metadata.file) {
+                        const file = route.metadata.file.split('/').pop();
+                        meta = `<span class="tree-meta">${file}:${route.metadata.line} (${route.metadata.name})</span>`;
+                    }
+
+                    div.innerHTML = `
+                        <span class="badge ${badgeClass}" style="width: 50px; text-align: center; display: inline-block;">${method}</span>
+                        <span class="tree-label">${route.path}</span>
+                        ${meta}
+                    `;
+                    wrapper.appendChild(div);
+                });
+            }
+
+            // Render children routers
+            if (node.routers) {
+                node.routers.forEach(router => {
+                    const div = document.createElement('div');
+                    // div.className = 'tree-node';
+                    
+                    const header = document.createElement('div');
+                    header.className = 'tree-item';
+                    header.innerHTML = `
+                        <span class="badge badge-ROUTER">ROUTER</span>
+                        <span class="tree-label">${router.path}</span>
+                    `;
+                    div.appendChild(header);
+
+                    if (router.children) {
+                        const childrenContainer = document.createElement('div');
+                        childrenContainer.className = 'tree-node';
+                        renderRegistry(router.children, childrenContainer);
+                        div.appendChild(childrenContainer);
+                    }
+                    wrapper.appendChild(div);
+                });
+            }
+
+            // Render children controllers
+            if (node.controllers) {
+                node.controllers.forEach(ctrl => {
+                    const div = document.createElement('div');
+                    div.className = 'tree-item';
+                   
+                    let meta = '';
+                    if (ctrl.metadata && ctrl.metadata.file) {
+                        const file = ctrl.metadata.file.split('/').pop();
+                        meta = `<span class="tree-meta">${file}:${ctrl.metadata.line}</span>`;
+                    }
+
+                    div.innerHTML = `
+                        <span class="badge badge-CONTROLLER">CTRL</span>
+                        <span class="tree-label">${ctrl.name}</span>
+                        <span style="color: #64748b; margin-left: 0.5rem;">@ ${ctrl.path}</span>
+                        ${meta}
+                    `;
+                    wrapper.appendChild(div);
+                });
+            }
+
+            container.appendChild(wrapper);
+        }
+
+        const registryContainer = document.getElementById('registry-tree');
+        renderRegistry(registryData, registryContainer);
+    </script>
 
     <script>
         // Injected function from server config

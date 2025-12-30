@@ -2,7 +2,7 @@ import { Eta } from 'eta';
 import { readdir, stat } from 'fs/promises';
 import { basename, join, resolve } from 'path';
 import type { ShokupanContext } from '../context';
-import type { StaticServeOptions } from '../types';
+import type { Middleware, StaticServeOptions } from '../types';
 
 const eta = new Eta();
 
@@ -10,7 +10,7 @@ export function serveStatic<T extends Record<string, any>>(ctx: ShokupanContext<
     const rootPath = resolve(config.root || ".");
     const normalizedPrefix = prefix.endsWith('/') && prefix !== '/' ? prefix.slice(0, -1) : prefix;
 
-    return async () => {
+    const serveStaticMiddleware: Middleware = async () => {
         // 1. Calculate relative path
         // ctx.path is full path.
         // If prefix is /static, and path is /static/foo.css, relative is /foo.css
@@ -169,4 +169,9 @@ export function serveStatic<T extends Record<string, any>>(ctx: ShokupanContext<
         }
         return response;
     };
+
+    (serveStaticMiddleware as any).isBuiltin = true;
+    (serveStaticMiddleware as any).pluginName = 'ServeStatic';
+
+    return serveStaticMiddleware;
 }

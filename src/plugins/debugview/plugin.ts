@@ -1,5 +1,6 @@
 import { Eta } from "eta";
 import { ShokupanRouter } from "../../router";
+import { $appRoot } from "../../symbol";
 import type { ShokupanHooks } from "../../types";
 
 interface RequestMetrics {
@@ -71,15 +72,26 @@ export class DebugDashboard extends ShokupanRouter {
             });
         });
 
+        // Serve the registry as JSON
+        this.get("/registry", (ctx) => {
+            const app = (this as any)[$appRoot];
+            const registry = app?.getComponentRegistry ? app.getComponentRegistry() : null;
+            return ctx.json({ registry });
+        });
+
         // Serve the dashboard
         this.get("/", async (ctx) => {
             const uptimeSeconds = Math.floor((Date.now() - this.startTime) / 1000);
             const uptime = `${Math.floor(uptimeSeconds / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m ${uptimeSeconds % 60}s`;
 
+            const app = (this as any)[$appRoot];
+            const registry = app?.getComponentRegistry ? app.getComponentRegistry() : null;
+
             const template = await Bun.file(__dirname + "/template.eta").text();
             const html = this.eta.renderString(template, {
                 metrics: this.metrics,
                 uptime,
+                registry,
                 // Serialize the function to string if it exists
                 getRequestHeaders: this.dashboardConfig.getRequestHeaders?.toString()
             });
