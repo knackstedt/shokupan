@@ -81,17 +81,97 @@ async function runBenchmark(framework: string, runtime: string) {
 
     const proc = spawn(cmd, {
         env,
-        stdout: "inherit",
-        stderr: "inherit",
+        stdout: "pipe",
+        stderr: "pipe",
         onExit(proc, exitCode, signalCode, error) {
-            if (exitCode !== 0 && signalCode !== 15 && signalCode !== 2) { // 15 is SIGTERM
-                console.error(`Process exited with code ${exitCode}`);
+            // Bun might pass signalCode as string (e.g. "SIGTERM") or number depending on version/context.
+            // Node compatibility usually means string.
+            // We ignore SIGTERM (15) and SIGINT (2) as "unexpected" if we triggered them.
+            const isExpectedSignal = signalCode === 15 || signalCode === "SIGTERM" || signalCode === 2 || signalCode === "SIGINT";
+            
+            if (exitCode !== 0 && !isExpectedSignal) {
+                console.error(`Process exited unexpectedly with code ${exitCode}, signal ${signalCode}`);
+                if (error) console.error(`Error: ${error}`);
             }
         },
     });
 
-    // Wait for server to be ready
-    await new Promise(r => setTimeout(r, 2000));
+    // Helper to pipe stream to process.stdout/stderr and capture lines
+    const pipeStream = async (stream: ReadableStream, dest: any) => {
+        if (!stream) return;
+        const reader = stream.getReader();
+        const decoder = new TextDecoder();
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const text = decoder.decode(value);
+                dest.write(text);
+                // Simple accumulation for error reporting
+                // Note: this might separate lines incorrectly if chunks end mid-line, but sufficient for debug logs
+                if (outputLines.length < 100) { // Limit stored log size
+                    outputLines.push(text);
+                }
+            }
+        } catch (e) {
+            // Stream closed or error
+        }
+    };
+
+    const outputLines: string[] = [];
+    // Start piping in background without awaiting
+    pipeStream(proc.stdout, process.stdout);
+    pipeStream(proc.stderr, process.stderr);
+
+    // Wait a bit for the process to start
+    await new Promise(r => setTimeout(r, 1500));
+    
+    // Check if process is still alive
+    if (proc.killed || proc.exitCode !== null) {
+        console.error(`Process died immediately. Exit code: ${proc.exitCode}`);
+        console.error("Last output:");
+        console.error(outputLines.join(""));
+        return { error: "Process died immediately" };
+    }
+
+    // Wait for server to be ready with health check
+    let serverReady = false;
+    let lastError: any = null;
+    for (let i = 0; i < 20; i++) {
+        await new Promise(r => setTimeout(r, 500));
+        
+        // Check if process died
+        if (proc.killed || proc.exitCode !== null) {
+            console.error(`Process died during startup. Exit code: ${proc.exitCode}`);
+            console.error("Last output:");
+            console.error(outputLines.join(""));
+            return { error: "Process died during startup" };
+        }
+        
+        try {
+            const healthCheck = await fetch(`http://localhost:${port}/static`, {
+                signal: AbortSignal.timeout(1000)
+            });
+            if (healthCheck.ok) {
+                serverReady = true;
+                console.log(`Server is ready on port ${port}`);
+                break;
+            }
+            lastError = `HTTP ${healthCheck.status}`;
+        } catch (e: any) {
+            lastError = e.message || String(e);
+            // Server not ready yet, continue waiting
+        }
+    }
+
+    if (!serverReady) {
+        console.error(`Server failed to start on port ${port}`);
+        console.error(`Last error: ${lastError}`);
+        console.error(`Framework: ${framework}, Runtime: ${runtime}`);
+        proc.kill();
+        await new Promise(r => setTimeout(r, 1000));
+        return { error: `Server failed to start: ${lastError}` };
+    }
 
     const results: Record<string, any> = {};
 

@@ -29,12 +29,12 @@ export function createHttpServer(): ServerFactory {
             response.headers.forEach((v, k) => res.setHeader(k, v));
 
             if (response.body) {
-                // @ts-ignore
-                for await (const chunk of response.body) {
-                    res.write(chunk);
-                }
+                // Optimize: Use arrayBuffer for direct conversion instead of async iteration
+                const buffer = await response.arrayBuffer();
+                res.end(Buffer.from(buffer));
+            } else {
+                res.end();
             }
-            res.end();
         });
 
         const fauxServer: Server = {
@@ -99,12 +99,12 @@ export function createHttpsServer(sslOptions: https.ServerOptions): ServerFactor
             response.headers.forEach((v, k) => res.setHeader(k, v));
 
             if (response.body) {
-                // @ts-ignore
-                for await (const chunk of response.body) {
-                    res.write(chunk);
-                }
+                // Optimize: Use arrayBuffer for direct conversion instead of async iteration
+                const buffer = await response.arrayBuffer();
+                res.end(Buffer.from(buffer));
+            } else {
+                res.end();
             }
-            res.end();
         });
 
         const fauxServer: Server = {

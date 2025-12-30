@@ -34,7 +34,11 @@ async function main() {
             process.exit(1);
         }
     } catch (err) {
-        console.error("Worker error:", err);
+        console.error("Worker error loading module:", caseFile);
+        console.error("Error details:", err);
+        if (err instanceof Error) {
+            console.error("Stack trace:", err.stack);
+        }
         process.exit(1);
     }
 }
