@@ -4,7 +4,7 @@ import fs from "fs";
 import path from "path";
 // We will use a system command to open the browser.
 
-const FRAMEWORKS = ["shokupan", "fastify", "express", "koa", "hapi", "nest"];
+const FRAMEWORKS = ["shokupan", "fastify", "express", "koa", "hapi", "nest", "hono", "elysia"];
 const RUNTIMES = ["bun", "node"];
 const ENDPOINTS = ["static", "json", "dynamic/123"];
 
@@ -88,7 +88,7 @@ async function runBenchmark(framework: string, runtime: string) {
             // Node compatibility usually means string.
             // We ignore SIGTERM (15) and SIGINT (2) as "unexpected" if we triggered them.
             const isExpectedSignal = signalCode === 15 || signalCode === "SIGTERM" || signalCode === 2 || signalCode === "SIGINT";
-            
+
             if (exitCode !== 0 && !isExpectedSignal) {
                 console.error(`Process exited unexpectedly with code ${exitCode}, signal ${signalCode}`);
                 if (error) console.error(`Error: ${error}`);
@@ -125,7 +125,7 @@ async function runBenchmark(framework: string, runtime: string) {
 
     // Wait a bit for the process to start
     await new Promise(r => setTimeout(r, 1500));
-    
+
     // Check if process is still alive
     if (proc.killed || proc.exitCode !== null) {
         console.error(`Process died immediately. Exit code: ${proc.exitCode}`);
@@ -139,7 +139,7 @@ async function runBenchmark(framework: string, runtime: string) {
     let lastError: any = null;
     for (let i = 0; i < 20; i++) {
         await new Promise(r => setTimeout(r, 500));
-        
+
         // Check if process died
         if (proc.killed || proc.exitCode !== null) {
             console.error(`Process died during startup. Exit code: ${proc.exitCode}`);
@@ -147,7 +147,7 @@ async function runBenchmark(framework: string, runtime: string) {
             console.error(outputLines.join(""));
             return { error: "Process died during startup" };
         }
-        
+
         try {
             const healthCheck = await fetch(`http://localhost:${port}/static`, {
                 signal: AbortSignal.timeout(1000)

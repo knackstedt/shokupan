@@ -60,7 +60,7 @@ export enum RouteParamType {
 }
 
 export interface ServerFactory {
-    (options: any): Server | Promise<Server>;
+    (options: any): Server<any> | Promise<Server<any>>;
 }
 
 export type NextFn = () => Promise<any>;
@@ -91,18 +91,54 @@ export type ShokupanRouteConfig = DeepPartial<{
 }>;
 
 export type ShokupanRoute = {
+    /**
+     * HTTP method
+     */
     method: Method;
+    /**
+     * Route path
+     */
     path: string;
+    /**
+     * Compiled regex for the route
+     */
     regex: RegExp;
+    /**
+     * Route parameters
+     */
     keys: string[];
+    /**
+     * Route handler
+     */
     handler: ShokupanHandler;
+    /**
+     * OpenAPI spec for the route
+     */
     handlerSpec?: MethodAPISpec;
+    /**
+     * Group for the route
+     */
     group?: string;
+    /**
+     * Guards for the route
+     */
     guards?: {
+        /**
+         * Guard handler
+         */
         handler: ShokupanHandler;
+        /**
+         * Guard OpenAPI spec
+         */
         spec?: GuardAPISpec;
     }[];
+    /**
+     * Timeout for this specific route (milliseconds).
+     */
     requestTimeout?: number;
+    /**
+     * Custom JSX renderer for this route.
+     */
     renderer?: JSXRenderer;
     /**
      * Hooks from the router/route definition
