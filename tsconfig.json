@@ -38,7 +38,7 @@
     ],
     "exclude": [
         "node_modules",
-        "benchmark",
+        "benchmarking",
         "dist",
         "test",
         "example"

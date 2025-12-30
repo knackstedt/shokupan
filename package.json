@@ -20,7 +20,8 @@
     "scripts": {
         "dev": "bun --watch --inspect src/example/main.ts",
         "debug:otel": "sh scripts/debug-otel.sh",
-        "build": "vite build"
+        "build": "vite build",
+        "bench": "cd src/benchmarking && bun runner.ts"
     },
     "bin": {
         "shokupan": "./dist/cli.js",

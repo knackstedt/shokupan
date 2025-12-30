@@ -3,7 +3,6 @@
     "version": "0.0.0",
     "type": "module",
     "scripts": {
-        "prebench": "tsc --noEmit false",
         "bench": "bun runner.ts"
     },
     "private": false,

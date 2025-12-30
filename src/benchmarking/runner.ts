@@ -30,7 +30,7 @@ async function compileForNode() {
     ], { stdout: "inherit", stderr: "inherit" });
     await workerProc.exited;
 
-    const pkg = JSON.parse(fs.readFileSync(path.join(import.meta.dir, "../package.json"), "utf8"));
+    const pkg = JSON.parse(fs.readFileSync(path.join(import.meta.dir, "./package.json"), "utf8"));
     const externals = Object.keys(pkg.dependencies || {}).concat(Object.keys(pkg.devDependencies || {}));
     const externalFlags = externals.flatMap(e => ["--external", e]);
 
