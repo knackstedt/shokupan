@@ -24,6 +24,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     readonly applicationConfig: ShokupanConfig = {};
     public openApiSpec?: any;
     private middleware: Middleware[] = [];
+    private composedMiddleware?: Middleware;
 
     get logger() {
         return this.applicationConfig.logger;
@@ -130,22 +131,33 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             idleTimeout: this.applicationConfig.readTimeout ? this.applicationConfig.readTimeout / 1000 : undefined,
             websocket: {
                 open(ws) {
-                    if (ws.data?.handler?.open) ws.data.handler.open(ws);
+                    ws.data?.handler?.open?.(ws);
                 },
                 message(ws, message) {
-                    if (ws.data?.handler?.message) ws.data.handler.message(ws, message);
+                    ws.data?.handler?.message?.(ws, message);
                 },
                 drain(ws) {
-                    if (ws.data?.handler?.drain) ws.data.handler.drain(ws);
+                    ws.data?.handler?.drain?.(ws);
                 },
                 close(ws, code, reason) {
-                    if (ws.data?.handler?.close) ws.data.handler.close(ws, code, reason);
+                    ws.data?.handler?.close?.(ws, code, reason);
                 },
             }
         };
 
-        const server = this.applicationConfig.serverFactory
-            ? await this.applicationConfig.serverFactory(serveOptions)
+
+
+        let factory = this.applicationConfig.serverFactory;
+
+        // Detect if we are not running on Bun
+        // @ts-ignore
+        if (!factory && typeof Bun === "undefined") {
+            const { createHttpServer } = await import("./plugins/server-adapter");
+            factory = createHttpServer();
+        }
+
+        const server = factory
+            ? await factory(serveOptions)
             : Bun.serve(serveOptions);
 
         console.log(`Shokupan server listening on http://${server.hostname}:${server.port}`);
@@ -214,153 +226,178 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
      * @returns The response to send.
      */
     public async fetch(req: Request, server?: import("bun").Server): Promise<Response> {
-        const tracer = trace.getTracer("shokupan.application");
-        const store = asyncContext.getStore();
+        if (this.applicationConfig.enableTracing) {
+            const tracer = trace.getTracer("shokupan.application");
+            const store = asyncContext.getStore();
 
-        const attrs = {
-            attributes: {
-                "http.url": req.url,
-                "http.method": req.method
+            const attrs = {
+                attributes: {
+                    "http.url": req.url,
+                    "http.method": req.method
+                }
+            };
+
+            const parent = store?.get("span");
+            const ctx = parent ? trace.setSpan(context.active(), parent) : undefined;
+            return tracer.startActiveSpan(`${req.method} ${new URL(req.url).pathname}`, attrs, ctx, span => {
+                const ctxMap = new Map();
+                ctxMap.set("span", span);
+                ctxMap.set("request", req);
+
+                return asyncContext.run(ctxMap, () => this.handleRequest(req, server).finally(() => span.end()));
+            });
+        }
+
+        // If ALS is enabled but tracing is not
+        if (this.applicationConfig.enableAsyncLocalStorage) {
+            const ctxMap = new Map();
+            ctxMap.set("request", req);
+            return asyncContext.run(ctxMap, () => this.handleRequest(req, server));
+        }
+
+        return this.handleRequest(req, server);
+    }
+
+    private async handleRequest(req: Request, server?: import("bun").Server): Promise<Response> {
+        // Cast to ShokupanRequest if needed, though at runtime it's just a Request
+        // But ShokupanContext expects ShokupanRequest.
+        const request = req as unknown as ShokupanRequest<T>;
+
+        const ctx = new ShokupanContext<T>(request, server, undefined, this, this.applicationConfig.enableMiddlewareTracking);
+
+        const handle = async () => {
+
+            try {
+                // Request Start Hook
+                if (this.applicationConfig.hooks?.onRequestStart) {
+                    await this.applicationConfig.hooks.onRequestStart(ctx);
+                }
+
+                // Compose middleware + router dispatch
+                const fn = this.composedMiddleware ??= compose(this.middleware);
+
+                // Object.defineProperty(fn, 'name', { value: "middleware chain", configurable: false });
+
+                // The "next" at the end of the middleware chain is the router dispatch
+                const result = await fn(ctx, async () => {
+                    const match = this.find(req.method, ctx.path);
+                    // TODO: Execute router-level hooks from match?
+                    // For now, only app-level hooks are fully supported here.
+                    if (match) {
+                        ctx.params = match.params;
+                        return match.handler(ctx);
+                    }
+                    return null;
+                });
+
+                let response: Response;
+                if (result instanceof Response) {
+                    response = result;
+                }
+                // Check explicit void return but response set in context
+                else if ((result === null || result === undefined) && ctx._finalResponse instanceof Response) {
+                    response = ctx._finalResponse;
+                }
+                else if ((result === null || result === undefined) && ctx.response.status === 404) {
+                    // If status is 404 (default) and no result, try to see if it was modified?
+                    // Actually ShokupanContext sets default status 200? No context.response wraps a base response?
+                    // Wait, context has internal response object.
+
+                    // If simply nothing was returned and status wasn't set to something else, assume 404 Not Found
+                    // But if user set status 200 manually?
+
+                    // Simple logic:
+                    const span = asyncContext.getStore()?.get("span");
+                    if (span) span.setAttribute("http.status_code", 404);
+                    response = ctx.text("Not Found", 404);
+                }
+                else if (result === null || result === undefined) {
+                    // Fallback to whatever is in ctx
+                    // Or if ctx has a body set?
+                    // For now default not found logic above covers most "no match" cases.
+                    // But if match found and handler returned null?
+                    if (ctx._finalResponse) response = ctx._finalResponse;
+                    else response = ctx.text("Not Found", 404);
+                }
+                else if (typeof result === "object") {
+                    response = ctx.json(result);
+                }
+                else {
+                    response = ctx.text(String(result));
+                }
+
+                // Request End Hook - Processing finished, response ready
+                if (this.applicationConfig.hooks?.onRequestEnd) {
+                    await this.applicationConfig.hooks.onRequestEnd(ctx);
+                }
+
+                // Response Start Hook - About to send response
+                if (this.applicationConfig.hooks?.onResponseStart) {
+                    await this.applicationConfig.hooks.onResponseStart(ctx, response);
+                }
+
+                return response;
+
+            }
+            catch (err: any) {
+                console.error(err);
+                const span = asyncContext.getStore()?.get("span");
+                if (span) span.setStatus({ code: 2 }); // Error
+
+                const status = err.status || err.statusCode || 500;
+                const body: any = { error: err.message || "Internal Server Error" };
+                if (err.errors) body.errors = err.errors;
+
+                // Error Hook
+                if (this.applicationConfig.hooks?.onError) {
+                    try {
+                        await this.applicationConfig.hooks.onError(err, ctx as any);
+                    } catch (hookErr) {
+                        console.error("Error in onError hook:", hookErr);
+                    }
+                }
+
+                return ctx.json(body, status);
             }
         };
 
-        const parent = store?.get("span");
-        const ctx = parent ? trace.setSpan(context.active(), parent) : undefined;
-        return tracer.startActiveSpan(`${req.method} ${new URL(req.url).pathname}`, attrs, ctx, span => {
-            const ctxMap = new Map();
-            ctxMap.set("span", span);
-            ctxMap.set("request", req);
+        // Timeout Logic
+        let executionPromise = handle();
+        const timeoutMs = this.applicationConfig.requestTimeout;
 
-            const runCallback = () => {
-                // Cast to ShokupanRequest if needed, though at runtime it's just a Request
-                // But ShokupanContext expects ShokupanRequest.
-                const request = req as unknown as ShokupanRequest<T>;
-
-                const ctx = new ShokupanContext<T>(request, server, undefined, this, this.applicationConfig.enableMiddlewareTracking);
-
-                const handle = async () => {
-
+        if (timeoutMs && timeoutMs > 0 && this.applicationConfig.hooks?.onRequestTimeout) {
+            let timeoutId: any;
+            const timeoutPromise = new Promise<Response>((_, reject) => {
+                timeoutId = setTimeout(async () => {
                     try {
-                        // Request Start Hook
-                        if (this.applicationConfig.hooks?.onRequestStart) {
-                            await this.applicationConfig.hooks.onRequestStart(ctx);
+                        if (this.applicationConfig.hooks?.onRequestTimeout) {
+                            await this.applicationConfig.hooks.onRequestTimeout(ctx);
                         }
+                    } catch (e) { console.error("Error in onRequestTimeout hook:", e); }
 
-                        // Compose middleware + router dispatch
-                        const fn = compose(this.middleware);
-                        // Object.defineProperty(fn, 'name', { value: "middleware chain", configurable: false });
+                    reject(new Error("Request Timeout"));
+                }, timeoutMs);
+            });
 
-                        // The "next" at the end of the middleware chain is the router dispatch
-                        const result = await fn(ctx, async () => {
-                            const match = this.find(req.method, ctx.path);
-                            // TODO: Execute router-level hooks from match?
-                            // For now, only app-level hooks are fully supported here.
-                            if (match) {
-                                ctx.params = match.params;
-                                return match.handler(ctx);
-                            }
-                            return null;
-                        });
+            executionPromise = Promise.race([executionPromise, timeoutPromise])
+                .finally(() => clearTimeout(timeoutId));
+        }
 
-                        let response: Response;
-                        if (result instanceof Response) {
-                            response = result;
-                        }
-                        // Check explicit void return but response set in context
-                        else if ((result === null || result === undefined) && ctx._finalResponse instanceof Response) {
-                            response = ctx._finalResponse;
-                        }
-                        else if (result === null || result === undefined) {
-                            span.setAttribute("http.status_code", 404);
-                            response = ctx.text("Not Found", 404);
-                        }
-                        else if (typeof result === "object") {
-                            response = ctx.json(result);
-                        }
-                        else {
-                            response = ctx.text(String(result));
-                        }
-
-                        // Request End Hook - Processing finished, response ready
-                        if (this.applicationConfig.hooks?.onRequestEnd) {
-                            await this.applicationConfig.hooks.onRequestEnd(ctx);
-                        }
-
-                        // Response Start Hook - About to send response
-                        if (this.applicationConfig.hooks?.onResponseStart) {
-                            await this.applicationConfig.hooks.onResponseStart(ctx, response);
-                        }
-
-                        return response;
-
-                    }
-                    catch (err: any) {
-                        console.error(err);
-                        span.setStatus({ code: 2 }); // Error
-                        const status = err.status || err.statusCode || 500;
-                        const body: any = { error: err.message || "Internal Server Error" };
-                        if (err.errors) body.errors = err.errors;
-
-                        // Error Hook
-                        if (this.applicationConfig.hooks?.onError) {
-                            try {
-                                await this.applicationConfig.hooks.onError(err, ctx as any);
-                            } catch (hookErr) {
-                                console.error("Error in onError hook:", hookErr);
-                            }
-                        }
-
-                        return ctx.json(body, status);
-                    }
-                };
-
-                // Timeout Logic
-                let executionPromise = handle();
-                const timeoutMs = this.applicationConfig.requestTimeout;
-
-                if (timeoutMs && timeoutMs > 0 && this.applicationConfig.hooks?.onRequestTimeout) {
-                    let timeoutId: any;
-                    const timeoutPromise = new Promise<Response>((_, reject) => {
-                        timeoutId = setTimeout(async () => {
-                            try {
-                                if (this.applicationConfig.hooks?.onRequestTimeout) {
-                                    await this.applicationConfig.hooks.onRequestTimeout(ctx);
-                                }
-                            } catch (e) { console.error("Error in onRequestTimeout hook:", e); }
-
-                            reject(new Error("Request Timeout"));
-                        }, timeoutMs);
-                    });
-
-                    executionPromise = Promise.race([executionPromise, timeoutPromise])
-                        .finally(() => clearTimeout(timeoutId));
+        return executionPromise
+            .catch((err) => {
+                if (err.message === "Request Timeout") {
+                    return ctx.text("Request Timeout", 408);
                 }
-
-                return executionPromise
-                    .catch((err) => {
-                        if (err.message === "Request Timeout") {
-                            return ctx.text("Request Timeout", 408);
-                        }
-                        console.error("Unexpected error in request execution:", err);
-                        return ctx.text("Internal Server Error", 500);
-                    })
-                    .then(async (res) => {
-                        // Response End Hook - Response returned
-                        // Note: We can't guarantee it's fully sent to client here, but it's handed off to Bun
-                        if (this.applicationConfig.hooks?.onResponseEnd) {
-                            await this.applicationConfig.hooks.onResponseEnd(ctx as any, res);
-                        }
-                        return res;
-                    })
-                    .finally(() => span.end());
-            };
-
-            if (this.applicationConfig.enableAsyncLocalStorage) {
-                return asyncContext.run(ctxMap, runCallback);
-            }
-            else {
-                return runCallback();
-            }
-        });
+                console.error("Unexpected error in request execution:", err);
+                return ctx.text("Internal Server Error", 500);
+            })
+            .then(async (res) => {
+                // Response End Hook - Response returned
+                // Note: We can't guarantee it's fully sent to client here, but it's handed off to Bun
+                if (this.applicationConfig.hooks?.onResponseEnd) {
+                    await this.applicationConfig.hooks.onResponseEnd(ctx as any, res);
+                }
+                return res;
+            });
     }
 }

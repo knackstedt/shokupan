@@ -24,7 +24,7 @@ describe('OpenAPI Runtime Analysis & Inference', () => {
             const app = new Shokupan();
 
             app.get('/search', (ctx) => {
-                const query = ctx.query.q;
+                const query = ctx.query['q'];
                 return { results: [], query };
             });
 
@@ -155,8 +155,8 @@ describe('OpenAPI Runtime Analysis & Inference', () => {
             const app = new Shokupan();
 
             app.get('/items', (ctx) => {
-                const page = parseInt(ctx.query.page);
-                const limit = parseInt(ctx.query.limit);
+                const page = parseInt(ctx.query['page']);
+                const limit = parseInt(ctx.query['limit']);
                 return { page, limit };
             });
 
@@ -177,8 +177,8 @@ describe('OpenAPI Runtime Analysis & Inference', () => {
             const app = new Shokupan();
 
             app.get('/calculate', (ctx) => {
-                const price = parseFloat(ctx.query.price);
-                const tax = parseFloat(ctx.query.tax);
+                const price = parseFloat(ctx.query['price']);
+                const tax = parseFloat(ctx.query['tax']);
                 return { total: price + tax };
             });
 
@@ -195,7 +195,7 @@ describe('OpenAPI Runtime Analysis & Inference', () => {
             const app = new Shokupan();
 
             app.get('/math', (ctx) => {
-                const value = Number(ctx.query.value);
+                const value = Number(ctx.query['value']);
                 return { result: value * 2 };
             });
 
@@ -211,7 +211,7 @@ describe('OpenAPI Runtime Analysis & Inference', () => {
             const app = new Shokupan();
 
             app.get('/filter', (ctx) => {
-                const active = Boolean(ctx.query.active);
+                const active = Boolean(ctx.query['active']);
                 return { active };
             });
 
@@ -227,7 +227,7 @@ describe('OpenAPI Runtime Analysis & Inference', () => {
             const app = new Shokupan();
 
             app.get('/check', (ctx) => {
-                const enabled = !!ctx.query.enabled;
+                const enabled = !!ctx.query['enabled'];
                 return { enabled };
             });
 
@@ -243,7 +243,7 @@ describe('OpenAPI Runtime Analysis & Inference', () => {
             const app = new Shokupan();
 
             app.get('/search', (ctx) => {
-                const query = ctx.query.q;
+                const query = ctx.query['q'];
                 return { query };
             });
 
@@ -259,7 +259,7 @@ describe('OpenAPI Runtime Analysis & Inference', () => {
             const app = new Shokupan();
 
             app.get('/users/:id', (ctx) => {
-                const id = parseInt(ctx.params.id);
+                const id = parseInt(ctx.params['id']);
                 return { user: { id } };
             });
 
@@ -276,10 +276,10 @@ describe('OpenAPI Runtime Analysis & Inference', () => {
             const app = new Shokupan();
 
             app.get('/products', (ctx) => {
-                const category = ctx.query.category; // string
-                const minPrice = parseFloat(ctx.query.minPrice); // number
-                const inStock = Boolean(ctx.query.inStock); // boolean
-                const limit = parseInt(ctx.query.limit); // integer
+                const category = ctx.query['category']; // string
+                const minPrice = parseFloat(ctx.query['minPrice']); // number
+                const inStock = Boolean(ctx.query['inStock']); // boolean
+                const limit = parseInt(ctx.query['limit']); // integer
                 return { category, minPrice, inStock, limit };
             });
 
@@ -297,8 +297,8 @@ describe('OpenAPI Runtime Analysis & Inference', () => {
 
             app.get('/test', (ctx) => {
                 // First access as string, then convert to int
-                const rawPage = ctx.query.page;
-                const page = parseInt(ctx.query.page);
+                const rawPage = ctx.query['page'];
+                const page = parseInt(ctx.query['page']);
                 return { rawPage, page };
             });
 
@@ -321,7 +321,7 @@ describe('OpenAPI Runtime Analysis & Inference', () => {
                 description: 'Retrieves a list of items'
             },
             (ctx) => {
-                const search = ctx.query.search;
+                const search = ctx.query['search'];
                 return { items: [], search };
             }
         );
@@ -345,7 +345,7 @@ describe('OpenAPI Runtime Analysis & Inference', () => {
         const apiRouter = new ShokupanRouter();
 
         apiRouter.get('/users', (ctx) => {
-            const role = ctx.query.role;
+            const role = ctx.query['role'];
             return { users: [], role };
         });
 

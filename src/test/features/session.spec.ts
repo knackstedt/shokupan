@@ -13,12 +13,12 @@ describe("Session Middleware", () => {
         }));
 
         app.get('/set', (ctx) => {
-            ctx.session.user = "test-user";
+            ctx.session['user'] = "test-user";
             return "set";
         });
 
         app.get('/get', (ctx) => {
-            return { user: ctx.session.user };
+            return { user: ctx.session['user'] };
         });
 
         const server = await app.listen();
@@ -49,8 +49,8 @@ describe("Session Middleware", () => {
         app.use(session({ secret: 'secret', resave: false, saveUninitialized: true }));
 
         app.get('/count', (ctx) => {
-            ctx.session.count = (ctx.session.count || 0) + 1;
-            return { count: ctx.session.count };
+            ctx.session['count'] = (ctx.session['count'] || 0) + 1;
+            return { count: ctx.session['count'] };
         });
 
         const server = await app.listen();
@@ -63,14 +63,14 @@ describe("Session Middleware", () => {
             const res = await fetch(`${baseUrl}/count`);
             cookie = res.headers.get("set-cookie")!;
             const data = await res.json();
-            expect(data.count).toBe(1);
+            expect(data['count']).toBe(1);
         }
 
         // Request 2
         {
             const res = await fetch(`${baseUrl}/count`, { headers: { "Cookie": cookie } });
             const data = await res.json();
-            expect(data.count).toBe(2);
+            expect(data['count']).toBe(2);
         }
 
         server.stop();
@@ -84,7 +84,7 @@ describe("Session Middleware", () => {
             await new Promise<void>((resolve, reject) => {
                 ctx.session.regenerate((err) => {
                     if (err) return reject(err);
-                    ctx.session.user = "logged-in";
+                    ctx.session['user'] = "logged-in";
                     resolve();
                 });
             });
@@ -92,14 +92,14 @@ describe("Session Middleware", () => {
         });
 
         app.get('/me', (ctx) => {
-            return { id: ctx.session.id, user: ctx.session.user };
+            return { id: ctx.session['id'], user: ctx.session['user'] };
         });
 
         const server = await app.listen();
         const baseUrl = `http://localhost:${server.port}`;
 
         // 1. Start session
-        const res1 = await fetch(`${baseUrl}/me`);
+        const res1 = await fetch(`${baseUrl}/me`) as any;
         const cookie1 = res1.headers.get("set-cookie")!;
         const data1 = await res1.json();
 
@@ -112,7 +112,7 @@ describe("Session Middleware", () => {
 
         // 3. Check new session
         const res3 = await fetch(`${baseUrl}/me`, { headers: { "Cookie": cookie2 } });
-        const data3 = await res3.json();
+        const data3 = await res3.json() as any;
 
         // ID should be different
         expect(data3.id).not.toBe(data1.id);
@@ -122,7 +122,7 @@ describe("Session Middleware", () => {
         // MemoryStore implementation of session maps ID to data. 
         // destroy() removes it. So passing old cookie should result in a NEW session (empty)
         const res4 = await fetch(`${baseUrl}/me`, { headers: { "Cookie": cookie1 } });
-        const data4 = await res4.json();
+        const data4 = await res4.json() as any;
         const cookie4 = res4.headers.get("set-cookie"); // Should assign new session
 
         expect(data4.user).toBeUndefined();
@@ -136,7 +136,7 @@ describe("Session Middleware", () => {
         app.use(session({ secret: 'secret', resave: false, saveUninitialized: true }));
 
         app.get('/set', (ctx) => {
-            ctx.session.val = 1;
+            ctx.session['val'] = 1;
             return "ok";
         });
 
@@ -151,7 +151,7 @@ describe("Session Middleware", () => {
         });
 
         app.get('/check', (ctx) => {
-            return { val: ctx.session.val };
+            return { val: ctx.session['val'] };
         });
 
         const server = await app.listen();
@@ -163,7 +163,7 @@ describe("Session Middleware", () => {
 
         // Check
         const res2 = await fetch(`${baseUrl}/check`, { headers: { "Cookie": cookie } });
-        expect((await res2.json()).val).toBe(1);
+        expect((await res2.json() as any).val).toBe(1);
 
         // Destroy
         await fetch(`${baseUrl}/destroy`, { headers: { "Cookie": cookie } });
@@ -172,7 +172,7 @@ describe("Session Middleware", () => {
         const res4 = await fetch(`${baseUrl}/check`, { headers: { "Cookie": cookie } });
         // Since session was destroyed, middleware should generate a NEW session.
         // Data should be empty.
-        expect((await res4.json()).val).toBeUndefined();
+        expect((await res4.json() as any).val).toBeUndefined();
 
         server.stop();
     });
@@ -217,7 +217,7 @@ describe("Session Middleware", () => {
         }));
 
         app.get('/', (ctx) => {
-            ctx.session.touched = true;
+            ctx.session['touched'] = true;
             return "ok";
         });
 

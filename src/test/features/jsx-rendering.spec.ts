@@ -33,7 +33,7 @@ describe("JSX Rendering", () => {
 
         const res = await app.fetch(new Request("http://localhost/fail"));
         expect(res.status).toBe(500);
-        const body = await res.json();
+        const body = await res.json() as any;
         expect(body.error).toBe("No JSX renderer configured");
     });
 

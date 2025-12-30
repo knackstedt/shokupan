@@ -43,7 +43,7 @@ describe("Validation Plugin", () => {
         });
         const res2 = await app.fetch(req2);
         expect(res2.status).toBe(400);
-        const err = await res2.json();
+        const err = await res2.json() as any;
         expect(err.error).toBe("Validation Error");
     });
 
@@ -212,7 +212,7 @@ describe("Validation Plugin", () => {
         app.get("/user/:id",
             validate({ params: schema }),
             async (ctx) => {
-                return { id: ctx.params.id };
+                return { id: ctx.params['id'] };
             }
         );
 

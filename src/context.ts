@@ -16,8 +16,8 @@ export interface HandlerStackItem {
 }
 
 export class ShokupanContext<State extends Record<string, any> = Record<string, any>> {
-    public readonly url: URL;
-    public params: Record<string, string> = {};
+    private _url: URL | undefined;
+    public params: Record<string, string> = {}; // Router assigns this, but default to empty object
     public state: State;
     public handlerStack: HandlerStackItem[] = [];
 
@@ -31,7 +31,6 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
         public readonly app?: Shokupan,
         enableMiddlewareTracking: boolean = false
     ) {
-        this.url = new URL(request.url);
         this.state = state || {} as State;
         if (enableMiddlewareTracking) {
             const self = this;
@@ -50,6 +49,15 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
         this.response = new ShokupanResponse();
     }
 
+    get url(): URL {
+        if (!this._url) {
+            // WebSocket contexts may have empty request URLs
+            const urlString = this.request.url || 'http://localhost/';
+            this._url = new URL(urlString);
+        }
+        return this._url;
+    }
+
     /**
      * Base request
      */
@@ -61,7 +69,38 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     /**
      * Request path
      */
-    get path() { return this.url.pathname; }
+    get path() {
+        // Optimization: return cached path if url already parsed
+        if (this._url) return this._url.pathname;
+
+        // Fast path extraction without URL parsing
+        const url = this.request.url;
+
+        // Handle full URL: http://localhost:3000/foo?bar
+        let queryIndex = url.indexOf('?');
+        const end = queryIndex === -1 ? url.length : queryIndex;
+
+        // Ensure we skip protocol/host
+        let start = 0;
+        const protocolIndex = url.indexOf('://');
+        if (protocolIndex !== -1) {
+            const hostStart = protocolIndex + 3;
+            // Find first slash after host
+            const pathStart = url.indexOf('/', hostStart);
+            if (pathStart !== -1 && pathStart < end) {
+                start = pathStart;
+            } else {
+                return '/';
+            }
+        } else {
+            // Relative or simple path
+            if (url.charCodeAt(0) === 47) { // '/'
+                start = 0;
+            }
+        }
+
+        return url.substring(start, end);
+    }
     /**
      * Request query params
      */
@@ -159,9 +198,29 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     }
 
     private mergeHeaders(headers?: HeadersInit): Headers {
-        const h = new Headers(this.response.headers);
+        let h: Headers;
+        // Optimization: avoid double allocation if response headers are empty/null
+        if (this.response.hasPopulatedHeaders) {
+            h = new Headers(this.response.headers);
+        } else {
+            h = new Headers();
+        }
+
         if (headers) {
-            new Headers(headers).forEach((v, k) => h.set(k, v));
+            // Efficient merge dependent on type
+            if (headers instanceof Headers) {
+                headers.forEach((v, k) => h.set(k, v));
+            } else if (Array.isArray(headers)) {
+                headers.forEach(([k, v]) => h.set(k, v));
+            } else {
+                // Object iteration
+                const keys = Object.keys(headers);
+                for (let i = 0; i < keys.length; i++) {
+                    const key = keys[i];
+                    const val = (headers as any)[key];
+                    h.set(key, val);
+                }
+            }
         }
         return h;
     }
@@ -197,16 +256,21 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
      * Respond with a JSON object
      */
     json(data: any, status?: number, headers?: HeadersInit) {
+        const finalStatus = status ?? this.response.status;
+        const jsonString = JSON.stringify(data);
+
+        // Fast path: no custom headers and no response headers set
+        if (!headers && !this.response.hasPopulatedHeaders) {
+            this._finalResponse = new Response(jsonString, {
+                status: finalStatus,
+                headers: { "content-type": "application/json" }
+            });
+            return this._finalResponse;
+        }
+
+        // Slow path: merge headers
         const finalHeaders = this.mergeHeaders(headers);
         finalHeaders.set("content-type", "application/json");
-        const finalStatus = status ?? this.response.status;
-
-        const d = Date.now();
-        const jsonString = JSON.stringify(data);
-        const e = Date.now();
-
-        console.log(`JSON.stringify took ${e - d}ms`);
-
         this._finalResponse = new Response(jsonString, { status: finalStatus, headers: finalHeaders });
         return this._finalResponse;
     }
@@ -215,9 +279,20 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
      * Respond with a text string
      */
     text(data: string, status?: number, headers?: HeadersInit) {
+        const finalStatus = status ?? this.response.status;
+
+        // Fast path: no custom headers and no response headers set
+        if (!headers && !this.response.hasPopulatedHeaders) {
+            this._finalResponse = new Response(data, {
+                status: finalStatus,
+                headers: { "content-type": "text/plain" }
+            });
+            return this._finalResponse;
+        }
+
+        // Slow path: merge headers
         const finalHeaders = this.mergeHeaders(headers);
         finalHeaders.set("content-type", "text/plain");
-        const finalStatus = status ?? this.response.status;
         this._finalResponse = new Response(data, { status: finalStatus, headers: finalHeaders });
         return this._finalResponse;
     }

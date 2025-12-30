@@ -11,21 +11,21 @@ describe("Middleware Tracking", () => {
         });
 
         const middleware = async (ctx: ShokupanContext, next: any) => {
-            ctx.state.foo = "bar";
+            ctx.state['foo'] = "bar";
             await next();
         };
 
         app.use(middleware);
 
         app.get("/tracking", async (ctx) => {
-            ctx.state.baz = "qux";
+            ctx.state['baz'] = "qux";
             return ctx.json({ stack: ctx.handlerStack });
         });
 
         const server = await app.listen(0);
         const port = server.port;
         const res = await fetch(`http://localhost:${port}/tracking`);
-        const data = await res.json();
+        const data = await res.json() as any;
 
         server.stop();
 
@@ -63,7 +63,7 @@ describe("Middleware Tracking", () => {
         const server = await app.listen(0);
         const port = server.port;
         const res = await fetch(`http://localhost:${port}/no-tracking`);
-        const data = await res.json();
+        const data = await res.json() as any;
 
         server.stop();
 

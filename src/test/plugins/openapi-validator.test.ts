@@ -68,14 +68,14 @@ describe('OpenAPI Validator Plugin', () => {
             await axios.post(`${baseUrl}/items`, { name: 'Test', price: 10 });
 
             // 2. Invalid POST (Missing price)
-            const res2 = await axios.post(`${baseUrl}/items`, { name: 'Test' }, {
+            const res2 = await axios.post<any>(`${baseUrl}/items`, { name: 'Test' }, {
                 validateStatus: () => true
             });
             expect(res2.status).toBe(400);
             expect(res2.data.errors[0].message).toContain('required property');
 
             // 3. Invalid POST (Wrong type)
-            const res3 = await axios.post(`${baseUrl}/items`, { name: 'Test', price: "expensive" }, {
+            const res3 = await axios.post<any>(`${baseUrl}/items`, { name: 'Test', price: "expensive" }, {
                 validateStatus: () => true
             });
             expect(res3.status).toBe(400);
@@ -91,7 +91,7 @@ describe('OpenAPI Validator Plugin', () => {
             expect(res5.status).toBe(400);
 
             // 5b. Invalid GET query (Number constraint)
-            const res5b = await axios.get(`${baseUrl}/items?limit=0`, {
+            const res5b = await axios.get<any>(`${baseUrl}/items?limit=0`, {
                 validateStatus: () => true
             });
             expect(res5b.status).toBe(400);
@@ -133,7 +133,7 @@ describe('OpenAPI Validator Plugin', () => {
         try {
             await axios.get(`${baseUrl}/users/123`);
 
-            const res = await axios.get(`${baseUrl}/users/abc`, {
+            const res = await axios.get<any>(`${baseUrl}/users/abc`, {
                 validateStatus: () => true
             });
             expect(res.status).toBe(400);

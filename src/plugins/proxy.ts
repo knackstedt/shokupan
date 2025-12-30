@@ -31,7 +31,7 @@ export function Proxy(options: ProxyOptions): Middleware {
 
             if (success) {
                 // Return undefined to stop the middleware chain, as the connection is upgraded
-                return;
+                return undefined;
             }
         }
 
@@ -62,7 +62,7 @@ export function Proxy(options: ProxyOptions): Middleware {
         headers.delete("upgrade");
 
 
-        const proxyReq = new Request(url, {
+        const proxyReq = new Request(url.toString(), {
             method: req.method,
             headers: headers,
             body: req.body,

@@ -4,13 +4,14 @@
  * before the actual Response object is created.
  */
 export class ShokupanResponse {
-    private _headers = new Headers();
+    private _headers: Headers | null = null;
     private _status = 200;
 
     /**
      * Get the current headers
      */
     get headers() {
+        if (!this._headers) this._headers = new Headers();
         return this._headers;
     }
 
@@ -34,6 +35,7 @@ export class ShokupanResponse {
      * @param value Header value
      */
     public set(key: string, value: string) {
+        if (!this._headers) this._headers = new Headers();
         this._headers.set(key, value);
         return this;
     }
@@ -44,6 +46,7 @@ export class ShokupanResponse {
      * @param value Header value
      */
     public append(key: string, value: string) {
+        if (!this._headers) this._headers = new Headers();
         this._headers.append(key, value);
         return this;
     }
@@ -53,7 +56,7 @@ export class ShokupanResponse {
      * @param key Header name
      */
     public get(key: string) {
-        return this._headers.get(key);
+        return this._headers?.get(key) || null;
     }
 
     /**
@@ -61,6 +64,13 @@ export class ShokupanResponse {
      * @param key Header name
      */
     public has(key: string) {
-        return this._headers.has(key);
+        return this._headers?.has(key) || false;
+    }
+
+    /**
+     * Internal: check if headers have been initialized/modified
+     */
+    public get hasPopulatedHeaders() {
+        return this._headers !== null;
     }
 }

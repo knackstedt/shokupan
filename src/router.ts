@@ -286,7 +286,9 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                             }
                         }
 
-                        const tracedOriginalHandler = traceHandler(originalHandler, normalizedPath);
+                        const tracedOriginalHandler = ctx.app?.applicationConfig.enableTracing
+                            ? traceHandler(originalHandler, normalizedPath)
+                            : originalHandler;
                         return tracedOriginalHandler.apply(instance, args);
                     };
 
@@ -472,8 +474,10 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
     private applyHooks(match: { handler: ShokupanHandler<T>; params: Record<string, string>; }) {
         if (!this.config?.hooks) return match;
-
         const hooks = this.config.hooks;
+
+        // Optimize: Check if any relevant hooks are actually defined
+        if (!hooks.onRequestStart && !hooks.onRequestEnd && !hooks.onError) return match;
         const originalHandler = match.handler;
 
         match.handler = async (ctx: ShokupanContext<T>) => {

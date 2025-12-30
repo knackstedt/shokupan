@@ -116,6 +116,6 @@ describe("OpenAPI Integration", () => {
         expect(response.status).toBe(200);
         const spec = await response.json();
 
-        expect(spec.paths["/app-root"]).toBeDefined();
+        expect((spec as any).paths["/app-root"]).toBeDefined();
     });
 });
