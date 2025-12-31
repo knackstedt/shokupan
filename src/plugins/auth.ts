@@ -311,7 +311,7 @@ export class AuthPlugin extends ShokupanRouter<any> {
     /**
      * Middleware to verify JWT
      */
-    public middleware() {
+    public getMiddleware() {
         return async (ctx: ShokupanContext, next: () => Promise<any>) => {
             const authHeader = ctx.req.headers.get("Authorization");
             let token = authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : null;

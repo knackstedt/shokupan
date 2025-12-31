@@ -75,6 +75,8 @@ export type NextFn = () => Promise<any>;
 export type Middleware = ((ctx: ShokupanContext<unknown>, next: NextFn) => Promise<any> | any) & {
     isBuiltin?: boolean;
     pluginName?: string;
+    metadata?: RouteMetadata;
+    order?: number;
 };
 export type JSXRenderer = (element: any, args?: unknown) => string | Promise<string>;
 
@@ -159,6 +161,10 @@ export type ShokupanRoute = {
      * Source metadata
      */
     metadata?: RouteMetadata;
+    /**
+     * Order of the middleware
+     */
+    order?: number;
 };
 
 export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> = DeepPartial<{

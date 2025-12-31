@@ -1,7 +1,7 @@
 import { createNodeEngines } from '@surrealdb/node';
 import { RecordId, Surreal } from 'surrealdb';
 
-const engine = process.env.SHOKUPAN_DB_ENGINE === 'memory' ? 'mem://' : 'rocksdb://database';
+const engine = process.env['SHOKUPAN_DB_ENGINE'] === 'memory' ? 'mem://' : 'rocksdb://database';
 
 const db = new Surreal({
     engines: createNodeEngines(),
@@ -26,7 +26,7 @@ export const datastore = {
     async query(query: string, vars?: Record<string, unknown>) {
         try {
             // console.error("DS QUERY:", query);
-            const r = await db.query(query, vars);
+            const r = await db.query(query, vars).collect<any>();
             // console.error("DS RESULT:", JSON.stringify(r));
             return r;
         } catch (e) {

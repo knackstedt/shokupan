@@ -121,9 +121,6 @@
             background-color: var(--accent) !important;
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet">
-    <script type="text/javascript" src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
     <style>
         .tabulator {
             height: 100%;
@@ -226,16 +223,78 @@
             box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet">
+    <script type="text/javascript" src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
+    <style>
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 1rem;
+            border-bottom: 1px solid var(--card-border);
+            margin-bottom: 2rem;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            padding: 1rem;
+            cursor: pointer;
+            font-size: 1rem;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover {
+            color: var(--text-primary);
+        }
+        .tab-btn.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Graph */
+        #cy {
+            width: 100%;
+            height: 600px;
+            background-color: var(--bg-secondary);
+            border-radius: 1rem;
+            border: 1px solid var(--card-border);
+        }
+    </style>
+    <style>
+        .tabulator {
+            height: 100%;
+            width: 100%;
+            background-color: #0f1322;
+        }
+    </style>
 </head>
 
 <body>
     <div class="container">
         <header>
-            <h1>Debug Dashboard</h1>
-            <div style="color: var(--text-secondary)">Uptime: <span id="uptime">
-                    <%= it.uptime %>
-                </span></div>
+            <div>
+                <h1>Debug Dashboard</h1>
+                <div style="color: var(--text-secondary)">Uptime: <span id="uptime">
+                        <%= it.uptime %>
+                    </span></div>
+            </div>
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+                <button class="tab-btn" onclick="switchTab('registry')">Registry</button>
+                <button class="tab-btn" onclick="switchTab('graph')">Graph</button>
+            </div>
         </header>
+
+        <!-- Overview Tab -->
+        <div id="tab-overview" class="tab-content active">
 
         <div class="metrics-grid">
             <div class="card">
@@ -298,13 +357,27 @@
             <canvas id="latencyChart"></canvas>
         </div>
 
-        <div id="table-container" style="padding: 0">
-            <div id="requests-table"></div>
+            <div id="table-container" style="padding: 0">
+                <div id="requests-table"></div>
+            </div>
         </div>
 
-        <div id="registry-container" class="card" style="margin-top: 2rem;">
-            <div class="card-title">Component Registry</div>
-            <div id="registry-tree" style="margin-top: 1rem; font-family: monospace; font-size: 0.9rem;"></div>
+        <!-- Registry Tab -->
+        <div id="tab-registry" class="tab-content">
+            <div id="registry-container" class="card" style="margin-top: 2rem;">
+                <div class="card-title">Component Registry</div>
+                <div id="registry-tree" style="margin-top: 1rem; font-family: monospace; font-size: 0.9rem;"></div>
+            </div>
+        </div>
+
+        <!-- Graph Tab -->
+        <div id="tab-graph" class="tab-content">
+             <div class="card" style="margin-bottom: 1rem;">
+                <div style="display: flex; gap: 1rem;">
+                    <input type="text" id="graph-search" placeholder="Search routes or middleware..." style="flex:1; padding: 0.5rem; border-radius: 0.5rem; background: var(--bg-primary); border: 1px solid var(--card-border); color: var(--text-primary);">
+                </div>
+            </div>
+            <div id="cy"></div>
         </div>
     </div>
 
@@ -350,6 +423,8 @@
     <script>
         // Registry Data
         const registryData = <%~ JSON.stringify(it.registry) %>;
+        const rootPath = "<%~ it.rootPath %>";
+        const linkPattern = "<%~ it.linkPattern %>";
 
         function renderRegistry(node, container) {
             if (!node) {
@@ -359,108 +434,180 @@
 
             const wrapper = document.createElement('div');
             
-            // Render middleware
-            if (node.middleware && node.middleware.length > 0) {
-                const div = document.createElement('div');
-                div.innerHTML = `<div class="tree-item"><span class="badge" style="background: #9333ea; color: white;">MIDDLEWARE</span></div>`;
-                
-                const mwContainer = document.createElement('div');
-                mwContainer.className = 'tree-node';
-                
-                node.middleware.forEach(mw => {
+            // Helper to clean paths
+            const cleanPath = (p) => {
+                if (!p) return '';
+                if (p.startsWith(rootPath)) return p.slice(rootPath.length + 1);
+                return p;
+            };
+
+            // Helper to create file link
+            const createFileMeta = (metadata, defaultName) => {
+                 if (metadata && metadata.file) {
+                    const relative = cleanPath(metadata.file);
+                    const absolute = metadata.file;
+                    const line = metadata.line;
+                    
+                    // Generate Link
+                    let link = linkPattern
+                        .replace('{{absolute}}', absolute)
+                        .replace('{{relative}}', relative)
+                        .replace('{{line}}', line);
+
+                    const name = metadata.name || defaultName;
+                    
+                    // Label Filtering
+                    const blocklist = ['wrappedHandler', 'anonymous', 'finalHandler', 'routeHandler'];
+                    let displayNameStr = '';
+                    if (name && !blocklist.includes(name)) {
+                        displayNameStr = ` <span style="color: #94a3b8; font-size: 0.8em;">(${name})</span>`;
+                    }
+
+                    const builtin = metadata.isBuiltin ? `<span class="badge" style="background: #059669; margin-left:10px;">BUILTIN</span>` : '';
+                    const pluginName = metadata.pluginName ? `<span style="color: #6ee7b7; margin-left: 5px;">[${metadata.pluginName}]</span>` : '';
+                    
+                    return `<a href="${link}" target="_blank" style="text-decoration: none; color: inherit;"><span class="tree-meta" style="cursor: pointer; text-decoration: underline;">${relative}:${line}</span></a>${displayNameStr} ${builtin} ${pluginName}`;
+                }
+                return '';
+            };
+
+            // 1. Flatten all items
+            const allItems = [];
+            if (node.middleware) node.middleware.forEach(i => allItems.push({ ...i, kind: 'middleware' }));
+            if (node.routes) node.routes.forEach(i => allItems.push({ ...i, kind: 'route' }));
+            if (node.routers) node.routers.forEach(i => allItems.push({ ...i, kind: 'router' }));
+            if (node.controllers) node.controllers.forEach(i => allItems.push({ ...i, kind: 'controller' }));
+
+            // 2. Sort by Order
+            allItems.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+            // 3. Render
+            const renderedRoutes = new Set(); // Track rendered routes to avoid duplication when grouping
+
+            // Helper to find original route object reference to track in Set
+            // Since we spread ...i above, we created shallow copies. 
+            // We can match by specific properties (method + path + line?) OR strict identity if we use original array for grouping lookup
+            
+            // Actually, we can just use the path+method unique key for identifying routes in this scope?
+            // Or better: map the controller group logic to use these new objects.
+
+            // Let's rebuild the controller groups map using the flattened objects
+            const controllerGroups = new Map();
+            allItems.forEach(item => {
+                if (item.kind === 'route' && item.tags && item.tags.length > 0) {
+                    const tag = item.tags[0];
+                    if (!controllerGroups.has(tag)) controllerGroups.set(tag, []);
+                    controllerGroups.get(tag).push(item);
+                }
+            });
+
+            allItems.forEach(item => {
+                // Middleware
+                if (item.kind === 'middleware') {
+                    const div = document.createElement('div');
+                    div.innerHTML = `<div class="tree-item"><span class="badge" style="background: #9333ea; color: white;">MIDDLEWARE</span></div>`;
+                    const mwContainer = document.createElement('div');
+                    mwContainer.className = 'tree-node';
+                    
                     const mwDiv = document.createElement('div');
                     mwDiv.className = 'tree-item';
-                    
-                    let meta = '';
-                    if (mw.metadata) {
-                        const file = mw.metadata.file ? mw.metadata.file.split('/').pop() : 'unknown';
-                        const name = mw.metadata.name || mw.name;
-                        const builtin = mw.metadata.isBuiltin ? `<span class="badge" style="background: #059669; margin-left:10px;">BUILTIN</span>` : '';
-                        const pluginName = mw.metadata.pluginName ? `<span style="color: #6ee7b7; margin-left: 5px;">[${mw.metadata.pluginName}]</span>` : '';
-                        
-                        meta = `<span class="tree-meta">${file}:${mw.metadata.line}</span> ${builtin} ${pluginName}`;
-                    }
-
-                    mwDiv.innerHTML = `
-                        <span class="tree-label">${mw.name}</span>
-                        ${meta}
-                    `;
+                    const meta = createFileMeta(item.metadata, item.name);
+                    mwDiv.innerHTML = `<span class="tree-label">${item.name}</span>${meta}`;
                     mwContainer.appendChild(mwDiv);
-                });
-                div.appendChild(mwContainer);
-                wrapper.appendChild(div);
-            }
-
-            // Render root container (Routes)
-            if (node.routes) {
-                node.routes.forEach(route => {
-                    const div = document.createElement('div');
-                    div.className = 'tree-item';
-                    
-                    const method = route.method.toUpperCase();
-                    const badgeClass = `badge-${method}`;
-                    
-                    let meta = '';
-                    if (route.metadata && route.metadata.file) {
-                        const file = route.metadata.file.split('/').pop();
-                        meta = `<span class="tree-meta">${file}:${route.metadata.line} (${route.metadata.name})</span>`;
-                    }
-
-                    div.innerHTML = `
-                        <span class="badge ${badgeClass}" style="width: 50px; text-align: center; display: inline-block;">${method}</span>
-                        <span class="tree-label">${route.path}</span>
-                        ${meta}
-                    `;
+                    div.appendChild(mwContainer);
                     wrapper.appendChild(div);
-                });
-            }
+                }
 
-            // Render children routers
-            if (node.routers) {
-                node.routers.forEach(router => {
+                // Router
+                else if (item.kind === 'router') {
                     const div = document.createElement('div');
-                    // div.className = 'tree-node';
-                    
                     const header = document.createElement('div');
                     header.className = 'tree-item';
+                    const meta = createFileMeta(item.metadata, 'Router');
                     header.innerHTML = `
                         <span class="badge badge-ROUTER">ROUTER</span>
-                        <span class="tree-label">${router.path}</span>
+                        <span class="tree-label">${item.path}</span>
+                        ${meta}
                     `;
                     div.appendChild(header);
 
-                    if (router.children) {
+                    if (item.children) {
                         const childrenContainer = document.createElement('div');
                         childrenContainer.className = 'tree-node';
-                        renderRegistry(router.children, childrenContainer);
+                        renderRegistry(item.children, childrenContainer);
                         div.appendChild(childrenContainer);
                     }
                     wrapper.appendChild(div);
-                });
-            }
+                }
 
-            // Render children controllers
-            if (node.controllers) {
-                node.controllers.forEach(ctrl => {
+                // Controller
+                else if (item.kind === 'controller') {
+                    // Render Controller Group
+                    const name = item.name;
+                    
+                    // Render Header
+                    const div = document.createElement('div');
+                    const header = document.createElement('div');
+                    header.className = 'tree-item';
+                    const meta = createFileMeta(item.metadata, name);
+                    header.innerHTML = `
+                        <span class="badge badge-CONTROLLER">CTRL</span>
+                        <span class="tree-label" style="font-weight: bold;">${name}</span>
+                        ${meta}
+                    `;
+                    div.appendChild(header);
+
+                    // Render Routes belonging to this controller
+                    const routes = controllerGroups.get(name) || [];
+                    if (routes.length > 0) {
+                        const routesContainer = document.createElement('div');
+                        routesContainer.className = 'tree-node';
+                        
+                        routes.forEach(r => {
+                            renderedRoutes.add(r); // Mark as rendered
+                            
+                            const rDiv = document.createElement('div');
+                            rDiv.className = 'tree-item';
+                            const method = r.method.toUpperCase();
+                            const badgeClass = `badge-${method}`;
+                            const rMeta = createFileMeta(r.metadata, r.handlerName);
+                            rDiv.innerHTML = `
+                                <span class="badge ${badgeClass}" style="width: 50px; text-align: center; display: inline-block;">${method}</span>
+                                <span class="tree-label">${r.path}</span>
+                                ${rMeta}
+                            `;
+                            routesContainer.appendChild(rDiv);
+                        });
+                        div.appendChild(routesContainer);
+                    } else {
+                        // Empty controller or no tagged routes found
+                        // It's still valid to show it
+                        const note = document.createElement('div');
+                        note.className = 'tree-node';
+                        note.innerHTML = '<span style="color: #64748b; font-style: italic;">(No routes detected)</span>';
+                        div.appendChild(note);
+                    }
+                    wrapper.appendChild(div);
+                }
+
+                // Route (Loose)
+                else if (item.kind === 'route') {
+                    if (renderedRoutes.has(item)) return; // Skip if already rendered in controller
+                    
                     const div = document.createElement('div');
                     div.className = 'tree-item';
-                   
-                    let meta = '';
-                    if (ctrl.metadata && ctrl.metadata.file) {
-                        const file = ctrl.metadata.file.split('/').pop();
-                        meta = `<span class="tree-meta">${file}:${ctrl.metadata.line}</span>`;
-                    }
+                    const method = item.method.toUpperCase();
+                    const badgeClass = `badge-${method}`;
+                    const meta = createFileMeta(item.metadata, item.handlerName);
 
                     div.innerHTML = `
-                        <span class="badge badge-CONTROLLER">CTRL</span>
-                        <span class="tree-label">${ctrl.name}</span>
-                        <span style="color: #64748b; margin-left: 0.5rem;">@ ${ctrl.path}</span>
+                        <span class="badge ${badgeClass}" style="width: 50px; text-align: center; display: inline-block;">${method}</span>
+                        <span class="tree-label">${item.path}</span>
                         ${meta}
                     `;
                     wrapper.appendChild(div);
-                });
-            }
-
+                }
+            });
             container.appendChild(wrapper);
         }
 
@@ -590,6 +737,431 @@
         setInterval(updateDashboard, 2000);
         // Initial load
         updateDashboard();
+
+        // --- Tabs Logic ---
+        function switchTab(tabId) {
+            // Update buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            // Find the button that was clicked
+            const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick') === `switchTab('${tabId}')`);
+            if (btn) btn.classList.add('active');
+
+            // Update content
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+
+            if (tabId === 'graph') {
+                initGraph();
+            }
+        }
+
+
+        // --- Graph Visualization (ReactFlow + ELK) ---
+        
+        // We use dynamic imports or a module script to use React/ReactFlow
+    </script>
+
+    <!-- React/ReactFlow Dependencies -->
+    <link rel="stylesheet" href="https://esm.sh/@xyflow/react@12.3.6/dist/style.css" />
+    <style>
+        .react-flow__controls-button {
+            color: #000 !important;
+            fill: #000 !important;
+            border-bottom: 1px solid #eee;
+        }
+        .react-flow__controls-button svg {
+            fill: currentColor;
+        }
+        .react-flow__node.react-flow__node-router { 
+            height: fit-content !important;
+        }
+    </style>
+    <script type="module">
+        import React, { useState, useEffect, useCallback, useMemo } from 'https://esm.sh/react@18.3.1';
+        import { createRoot } from 'https://esm.sh/react-dom@18.3.1/client?deps=react@18.3.1';
+        import { ReactFlow, Background, Controls, useNodesState, useEdgesState, Panel, Handle } from 'https://esm.sh/@xyflow/react@12.3.6?deps=react@18.3.1,react-dom@18.3.1';
+        import ELK from 'https://esm.sh/elkjs@0.9.3/lib/elk.bundled.js';
+
+        const elk = new ELK();
+
+        const NODE_STYLES = {
+            app: { background: 'rgba(59, 130, 246, 0.1)', color: '#fff', border: '2px solid #3b82f6', borderRadius: '4px', fontWeight: 'bold' },
+            router: { background: 'rgba(30, 41, 59, 0.5)', color: '#f8fafc', border: '2px dashed #475569', borderRadius: '8px' },
+            controller: { background: 'rgba(124, 58, 237, 0.1)', color: '#a78bfa', border: '1px solid #7c3aed', borderRadius: '6px' },
+            middleware: { background: '#7e22ce', color: '#fff', border: '1px solid #6b21a8', borderRadius: '12px', padding: '6px 12px', fontSize: '10px' }
+        };
+
+        const GroupNode = ({ data }) => {
+            return React.createElement('div', { style: { padding: '10px', height: '100%' } },
+                React.createElement('div', { style: { fontWeight: 'bold', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '5px', marginBottom: '5px' } }, 
+                    data.label
+                ),
+                data.routes && data.routes.map((r, i) => 
+                    React.createElement('div', { key: i, style: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', margin: '2px 0' } },
+                        React.createElement('span', { 
+                            style: { 
+                                padding: '2px 6px', 
+                                borderRadius: '4px', 
+                                background: '#0f172a', 
+                                border: `1px solid ${
+                                    r.method === 'GET' ? '#3b82f6' : 
+                                    r.method === 'POST' ? '#22c55e' : 
+                                    r.method === 'PUT' ? '#eab308' : 
+                                    r.method === 'DELETE' ? '#ef4444' : '#64748b'
+                                }`,
+                                color: r.method === 'GET' ? '#3b82f6' : 
+                                       r.method === 'POST' ? '#22c55e' : 
+                                       r.method === 'PUT' ? '#eab308' : 
+                                       r.method === 'DELETE' ? '#ef4444' : '#f8fafc',
+                                fontWeight: 'bold',
+                                fontSize: '10px',
+                                minWidth: '40px',
+                                textAlign: 'center'
+                            } 
+                        }, r.method),
+                        React.createElement('span', { style: { fontFamily: 'monospace', color: '#cbd5e1' } }, r.path)
+                    )
+                ),
+                React.createElement(Handle, { type: 'target', position: 'top' }),
+                React.createElement(Handle, { type: 'source', position: 'bottom' })
+            );
+        };
+
+        const nodeTypes = {
+            controller: GroupNode,
+            router: GroupNode
+        };
+
+        const GraphComponent = () => {
+            const [nodes, setNodes, onNodesChange] = useNodesState([]);
+            const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+            const [loading, setLoading] = useState(true);
+            const [searchTerm, setSearchTerm] = useState('');
+
+            // Search Filter
+            useEffect(() => {
+                if (!searchTerm) {
+                    setNodes(nds => nds.map(node => ({ ...node, style: { ...node.style, opacity: 1 } })));
+                    setEdges(eds => eds.map(edge => ({ ...edge, style: { ...edge.style, opacity: 1 } })));
+                    return;
+                }
+
+                const query = searchTerm.toLowerCase();
+                const matchedIds = new Set();
+                
+                // Find matches in labels OR in internal routes
+                nodes.forEach(node => {
+                    const labelMatch = node.data.label && node.data.label.toLowerCase().includes(query);
+                    const routeMatch = node.data.routes && node.data.routes.some(r => r.path.toLowerCase().includes(query));
+                    
+                    if (labelMatch || routeMatch) matchedIds.add(node.id);
+                });
+
+                setNodes(nds => nds.map(node => ({
+                    ...node,
+                    style: { ...node.style, opacity: matchedIds.has(node.id) ? 1 : 0.1 }
+                })));
+                
+                setEdges(eds => eds.map(edge => ({
+                    ...edge,
+                    style: { ...edge.style, opacity: 0.1 }
+                })));
+
+            }, [searchTerm]);
+
+
+            useEffect(() => {
+                const buildGraph = async () => {
+                    if (!registryData) return;
+
+                    const elkEdges = [];
+                    const makeId = (type, parent, idx, name) => `${type}_${parent || 'root'}_${idx}_${name.replace(/[^a-zA-Z0-9]/g, '')}`;
+
+                    function buildHierarchy(node, currentId) {
+                        if (!node) return null;
+                        const children = [];
+                        let previousNodeId = null;
+
+                        // 1. Process Middleware (Chain them sequentially)
+                        let lastMiddlewareId = null;
+                        
+                        if (node.middleware) {
+                           node.middleware.forEach((mw, idx) => {
+                                const id = makeId('mw', currentId, idx, mw.name);
+                                const label = mw.name + (mw.metadata?.pluginName ? `\n[${mw.metadata.pluginName}]` : '');
+                                children.push({ id, width: 140, height: 40, labels: [{ text: label }], type: 'middleware' });
+                                
+                                if (lastMiddlewareId) {
+                                    elkEdges.push({ id: `e_${lastMiddlewareId}_${id}`, sources: [lastMiddlewareId], targets: [id] });
+                                }
+                                lastMiddlewareId = id;
+                           });
+                        }
+                        
+                        // Use the last middleware as the source for all downstream components (controllers/routers)
+                        const upstreamSourceId = lastMiddlewareId;
+
+                        // Map to store controller group nodes by name
+                        const controllerGroups = new Map();
+
+                        // 2. Create Controller Containers (Now Compact Nodes)
+                        if (node.controllers) {
+                            node.controllers.forEach((ctrl, idx) => {
+                                const id = makeId('ctrl', currentId, idx, ctrl.name);
+                                const ctrlNode = { 
+                                    id, 
+                                    labels: [{ text: ctrl.name }],
+                                    type: 'controller',
+                                    routes: [],
+                                    layoutOptions: { 
+                                        'elk.direction': 'DOWN'
+                                    }
+                                };
+                                controllerGroups.set(ctrl.name, ctrlNode);
+                                children.push(ctrlNode);
+                                
+                                // Edge from Middleware (if any)
+                                if (upstreamSourceId) {
+                                    elkEdges.push({ id: `e_${upstreamSourceId}_${id}`, sources: [upstreamSourceId], targets: [id] });
+                                }
+                            });
+                        }
+
+                        // 3. Process Routes (Collect into Controllers or Routers)
+                        // If a route doesn't belong to a controller, we might need a "Misc Routes" node or just list it in parent router?
+                        // For now, let's attach to parent router if no controller, or create a 'Routes' node.
+                        
+                        // We need a place to put loose routes (not in a controller)
+                        // Let's create a 'RouterRoutes' node if there are any loose routes
+                        const looseRoutes = [];
+
+                        if (node.routes) {
+                            node.routes.forEach((route, idx) => {
+                                let placed = false;
+                                if (route.tags) {
+                                    for (const tag of route.tags) {
+                                        if (controllerGroups.has(tag)) {
+                                            controllerGroups.get(tag).routes.push({ method: route.method, path: route.path });
+                                            
+                                            // Dynamic Sizing
+                                            const group = controllerGroups.get(tag);
+                                            // Estimate width: Base 20 + approx 8px per char for longest string (method + space + path)
+                                            // Method badge is ~50px width.
+                                            const longestRoute = group.routes.reduce((max, r) => Math.max(max, (r.method.length + r.path.length + 1)), 0);
+                                            // Char width estimate (monospace roughly 7-8px) + badge (50px) + padding (30px)
+                                            const calculatedWidth = 50 + (longestRoute * 8) + 40;
+                                            
+                                            group.width = Math.max(300, calculatedWidth); // Min 300px
+                                            group.height = 50 + (group.routes.length * 30); // 30px per row
+                                            
+                                            placed = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                
+                                if (!placed) {
+                                    looseRoutes.push(route);
+                                }
+                            });
+                        }
+
+                        // If there are loose routes, we can display them in the Router node itself?
+                        // But Router node is currently a container. 
+                        // Let's make the Router node ALSO custom and capable of showing routes?
+                        // Yes, 'router' type is now GroupNode too.
+                        const routerRoutes = looseRoutes.map(r => ({ method: r.method, path: r.path }));
+                        
+                        // 4. Process Child Routers
+                        if (node.routers) {
+                            node.routers.forEach((router, idx) => {
+                                const id = makeId('router', currentId, idx, router.path);
+                                const childResult = buildHierarchy(router.children, id);
+                                
+                                // Router Node (Compact + Container)
+                                // It can have children (sub-routers, controllers) AND its own routes
+                                const routerNode = {
+                                    id,
+                                    labels: [{ text: router.path }],
+                                    type: 'router',
+                                    // Own routes
+                                    routes: [], // Will be populated by childResult logic if we structured differently?
+                                                // Actually, buildHierarchy processes the *contents* of the router.
+                                                // The current `node.routers` iteration creates the wrapper.
+                                                // We can't easily peek inside `router.children` here to pull routes up, 
+                                                // unless we change signature. 
+                                                // BUT, `childResult` contains the children nodes.
+                                    
+                                    children: childResult ? childResult.children : [],
+                                    
+                                    layoutOptions: { 
+                                        'elk.padding': '[top=40,left=20,bottom=20,right=20]',
+                                        'elk.direction': 'DOWN',
+                                        'elk.algorithm': 'layered',
+                                        'elk.hierarchyHandling': 'INCLUDE_CHILDREN'
+                                    }
+                                };
+                                
+                                if (childResult && childResult.ownRoutes && childResult.ownRoutes.length > 0) {
+                                     routerNode.routes = childResult.ownRoutes;
+                                     
+                                     // Dynamic Sizing for Router Nodes
+                                     const longestRoute = routerNode.routes.reduce((max, r) => Math.max(max, (r.method.length + r.path.length + 1)), 0);
+                                     const calculatedWidth = 50 + (longestRoute * 8) + 40;
+                                     routerNode.width = Math.max(300, calculatedWidth);
+                                }
+
+                                children.push(routerNode);
+
+                                // Edge from Middleware (if any)
+                                if (upstreamSourceId) {
+                                    elkEdges.push({ id: `e_${upstreamSourceId}_${id}`, sources: [upstreamSourceId], targets: [id] });
+                                }
+                            });
+                        }
+                        
+                        return { children, ownRoutes: routerRoutes };
+                    }
+
+                    const rootData = buildHierarchy(registryData, 'root');
+
+                    console.log({elkEdges});
+
+                    const graph = {
+                        id: 'root',
+                        layoutOptions: {
+                            'elk.algorithm': 'layered',
+                            'elk.direction': 'DOWN',
+                            'elk.padding': '[top=50,left=50,bottom=50,right=50]',
+                            'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
+                            'elk.spacing.nodeNode': '40',
+                            'elk.layered.spacing.nodeNodeBetweenLayers': '50'
+                        },
+                        children: [
+                             {
+                                id: 'app_container',
+                                type: 'app',
+                                labels: [{text: 'Application'}],
+                                children: rootData.children,
+                                // If root has routes, we need to show them. rootData.ownRoutes
+                                // We can add a "Root Routes" node if needed.
+                                layoutOptions: { 'elk.padding': '[top=50,left=20,bottom=150,right=20]' }
+                            }
+                        ],
+                        edges: elkEdges
+                    };
+                    
+                    // Add root routes if any
+                    if (rootData.ownRoutes && rootData.ownRoutes.length > 0) {
+                        graph.children[0].children.unshift({
+                            id: 'root_routes',
+                            type: 'router', // Reuse style
+                            labels: [{text: 'Root Routes'}],
+                            routes: rootData.ownRoutes,
+                            width: 300,
+                            height: 40 + (rootData.ownRoutes.length * 25)
+                        });
+                    }
+
+                    try {
+                        const layoutedGraph = await elk.layout(graph);
+                        
+                        const flowNodes = [];
+                        
+                        const processLayoutedNode = (node, parentId = undefined) => {
+                            if (node.id === 'root') {
+                                node.children?.forEach(c => processLayoutedNode(c));
+                                return;
+                            }
+                            
+                            const style = NODE_STYLES[node.type] || {};
+                            const isGroup = node.children && node.children.length > 0;
+                            
+                            // Calculate dynamic height for compact nodes if not set by ELK (ELK needs explicit if not simple)
+                            // We set width/height in buildHierarchy for some, but for compound nodes ELK calculates based on children + padding.
+                            // For Controller nodes (leafs in terms of graph structure now, but contain custom route list),
+                            // we need to set dimensions BEFORE layout preferably.
+                            // Let's fix the dimensions in buildHierarchy.
+                            
+                            // Recalculate if needed or use what ELK gave back
+                            
+                            flowNodes.push({
+                                id: node.id,
+                                position: { x: node.x, y: node.y },
+                                data: { 
+                                    label: node.labels?.[0]?.text,
+                                    routes: node.routes // Pass routes to custom node
+                                },
+                                style: { 
+                                    ...style, 
+                                    width: node.width, 
+                                    height: node.height,
+                                    zIndex: isGroup ? -1 : 1
+                                },
+                                type: node.type === 'controller' || node.type === 'router' ? node.type : 'default',
+                                parentNode: parentId,
+                                draggable: false,
+                                extent: 'parent'
+                            });
+                            
+                            if (node.children) {
+                                node.children.forEach(c => processLayoutedNode(c, node.id));
+                            }
+                        };
+                        
+                        processLayoutedNode(layoutedGraph);
+
+                        const flowEdges = elkEdges.map(e => ({
+                            id: e.id,
+                            source: e.sources[0],
+                            target: e.targets[0],
+                            type: 'smoothstep',
+                            animated: true,
+                            style: { stroke: '#475569', strokeWidth: 2 }
+                        }));
+                        
+                        setNodes(flowNodes);
+                        setEdges(flowEdges);
+
+                    } catch (e) {
+                        console.error("ELK Layout Error", e);
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+
+                buildGraph();
+            }, []);
+
+            if (loading) return React.createElement('div', { style: { color: '#fff', padding: '20px' } }, 'Laying out graph...');
+
+            return React.createElement(ReactFlow, {
+                nodes,
+                edges,
+                onNodesChange,
+                onEdgesChange,
+                nodeTypes, // Register custom types
+                fitView: true,
+                minZoom: 0.1,
+            }, 
+                React.createElement(Background, { color: '#334155', gap: 16 }),
+                React.createElement(Controls)
+            );
+        };
+
+        function mountReact() {
+            const container = document.getElementById('cy');
+             if (container && !container._reactRoot) {
+                const root = createRoot(container);
+                container._reactRoot = root;
+                root.render(React.createElement(GraphComponent));
+            }
+        }
+        window.initGraph = mountReact;
+
+
+
+
     </script>
 </body>
 

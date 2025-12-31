@@ -7,7 +7,7 @@ import { ShokupanRequest } from './request';
 import type { Shokupan } from './shokupan';
 import { $appRoot, $childControllers, $childRouters, $controllerPath, $dispatch, $isApplication, $isMounted, $isRouter, $middleware, $mountPath, $parent, $routeArgs, $routeMethods, $routes, $routeSpec } from './symbol';
 
-import { type GuardAPISpec, HTTPMethods, type JSXRenderer, type Method, type MethodAPISpec, type OpenAPIOptions, type ProcessResult, type RequestOptions, RouteParamType, type ShokupanController, type ShokupanHandler, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions, type RouteMetadata } from './types';
+import { type GuardAPISpec, HTTPMethods, type JSXRenderer, type Method, type MethodAPISpec, type OpenAPIOptions, type ProcessResult, type RequestOptions, RouteParamType, type ShokupanController, type ShokupanHandler, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions, type RouteMetadata, type Middleware } from './types';
 import { asyncContext } from './util/async-hooks';
 import { traceHandler } from './util/instrumentation';
 import { getCallerInfo } from './util/stack';
@@ -33,6 +33,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     public [$childRouters]: ShokupanRouter<T>[] = [];
     public [$childControllers]: ShokupanController[] = [];
 
+    public middleware: Middleware[] = [];
+
     get rootConfig() {
         return this[$appRoot]?.applicationConfig;
     }
@@ -53,14 +55,17 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             path: r.path,
             method: r.method,
             metadata: r.metadata,
-            handlerName: r.handler.name
+            handlerName: r.handler.name,
+            tags: r.handlerSpec?.tags,
+            order: r.order
         }));
 
         // Collect middleware (if exists, e.g. on Shokupan app)
-        const mw = (this as any).middleware as any[] | undefined;
+        const mw = this.middleware;
         const middleware = mw ? mw.map(m => ({
             name: m.name || 'middleware',
-            metadata: m.metadata
+            metadata: m.metadata,
+            order: m.order
         })) : [];
 
         // Collect child routers
@@ -982,28 +987,10 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         const prefix = uriPath.startsWith('/') ? uriPath : '/' + uriPath;
         const normalizedPrefix = prefix.endsWith('/') && prefix !== '/' ? prefix.slice(0, -1) : prefix;
 
-        const handler = serveStatic(null as any, config, prefix); // Note: bind context later? 
-        // Wait, serveStatic returns a handler: (ctx) => Promise<Response>
-        // But here we need to insert it into `this.add`.
-        // `serveStatic` implementation above takes `ctx` as first arg. 
-        // We probably want `serveStatic` to RETURN a handler, OR adapt it.
-
-        // Let's look at how serveStatic was implemented in plugins/serve-static.ts
-        // export function serveStatic<T>(ctx: ShokupanContext<T>, config: StaticServeOptions<T>, prefix: string) { ... return async () => { ... } }
-        // It seems `serveStatic` IS a factory that returns a "runner" but it takes `ctx` immediately?
-        // Wait, looking at the previous file content for serveStatic:
-        // export function serveStatic<T>(ctx: ShokupanContext<T>, config: StaticServeOptions<T>, prefix: string)
-
-        // That seems wrong for a Router method that delegates. 
-        // The router adds a handler `(ctx) => ...`.
-        // So we need `(ctx) => serveStatic(ctx, config, prefix)`.
-        // But `serveStatic` as implemented returns `async () => { ... }`.
-
         // Correct usage of the new plugin:
         const routeHandler = async (ctx: ShokupanContext<T>) => {
             // The plugin returns a function that executes the logic
-            const runner = serveStatic(ctx, config, prefix);
-            return runner();
+            return serveStatic(ctx, config, prefix);
         };
 
         // Derive Group/Tag name from the path's last segment

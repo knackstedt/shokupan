@@ -8,7 +8,7 @@ export interface CompressionOptions {
 export function Compression(options: CompressionOptions = {}): Middleware {
     const threshold = options.threshold ?? 512; // 1KB default
 
-    return async (ctx: ShokupanContext, next: NextFn) => {
+    const compressionMiddleware: Middleware = async function CompressionMiddleware(ctx: ShokupanContext, next: NextFn) {
         const acceptEncoding = ctx.headers.get("accept-encoding") || "";
 
         // Check if compression is supported
@@ -95,4 +95,7 @@ export function Compression(options: CompressionOptions = {}): Middleware {
 
         return response;
     };
+    (compressionMiddleware as any).isBuiltin = true;
+    (compressionMiddleware as any).pluginName = 'Compression';
+    return compressionMiddleware;
 };

@@ -25,7 +25,6 @@ const tracer = trace.getTracer("shokupan.application");
 export class Shokupan<T = any> extends ShokupanRouter<T> {
     readonly applicationConfig: ShokupanConfig = {};
     public openApiSpec?: any;
-    public middleware: Middleware[] = [];
     private composedMiddleware?: Middleware;
 
     get logger() {
@@ -69,6 +68,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             };
         }
 
+        // Create wrapper but preserve metadata for registry
         trackedMiddleware = async (ctx, next) => {
             // Cast to any to access handlerStack if types are strict, but ShokupanContext should have it.
             const c = ctx as any;
@@ -83,8 +83,10 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             }
             return middleware(ctx, next);
         };
-        // ---------------------------------
+        (trackedMiddleware as any).metadata = (middleware as any).metadata;
+        Object.defineProperty(trackedMiddleware, 'name', { value: (middleware as any).name || 'middleware' });
 
+        (trackedMiddleware as any).order = this.middleware.length;
         this.middleware.push(trackedMiddleware);
         return this;
     }

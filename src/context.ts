@@ -26,7 +26,7 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
 
     constructor(
         public readonly request: ShokupanRequest<any>,
-        public readonly server?: Server,
+        public readonly server?: Server<any>,
         state?: State,
         public readonly app?: Shokupan,
         enableMiddlewareTracking: boolean = false

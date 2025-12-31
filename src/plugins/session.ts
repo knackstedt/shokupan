@@ -217,7 +217,7 @@ export function Session(options: SessionOptions): Middleware {
     const saveUninitialized = options.saveUninitialized === undefined ? true : options.saveUninitialized;
     const rolling = options.rolling || false;
 
-    return async (ctx: ShokupanContext, next) => {
+    const sessionMiddleware: Middleware = async function SessionMiddleware(ctx: ShokupanContext, next) {
         // 1. Get Session ID from Cookie
         let reqSessionId: string | null = null;
         let isSigned = false;
@@ -415,4 +415,7 @@ export function Session(options: SessionOptions): Middleware {
 
         return result;
     };
+    (sessionMiddleware as any).isBuiltin = true;
+    (sessionMiddleware as any).pluginName = 'Session';
+    return sessionMiddleware;
 }

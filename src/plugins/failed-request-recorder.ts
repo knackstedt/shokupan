@@ -1,8 +1,8 @@
-import { createHash } from 'node:crypto';
 import { trace } from '@opentelemetry/api';
-import { datastore } from '../util/datastore';
-import type { Middleware } from '../types';
+import { createHash } from 'node:crypto';
 import type { ShokupanContext } from '../context';
+import type { Middleware } from '../types';
+import { datastore } from '../util/datastore';
 
 export interface FailedRequestRecorderOptions {
     /**
@@ -132,7 +132,7 @@ async function cleanup(maxCapacity: number, ttl: number) {
     const results = await datastore.query('SELECT count() FROM failed_requests GROUP ALL');
 
     // Results is [{ result: [{ count: N }], status: 'OK', ... }]
-    if (!results || !results[0] || !results[0].result) return;
+    if (!results?.[0]?.result) return;
 
     const countRecords = results[0].result as any[];
 

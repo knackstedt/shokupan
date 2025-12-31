@@ -20,7 +20,7 @@ export interface SecurityHeadersOptions {
 }
 
 export function SecurityHeaders(options: SecurityHeadersOptions = {}): Middleware {
-    return async (ctx: ShokupanContext, next: NextFn) => {
+    const securityHeadersMiddleware: Middleware = async function SecurityHeadersMiddleware(ctx: ShokupanContext, next: NextFn) {
         const headers: Record<string, string> = {};
 
         // Helper to set header if not already set or force it
@@ -125,5 +125,9 @@ export function SecurityHeaders(options: SecurityHeadersOptions = {}): Middlewar
         // that the router respects, OR we must wrap the response.
 
         return response;
+        return response;
     };
+    (securityHeadersMiddleware as any).isBuiltin = true;
+    (securityHeadersMiddleware as any).pluginName = 'SecurityHeaders';
+    return securityHeadersMiddleware;
 }

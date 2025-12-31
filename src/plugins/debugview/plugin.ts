@@ -87,16 +87,59 @@ export class DebugDashboard extends ShokupanRouter {
             const app = (this as any)[$appRoot];
             const registry = app?.getComponentRegistry ? app.getComponentRegistry() : null;
 
+            const linkPattern = this.getLinkPattern();
+
             const template = await Bun.file(__dirname + "/template.eta").text();
             const html = this.eta.renderString(template, {
                 metrics: this.metrics,
                 uptime,
                 registry,
+                rootPath: process.cwd(),
+                linkPattern,
                 // Serialize the function to string if it exists
                 getRequestHeaders: this.dashboardConfig.getRequestHeaders?.toString()
             });
             return ctx.html(html);
         });
+    }
+
+    private getLinkPattern(): string {
+        // 1. Check for IDE environment
+        const term = process.env['TERM_PROGRAM'] || '';
+        if (['vscode', 'cursor', 'antigravity'].some(t => term.includes(t))) {
+            return 'vscode://file/{{absolute}}:{{line}}';
+        }
+
+        // 2. Try Git
+        try {
+            const { execSync } = require('child_process');
+            const remote = execSync('git config --get remote.origin.url', { encoding: 'utf8' }).trim();
+            const branch = execSync('git branch --show-current', { encoding: 'utf8' }).trim();
+
+            if (remote) {
+                // Normalize SSH urls (git@github.com:user/repo.git) to https
+                let httpUrl = remote;
+                if (remote.startsWith('git@')) {
+                    httpUrl = remote.replace(':', '/').replace('git@', 'https://');
+                }
+                if (httpUrl.endsWith('.git')) {
+                    httpUrl = httpUrl.slice(0, -4);
+                }
+
+                // GitHub / GitLab / Bitbucket
+                if (httpUrl.includes('github.com') || httpUrl.includes('gitlab.com')) {
+                    return `${httpUrl}/blob/${branch}/{{relative}}#L{{line}}`;
+                }
+                if (httpUrl.includes('bitbucket.org')) {
+                    return `${httpUrl}/src/${branch}/{{relative}}#lines-{{line}}`;
+                }
+            }
+        } catch (e) {
+            // Ignore git errors
+        }
+
+        // Fallback
+        return 'vscode://file/{{absolute}}:{{line}}';
     }
 
     /**

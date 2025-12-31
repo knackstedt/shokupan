@@ -20,7 +20,7 @@ export function Cors(options: CorsOptions = {}): Middleware {
 
     const opts = { ...defaults, ...options };
 
-    const corsMiddleware: Middleware = async (ctx: ShokupanContext, next: NextFn) => {
+    const corsMiddleware: Middleware = async function CorsMiddleware(ctx: ShokupanContext, next: NextFn) {
         const headers = new Headers();
         const origin = ctx.headers.get("origin");
 

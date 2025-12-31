@@ -2,7 +2,7 @@
  * Captures the file and line number of the caller.
  * Use skipFrames to skip helper functions in the stack trace.
  */
-export function getCallerInfo(skipFrames = 2): { file: string; line: number } {
+export function getCallerInfo(skipFrames = 1): { file: string; line: number } {
     let file = 'unknown';
     let line = 0;
 

@@ -43,7 +43,7 @@ export function RateLimit(options: RateLimitOptions = {}): Middleware {
         }
     }, windowMs);
 
-    const rateLimitMiddleware: Middleware = async (ctx: ShokupanContext, next: NextFn) => {
+    const rateLimitMiddleware: Middleware = async function RateLimitMiddleware(ctx: ShokupanContext, next: NextFn) {
         if (skip(ctx)) return next();
 
         const key = keyGenerator(ctx);
