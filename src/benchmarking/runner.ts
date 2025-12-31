@@ -20,6 +20,7 @@ type BenchmarkResult = {
     latency: number;
     throughput: number;
     error?: string;
+    percentiles?: Record<string, number>;
 };
 
 type RuntimeResults = Record<string, Record<string, BenchmarkResult>>; // runtime -> endpoint -> result
@@ -70,15 +71,33 @@ async function compileForNode(targetFrameworks: string[]) {
 
 function runAutocannon(url: string) {
     return new Promise<any>((resolve, reject) => {
-        autocannon({
+        const latencies: number[] = [];
+        const instance = autocannon({
             url,
             connections: 100,
-            duration: 5
+            duration: 5,
         }, (err, result) => {
             if (err) return reject(err);
+            (result as any).latencies = latencies;
             resolve(result);
         });
+
+        instance.on('response', (client, statusCode, resBytes, responseTime) => {
+            latencies.push(responseTime);
+        });
     });
+}
+
+function calculatePercentile(latencies: number[], percentile: number): number {
+    if (latencies.length === 0) return 0;
+    // Autocannon latencies are not necessarily sorted? Documentation implies array of all latencies. To be safe, sort them.
+    // Actually, sorting huge array might be slow but for 5s run with 100 conns it might be manageable (~100k-1M reqs?)
+    // 100k requests array sort is fine.
+
+    // Sort logic should happen once if possible, but calculating multiple percentiles means we can sort once.
+    // We'll sort in runBenchmark.
+    const index = Math.ceil(percentile / 100 * latencies.length) - 1;
+    return latencies[Math.max(0, Math.min(latencies.length - 1, index))];
 }
 
 async function runBenchmark(framework: string, runtime: string) {
@@ -103,7 +122,7 @@ async function runBenchmark(framework: string, runtime: string) {
         stdout: "pipe",
         stderr: "pipe",
         onExit(proc, exitCode, signalCode, error) {
-            const isExpectedSignal = signalCode === 15 || signalCode === "SIGTERM" || signalCode === 2 || signalCode === "SIGINT";
+            const isExpectedSignal = signalCode === 15 || signalCode === 2;
             if (exitCode !== 0 && !isExpectedSignal) {
                 console.error(`Process exited unexpectedly with code ${exitCode}, signal ${signalCode}`);
                 if (error) console.error(`Error: ${error}`);
@@ -176,10 +195,23 @@ async function runBenchmark(framework: string, runtime: string) {
             const url = `http://localhost:${port}/${endpoint}`;
             try {
                 const res = await runAutocannon(url);
+
+                // Calculate custom percentiles from raw latencies
+                const latencies = (res.latencies || []).sort((a: number, b: number) => a - b);
+                const percentiles = {
+                    p1: calculatePercentile(latencies, 1),
+                    p5: calculatePercentile(latencies, 5),
+                    p25: calculatePercentile(latencies, 25),
+                    p75: calculatePercentile(latencies, 75),
+                    p95: calculatePercentile(latencies, 95),
+                    p99: calculatePercentile(latencies, 99)
+                };
+
                 results[endpoint] = {
                     requests: res.requests.average,
                     latency: res.latency.average,
-                    throughput: res.throughput.average
+                    throughput: res.throughput.average,
+                    percentiles
                 };
             } catch (e) {
                 console.error(`Failed to benchmark ${endpoint}:`, e);
@@ -361,6 +393,7 @@ function generateReport(history: HistoryEntry[]) {
             padding: 15px;
             position: relative;
             height: 350px;
+            padding-bottom: 50px;
         }
         
         .chart-container.full-width {
@@ -436,6 +469,14 @@ function generateReport(history: HistoryEntry[]) {
                 <canvas id="throughputChart"></canvas>
             </div>
             <div class="chart-container full-width">
+                 <h3>Latency Percentiles (Lower is better)</h3>
+                 <canvas id="percentileChart"></canvas>
+            </div>
+            <div class="chart-container full-width">
+                 <h3>Latency Spread (Consistency) - Lower is better</h3>
+                 <canvas id="spreadChart"></canvas>
+            </div>
+            <div class="chart-container full-width">
                  <h3>Runtime Comparison (Bun vs Node) - Req/Sec</h3>
                  <canvas id="runtimeCompChart"></canvas>
             </div>
@@ -454,8 +495,16 @@ function generateReport(history: HistoryEntry[]) {
                         <th>Runtime</th>
                         <th>Endpoint</th>
                         <th>Req/s</th>
-                        <th>Latency (ms)</th>
+                        <th>Avg Latency (ms)</th>
                         <th>Throughput (MB/s)</th>
+                        <th>P1</th>
+                        <th>P5</th>
+                        <th>P25</th>
+                        <th>P75</th>
+                        <th>P95</th>
+                        <th>P99</th>
+                        <th>Spread (P95-P5)</th>
+                        <th>Tail (P99-P1)</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -482,33 +531,19 @@ function generateReport(history: HistoryEntry[]) {
         
         function getColor(framework, runtime, options = {}) {
             const base = frameworkColors[framework] || frameworkColors['default'];
-            
-            // Bun = Solid Color
-            // Node = Pattern/Different Style
-            // Since we can't easily do hatched patterns without canvas API fuss, 
-            // we will use opacity or slight color shift.
-            // Requirement: "apply a different style for node/bun"
-            
             if (runtime === 'bun') {
-                 // Bun is "Pure" / Solid
                  return options.opacity ? addAlpha(base, options.opacity) : base;
             } else {
-                 // Node is "Faded" / "Ghost" style to differentiate
-                 // Or we can make it darker. Let's make it 50% opacity border with clear center? 
-                 // Chart.js supports 'backgroundColor' and 'borderColor'.
-                 // Let's return a color that is semi-transparent for Node.
                  return addAlpha(base, 0.4); 
             }
         }
         
         function getBorderColor(framework, runtime) {
              const base = frameworkColors[framework] || frameworkColors['default'];
-             // Both get solid borders to maintain visibility
              return base;
         }
 
         function addAlpha(color, opacity) {
-            // hex to rgb
             let c = color.substring(1).split('');
             if(c.length== 3){
                 c= [c[0], c[0], c[1], c[1], c[2], c[2]];
@@ -529,12 +564,11 @@ function generateReport(history: HistoryEntry[]) {
             const latest = historyData[0];
             const endpoints = new Set();
             
-            // Scan latest run to find all available endpoints
             Object.values(latest.results).forEach(frameworkRes => {
                 Object.values(frameworkRes).forEach(runtimeRes => {
                     if (runtimeRes.error) return;
                     Object.keys(runtimeRes).forEach(ep => {
-                        if (ep !== 'error' && ep !== 'requests' && ep !== 'latency' && ep !== 'throughput') {
+                        if (ep !== 'error' && ep !== 'requests' && ep !== 'latency' && ep !== 'throughput' && ep !== 'percentiles') {
                             if (typeof runtimeRes[ep] === 'object') {
                                 endpoints.add(ep);
                             }
@@ -553,8 +587,6 @@ function generateReport(history: HistoryEntry[]) {
                 epSelect.appendChild(opt);
             });
             
-            // Set initial state from HTML default
-            
             // Event Listeners
             epSelect.addEventListener('change', (e) => {
                 currentEndpoint = e.target.value;
@@ -572,6 +604,8 @@ function generateReport(history: HistoryEntry[]) {
         function updateView() {
             updateReqSecChart();
             updateThroughputChart();
+            updatePercentileChart();
+            updateSpreadChart();
             updateRuntimeCompChart();
             updateTrendChart();
             updateTable();
@@ -588,16 +622,29 @@ function generateReport(history: HistoryEntry[]) {
                    const runtimeRes = fwRes[rt];
                    if (!runtimeRes || runtimeRes.error) return;
 
-                   let metric = { requests: 0, latency: 0, throughput: 0, count: 0 };
+                   let metric = { 
+                       requests: 0, 
+                       latency: 0, 
+                       throughput: 0, 
+                       count: 0,
+                       percentiles: { p1:0, p5:0, p25:0, p75:0, p95:0, p99:0 }
+                   };
                    
                    if (endpointFilter === 'all') {
                        // Average across all found endpoints
                        Object.keys(runtimeRes).forEach(key => {
-                            if (key !== 'error' && typeof runtimeRes[key] === 'object') {
+                            if (key !== 'error' && typeof runtimeRes[key] === 'object' && key !== 'percentiles') {
                                 const val = runtimeRes[key];
                                 metric.requests += val.requests || 0;
                                 metric.latency += val.latency || 0;
                                 metric.throughput += val.throughput || 0;
+                                
+                                if (val.percentiles) {
+                                    Object.keys(metric.percentiles).forEach(p => {
+                                        metric.percentiles[p] += val.percentiles[p] || 0;
+                                    });
+                                }
+                                
                                 metric.count++;
                             }
                        });
@@ -605,6 +652,9 @@ function generateReport(history: HistoryEntry[]) {
                            metric.requests /= metric.count;
                            metric.latency /= metric.count;
                            metric.throughput /= metric.count;
+                           Object.keys(metric.percentiles).forEach(p => {
+                               metric.percentiles[p] /= metric.count;
+                           });
                        }
                    } else {
                        const res = runtimeRes[endpointFilter];
@@ -612,6 +662,9 @@ function generateReport(history: HistoryEntry[]) {
                            metric.requests = res.requests;
                            metric.latency = res.latency;
                            metric.throughput = res.throughput;
+                           if (res.percentiles) {
+                               metric.percentiles = { ...res.percentiles };
+                           }
                        } else {
                            return; // Endpoint doesn't exist for this fw
                        }
@@ -622,7 +675,8 @@ function generateReport(history: HistoryEntry[]) {
                        runtime: rt,
                        requests: metric.requests,
                        latency: metric.latency,
-                       throughput: metric.throughput
+                       throughput: metric.throughput,
+                       percentiles: metric.percentiles
                    });
                });
            });
@@ -663,7 +717,6 @@ function generateReport(history: HistoryEntry[]) {
             const labels = data.map(d => \`\${d.framework} (\${d.runtime})\`);
             const values = data.map(d => d.requests);
             
-            // Apply color coding
             const bgColors = data.map(d => getColor(d.framework, d.runtime));
             const borderColors = data.map(d => getBorderColor(d.framework, d.runtime));
 
@@ -704,25 +757,89 @@ function generateReport(history: HistoryEntry[]) {
             });
         }
         
+        function updatePercentileChart() {
+            const data = getLatestDataForEndpoint(currentEndpoint);
+            // This chart will have specific percentiles on X axis, and lines for each framework
+            // X Axis: P1, P5, P25, P75, P95, P99
+            
+            const percentiles = ['p1', 'p5', 'p25', 'p75', 'p95', 'p99'];
+            const labels = ['1%', '5%', '25%', '75%', '95%', '99%'];
+            
+            const datasets = data.map(d => {
+                const pData = percentiles.map(p => d.percentiles[p] || 0);
+                const borderDash = d.runtime === 'node' ? [5, 5] : [];
+                return {
+                    label: \`\${d.framework} (\${d.runtime})\`,
+                    data: pData,
+                    borderColor: getBorderColor(d.framework, d.runtime),
+                    backgroundColor: getColor(d.framework, d.runtime),
+                    borderDash: borderDash,
+                    tension: 0.1,
+                    fill: false
+                };
+            });
+            
+            createOrUpdateChart('percentileChart', 'line', {
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                     scales: {
+                        y: {
+                            title: { display: true, text: 'Latency (ms)', color: '#909296' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function updateSpreadChart() {
+             const data = getLatestDataForEndpoint(currentEndpoint);
+             
+             // Two datasets: P95-P5 and P99-P1
+             const labels = data.map(d => \`\${d.framework} (\${d.runtime})\`);
+             
+             const spreadCore = data.map(d => (d.percentiles.p95 - d.percentiles.p5));
+             const spreadTail = data.map(d => (d.percentiles.p99 - d.percentiles.p1));
+             
+             createOrUpdateChart('spreadChart', 'bar', {
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Core Spread (P95 - P5)',
+                            data: spreadCore,
+                            backgroundColor: data.map(d => addAlpha(getColor(d.framework, d.runtime, {opacity: 1}), 0.8)),
+                            borderColor: data.map(d => getBorderColor(d.framework, d.runtime)),
+                            borderWidth: 1
+                        },
+                         {
+                            label: 'Tail Spread (P99 - P1)',
+                            data: spreadTail,
+                            backgroundColor: data.map(d => addAlpha(getColor(d.framework, d.runtime, {opacity: 1}), 0.3)), // Faded for tail
+                            borderColor: data.map(d => getBorderColor(d.framework, d.runtime)),
+                            borderWidth: 1
+                        }
+                    ]
+                }
+             });
+        }
+        
         function updateRuntimeCompChart() {
             const latest = historyData[0];
             const frameworks = Object.keys(latest.results).sort(); 
-            // Better to sort by performance of 'bun' + 'all' maybe? Or just alphabetical?
-            // Let's sort alphabetical for this comparison chart so it's consistent
             
-            // Prepare datasets
             const bunData = [];
             const nodeData = [];
             
-            // Helper to get value
             const getVal = (fw, rt) => {
                  const res = latest.results[fw]?.[rt];
                  if (!res || res.error) return 0;
                  if (currentEndpoint === 'all') {
-                     // avg
                      let total = 0, count = 0;
                       Object.keys(res).forEach(key => {
-                            if (key !== 'error' && typeof res[key] === 'object') {
+                            if (key !== 'error' && typeof res[key] === 'object' && key !== 'percentiles') {
                                 total += res[key].requests || 0;
                                 count++;
                             }
@@ -736,9 +853,6 @@ function generateReport(history: HistoryEntry[]) {
                 bunData.push(getVal(fw, 'bun'));
                 nodeData.push(getVal(fw, 'node'));
             });
-            
-            // We want color coding per bar, but this is a grouped bar chart with 2 datasets.
-            // Chart.js allows array of colors for 'backgroundColor'.
             
             const bunColors = frameworks.map(fw => getColor(fw, 'bun'));
             const bunBorders = frameworks.map(fw => getBorderColor(fw, 'bun'));
@@ -763,7 +877,6 @@ function generateReport(history: HistoryEntry[]) {
                             backgroundColor: nodeColors,
                             borderColor: nodeBorders,
                             borderWidth: 2,
-                            // Add a pattern fallback note in tooltip if possible, but distinct style is opacity 0.4
                         }
                     ]
                 }
@@ -792,7 +905,7 @@ function generateReport(history: HistoryEntry[]) {
                     if (currentEndpoint === 'all') {
                          let total = 0, count = 0;
                          Object.keys(res).forEach(key => {
-                            if (key !== 'error' && typeof res[key] === 'object') {
+                            if (key !== 'error' && typeof res[key] === 'object' && key !== 'percentiles') {
                                 total += res[key].requests || 0;
                                 count++;
                             }
@@ -802,16 +915,13 @@ function generateReport(history: HistoryEntry[]) {
                     return res[currentEndpoint]?.requests || null;
                 });
                 
-                // Line Style
-                // Bun: Solid Line
-                // Node: Dashed Line
                 const borderDash = combo.rt === 'node' ? [5, 5] : [];
                 
                 datasets.push({
                     label: \`\${combo.fw} (\${combo.rt})\`,
                     data: dataPoints,
                     borderColor: getBorderColor(combo.fw, combo.rt),
-                    backgroundColor: getColor(combo.fw, combo.rt), // for legend
+                    backgroundColor: getColor(combo.fw, combo.rt),
                     borderDash: borderDash,
                     tension: 0.3,
                     fill: false
@@ -832,15 +942,17 @@ function generateReport(history: HistoryEntry[]) {
              tbody.innerHTML = '';
              
              if (data.length === 0) {
-                 tbody.innerHTML = '<tr><td colspan="6">No data found</td></tr>';
+                 tbody.innerHTML = '<tr><td colspan="12">No data found</td></tr>';
                  return;
              }
              
              data.forEach(row => {
                  const tr = document.createElement('tr');
-                 // Add small color indicator
                  const color = getColor(row.framework, row.runtime);
                  const style = \`display:inline-block;width:10px;height:10px;background:\${color};border-radius:50%;margin-right:8px;\`;
+                 const p = row.percentiles || {};
+                 const spreadCore = (p.p95 - p.p5) || 0;
+                 const spreadTail = (p.p99 - p.p1) || 0;
                  
                  tr.innerHTML = \`
                     <td><span style="\${style}"></span> \${row.framework}</td>
@@ -849,6 +961,14 @@ function generateReport(history: HistoryEntry[]) {
                     <td>\${row.requests.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
                     <td>\${row.latency.toFixed(2)}</td>
                     <td>\${(row.throughput / (1024 * 1024)).toFixed(2)}</td>
+                    <td>\${p.p1?.toFixed(2) || '-'}</td>
+                    <td>\${p.p5?.toFixed(2) || '-'}</td>
+                    <td>\${p.p25?.toFixed(2) || '-'}</td>
+                    <td>\${p.p75?.toFixed(2) || '-'}</td>
+                    <td>\${p.p95?.toFixed(2) || '-'}</td>
+                    <td>\${p.p99?.toFixed(2) || '-'}</td>
+                    <td>\${spreadCore.toFixed(2)} ms</td>
+                    <td>\${spreadTail.toFixed(2)} ms</td>
                  \`;
                  tbody.appendChild(tr);
              });
