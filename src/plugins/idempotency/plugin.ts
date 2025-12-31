@@ -113,8 +113,8 @@ export function Idempotency(options: IdempotencyOptions = {}): Middleware {
         return result;
     };
 
-    (idempotencyMiddleware as any).isBuiltin = true;
-    (idempotencyMiddleware as any).pluginName = 'Idempotency';
+    idempotencyMiddleware.isBuiltin = true;
+    idempotencyMiddleware.pluginName = 'Idempotency';
 
     return idempotencyMiddleware;
 }

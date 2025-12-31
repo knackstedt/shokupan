@@ -127,7 +127,7 @@ export function SecurityHeaders(options: SecurityHeadersOptions = {}): Middlewar
         return response;
         return response;
     };
-    (securityHeadersMiddleware as any).isBuiltin = true;
-    (securityHeadersMiddleware as any).pluginName = 'SecurityHeaders';
+    securityHeadersMiddleware.isBuiltin = true;
+    securityHeadersMiddleware.pluginName = 'SecurityHeaders';
     return securityHeadersMiddleware;
 }

@@ -107,8 +107,8 @@ export function RateLimitMiddleware(options: RateLimitOptions = {}): Middleware 
         return response;
     };
 
-    (rateLimitMiddleware as any).isBuiltin = true;
-    (rateLimitMiddleware as any).pluginName = 'RateLimit';
+    rateLimitMiddleware.isBuiltin = true;
+    rateLimitMiddleware.pluginName = 'RateLimit';
 
     return rateLimitMiddleware;
 }

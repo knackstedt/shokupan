@@ -95,7 +95,7 @@ export function Compression(options: CompressionOptions = {}): Middleware {
 
         return response;
     };
-    (compressionMiddleware as any).isBuiltin = true;
-    (compressionMiddleware as any).pluginName = 'Compression';
+    compressionMiddleware.isBuiltin = true;
+    compressionMiddleware.pluginName = 'Compression';
     return compressionMiddleware;
 };

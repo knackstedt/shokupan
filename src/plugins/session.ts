@@ -415,7 +415,7 @@ export function Session(options: SessionOptions): Middleware {
 
         return result;
     };
-    (sessionMiddleware as any).isBuiltin = true;
-    (sessionMiddleware as any).pluginName = 'Session';
+    sessionMiddleware.isBuiltin = true;
+    sessionMiddleware.pluginName = 'Session';
     return sessionMiddleware;
 }

@@ -101,8 +101,8 @@ export function Cors(options: CorsOptions = {}): Middleware {
 
         return response;
     };
-    (corsMiddleware as any).isBuiltin = true;
-    (corsMiddleware as any).pluginName = 'Cors';
+    corsMiddleware.isBuiltin = true;
+    corsMiddleware.pluginName = 'Cors';
 
     return corsMiddleware;
 }

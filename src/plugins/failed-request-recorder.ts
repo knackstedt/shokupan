@@ -31,8 +31,8 @@ export function FailedRequestRecorder(options: FailedRequestRecorderOptions = {}
             throw err;
         }
     };
-    (recorderMiddleware as any).isBuiltin = true;
-    (recorderMiddleware as any).pluginName = 'FailedRequestRecorder';
+    recorderMiddleware.isBuiltin = true;
+    recorderMiddleware.pluginName = 'FailedRequestRecorder';
 
     return recorderMiddleware;
 }

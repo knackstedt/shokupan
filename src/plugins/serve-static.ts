@@ -170,8 +170,8 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
         return response;
     };
 
-    (serveStaticMiddleware as any).isBuiltin = true;
-    (serveStaticMiddleware as any).pluginName = 'ServeStatic';
+    serveStaticMiddleware.isBuiltin = true;
+    serveStaticMiddleware.pluginName = 'ServeStatic';
 
     return serveStaticMiddleware;
 }
