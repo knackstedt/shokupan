@@ -1,3 +1,4 @@
+import * as zlib from "node:zlib"; // TODO: When bun compression support supercedes node, remove this
 import type { ShokupanContext } from "../context";
 import type { Middleware, NextFn } from "../types";
 
@@ -6,7 +7,7 @@ export interface CompressionOptions {
 }
 
 export function Compression(options: CompressionOptions = {}): Middleware {
-    const threshold = options.threshold ?? 512; // 1KB default
+    const threshold = options.threshold ?? 512; // 512 bytes default
 
     const compressionMiddleware: Middleware = async function CompressionMiddleware(ctx: ShokupanContext, next: NextFn) {
         const acceptEncoding = ctx.headers.get("accept-encoding") || "";
@@ -23,7 +24,6 @@ export function Compression(options: CompressionOptions = {}): Middleware {
         let response = await next();
 
         // Check for implicit return stored in context
-        // This handles cases where handlers use ctx.text() / ctx.json() but return void
         if (!(response instanceof Response) && ctx._finalResponse instanceof Response) {
             response = ctx._finalResponse;
         }
@@ -32,20 +32,31 @@ export function Compression(options: CompressionOptions = {}): Middleware {
             // Don't compress if already compressed
             if (response.headers.has("Content-Encoding")) return response;
 
-            // Check Content-Type (optional, mostly text/json/xml)
-            // For now, let's just compress if we can read the body easily.
+            // Optimized path: use raw body from context if available
+            let body: ArrayBuffer;
+            let bodySize: number;
 
-            // Cloning response to read body
-            // Note: This might be expensive for streams. 
-            // We only support basic compression for now (string/buffer bodies).
-            // If body is a ReadableStream, Bun.gzip/deflateSync won't work directly on it mostly.
+            if (ctx._rawBody !== undefined) {
+                // Fast path: we have the raw body from ctx.json() or ctx.text()
+                if (typeof ctx._rawBody === "string") {
+                    const encoded = new TextEncoder().encode(ctx._rawBody);
+                    body = encoded.buffer as ArrayBuffer;
+                    bodySize = encoded.byteLength;
+                } else if (ctx._rawBody instanceof Uint8Array) {
+                    body = ctx._rawBody.buffer as ArrayBuffer;
+                    bodySize = ctx._rawBody.byteLength;
+                } else {
+                    body = ctx._rawBody;
+                    bodySize = ctx._rawBody.byteLength;
+                }
+            } else {
+                // Fallback: read from response (slower)
+                body = await response.arrayBuffer();
+                bodySize = body.byteLength;
+            }
 
-            // Let's try to read as ArrayBuffer
-            const body = await response.arrayBuffer();
-
-            if (body.byteLength < threshold) {
-                // Return new response with original body because we consumed it
-                // Do NOT set Content-Encoding as we are not compressing
+            if (bodySize < threshold) {
+                // Don't compress, but we consumed the body so recreate the response
                 return new Response(body, {
                     status: response.status,
                     statusText: response.statusText,
@@ -54,10 +65,9 @@ export function Compression(options: CompressionOptions = {}): Middleware {
             }
 
             let compressed: Uint8Array;
+
             switch (method) {
                 case "br":
-                    // Configurable params could be added later
-                    const zlib = require("node:zlib");
                     compressed = await new Promise((res, rej) => zlib.brotliCompress(body, {
                         params: {
                             [zlib.constants.BROTLI_PARAM_QUALITY]: 4,
@@ -68,13 +78,19 @@ export function Compression(options: CompressionOptions = {}): Middleware {
                     }));
                     break;
                 case "gzip":
-                    compressed = Bun.gzipSync(body);
+                    compressed = await new Promise((res, rej) => zlib.gzip(body, (err, data) => {
+                        if (err) return rej(err);
+                        res(data);
+                    }));
                     break;
                 case "zstd":
                     compressed = await Bun.zstdCompress(body);
                     break;
-                default:
-                    compressed = Bun.deflateSync(body);
+                default: // deflate
+                    compressed = await new Promise((res, rej) => zlib.deflate(body, (err, data) => {
+                        if (err) return rej(err);
+                        res(data);
+                    }));
                     break;
             }
 
@@ -87,10 +103,6 @@ export function Compression(options: CompressionOptions = {}): Middleware {
                 statusText: response.statusText,
                 headers
             });
-        }
-        else {
-            // Pass through non-Response values (e.g. undefined, or raw objects)
-            // The application or other middleware might handle them.
         }
 
         return response;

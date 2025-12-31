@@ -31,6 +31,7 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     public readonly response: ShokupanResponse;
     public _debug?: DebugCollector;
     public _finalResponse?: Response;
+    public _rawBody?: string | ArrayBuffer | Uint8Array; // Raw body for compression optimization
 
     constructor(
         public readonly request: ShokupanRequest<any>,
@@ -242,6 +243,12 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     public send(body?: BodyInit, options?: ResponseInit) {
         const headers = this.mergeHeaders(options?.headers as any);
         const status = options?.status ?? this.response.status;
+
+        // Store raw body for compression middleware
+        if (typeof body === "string" || body instanceof ArrayBuffer || body instanceof Uint8Array) {
+            this._rawBody = body;
+        }
+
         this._finalResponse = new Response(body, { status, headers });
         return this._finalResponse;
     }
@@ -267,6 +274,9 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
         const finalStatus = status ?? this.response.status;
         const jsonString = JSON.stringify(data);
 
+        // Store raw body for compression middleware
+        this._rawBody = jsonString;
+
         // Fast path: no custom headers and no response headers set
         if (!headers && !this.response.hasPopulatedHeaders) {
             this._finalResponse = new Response(jsonString, {
@@ -289,18 +299,21 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     text(data: string, status?: number, headers?: HeadersInit) {
         const finalStatus = status ?? this.response.status;
 
+        // Store raw body for compression middleware
+        this._rawBody = data;
+
         // Fast path: no custom headers and no response headers set
         if (!headers && !this.response.hasPopulatedHeaders) {
             this._finalResponse = new Response(data, {
                 status: finalStatus,
-                headers: { "content-type": "text/plain" }
+                headers: { "content-type": "text/plain; charset=utf-8" }
             });
             return this._finalResponse;
         }
 
         // Slow path: merge headers
         const finalHeaders = this.mergeHeaders(headers);
-        finalHeaders.set("content-type", "text/plain");
+        finalHeaders.set("content-type", "text/plain; charset=utf-8");
         this._finalResponse = new Response(data, { status: finalStatus, headers: finalHeaders });
         return this._finalResponse;
     }
@@ -309,9 +322,13 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
      * Respond with HTML content
      */
     html(html: string, status?: number, headers?: HeadersInit) {
-        const finalHeaders = this.mergeHeaders(headers);
-        finalHeaders.set("content-type", "text/html");
         const finalStatus = status ?? this.response.status;
+        const finalHeaders = this.mergeHeaders(headers);
+        finalHeaders.set("content-type", "text/html; charset=utf-8");
+
+        // Store raw body for compression middleware
+        this._rawBody = html;
+
         this._finalResponse = new Response(html, { status: finalStatus, headers: finalHeaders });
         return this._finalResponse;
     }
@@ -363,6 +380,6 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
         }
 
         const html = await this.renderer(element, args);
-        return this.html(html, status, headers);
+        return this.html(html, status, headers); // html() already stores _rawBody
     }
 }
