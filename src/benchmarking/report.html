@@ -4,17 +4,92 @@
 <head>
     <title>Benchmark Results</title>
     <style>
-        body { font-family: system-ui, sans-serif; padding: 20px; }
-        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        h2 { margin-top: 30px; }
+        :root {
+            --bg-color: #1a1b1e;
+            --text-color: #e4e5e7;
+            --table-bg: #25262b;
+            --table-border: #373a40;
+            --primary-color: #339af0;
+            --header-bg: #2c2e33;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: system-ui, -apple-system, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(45deg, #339af0, #51cf66);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        h2 {
+            margin-top: 40px;
+            border-bottom: 1px solid var(--table-border);
+            padding-bottom: 10px;
+            font-size: 1.5rem;
+            color: #fff;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            background-color: var(--table-bg);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            margin-bottom: 2rem;
+        }
+
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--table-border);
+        }
+
+        th {
+            background-color: var(--header-bg);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+            color: var(--primary-color);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background-color: rgba(255, 255, 255, 0.03);
+        }
+
+        .meta {
+            color: #909296;
+            font-size: 0.9rem;
+            margin-bottom: 40px;
+        }
     </style>
 </head>
 <body>
-    <h1>Benchmark Results</h1>
-    <p>Generated on 12/30/2025, 8:40:49 AM</p>
-    <h2>shokupan</h2>
+    <div class="container">
+        <h1>Benchmark Results</h1>
+        <p class="meta">Generated on 12/30/2025, 8:07:14 PM</p>
+        <h2>shokupan</h2>
         <table>
             <thead>
                 <tr>
@@ -29,44 +104,44 @@
                         <tr>
                             <td>bun</td>
                             <td>static</td>
-                            <td>164134.40</td>
-                            <td>0.10</td>
-                            <td>17.69 MB/s</td>
+                            <td>175065.60</td>
+                            <td>0.07</td>
+                            <td>18.86 MB/s</td>
                         </tr>
                         <tr>
                             <td>bun</td>
                             <td>json</td>
-                            <td>144582.40</td>
-                            <td>0.15</td>
-                            <td>72.66 MB/s</td>
+                            <td>178649.60</td>
+                            <td>0.06</td>
+                            <td>89.81 MB/s</td>
                         </tr>
                         <tr>
                             <td>bun</td>
                             <td>dynamic/123</td>
-                            <td>177600.00</td>
-                            <td>0.06</td>
-                            <td>21.17 MB/s</td>
+                            <td>186508.80</td>
+                            <td>0.05</td>
+                            <td>22.23 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>static</td>
-                            <td>179340.80</td>
-                            <td>0.06</td>
-                            <td>19.33 MB/s</td>
+                            <td>188659.20</td>
+                            <td>0.05</td>
+                            <td>20.34 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>json</td>
-                            <td>169331.20</td>
-                            <td>0.07</td>
-                            <td>85.11 MB/s</td>
+                            <td>179980.80</td>
+                            <td>0.06</td>
+                            <td>90.46 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>dynamic/123</td>
-                            <td>177523.20</td>
-                            <td>0.06</td>
-                            <td>21.16 MB/s</td>
+                            <td>189964.80</td>
+                            <td>0.05</td>
+                            <td>22.65 MB/s</td>
                         </tr></tbody></table><h2>fastify</h2>
         <table>
             <thead>
@@ -82,44 +157,44 @@
                         <tr>
                             <td>bun</td>
                             <td>static</td>
-                            <td>151404.80</td>
-                            <td>0.13</td>
-                            <td>18.48 MB/s</td>
+                            <td>165209.60</td>
+                            <td>0.10</td>
+                            <td>20.17 MB/s</td>
                         </tr>
                         <tr>
                             <td>bun</td>
                             <td>json</td>
-                            <td>136300.80</td>
-                            <td>0.17</td>
-                            <td>70.44 MB/s</td>
+                            <td>156992.00</td>
+                            <td>0.11</td>
+                            <td>81.16 MB/s</td>
                         </tr>
                         <tr>
                             <td>bun</td>
                             <td>dynamic/123</td>
-                            <td>151872.00</td>
-                            <td>0.12</td>
-                            <td>20.28 MB/s</td>
+                            <td>169177.60</td>
+                            <td>0.09</td>
+                            <td>22.59 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>static</td>
-                            <td>144646.40</td>
-                            <td>0.15</td>
-                            <td>17.66 MB/s</td>
+                            <td>154950.40</td>
+                            <td>0.13</td>
+                            <td>18.91 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>json</td>
-                            <td>140652.80</td>
-                            <td>0.15</td>
-                            <td>72.71 MB/s</td>
+                            <td>150668.80</td>
+                            <td>0.12</td>
+                            <td>77.89 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>dynamic/123</td>
-                            <td>156710.40</td>
+                            <td>161318.40</td>
                             <td>0.11</td>
-                            <td>20.92 MB/s</td>
+                            <td>21.54 MB/s</td>
                         </tr></tbody></table><h2>express</h2>
         <table>
             <thead>
@@ -135,44 +210,44 @@
                         <tr>
                             <td>bun</td>
                             <td>static</td>
-                            <td>79369.61</td>
-                            <td>0.62</td>
-                            <td>14.46 MB/s</td>
+                            <td>76313.61</td>
+                            <td>0.66</td>
+                            <td>13.90 MB/s</td>
                         </tr>
                         <tr>
                             <td>bun</td>
                             <td>json</td>
-                            <td>73923.20</td>
-                            <td>0.73</td>
-                            <td>42.86 MB/s</td>
+                            <td>72060.80</td>
+                            <td>0.75</td>
+                            <td>41.79 MB/s</td>
                         </tr>
                         <tr>
                             <td>bun</td>
                             <td>dynamic/123</td>
-                            <td>84483.20</td>
-                            <td>0.55</td>
-                            <td>16.44 MB/s</td>
+                            <td>74057.61</td>
+                            <td>0.79</td>
+                            <td>14.40 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>static</td>
-                            <td>58947.20</td>
-                            <td>1.14</td>
-                            <td>10.74 MB/s</td>
+                            <td>69868.80</td>
+                            <td>0.81</td>
+                            <td>12.72 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>json</td>
-                            <td>61628.80</td>
-                            <td>1.07</td>
-                            <td>35.75 MB/s</td>
+                            <td>71747.20</td>
+                            <td>0.76</td>
+                            <td>41.60 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>dynamic/123</td>
-                            <td>79561.61</td>
-                            <td>0.62</td>
-                            <td>15.47 MB/s</td>
+                            <td>81628.80</td>
+                            <td>0.60</td>
+                            <td>15.88 MB/s</td>
                         </tr></tbody></table><h2>koa</h2>
         <table>
             <thead>
@@ -188,44 +263,44 @@
                         <tr>
                             <td>bun</td>
                             <td>static</td>
-                            <td>34473.60</td>
-                            <td>2.38</td>
-                            <td>4.21 MB/s</td>
+                            <td>57710.40</td>
+                            <td>1.17</td>
+                            <td>7.04 MB/s</td>
                         </tr>
                         <tr>
                             <td>bun</td>
                             <td>json</td>
-                            <td>52208.00</td>
-                            <td>1.39</td>
-                            <td>26.99 MB/s</td>
+                            <td>54051.20</td>
+                            <td>1.31</td>
+                            <td>27.94 MB/s</td>
                         </tr>
                         <tr>
                             <td>bun</td>
                             <td>dynamic/123</td>
-                            <td>50147.20</td>
-                            <td>1.48</td>
-                            <td>6.70 MB/s</td>
+                            <td>54416.00</td>
+                            <td>1.31</td>
+                            <td>7.27 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>static</td>
-                            <td>43211.20</td>
-                            <td>1.80</td>
-                            <td>5.27 MB/s</td>
+                            <td>34422.40</td>
+                            <td>2.38</td>
+                            <td>4.20 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>json</td>
-                            <td>47505.60</td>
-                            <td>1.58</td>
-                            <td>24.55 MB/s</td>
+                            <td>50835.20</td>
+                            <td>1.44</td>
+                            <td>26.28 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>dynamic/123</td>
-                            <td>48572.80</td>
-                            <td>1.54</td>
-                            <td>6.48 MB/s</td>
+                            <td>59945.60</td>
+                            <td>1.13</td>
+                            <td>8.00 MB/s</td>
                         </tr></tbody></table><h2>hapi</h2>
         <table>
             <thead>
@@ -241,44 +316,44 @@
                         <tr>
                             <td>bun</td>
                             <td>static</td>
-                            <td>31243.20</td>
-                            <td>2.72</td>
-                            <td>5.18 MB/s</td>
+                            <td>28720.00</td>
+                            <td>2.99</td>
+                            <td>4.76 MB/s</td>
                         </tr>
                         <tr>
                             <td>bun</td>
                             <td>json</td>
-                            <td>32193.60</td>
-                            <td>2.62</td>
-                            <td>18.09 MB/s</td>
+                            <td>36584.00</td>
+                            <td>2.26</td>
+                            <td>20.55 MB/s</td>
                         </tr>
                         <tr>
                             <td>bun</td>
                             <td>dynamic/123</td>
-                            <td>39894.40</td>
-                            <td>2.02</td>
-                            <td>7.08 MB/s</td>
+                            <td>38243.20</td>
+                            <td>2.13</td>
+                            <td>6.79 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>static</td>
-                            <td>34972.81</td>
-                            <td>2.37</td>
-                            <td>5.80 MB/s</td>
+                            <td>36091.20</td>
+                            <td>2.28</td>
+                            <td>5.99 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>json</td>
-                            <td>32468.80</td>
-                            <td>2.59</td>
-                            <td>18.23 MB/s</td>
+                            <td>34057.60</td>
+                            <td>2.45</td>
+                            <td>19.13 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>dynamic/123</td>
-                            <td>34808.00</td>
-                            <td>2.39</td>
-                            <td>6.17 MB/s</td>
+                            <td>36884.81</td>
+                            <td>2.23</td>
+                            <td>6.54 MB/s</td>
                         </tr></tbody></table><h2>nest</h2>
         <table>
             <thead>
@@ -294,44 +369,44 @@
                         <tr>
                             <td>bun</td>
                             <td>static</td>
-                            <td>41430.40</td>
-                            <td>1.91</td>
-                            <td>7.55 MB/s</td>
+                            <td>34475.20</td>
+                            <td>2.41</td>
+                            <td>6.28 MB/s</td>
                         </tr>
                         <tr>
                             <td>bun</td>
                             <td>json</td>
-                            <td>41921.60</td>
-                            <td>1.91</td>
-                            <td>24.31 MB/s</td>
+                            <td>43182.40</td>
+                            <td>1.84</td>
+                            <td>25.04 MB/s</td>
                         </tr>
                         <tr>
                             <td>bun</td>
                             <td>dynamic/123</td>
-                            <td>36590.40</td>
-                            <td>2.25</td>
-                            <td>7.12 MB/s</td>
+                            <td>36222.40</td>
+                            <td>2.28</td>
+                            <td>7.05 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>static</td>
-                            <td>46923.20</td>
-                            <td>1.64</td>
-                            <td>8.55 MB/s</td>
+                            <td>51529.60</td>
+                            <td>1.43</td>
+                            <td>9.39 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>json</td>
-                            <td>34244.81</td>
-                            <td>2.44</td>
-                            <td>19.86 MB/s</td>
+                            <td>44476.80</td>
+                            <td>1.76</td>
+                            <td>25.79 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>dynamic/123</td>
-                            <td>40284.81</td>
-                            <td>1.99</td>
-                            <td>7.84 MB/s</td>
+                            <td>36158.40</td>
+                            <td>2.27</td>
+                            <td>7.04 MB/s</td>
                         </tr></tbody></table><h2>hono</h2>
         <table>
             <thead>
@@ -347,44 +422,44 @@
                         <tr>
                             <td>bun</td>
                             <td>static</td>
-                            <td>153920.00</td>
-                            <td>0.10</td>
-                            <td>18.64 MB/s</td>
+                            <td>171865.60</td>
+                            <td>0.06</td>
+                            <td>20.81 MB/s</td>
                         </tr>
                         <tr>
                             <td>bun</td>
                             <td>json</td>
-                            <td>157190.40</td>
-                            <td>0.10</td>
-                            <td>79.01 MB/s</td>
+                            <td>169792.00</td>
+                            <td>0.07</td>
+                            <td>85.33 MB/s</td>
                         </tr>
                         <tr>
                             <td>bun</td>
                             <td>dynamic/123</td>
-                            <td>154560.00</td>
-                            <td>0.10</td>
-                            <td>20.49 MB/s</td>
+                            <td>176704.00</td>
+                            <td>0.06</td>
+                            <td>23.43 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>static</td>
-                            <td>151641.60</td>
-                            <td>0.10</td>
-                            <td>18.36 MB/s</td>
+                            <td>173043.20</td>
+                            <td>0.06</td>
+                            <td>20.96 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>json</td>
-                            <td>147084.80</td>
-                            <td>0.12</td>
-                            <td>73.93 MB/s</td>
+                            <td>170585.60</td>
+                            <td>0.07</td>
+                            <td>85.73 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>dynamic/123</td>
-                            <td>151846.40</td>
-                            <td>0.10</td>
-                            <td>20.12 MB/s</td>
+                            <td>176448.00</td>
+                            <td>0.06</td>
+                            <td>23.39 MB/s</td>
                         </tr></tbody></table><h2>elysia</h2>
         <table>
             <thead>
@@ -400,44 +475,45 @@
                         <tr>
                             <td>bun</td>
                             <td>static</td>
-                            <td>141734.40</td>
-                            <td>0.14</td>
-                            <td>17.17 MB/s</td>
+                            <td>158630.40</td>
+                            <td>0.09</td>
+                            <td>19.21 MB/s</td>
                         </tr>
                         <tr>
                             <td>bun</td>
                             <td>json</td>
-                            <td>152921.60</td>
-                            <td>0.10</td>
-                            <td>76.86 MB/s</td>
+                            <td>164723.21</td>
+                            <td>0.07</td>
+                            <td>82.79 MB/s</td>
                         </tr>
                         <tr>
                             <td>bun</td>
                             <td>dynamic/123</td>
-                            <td>147385.60</td>
-                            <td>0.12</td>
-                            <td>19.53 MB/s</td>
+                            <td>160012.80</td>
+                            <td>0.09</td>
+                            <td>21.21 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>static</td>
-                            <td>138003.21</td>
-                            <td>0.15</td>
-                            <td>16.72 MB/s</td>
+                            <td>159961.60</td>
+                            <td>0.09</td>
+                            <td>19.37 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>json</td>
-                            <td>155123.21</td>
-                            <td>0.09</td>
-                            <td>77.97 MB/s</td>
+                            <td>166822.40</td>
+                            <td>0.07</td>
+                            <td>83.83 MB/s</td>
                         </tr>
                         <tr>
                             <td>node</td>
                             <td>dynamic/123</td>
-                            <td>136032.00</td>
-                            <td>0.16</td>
-                            <td>18.03 MB/s</td>
+                            <td>160320.00</td>
+                            <td>0.08</td>
+                            <td>21.25 MB/s</td>
                         </tr></tbody></table>
+    </div>
 </body>
 </html>

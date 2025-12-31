@@ -58,13 +58,30 @@ Execute the full benchmark suite:
 ```bash
 bun run test
 ```
+or directly via the runner:
+```bash
+bun runner.ts
+```
 
-This will:
+### Options
 
-1. Compile all framework cases for Node.js compatibility
-2. Run benchmarks for each framework × runtime × endpoint combination
-3. Generate an HTML report at `report.html`
-4. Automatically open the report in your default browser
+**Filter by Framework**
+
+To run benchmarks for a specific framework only, use the `--filter` flag:
+
+```bash
+bun runner.ts --filter shokupan
+```
+
+This is useful for quick testing during development.
+
+### Reports and History
+
+The runner automatically generates an interactive HTML report at `report.html`.
+
+- **Sorting**: Frameworks are sorted by performance (Best Requests/Sec) by default.
+- **History**: The report includes tabs for the last 10 benchmark runs, allowing you to track performance changes over time. Results are persisted in `benchmark-results.json`.
+- **Auto-Open**: The report will automatically open in your default browser after the benchmark completes.
 
 ## Project Structure
 
