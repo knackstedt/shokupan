@@ -548,9 +548,17 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         };
     }
 
-    private applyHooks(match: { handler: ShokupanHandler<T>; params: Record<string, string>; }) {
+    private applyRouterHooks(match: { handler: ShokupanHandler<T>; params: Record<string, string>; }) {
         if (!this.config?.hooks) return match;
         const hooks = this.config.hooks;
+        // Re-use static helper or method to avoid code duplication with add()
+        return {
+            ...match,
+            handler: this.wrapWithHooks(match.handler, hooks)
+        };
+    }
+
+    private wrapWithHooks(handler: ShokupanHandler<T>, hooks: ShokupanHooks | ShokupanHooks[]) {
         const hookList = Array.isArray(hooks) ? hooks : [hooks];
 
         // Optimize: Check if any relevant hooks are actually defined
@@ -558,10 +566,11 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         const hasEnd = hookList.some(h => !!h.onRequestEnd);
         const hasError = hookList.some(h => !!h.onError);
 
-        if (!hasStart && !hasEnd && !hasError) return match;
-        const originalHandler = match.handler;
+        if (!hasStart && !hasEnd && !hasError) return handler;
 
-        match.handler = async (ctx: ShokupanContext<T>) => {
+        const originalHandler = handler;
+
+        const wrapped = async (ctx: ShokupanContext<T>) => {
             if (hasStart) {
                 for (let i = 0; i < hookList.length; i++) {
                     const h = hookList[i];
@@ -574,10 +583,11 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             let previousNode: string | undefined;
 
             if (debug) {
-                debugId = (originalHandler as any)._debugId || originalHandler.name || 'handler';
+                // @ts-ignore
+                debugId = originalHandler._debugId || originalHandler.name || 'handler';
                 previousNode = debug.getCurrentNode();
                 debug.trackEdge(previousNode, debugId);
-                debug.setNode(debugId);
+                debug.setNode(debugId!);
             }
 
             const start = performance.now();
@@ -603,9 +613,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             }
         };
         // Preserve original handler reference for analysis if needed
-        (match.handler as any).originalHandler = (originalHandler as any).originalHandler ?? originalHandler;
-
-        return match;
+        (wrapped as any).originalHandler = (originalHandler as any).originalHandler ?? originalHandler;
+        return wrapped;
     }
 
     /**
@@ -628,7 +637,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                     route.keys.forEach((key: string, index: number) => {
                         params[key] = match[index + 1];
                     });
-                    return this.applyHooks({ handler: route.handler, params });
+                    return { handler: route.bakedHandler || route.handler, params };
                 }
             }
             return null;
@@ -652,14 +661,14 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             if (path === prefix || path.startsWith(prefix + "/")) {
                 const subPath = path.slice(prefix.length) || "/";
                 const match = child.find(method, subPath);
-                if (match) return this.applyHooks(match);
+                if (match) return this.applyRouterHooks(match);
             }
             // Handle case where prefix ends with /
             if (prefix.endsWith("/")) {
                 if (path.startsWith(prefix)) {
                     const subPath = path.slice(prefix.length) || "/";
                     const match = child.find(method, subPath);
-                    if (match) return this.applyHooks(match);
+                    if (match) return this.applyRouterHooks(match);
                 }
             }
         }
@@ -839,12 +848,21 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         (wrappedHandler as any).originalHandler = (trackingHandler as any).originalHandler || trackingHandler;
         // ---------------------------------
 
+        // ---------------------------------
+
+        // Bake in Hooks if present (Optimization)
+        let bakedHandler = wrappedHandler;
+        if (this.config?.hooks) {
+            bakedHandler = this.wrapWithHooks(wrappedHandler, this.config.hooks);
+        }
+
         this[$routes].push({
             method,
             path,
             regex,
             keys,
             handler: wrappedHandler,
+            bakedHandler,
             handlerSpec: spec,
             group,
             guards: routeGuards.length > 0 ? routeGuards : undefined,
