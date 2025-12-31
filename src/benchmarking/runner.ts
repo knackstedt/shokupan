@@ -195,6 +195,20 @@ async function runBenchmark(framework: string, runtime: string) {
 }
 
 async function main() {
+    if (args.includes("--report-only")) {
+        console.log("Generating report from existing history...");
+        let history: HistoryEntry[] = [];
+        if (fs.existsSync(HISTORY_PATH)) {
+            try {
+                history = JSON.parse(fs.readFileSync(HISTORY_PATH, "utf8"));
+            } catch (e) {
+                console.error("Failed to parse history.");
+            }
+        }
+        generateReport(history);
+        return;
+    }
+
     let targetFrameworks = FRAMEWORKS;
 
     if (filter) {
@@ -259,241 +273,594 @@ async function main() {
 function generateReport(history: HistoryEntry[]) {
     // We reverse history so index 0 is the Latest
     const sortedHistory = [...history].reverse();
-
-    const generateTable = (results: FrameworkResults) => {
-        // Sort frameworks by "Performance Score" (Max Requests/Sec across all variants)
-        const sortedFrameworks = Object.keys(results).sort((a, b) => {
-            const getMaxReq = (fw: string) => {
-                let max = 0;
-                for (const rt of RUNTIMES) {
-                    const rtRes = results[fw]?.[rt];
-                    if (!rtRes || (rtRes as any).error) continue;
-                    for (const ep of ENDPOINTS) {
-                        const val = (rtRes as any)[ep]?.requests || 0;
-                        if (val > max) max = val;
-                    }
-                }
-                return max;
-            };
-            return getMaxReq(b) - getMaxReq(a);
-        });
-
-        let tableRows = "";
-        for (const fw of sortedFrameworks) {
-            tableRows += `<h2>${fw}</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Runtime</th>
-                        <th>Endpoint</th>
-                        <th>Req/s (Avg)</th>
-                        <th>Latency (Avg ms)</th>
-                        <th>Throughput (Avg bytes/s)</th>
-                    </tr>
-                </thead>
-                <tbody>`;
-
-            for (const rt of RUNTIMES) {
-                const res = results[fw][rt];
-                if (!res || (res as any).error) {
-                    // Only show error if we expected results for this framework (it exists in the results object)
-                    // If this is a filtered run and framework is missing, it won't be in sortedFrameworks anyway.
-                    if (res) {
-                        tableRows += `<tr><td>${rt}</td><td colspan="4">Error: ${(res as any)?.error || 'Unknown'}</td></tr>`;
-                    } else {
-                        tableRows += `<tr><td>${rt}</td><td colspan="4">No Data</td></tr>`;
-
-                    }
-                    continue;
-                }
-
-                for (const ep of ENDPOINTS) {
-                    const epRes = (res as any)[ep];
-                    tableRows += `
-                            <tr>
-                                <td>${rt}</td>
-                                <td>${ep}</td>
-                                <td>${epRes?.requests?.toFixed(2) || '-'}</td>
-                                <td>${epRes?.latency?.toFixed(2) || '-'}</td>
-                                <td>${(epRes?.throughput ? (epRes.throughput / 1024 / 1024).toFixed(2) + ' MB/s' : '-')}</td>
-                            </tr>`;
-                }
-            }
-            tableRows += `</tbody></table>`;
-        }
-        return tableRows;
-    };
-
-    const tabsNav = sortedHistory.map((entry, idx) => {
-        const date = new Date(entry.timestamp).toLocaleString();
-        const active = idx === 0 ? 'active' : '';
-        return `<button class="tab-btn ${active}" onclick="openTab(event, 'run-${entry.timestamp}')">${date} ${idx === 0 ? '(Latest)' : ''}</button>`;
-    }).join("");
-
-    const tabsContent = sortedHistory.map((entry, idx) => {
-        const display = idx === 0 ? 'block' : 'none';
-        return `<div id="run-${entry.timestamp}" class="tab-content" style="display: ${display};">
-            ${generateTable(entry.results)}
-        </div>`;
-    }).join("");
-
+    // Embed the data for client-side processing
+    const historyJson = JSON.stringify(sortedHistory);
 
     const html = `
 <!DOCTYPE html>
 <html>
 <head>
     <title>Benchmark Results</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --bg-color: #1a1b1e;
             --text-color: #e4e5e7;
-            --table-bg: #25262b;
-            --table-border: #373a40;
+            --card-bg: #25262b;
+            --border-color: #373a40;
             --primary-color: #339af0;
-            --header-bg: #2c2e33;
-            --tab-active-bg: #339af0;
-            --tab-inactive-bg: #2c2e33;
+            --success-color: #51cf66;
+            --accent-color: #cc5de8;
         }
 
         body {
             background-color: var(--bg-color);
             color: var(--text-color);
             font-family: system-ui, -apple-system, sans-serif;
-            line-height: 1.6;
             margin: 0;
-            padding: 40px 20px;
+            padding: 20px;
         }
 
         .container {
-            max-width: 1000px;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
         h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            background: linear-gradient(45deg, #339af0, #51cf66);
+            background: linear-gradient(45deg, var(--primary-color), var(--success-color));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            margin-bottom: 20px;
         }
 
-        h2 {
-            margin-top: 40px;
-            border-bottom: 1px solid var(--table-border);
-            padding-bottom: 10px;
-            font-size: 1.5rem;
-            color: #fff;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            background-color: var(--table-bg);
+        .controls {
+            background: var(--card-bg);
+            padding: 20px;
             border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-            margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
         }
 
-        th, td {
-            padding: 12px 16px;
-            text-align: left;
-            border-bottom: 1px solid var(--table-border);
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
         }
 
-        th {
-            background-color: var(--header-bg);
-            font-weight: 600;
-            text-transform: uppercase;
-            font-size: 0.85rem;
-            letter-spacing: 0.5px;
-            color: var(--primary-color);
-        }
-
-        tr:last-child td {
-            border-bottom: none;
-        }
-
-        tr:hover td {
-            background-color: rgba(255, 255, 255, 0.03);
-        }
-
-        .meta {
-            color: #909296;
+        label {
             font-size: 0.9rem;
+            color: #909296;
+            font-weight: 600;
+        }
+
+        select {
+            background: var(--bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 1rem;
+            min-width: 200px;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
             margin-bottom: 40px;
         }
 
-        /* Tabs */
-        .tabs-nav {
-            margin-bottom: 20px;
-            display: flex;
-            gap: 10px;
-            overflow-x: auto;
-            padding-bottom: 10px;
+        .chart-container {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            position: relative;
+            height: 350px;
+        }
+        
+        .chart-container.full-width {
+            grid-column: span 2;
         }
 
-        .tab-btn {
-            background-color: var(--tab-inactive-bg);
-            color: var(--text-color);
-            border: 1px solid var(--table-border);
-            padding: 8px 16px;
-            cursor: pointer;
-            border-radius: 4px;
-            white-space: nowrap;
+        h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.1rem;
+            color: #c1c2c5;
         }
 
-        .tab-btn:hover {
-            background-color: #3b3e45;
+        /* Table styles */
+        .table-container {
+             background: var(--card-bg);
+             border: 1px solid var(--border-color);
+             border-radius: 8px;
+             overflow: hidden;
+             margin-top: 20px;
         }
-
-        .tab-btn.active {
-            background-color: var(--tab-active-bg);
-            color: white;
-            border-color: var(--tab-active-bg);
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
         }
-
-        .tab-content {
-            animation: fadeEffect 0.5s;
+        
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
         }
-
-        @keyframes fadeEffect {
-            from {opacity: 0;}
-            to {opacity: 1;}
+        
+        th {
+            background: #2c2e33;
+            color: var(--primary-color);
+            font-weight: 600;
+            font-size: 0.9rem;
         }
+        
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: rgba(255,255,255,0.03); }
 
     </style>
-    <script>
-        function openTab(evt, tabId) {
-            var i, tabcontent, tablinks;
-            tabcontent = document.getElementsByClassName("tab-content");
-            for (i = 0; i < tabcontent.length; i++) {
-                tabcontent[i].style.display = "none";
-            }
-            tablinks = document.getElementsByClassName("tab-btn");
-            for (i = 0; i < tablinks.length; i++) {
-                tablinks[i].className = tablinks[i].className.replace(" active", "");
-            }
-            document.getElementById(tabId).style.display = "block";
-            evt.currentTarget.className += " active";
-        }
-    </script>
 </head>
 <body>
     <div class="container">
-        <h1>Benchmark Results</h1>
-        <p class="meta">Viewing Report</p>
+        <h1>Benchmark Report</h1>
         
-        <div class="tabs-nav">
-            ${tabsNav}
+        <div class="controls">
+            <div class="control-group">
+                <label>Endpoint (Request Name)</label>
+                <select id="endpointFilter">
+                     <option value="all">All (Average)</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Compare Runtime</label>
+                <select id="runtimeFilter">
+                    <option value="all">All (Bun vs Node)</option>
+                    <option value="bun">Bun Only</option>
+                    <option value="node">Node Only</option>
+                </select>
+            </div>
         </div>
 
-        ${tabsContent}
+        <div class="charts-grid">
+            <div class="chart-container">
+                <h3>Requests / Second (Higher is better)</h3>
+                <canvas id="reqSecChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3>Throughput (MB/s) (Higher is better)</h3>
+                <canvas id="throughputChart"></canvas>
+            </div>
+            <div class="chart-container full-width">
+                 <h3>Runtime Comparison (Bun vs Node) - Req/Sec</h3>
+                 <canvas id="runtimeCompChart"></canvas>
+            </div>
+             <div class="chart-container full-width">
+                 <h3>Run-to-Run Trend (Req/Sec Delta)</h3>
+                 <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+        
+        <h3>Detailed Results (Latest Run)</h3>
+        <div class="table-container">
+            <table id="detailsTable">
+                <thead>
+                    <tr>
+                        <th>Framework</th>
+                        <th>Runtime</th>
+                        <th>Endpoint</th>
+                        <th>Req/s</th>
+                        <th>Latency (ms)</th>
+                        <th>Throughput (MB/s)</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
     </div>
+
+    <script>
+        const historyData = ${historyJson};
+        
+        // Designated colors for frameworks
+        const frameworkColors = {
+            'shokupan': '#339af0', // Blue
+            'fastify': '#20c997',  // Teal
+            'express': '#ff6b6b',  // Red
+            'koa': '#845ef7',      // Violet
+            'hapi': '#fcc419',     // Yellow
+            'nest': '#ff922b',     // Orange
+            'hono': '#fd7e14',     // OrangeRed
+            'elysia': '#cc5de8',   // Grape
+            'default': '#adb5bd'   // Grey
+        };
+        
+        function getColor(framework, runtime, options = {}) {
+            const base = frameworkColors[framework] || frameworkColors['default'];
+            
+            // Bun = Solid Color
+            // Node = Pattern/Different Style
+            // Since we can't easily do hatched patterns without canvas API fuss, 
+            // we will use opacity or slight color shift.
+            // Requirement: "apply a different style for node/bun"
+            
+            if (runtime === 'bun') {
+                 // Bun is "Pure" / Solid
+                 return options.opacity ? addAlpha(base, options.opacity) : base;
+            } else {
+                 // Node is "Faded" / "Ghost" style to differentiate
+                 // Or we can make it darker. Let's make it 50% opacity border with clear center? 
+                 // Chart.js supports 'backgroundColor' and 'borderColor'.
+                 // Let's return a color that is semi-transparent for Node.
+                 return addAlpha(base, 0.4); 
+            }
+        }
+        
+        function getBorderColor(framework, runtime) {
+             const base = frameworkColors[framework] || frameworkColors['default'];
+             // Both get solid borders to maintain visibility
+             return base;
+        }
+
+        function addAlpha(color, opacity) {
+            // hex to rgb
+            let c = color.substring(1).split('');
+            if(c.length== 3){
+                c= [c[0], c[0], c[1], c[1], c[2], c[2]];
+            }
+            c= '0x'+c.join('');
+            return 'rgba('+[(c>>16)&255, (c>>8)&255, c&255].join(',')+','+opacity+')';
+        }
+
+        // State
+        let currentEndpoint = 'all';
+        let currentRuntimeFilter = 'all';
+        
+        // Chart instances
+        let charts = {};
+
+        function init() {
+            // Populate Endpoint Filter
+            const latest = historyData[0];
+            const endpoints = new Set();
+            
+            // Scan latest run to find all available endpoints
+            Object.values(latest.results).forEach(frameworkRes => {
+                Object.values(frameworkRes).forEach(runtimeRes => {
+                    if (runtimeRes.error) return;
+                    Object.keys(runtimeRes).forEach(ep => {
+                        if (ep !== 'error' && ep !== 'requests' && ep !== 'latency' && ep !== 'throughput') {
+                            if (typeof runtimeRes[ep] === 'object') {
+                                endpoints.add(ep);
+                            }
+                        }
+                    });
+                });
+            });
+            
+            const epSelect = document.getElementById('endpointFilter');
+            const sortedEndpoints = Array.from(endpoints).sort();
+            
+            sortedEndpoints.forEach(ep => {
+                const opt = document.createElement('option');
+                opt.value = ep;
+                opt.innerText = ep;
+                epSelect.appendChild(opt);
+            });
+            
+            // Set initial state from HTML default
+            
+            // Event Listeners
+            epSelect.addEventListener('change', (e) => {
+                currentEndpoint = e.target.value;
+                updateView();
+            });
+            
+            document.getElementById('runtimeFilter').addEventListener('change', (e) => {
+                currentRuntimeFilter = e.target.value;
+                updateView();
+            });
+            
+            updateView();
+        }
+
+        function updateView() {
+            updateReqSecChart();
+            updateThroughputChart();
+            updateRuntimeCompChart();
+            updateTrendChart();
+            updateTable();
+        }
+        
+        function getLatestDataForEndpoint(endpointFilter) {
+           const latest = historyData[0];
+           const data = [];
+           
+           Object.entries(latest.results).forEach(([fwName, fwRes]) => {
+               const runtimes = currentRuntimeFilter === 'all' ? ['bun', 'node'] : [currentRuntimeFilter];
+               
+               runtimes.forEach(rt => {
+                   const runtimeRes = fwRes[rt];
+                   if (!runtimeRes || runtimeRes.error) return;
+
+                   let metric = { requests: 0, latency: 0, throughput: 0, count: 0 };
+                   
+                   if (endpointFilter === 'all') {
+                       // Average across all found endpoints
+                       Object.keys(runtimeRes).forEach(key => {
+                            if (key !== 'error' && typeof runtimeRes[key] === 'object') {
+                                const val = runtimeRes[key];
+                                metric.requests += val.requests || 0;
+                                metric.latency += val.latency || 0;
+                                metric.throughput += val.throughput || 0;
+                                metric.count++;
+                            }
+                       });
+                       if (metric.count > 0) {
+                           metric.requests /= metric.count;
+                           metric.latency /= metric.count;
+                           metric.throughput /= metric.count;
+                       }
+                   } else {
+                       const res = runtimeRes[endpointFilter];
+                       if (res) {
+                           metric.requests = res.requests;
+                           metric.latency = res.latency;
+                           metric.throughput = res.throughput;
+                       } else {
+                           return; // Endpoint doesn't exist for this fw
+                       }
+                   }
+                   
+                   data.push({
+                       framework: fwName,
+                       runtime: rt,
+                       requests: metric.requests,
+                       latency: metric.latency,
+                       throughput: metric.throughput
+                   });
+               });
+           });
+           
+           return data.sort((a, b) => b.requests - a.requests);
+        }
+
+        function createOrUpdateChart(id, type, config) {
+            const ctx = document.getElementById(id).getContext('2d');
+            if (charts[id]) { charts[id].destroy(); }
+            
+            charts[id] = new Chart(ctx, {
+                type: type,
+                data: config.data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#c1c2c5' } } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#373a40' },
+                            ticks: { color: '#909296' }
+                        },
+                        x: {
+                            grid: { color: '#373a40' },
+                            ticks: { color: '#909296' }
+                        }
+                    },
+                    ...config.options
+                }
+            });
+        }
+
+        function updateReqSecChart() {
+            const data = getLatestDataForEndpoint(currentEndpoint);
+            
+            const labels = data.map(d => \`\${d.framework} (\${d.runtime})\`);
+            const values = data.map(d => d.requests);
+            
+            // Apply color coding
+            const bgColors = data.map(d => getColor(d.framework, d.runtime));
+            const borderColors = data.map(d => getBorderColor(d.framework, d.runtime));
+
+            createOrUpdateChart('reqSecChart', 'bar', {
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Requests / Second',
+                        data: values,
+                        backgroundColor: bgColors,
+                        borderColor: borderColors,
+                        borderWidth: 2
+                    }]
+                }
+            });
+        }
+
+        function updateThroughputChart() {
+             const data = getLatestDataForEndpoint(currentEndpoint);
+            
+            const labels = data.map(d => \`\${d.framework} (\${d.runtime})\`);
+            const values = data.map(d => d.throughput / (1024 * 1024));
+            
+            const bgColors = data.map(d => getColor(d.framework, d.runtime));
+            const borderColors = data.map(d => getBorderColor(d.framework, d.runtime));
+
+            createOrUpdateChart('throughputChart', 'bar', {
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Throughput (MB/s)',
+                        data: values,
+                        backgroundColor: bgColors,
+                        borderColor: borderColors,
+                        borderWidth: 2
+                    }]
+                }
+            });
+        }
+        
+        function updateRuntimeCompChart() {
+            const latest = historyData[0];
+            const frameworks = Object.keys(latest.results).sort(); 
+            // Better to sort by performance of 'bun' + 'all' maybe? Or just alphabetical?
+            // Let's sort alphabetical for this comparison chart so it's consistent
+            
+            // Prepare datasets
+            const bunData = [];
+            const nodeData = [];
+            
+            // Helper to get value
+            const getVal = (fw, rt) => {
+                 const res = latest.results[fw]?.[rt];
+                 if (!res || res.error) return 0;
+                 if (currentEndpoint === 'all') {
+                     // avg
+                     let total = 0, count = 0;
+                      Object.keys(res).forEach(key => {
+                            if (key !== 'error' && typeof res[key] === 'object') {
+                                total += res[key].requests || 0;
+                                count++;
+                            }
+                       });
+                       return count ? total/count : 0;
+                 }
+                 return res[currentEndpoint]?.requests || 0;
+            };
+
+            frameworks.forEach(fw => {
+                bunData.push(getVal(fw, 'bun'));
+                nodeData.push(getVal(fw, 'node'));
+            });
+            
+            // We want color coding per bar, but this is a grouped bar chart with 2 datasets.
+            // Chart.js allows array of colors for 'backgroundColor'.
+            
+            const bunColors = frameworks.map(fw => getColor(fw, 'bun'));
+            const bunBorders = frameworks.map(fw => getBorderColor(fw, 'bun'));
+            
+            const nodeColors = frameworks.map(fw => getColor(fw, 'node'));
+            const nodeBorders = frameworks.map(fw => getBorderColor(fw, 'node'));
+
+            createOrUpdateChart('runtimeCompChart', 'bar', {
+                data: {
+                    labels: frameworks,
+                    datasets: [
+                        { 
+                            label: 'Bun', 
+                            data: bunData, 
+                            backgroundColor: bunColors,
+                            borderColor: bunBorders,
+                            borderWidth: 2
+                        },
+                        { 
+                            label: 'Node', 
+                            data: nodeData, 
+                            backgroundColor: nodeColors,
+                            borderColor: nodeBorders,
+                            borderWidth: 2,
+                            // Add a pattern fallback note in tooltip if possible, but distinct style is opacity 0.4
+                        }
+                    ]
+                }
+            });
+        }
+        
+        function updateTrendChart() {
+            const chronoHistory = [...historyData].reverse();
+            const labels = chronoHistory.map(h => new Date(h.timestamp).toLocaleTimeString());
+            const datasets = [];
+            
+            const combinations = [];
+            const latest = historyData[0];
+            Object.keys(latest.results).forEach(fw => {
+                 ['bun', 'node'].forEach(rt => {
+                     if (currentRuntimeFilter !== 'all' && currentRuntimeFilter !== rt) return;
+                     combinations.push({ fw, rt });
+                 });
+            });
+            
+            combinations.forEach((combo, idx) => {
+                const dataPoints = chronoHistory.map(entry => {
+                    const res = entry.results[combo.fw]?.[combo.rt];
+                    if (!res) return null;
+                    
+                    if (currentEndpoint === 'all') {
+                         let total = 0, count = 0;
+                         Object.keys(res).forEach(key => {
+                            if (key !== 'error' && typeof res[key] === 'object') {
+                                total += res[key].requests || 0;
+                                count++;
+                            }
+                       });
+                       return count ? total/count : null;
+                    }
+                    return res[currentEndpoint]?.requests || null;
+                });
+                
+                // Line Style
+                // Bun: Solid Line
+                // Node: Dashed Line
+                const borderDash = combo.rt === 'node' ? [5, 5] : [];
+                
+                datasets.push({
+                    label: \`\${combo.fw} (\${combo.rt})\`,
+                    data: dataPoints,
+                    borderColor: getBorderColor(combo.fw, combo.rt),
+                    backgroundColor: getColor(combo.fw, combo.rt), // for legend
+                    borderDash: borderDash,
+                    tension: 0.3,
+                    fill: false
+                });
+            });
+
+            createOrUpdateChart('trendChart', 'line', {
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                }
+            });
+        }
+        
+        function updateTable() {
+             const data = getLatestDataForEndpoint(currentEndpoint);
+             const tbody = document.querySelector('#detailsTable tbody');
+             tbody.innerHTML = '';
+             
+             if (data.length === 0) {
+                 tbody.innerHTML = '<tr><td colspan="6">No data found</td></tr>';
+                 return;
+             }
+             
+             data.forEach(row => {
+                 const tr = document.createElement('tr');
+                 // Add small color indicator
+                 const color = getColor(row.framework, row.runtime);
+                 const style = \`display:inline-block;width:10px;height:10px;background:\${color};border-radius:50%;margin-right:8px;\`;
+                 
+                 tr.innerHTML = \`
+                    <td><span style="\${style}"></span> \${row.framework}</td>
+                    <td>\${row.runtime}</td>
+                    <td>\${currentEndpoint}</td>
+                    <td>\${row.requests.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
+                    <td>\${row.latency.toFixed(2)}</td>
+                    <td>\${(row.throughput / (1024 * 1024)).toFixed(2)}</td>
+                 \`;
+                 tbody.appendChild(tr);
+             });
+        }
+
+        // Run
+        init();
+
+    </script>
 </body>
 </html>`;
+
 
     fs.writeFileSync(REPORT_PATH, html);
     console.log(`Report generated at ${REPORT_PATH}`);
