@@ -134,6 +134,11 @@ export type ShokupanRoute = {
      */
     handler: ShokupanHandler;
     /**
+     * Optimization: Handler with hooks baked in.
+     * Used by runtime router, while `handler` is used by OpenAPI generator.
+     */
+    bakedHandler?: ShokupanHandler;
+    /**
      * OpenAPI spec for the route
      */
     handlerSpec?: MethodAPISpec;
