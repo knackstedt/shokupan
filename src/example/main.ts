@@ -64,10 +64,10 @@ const app = new Shokupan<{
     enableMiddlewareTracking: true,
 
     // Event Hooks (app-level)
-    hooks: {
-        ...appLevelHooks,
-        ...dashboard.getHooks()
-    },
+    hooks: [
+        appLevelHooks,
+        dashboard.getHooks()
+    ],
 
 });
 
