@@ -15,6 +15,13 @@ export interface HandlerStackItem {
     stateChanges?: Record<string, any>;
 }
 
+export interface DebugCollector {
+    trackStep(id: string | undefined, type: string, duration: number, status: 'success' | 'error', error?: any): void;
+    trackEdge(fromId: string | undefined, toId: string | undefined): void;
+    setNode(id: string): void;
+    getCurrentNode(): string | undefined;
+}
+
 export class ShokupanContext<State extends Record<string, any> = Record<string, any>> {
     private _url: URL | undefined;
     public params: Record<string, string> = {}; // Router assigns this, but default to empty object
@@ -22,6 +29,7 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     public handlerStack: HandlerStackItem[] = [];
 
     public readonly response: ShokupanResponse;
+    public _debug?: DebugCollector;
     public _finalResponse?: Response;
 
     constructor(

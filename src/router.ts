@@ -7,7 +7,7 @@ import { ShokupanRequest } from './request';
 import type { Shokupan } from './shokupan';
 import { $appRoot, $childControllers, $childRouters, $controllerPath, $dispatch, $isApplication, $isMounted, $isRouter, $middleware, $mountPath, $parent, $routeArgs, $routeMethods, $routes, $routeSpec } from './symbol';
 
-import { type GuardAPISpec, HTTPMethods, type JSXRenderer, type Method, type MethodAPISpec, type OpenAPIOptions, type ProcessResult, type RequestOptions, RouteParamType, type ShokupanController, type ShokupanHandler, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions, type RouteMetadata, type Middleware } from './types';
+import { type GuardAPISpec, HTTPMethods, type JSXRenderer, type Method, type MethodAPISpec, type Middleware, type OpenAPIOptions, type ProcessResult, type RequestOptions, type RouteMetadata, RouteParamType, type ShokupanController, type ShokupanHandler, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions } from './types';
 import { asyncContext } from './util/async-hooks';
 import { traceHandler } from './util/instrumentation';
 import { getCallerInfo } from './util/stack';
@@ -57,7 +57,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             metadata: r.metadata,
             handlerName: r.handler.name,
             tags: r.handlerSpec?.tags,
-            order: r.order
+            order: r.order,
+            _fn: r.handler // Expose handler for debugging instrumentation
         }));
 
         // Collect middleware (if exists, e.g. on Shokupan app)
@@ -65,7 +66,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         const middleware = mw ? mw.map(m => ({
             name: m.name || 'middleware',
             metadata: m.metadata,
-            order: m.order
+            order: m.order,
+            _fn: m // Expose function for debugging instrumentation
         })) : [];
 
         // Collect child routers
@@ -554,13 +556,28 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         const originalHandler = match.handler;
 
         match.handler = async (ctx: ShokupanContext<T>) => {
-            if (hooks.onRequestStart) await hooks.onRequestStart(ctx);
+            if (hooks?.onRequestStart) await hooks.onRequestStart(ctx);
+
+            const debug = ctx._debug;
+            let debugId: string | undefined;
+            let previousNode: string | undefined;
+
+            if (debug) {
+                debugId = (originalHandler as any)._debugId || originalHandler.name || 'handler';
+                previousNode = debug.getCurrentNode();
+                debug.trackEdge(previousNode, debugId);
+                debug.setNode(debugId);
+            }
+
+            const start = performance.now();
             try {
-                const result = await originalHandler(ctx);
-                if (hooks.onRequestEnd) await hooks.onRequestEnd(ctx);
-                return result;
+                const res = await originalHandler(ctx);
+                if (debug) debug.trackStep(debugId, 'handler', performance.now() - start, 'success');
+                if (hooks?.onRequestEnd) await hooks.onRequestEnd(ctx);
+                return res;
             } catch (err) {
-                if (hooks.onError) {
+                if (debug) debug.trackStep(debugId, 'handler', performance.now() - start, 'error', err);
+                if (hooks?.onError) {
                     try {
                         await hooks.onError(err, ctx);
                     } catch (e) {
@@ -568,6 +585,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                     }
                 }
                 throw err;
+            } finally {
+                if (debug && previousNode) debug.setNode(previousNode);
             }
         };
         // Preserve original handler reference for analysis if needed
@@ -988,9 +1007,10 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         const normalizedPrefix = prefix.endsWith('/') && prefix !== '/' ? prefix.slice(0, -1) : prefix;
 
         // Correct usage of the new plugin:
+        const handlerMiddleware = serveStatic(config, prefix);
+
         const routeHandler = async (ctx: ShokupanContext<T>) => {
-            // The plugin returns a function that executes the logic
-            return serveStatic(ctx, config, prefix);
+            return handlerMiddleware(ctx, async () => { });
         };
 
         // Derive Group/Tag name from the path's last segment

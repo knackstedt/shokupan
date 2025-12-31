@@ -49,7 +49,7 @@ const dashboard = new DebugDashboard({
 const app = new Shokupan<{
     session: session;
 }>({
-    port: 3001,
+    port: 3000,
     development: true,
     enableOpenApiGen: true,
 
@@ -283,7 +283,7 @@ Explore the different sections to see examples of each feature.
             `.trim()
         },
         servers: [{
-            url: 'http://localhost:3001',
+            url: 'http://localhost:3000',
             description: 'Local Development Server'
         }],
         tags: [
@@ -350,6 +350,6 @@ app.listen().then(() => {
     console.log(`
     🍞 Shokupan Comprehensive Example Server 🍞
     
-    Access the debug dashboard at http://localhost:3001/admin
+    Access the debug dashboard at http://localhost:3000/admin
     `);
 });

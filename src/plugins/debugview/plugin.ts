@@ -1,27 +1,33 @@
 import { Eta } from "eta";
+import type { DebugCollector } from "../../context";
 import { ShokupanRouter } from "../../router";
 import { $appRoot } from "../../symbol";
 import type { ShokupanHooks } from "../../types";
+import { datastore } from "../../util/datastore";
 
 interface RequestMetrics {
     totalRequests: number;
     successfulRequests: number;
     failedRequests: number;
     activeRequests: number;
-
-    // Timing averages (in milliseconds)
     averageTotalTime_ms: number;
-
-    // Store last N timings for moving average/display
     recentTimings: number[];
-
-    // Request logs
     logs: RequestLog[];
-
-    // Rate limited counts grouped by URL path
     rateLimitedCounts: Record<string, number>;
+
+    // Graph Metrics
+    nodeMetrics: Record<string, NodeMetric>;
+    edgeMetrics: Record<string, number>;
 }
 
+interface NodeMetric {
+    id: string;
+    type: string;
+    requests: number;
+    totalTime: number;
+    failures: number;
+    name: string;
+}
 
 export interface RequestLog {
     method: string;
@@ -31,21 +37,33 @@ export interface RequestLog {
     timestamp: number;
 }
 
-
-
-
 export interface DebugDashboardConfig {
-    /**
-     * Function to generate headers for the dashboard fetch requests.
-     * This function will be serialized and executed in the browser.
-     */
     getRequestHeaders?: () => Record<string, string>;
-
-    /**
-     * How long to keep request logs in milliseconds.
-     * @default 7200000 (2 hours)
-     */
     retentionMs?: number;
+}
+
+class Collector implements DebugCollector {
+    private currentNode: string | undefined;
+
+    constructor(private dashboard: DebugDashboard) { }
+
+    trackStep(id: string | undefined, type: string, duration: number, status: 'success' | 'error', error?: any) {
+        if (!id) return;
+        this.dashboard.recordNodeMetric(id, type, duration, status === 'error');
+    }
+
+    trackEdge(fromId: string | undefined, toId: string | undefined) {
+        if (!fromId || !toId) return;
+        this.dashboard.recordEdgeMetric(fromId, toId);
+    }
+
+    setNode(id: string) {
+        this.currentNode = id;
+    }
+
+    getCurrentNode(): string | undefined {
+        return this.currentNode;
+    }
 }
 
 export class DebugDashboard extends ShokupanRouter {
@@ -57,20 +75,25 @@ export class DebugDashboard extends ShokupanRouter {
         averageTotalTime_ms: 0,
         recentTimings: [],
         logs: [],
-        rateLimitedCounts: {}
+        rateLimitedCounts: {},
+        nodeMetrics: {},
+        edgeMetrics: {}
     };
-
 
     private eta = new Eta();
     private startTime = Date.now();
+    private instrumented = false;
 
     constructor(private readonly dashboardConfig: DebugDashboardConfig = {}) {
         super();
 
-        // Serve the metrics as JSON
         this.get("/metrics", (ctx) => {
             const uptimeSeconds = Math.floor((Date.now() - this.startTime) / 1000);
             const uptime = `${Math.floor(uptimeSeconds / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m ${uptimeSeconds % 60}s`;
+
+            // Ensure we have latest registry with IDs if possible (though ids are static after instrumentation)
+            // But we need to serve the registry TO the frontend so it knows the IDs.
+            // The frontend fetches /registry separately.
 
             return ctx.json({
                 metrics: this.metrics,
@@ -78,23 +101,67 @@ export class DebugDashboard extends ShokupanRouter {
             });
         });
 
-        // Serve the registry as JSON
         this.get("/registry", (ctx) => {
             const app = (this as any)[$appRoot];
+            if (!this.instrumented && app) {
+                this.instrumentApp(app);
+            }
+            // We need to return the registry WITH IDs. 
+            // instrumentApp modifies the functions, but doesn't persist the registry tree structure itself (getComponentRegistry returns new).
+            // So we need to re-generate the registry and re-assign IDs (or just generate them again deterministically).
+            // Actually, we can just call getComponentRegistry() and instrument it again (idempotent for IDs usually, or just re-assign).
+            // Better: getComponentRegistry() returns new objects. We traverse them, assign IDs to the objects based on structure, 
+            // AND ensure the functions match.
             const registry = app?.getComponentRegistry ? app.getComponentRegistry() : null;
+            if (registry) {
+                this.assignIdsToRegistry(registry, 'root');
+            }
             return ctx.json({ registry });
         });
 
-        // Serve the dashboard
+        // Replay/Failed Requests Endpoints
+        this.get("/failures", async (ctx) => {
+            const result = await datastore.query("SELECT * FROM failed_requests ORDER BY timestamp DESC LIMIT 50");
+            return ctx.json({ failures: result[0] });
+        });
+
+        this.post("/replay", async (ctx) => {
+            const body = await ctx.body();
+            // Logic to replay request:
+            // We can't easily replay against the running server instance from inside without a loopback fetch.
+            // We can use Shokupan.processRequest if we have access to app.
+            const app = (this as any)[$appRoot];
+            if (!app) return unkownError(ctx);
+
+            // Construct request
+            try {
+                // body should contain method, url, headers, body
+                const result = await app.processRequest({
+                    method: body.method,
+                    path: body.url, // or path
+                    headers: body.headers,
+                    body: body.body
+                });
+                return ctx.json({
+                    status: result.status,
+                    headers: result.headers,
+                    data: result.data
+                });
+            } catch (e) {
+                return ctx.json({ error: String(e) }, 500);
+            }
+        });
+
         this.get("/", async (ctx) => {
             const uptimeSeconds = Math.floor((Date.now() - this.startTime) / 1000);
             const uptime = `${Math.floor(uptimeSeconds / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m ${uptimeSeconds % 60}s`;
-
             const app = (this as any)[$appRoot];
             const registry = app?.getComponentRegistry ? app.getComponentRegistry() : null;
+            if (registry) {
+                this.assignIdsToRegistry(registry, 'root');
+            }
 
             const linkPattern = this.getLinkPattern();
-
             const template = await Bun.file(__dirname + "/template.eta").text();
             const html = this.eta.renderString(template, {
                 metrics: this.metrics,
@@ -102,73 +169,126 @@ export class DebugDashboard extends ShokupanRouter {
                 registry,
                 rootPath: process.cwd(),
                 linkPattern,
-                // Serialize the function to string if it exists
                 getRequestHeaders: this.dashboardConfig.getRequestHeaders?.toString()
             });
             return ctx.html(html);
         });
     }
 
+    private instrumentApp(app: any) {
+        if (!app.getComponentRegistry) return;
+        const registry = app.getComponentRegistry();
+        this.assignIdsToRegistry(registry, 'root');
+        this.instrumented = true;
+    }
+
+    // Traverses registry, generates IDs, and attaches them to the actual function objects
+    private assignIdsToRegistry(node: any, parentId: string) {
+        if (!node) return;
+
+        const makeId = (type: string, parent: string, idx: number, name: string) =>
+            `${type}_${parent}_${idx}_${name.replace(/[^a-zA-Z0-9]/g, '')}`;
+
+        // Middleware
+        if (node.middleware) {
+            node.middleware.forEach((mw: any, idx: number) => {
+                const id = makeId('mw', parentId, idx, mw.name);
+                mw.id = id; // Assign to registry object for frontend
+                if (mw._fn) (mw._fn as any)._debugId = id; // Assign to function for runtime tracking
+                delete mw._fn; // Clean up
+            });
+
+            // Derive last middleware ID for parenting? 
+            // Frontend logic determines edges. Here we just strictly ID nodes.
+        }
+
+        let lastId = parentId; // For recursive parenting if needed? 
+        // Actually ID generation strategy in frontend uses 'root' or parent router ID.
+        // We stick to passed parentId.
+
+        // Controllers
+        if (node.controllers) {
+            node.controllers.forEach((ctrl: any, idx: number) => {
+                const id = makeId('ctrl', parentId, idx, ctrl.name);
+                ctrl.id = id;
+                // Controllers don't have a single function. Attributes are on routes.
+                // But we can store metadata if needed.
+            });
+        }
+
+        // Routes (in this node/router/controller)
+        if (node.routes) {
+            node.routes.forEach((r: any, idx: number) => {
+                // Route ID: logic?
+                // Frontend doesn't explicitly ID route nodes unless they are loose.
+                // But we need to track them.
+                const id = makeId('route', parentId, idx, r.handlerName || 'handler');
+                r.id = id;
+                if (r._fn) (r._fn as any)._debugId = id;
+                delete r._fn;
+            });
+        }
+
+        // Child Routers
+        if (node.routers) {
+            node.routers.forEach((r: any, idx: number) => {
+                const id = makeId('router', parentId, idx, r.path);
+                r.id = id;
+                // Does router have a function? wrappedHandler?
+                // Routers are containers mainly.
+                this.assignIdsToRegistry(r.children, id);
+            });
+        }
+    }
+
+    public recordNodeMetric(id: string, type: string, duration: number, isError: boolean) {
+        if (!this.metrics.nodeMetrics[id]) {
+            this.metrics.nodeMetrics[id] = {
+                id,
+                type,
+                requests: 0,
+                totalTime: 0,
+                failures: 0,
+                name: id // simplify
+            };
+        }
+        const m = this.metrics.nodeMetrics[id];
+        m.requests++;
+        m.totalTime += duration;
+        if (isError) m.failures++;
+    }
+
+    public recordEdgeMetric(from: string, to: string) {
+        const key = `${from}|${to}`;
+        this.metrics.edgeMetrics[key] = (this.metrics.edgeMetrics[key] || 0) + 1;
+    }
+
     private getLinkPattern(): string {
-        // 1. Check for IDE environment
         const term = process.env['TERM_PROGRAM'] || '';
         if (['vscode', 'cursor', 'antigravity'].some(t => term.includes(t))) {
             return 'vscode://file/{{absolute}}:{{line}}';
         }
-
-        // 2. Try Git
-        try {
-            const { execSync } = require('child_process');
-            const remote = execSync('git config --get remote.origin.url', { encoding: 'utf8' }).trim();
-            const branch = execSync('git branch --show-current', { encoding: 'utf8' }).trim();
-
-            if (remote) {
-                // Normalize SSH urls (git@github.com:user/repo.git) to https
-                let httpUrl = remote;
-                if (remote.startsWith('git@')) {
-                    httpUrl = remote.replace(':', '/').replace('git@', 'https://');
-                }
-                if (httpUrl.endsWith('.git')) {
-                    httpUrl = httpUrl.slice(0, -4);
-                }
-
-                // GitHub / GitLab / Bitbucket
-                if (httpUrl.includes('github.com') || httpUrl.includes('gitlab.com')) {
-                    return `${httpUrl}/blob/${branch}/{{relative}}#L{{line}}`;
-                }
-                if (httpUrl.includes('bitbucket.org')) {
-                    return `${httpUrl}/src/${branch}/{{relative}}#lines-{{line}}`;
-                }
-            }
-        } catch (e) {
-            // Ignore git errors
-        }
-
-        // Fallback
         return 'vscode://file/{{absolute}}:{{line}}';
     }
 
-    /**
-     * Returns the hooks needed to collect metrics using Shokupan's lifecycle events.
-     * Add this spread to your application hooks.
-     */
     public getHooks(): ShokupanHooks {
         return {
             onRequestStart: (ctx) => {
+                const app = (this as any)[$appRoot];
+                if (!this.instrumented && app) {
+                    this.instrumentApp(app);
+                }
+
                 this.metrics.totalRequests++;
                 this.metrics.activeRequests++;
-                // Mark start time for this specific request on the context
                 (ctx as any)._debugStartTime = performance.now();
+
+                // Attach Collector
+                ctx._debug = new Collector(this);
             },
 
-            onRequestEnd: (ctx) => {
-                // Called when processing is done but before response is sent? 
-                // Actually onResponseEnd is better for full timing including serialization
-            },
-
-            onResponseEnd: (ctx, response) => {
+            onResponseEnd: async (ctx, response) => {
                 this.metrics.activeRequests = Math.max(0, this.metrics.activeRequests - 1);
-
                 const start = (ctx as any)._debugStartTime;
                 let duration = 0;
                 if (start) {
@@ -178,17 +298,37 @@ export class DebugDashboard extends ShokupanRouter {
 
                 if (response.status >= 400) {
                     this.metrics.failedRequests++;
-
                     if (response.status === 429) {
                         const path = ctx.path;
                         this.metrics.rateLimitedCounts[path] = (this.metrics.rateLimitedCounts[path] || 0) + 1;
                     }
+
+                    // Record failure in Datastore
+                    try {
+                        const headers: Record<string, string> = {};
+                        if (ctx.request.headers && typeof ctx.request.headers.forEach === 'function') {
+                            ctx.request.headers.forEach((v: string, k: string) => {
+                                headers[k] = v;
+                            });
+                        }
+
+                        await datastore.set('failed_requests', Date.now().toString(), {
+                            method: ctx.request.method,
+                            url: ctx.path || ctx.request.url,
+                            headers: headers,
+                            status: response.status,
+                            timestamp: Date.now(),
+                            state: ctx.state,
+                            // body?
+                        });
+                    } catch (e) {
+                        console.error("Failed to record failed request", e);
+                    }
+
                 } else {
                     this.metrics.successfulRequests++;
                 }
 
-
-                // Add log entry
                 this.metrics.logs.push({
                     method: ctx.request.method,
                     url: ctx.path,
@@ -197,37 +337,28 @@ export class DebugDashboard extends ShokupanRouter {
                     timestamp: Date.now()
                 });
 
-                // Apply retention policy
                 const retention = this.dashboardConfig.retentionMs ?? 7200000;
                 const cutoff = Date.now() - retention;
-
-                // Optimized removal from start only if needed (assuming roughly chronological order)
                 if (this.metrics.logs.length > 0 && this.metrics.logs[0].timestamp < cutoff) {
                     this.metrics.logs = this.metrics.logs.filter(log => log.timestamp >= cutoff);
                 }
-            },
-
-            onError: (err, ctx) => {
-                // If error hook is called, it usually results in a 500 response handled by Shokupan
-                // So onResponseEnd will likely pick it up as a failure (status 500)
-                // We don't double count here, but we could log specific error types if we wanted.
             }
         };
     }
 
     private updateTiming(duration: number) {
-        // Simple moving average
-        const alpha = 0.1; // Weight for new value
+        const alpha = 0.1;
         if (this.metrics.averageTotalTime_ms === 0) {
             this.metrics.averageTotalTime_ms = duration;
         } else {
             this.metrics.averageTotalTime_ms = (alpha * duration) + ((1 - alpha) * this.metrics.averageTotalTime_ms);
         }
-
-        // Keep recent timings for potential charts later
         this.metrics.recentTimings.push(duration);
         if (this.metrics.recentTimings.length > 50) {
             this.metrics.recentTimings.shift();
         }
     }
+}
+function unkownError(ctx: any): any {
+    return ctx.json({ error: "Unknown Error" }, 500);
 }

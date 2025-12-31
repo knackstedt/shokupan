@@ -94,108 +94,6 @@
             padding: 1.5rem;
             margin-bottom: 2rem;
         }
-
-        /* Tabulator Dark Theme Overrides */
-        .tabulator {
-            background-color: transparent !important;
-            border: none !important;
-        }
-
-        .tabulator-header {
-            background-color: var(--bg-primary) !important;
-            border-bottom: 1px solid var(--card-border) !important;
-            color: var(--text-secondary) !important;
-        }
-
-        .tabulator-row {
-            background-color: transparent !important;
-            color: var(--text-primary) !important;
-            border-bottom: 1px solid var(--card-border) !important;
-        }
-
-        .tabulator-row:hover {
-            background-color: rgba(255, 255, 255, 0.05) !important;
-        }
-
-        .tabulator-row.tabulator-selected {
-            background-color: var(--accent) !important;
-        }
-    </style>
-    <style>
-        .tabulator {
-            height: 100%;
-            width: 100%;
-            background-color: #0f1322;
-        }
-
-        .tabulator .tabulator-tableholder .tabulator-table {
-            color: #ccc;
-            background-color: #0f1322;
-        }
-
-        .tabulator .tabulator-header {
-            color: #ddd;
-            background-color: #0f1322;
-            border-top-color: #0b0b18;
-            border-bottom-color: #0b0b18;
-        }
-
-        .tabulator .tabulator-header .tabulator-col {
-            border-right-color: #15162f;
-            background-color: #0f1322;
-        }
-
-        .tabulator .tabulator-header .tabulator-col.tabulator-sortable[aria-sort=none] .tabulator-col-content .tabulator-col-sorter {
-            color: #0d0f20;
-        }
-
-        .tabulator .tabulator-header .tabulator-col.tabulator-sortable.tabulator-col-sorter-element:hover {
-            background-color: #111427;
-        }
-
-        .tabulator .tabulator-row {
-            border-bottom-color: #0c0d23;
-            transition: background-color 100ms ease;
-        }
-
-        .tabulator .tabulator-row .tabulator-cell {
-            border-right-color: #11152c;
-            align-content: center;
-        }
-
-        .tabulator .tabulator-row:hover {
-            background-color: #202540 !important;
-        }
-
-        .tabulator .tabulator-row.tabulator-row-even {
-            background-color: #1c1e2c;
-        }
-
-        .tabulator .tabulator-row.tabulator-row-odd {
-            background-color: #171824;
-        }
-
-        .tabulator .tabulator-row.tabulator-selected {
-            background-color: #252a43;
-        }
-
-        .tabulator input {
-            outline: 0;
-            background-color: #2f2f39;
-            padding: 6px 12px;
-            border-radius: 4px;
-            border: 1px solid #15162f;
-            color: #ccc;
-        }
-
-        .tabulator input:focus {
-            outline: 0;
-            background-color: #2f2f39;
-            padding: 6px 12px;
-            border-radius: 4px;
-            border: 1px solid #15162f;
-            color: #ccc;
-        }
     </style>
     <style>
         ::-webkit-scrollbar {
@@ -225,8 +123,61 @@
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet">
+    <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator_bootstrap5.min.css" rel="stylesheet">
     <script type="text/javascript" src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
+    <style>
+    .tabulator {
+  background-color: #0f1322;
+}
+.tabulator .tabulator-tableholder .tabulator-table {
+  color: #ccc;
+  background-color: #0f1322;
+}
+.tabulator .tabulator-header {
+  color: #ddd;
+  background-color: #0f1322;
+  border-top-color: #0b0b18;
+  border-bottom-color: #0b0b18;
+}
+.tabulator .tabulator-header .tabulator-col {
+  border-right-color: #15162f;
+  background-color: #0f1322;
+}
+.tabulator .tabulator-header .tabulator-col.tabulator-sortable[aria-sort=none] .tabulator-col-content .tabulator-col-sorter {
+  color: #0d0f20;
+}
+.tabulator .tabulator-header .tabulator-col.tabulator-sortable.tabulator-col-sorter-element:hover {
+  background-color: #111427;
+}
+.tabulator .tabulator-row {
+  border-bottom-color: #0c0d23;
+  transition: background-color 100ms ease;
+}
+.tabulator .tabulator-row .tabulator-cell {
+  border-right-color: #11152c;
+  align-content: center;
+}
+.tabulator .tabulator-row:hover {
+  background-color: #202540 !important;
+}
+.tabulator .tabulator-row.tabulator-row-even {
+  background-color: #1c1e2c;
+}
+.tabulator .tabulator-row.tabulator-row-odd {
+  background-color: #171824;
+}
+.tabulator .tabulator-row.tabulator-selected {
+  background-color: #252a43;
+}
+.tabulator .tabulator-header .tabulator-col .tabulator-header-filter input {
+    background-color: #0e1016ff;
+    color: #ccc;
+}
+.tabulator .tabulator-header .tabulator-col .tabulator-header-filter input:focus {
+    background-color: #212637ff;
+    color: #fff
+}
+    </style>
     <style>
         /* Tabs */
         .tabs {
@@ -274,6 +225,39 @@
             width: 100%;
             background-color: #0f1322;
         }
+        
+        /* Tooltip Styling */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .tooltip .tooltip-text {
+            visibility: hidden;
+            width: 220px;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            text-align: left;
+            border-radius: 6px;
+            padding: 8px;
+            position: absolute;
+            z-index: 1000;
+            bottom: 125%; /* Position above */
+            left: 50%;
+            margin-left: -110px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            border: 1px solid var(--card-border);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            backdrop-filter: blur(12px);
+            font-size: 0.85rem;
+            pointer-events: none;
+        }
+
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
     </style>
 </head>
 
@@ -290,6 +274,7 @@
                 <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
                 <button class="tab-btn" onclick="switchTab('registry')">Registry</button>
                 <button class="tab-btn" onclick="switchTab('graph')">Graph</button>
+                <button class="tab-btn" onclick="switchTab('failures')">Failures</button>
             </div>
         </header>
 
@@ -358,7 +343,7 @@
         </div>
 
             <div id="table-container" style="padding: 0">
-                <div id="requests-table"></div>
+                <div id="requests-table" class="table-dark"></div>
             </div>
         </div>
 
@@ -378,6 +363,18 @@
                 </div>
             </div>
             <div id="cy"></div>
+        </div>
+
+        <!-- Failures Tab -->
+        <div id="tab-failures" class="tab-content">
+             <div class="card" style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                <div class="card-title">Failed Requests (Last 50)</div>
+                <div>
+                    <button onclick="importFailure()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-right: 8px;">Import</button>
+                    <button onclick="fetchFailures()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px 10px; border-radius: 4px; cursor: pointer;">Refresh</button>
+                </div>
+             </div>
+             <div id="failures-table-container"></div>
         </div>
     </div>
 
@@ -423,6 +420,7 @@
     <script>
         // Registry Data
         const registryData = <%~ JSON.stringify(it.registry) %>;
+        window.registryData = registryData;
         const rootPath = "<%~ it.rootPath %>";
         const linkPattern = "<%~ it.linkPattern %>";
 
@@ -479,7 +477,27 @@
             if (node.controllers) node.controllers.forEach(i => allItems.push({ ...i, kind: 'controller' }));
 
             // 2. Sort by Order
-            allItems.sort((a, b) => (a.order || 0) - (b.order || 0));
+            const kindPriority = { 'middleware': 0, 'router': 1, 'controller': 2, 'route': 3 };
+            allItems.sort((a, b) => {
+                const pA = kindPriority[a.kind] !== undefined ? kindPriority[a.kind] : 99;
+                const pB = kindPriority[b.kind] !== undefined ? kindPriority[b.kind] : 99;
+                if (pA !== pB) return pA - pB;
+                return (a.order || 0) - (b.order || 0);
+            });
+
+            // Deduplication (by ID if available, or path+method)
+            const uniqueItems = [];
+            const seenIds = new Set();
+            allItems.forEach(item => {
+                const uniqueKey = item.id || (item.kind + ':' + (item.path || item.name));
+                if (!seenIds.has(uniqueKey)) {
+                    seenIds.add(uniqueKey);
+                    uniqueItems.push(item);
+                }
+            });
+            // Replace allItems with deduplicated list
+            allItems.length = 0;
+            allItems.push(...uniqueItems);
 
             // 3. Render
             const renderedRoutes = new Set(); // Track rendered routes to avoid duplication when grouping
@@ -501,6 +519,28 @@
                 }
             });
 
+
+            
+
+
+            // Helper for Tooltips
+            function getTooltipHtml(id) {
+                // Return default 0 metrics if not found, rather than empty string, so tooltip always appears if intended
+                const m = (metrics.nodeMetrics && metrics.nodeMetrics[id]) ? metrics.nodeMetrics[id] : { requests: 0, failures: 0 };
+                const totalReqs = metrics.totalRequests || 1; // avoid div/0
+                const percent = ((m.requests / totalReqs) * 100).toFixed(1);
+                const failRate = m.requests > 0 ? ((m.failures / m.requests) * 100).toFixed(1) : '0.0';
+                
+                return `
+                    <div class="tooltip-text">
+                        <div style="font-weight:bold; margin-bottom:4px; border-bottom:1px solid var(--text-secondary); padding-bottom:2px;">Metrics</div>
+                        <div style="display:flex; justify-content:space-between;"><span>Requests:</span> <span style="font-family:monospace">${m.requests}</span></div>
+                        <div style="display:flex; justify-content:space-between;"><span>Traffic:</span> <span style="font-family:monospace">${percent}%</span></div>
+                        <div style="display:flex; justify-content:space-between;"><span>Failures:</span> <span style="font-family:monospace; color:${m.failures > 0 ? '#ef4444' : 'inherit'}">${m.failures} (${failRate}%)</span></div>
+                    </div>
+                `;
+            }
+
             allItems.forEach(item => {
                 // Middleware
                 if (item.kind === 'middleware') {
@@ -510,11 +550,13 @@
                     mwContainer.className = 'tree-node';
                     
                     const mwDiv = document.createElement('div');
-                    mwDiv.className = 'tree-item';
+                    mwDiv.className = 'tree-item tooltip'; // Add tooltip class
                     const meta = createFileMeta(item.metadata, item.name);
-                    mwDiv.innerHTML = `<span class="tree-label">${item.name}</span>${meta}`;
+                    const tooltipHtml = getTooltipHtml(item.id);
+                    mwDiv.innerHTML = `<span class="tree-label">${item.name}</span>${meta}${tooltipHtml}`;
+                    
                     mwContainer.appendChild(mwDiv);
-                    div.appendChild(mwContainer);
+                    div.appendChild(mwDiv);
                     wrapper.appendChild(div);
                 }
 
@@ -522,12 +564,14 @@
                 else if (item.kind === 'router') {
                     const div = document.createElement('div');
                     const header = document.createElement('div');
-                    header.className = 'tree-item';
+                    header.className = 'tree-item tooltip'; // Add tooltip class
                     const meta = createFileMeta(item.metadata, 'Router');
+                    const tooltipHtml = getTooltipHtml(item.id);
                     header.innerHTML = `
                         <span class="badge badge-ROUTER">ROUTER</span>
                         <span class="tree-label">${item.path}</span>
                         ${meta}
+                        ${tooltipHtml}
                     `;
                     div.appendChild(header);
 
@@ -544,16 +588,19 @@
                 else if (item.kind === 'controller') {
                     // Render Controller Group
                     const name = item.name;
+                    const cPath = item.path || '';
                     
                     // Render Header
                     const div = document.createElement('div');
                     const header = document.createElement('div');
-                    header.className = 'tree-item';
+                    header.className = 'tree-item tooltip'; // Add tooltip class
                     const meta = createFileMeta(item.metadata, name);
+                    const tooltipHtml = getTooltipHtml(item.id);
                     header.innerHTML = `
                         <span class="badge badge-CONTROLLER">CTRL</span>
-                        <span class="tree-label" style="font-weight: bold;">${name}</span>
+                        <span class="tree-label" style="font-weight: bold;">${name} <span style="color:var(--text-secondary); font-weight:normal;">(${cPath})</span></span>
                         ${meta}
+                        ${tooltipHtml}
                     `;
                     div.appendChild(header);
 
@@ -567,14 +614,16 @@
                             renderedRoutes.add(r); // Mark as rendered
                             
                             const rDiv = document.createElement('div');
-                            rDiv.className = 'tree-item';
+                            rDiv.className = 'tree-item tooltip'; // Add tooltip class
                             const method = r.method.toUpperCase();
                             const badgeClass = `badge-${method}`;
                             const rMeta = createFileMeta(r.metadata, r.handlerName);
+                            const tHtml = getTooltipHtml(r.id);
                             rDiv.innerHTML = `
                                 <span class="badge ${badgeClass}" style="width: 50px; text-align: center; display: inline-block;">${method}</span>
                                 <span class="tree-label">${r.path}</span>
                                 ${rMeta}
+                                ${tHtml}
                             `;
                             routesContainer.appendChild(rDiv);
                         });
@@ -595,15 +644,17 @@
                     if (renderedRoutes.has(item)) return; // Skip if already rendered in controller
                     
                     const div = document.createElement('div');
-                    div.className = 'tree-item';
+                    div.className = 'tree-item tooltip'; // Add tooltip class
                     const method = item.method.toUpperCase();
                     const badgeClass = `badge-${method}`;
                     const meta = createFileMeta(item.metadata, item.handlerName);
+                    const tHtml = getTooltipHtml(item.id);
 
                     div.innerHTML = `
                         <span class="badge ${badgeClass}" style="width: 50px; text-align: center; display: inline-block;">${method}</span>
                         <span class="tree-label">${item.path}</span>
                         ${meta}
+                        ${tHtml}
                     `;
                     wrapper.appendChild(div);
                 }
@@ -698,6 +749,15 @@
 
                 const data = await res.json();
                 const metrics = data.metrics;
+                window.metrics = metrics; // Update global metrics for tooltips
+
+                // Refresh Registry if active
+                if (document.getElementById('tab-registry').classList.contains('active')) {
+                     const registryContainer = document.getElementById('registry-tree');
+                     // Simple clear and re-render (optimization: could just update tooltips)
+                     registryContainer.innerHTML = '';
+                     renderRegistry(registryData, registryContainer);
+                }
 
                 document.getElementById('uptime').innerText = data.uptime;
                 document.getElementById('total-requests').innerText = metrics.totalRequests;
@@ -819,7 +879,7 @@
                                 textAlign: 'center'
                             } 
                         }, r.method),
-                        React.createElement('span', { style: { fontFamily: 'monospace', color: '#cbd5e1' } }, r.path)
+                        React.createElement('span', { style: { fontFamily: 'monospace', color: r.isFailed ? '#ef4444' : '#cbd5e1', fontWeight: r.isFailed ? 'bold' : 'normal' } }, r.path)
                     )
                 ),
                 React.createElement(Handle, { type: 'target', position: 'top' }),
@@ -872,10 +932,22 @@
 
             useEffect(() => {
                 const buildGraph = async () => {
+                    const registryData = window.registryData;
                     if (!registryData) return;
 
                     const elkEdges = [];
                     const makeId = (type, parent, idx, name) => `${type}_${parent || 'root'}_${idx}_${name.replace(/[^a-zA-Z0-9]/g, '')}`;
+
+                    function getNodeStyle(id) {
+                        const m = window.metrics?.nodeMetrics && window.metrics.nodeMetrics[id];
+                        if (!m) return {};
+                        if (m.failures > 0) {
+                            // Red intensity based on failures
+                            const intensity = Math.min(1, m.failures / 5); 
+                            return { backgroundColor: `rgba(239, 68, 68, ${0.2 + intensity * 0.8})`, color: 'white' };
+                        }
+                        return {};
+                    }
 
                     function buildHierarchy(node, currentId) {
                         if (!node) return null;
@@ -887,9 +959,16 @@
                         
                         if (node.middleware) {
                            node.middleware.forEach((mw, idx) => {
-                                const id = makeId('mw', currentId, idx, mw.name);
+                                const id = mw.id || makeId('mw', currentId, idx, mw.name);
                                 const label = mw.name + (mw.metadata?.pluginName ? `\n[${mw.metadata.pluginName}]` : '');
-                                children.push({ id, width: 140, height: 40, labels: [{ text: label }], type: 'middleware' });
+                                children.push({ 
+                                    id, 
+                                    width: 140, 
+                                    height: 40, 
+                                    labels: [{ text: label }], 
+                                    type: 'middleware',
+                                    style: getNodeStyle(id)
+                                });
                                 
                                 if (lastMiddlewareId) {
                                     elkEdges.push({ id: `e_${lastMiddlewareId}_${id}`, sources: [lastMiddlewareId], targets: [id] });
@@ -907,11 +986,15 @@
                         // 2. Create Controller Containers (Now Compact Nodes)
                         if (node.controllers) {
                             node.controllers.forEach((ctrl, idx) => {
-                                const id = makeId('ctrl', currentId, idx, ctrl.name);
+                                const id = ctrl.id || makeId('ctrl', currentId, idx, ctrl.name);
                                 const ctrlNode = { 
                                     id, 
                                     labels: [{ text: ctrl.name }],
                                     type: 'controller',
+                                    width: 200, 
+                                    height: 100,
+                                    children: [],
+                                    style: getNodeStyle(id),
                                     routes: [],
                                     layoutOptions: { 
                                         'elk.direction': 'DOWN'
@@ -938,10 +1021,13 @@
                         if (node.routes) {
                             node.routes.forEach((route, idx) => {
                                 let placed = false;
-                                if (route.tags) {
+                                    if (route.tags) {
                                     for (const tag of route.tags) {
                                         if (controllerGroups.has(tag)) {
-                                            controllerGroups.get(tag).routes.push({ method: route.method, path: route.path });
+                                            const m = window.metrics?.nodeMetrics && window.metrics.nodeMetrics[route.id];
+                                            const isFailed = m && m.failures > 0;
+                                            
+                                            controllerGroups.get(tag).routes.push({ method: route.method, path: route.path, isFailed });
                                             
                                             // Dynamic Sizing
                                             const group = controllerGroups.get(tag);
@@ -975,7 +1061,7 @@
                         // 4. Process Child Routers
                         if (node.routers) {
                             node.routers.forEach((router, idx) => {
-                                const id = makeId('router', currentId, idx, router.path);
+                                const id = router.id || makeId('router', currentId, idx, router.path);
                                 const childResult = buildHierarchy(router.children, id);
                                 
                                 // Router Node (Compact + Container)
@@ -1064,7 +1150,9 @@
                     }
 
                     try {
+                        console.log("Starting ELK layout with graph:", JSON.stringify(graph, (k, v) => k === 'parent' ? undefined : v, 2));
                         const layoutedGraph = await elk.layout(graph);
+                        console.log("ELK layout success");
                         
                         const flowNodes = [];
                         
@@ -1076,14 +1164,6 @@
                             
                             const style = NODE_STYLES[node.type] || {};
                             const isGroup = node.children && node.children.length > 0;
-                            
-                            // Calculate dynamic height for compact nodes if not set by ELK (ELK needs explicit if not simple)
-                            // We set width/height in buildHierarchy for some, but for compound nodes ELK calculates based on children + padding.
-                            // For Controller nodes (leafs in terms of graph structure now, but contain custom route list),
-                            // we need to set dimensions BEFORE layout preferably.
-                            // Let's fix the dimensions in buildHierarchy.
-                            
-                            // Recalculate if needed or use what ELK gave back
                             
                             flowNodes.push({
                                 id: node.id,
@@ -1125,6 +1205,14 @@
 
                     } catch (e) {
                         console.error("ELK Layout Error", e);
+                        // Fallback UI
+                        const errorNode = {
+                            id: 'error',
+                            position: { x: 50, y: 50 },
+                            data: { label: 'Graph Layout Failed: ' + e.message },
+                            style: { color: 'red', border: '1px solid red', padding: '10px' }
+                        };
+                        setNodes([errorNode]);
                     } finally {
                         setLoading(false);
                     }
@@ -1159,8 +1247,112 @@
         }
         window.initGraph = mountReact;
 
+        // --- Failures Tab Logic ---
+        const failuresTable = new Tabulator("#failures-table-container", {
+            layout: "fitColumns",
+            height: "500px",
+            placeholder: "No failed requests found",
+            data: [],
+            columns: [
+                { title: "Time", field: "timestamp", width: 180, formatter: (cell) => new Date(cell.getValue()).toLocaleString() },
+                { title: "Method", field: "method", width: 100 },
+                { title: "URL", field: "url" },
+                { title: "Status", field: "status", width: 90, formatter: (cell) => `<span style="color: #ef4444; font-weight: bold;">${cell.getValue()}</span>` },
+                { title: "Actions", formatter: (cell) => {
+                    return `
+                        <button class="replay-btn" style="background:#3b82f6; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; margin-right:4px;">Replay</button>
+                        <button class="export-btn" style="background:#64748b; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Export</button>
+                    `;
+                }, cellClick: (e, cell) => {
+                    if (e.target.classList.contains('replay-btn')) {
+                        replayRequest(cell.getRow().getData());
+                    } else if (e.target.classList.contains('export-btn')) {
+                        exportFailure(cell.getRow().getData());
+                    }
+                }, width: 140, headerSort: false }
+            ]
+        });
+        
 
+        function exportFailure(data) {
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `failure-${data.timestamp}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
 
+        function importFailure() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = e => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = ev => {
+                    try {
+                        const data = JSON.parse(ev.target.result);
+                        replayRequest(data);
+                    } catch (err) { alert("Invalid JSON: " + err); }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        async function fetchFailures() {
+             try {
+                 const headers = getRequestHeaders ? getRequestHeaders() : {};
+                 // Handle relative path issue
+                 const basePath = window.location.pathname.endsWith('/') ? '' : window.location.pathname;
+                 const url = basePath + (basePath.endsWith('/') ? 'failures' : '/failures');
+                 
+                 const res = await fetch(url, { headers });
+                 if (!res.ok) return;
+                 const data = await res.json();
+                 failuresTable.replaceData(data.failures);
+             } catch (e) {
+                 console.error("Failed to fetch failures", e);
+             }
+        }
+        
+        async function replayRequest(req) {
+             if (!confirm(`Replay ${req.method} ${req.url}?`)) return;
+             
+             try {
+                 const headers = getRequestHeaders ? getRequestHeaders() : {};
+                 const basePath = window.location.pathname.endsWith('/') ? '' : window.location.pathname;
+                 const url = basePath + (basePath.endsWith('/') ? 'replay' : '/replay');
+
+                 const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { ...headers, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: req.method,
+                        url: req.url,
+                        headers: req.headers,
+                        body: req.body
+                    })
+                 });
+                 
+                 const result = await res.json();
+                 alert(`Replay Status: ${res.status}\n\nResponse:\n${JSON.stringify(result, null, 2)}`);
+             } catch (e) {
+                 alert("Replay Failed: " + e);
+             }
+        }
+
+        // Hook switchTab
+        const originalSwitchTab = switchTab;
+        switchTab = function(tabId) {
+            originalSwitchTab(tabId);
+            if (tabId === 'failures') {
+                fetchFailures();
+            }
+        };
 
     </script>
 </body>

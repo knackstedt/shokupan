@@ -38,10 +38,12 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     constructor(
         applicationConfig: ShokupanConfig = {}
     ) {
-        super();
+        const config = Object.assign({}, defaults, applicationConfig);
+        super(config);
+
         this[$isApplication] = true;
         this[$appRoot] = this;
-        Object.assign(this.applicationConfig, defaults, applicationConfig);
+        this.applicationConfig = config;
 
         // Capture metadata for the application instance
         const { file, line } = getCallerInfo();

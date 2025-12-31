@@ -17,7 +17,7 @@ export const compose = (middleware: Middleware[]) => {
     return function dispatch(context: ShokupanContext<unknown>, next?: NextFn): Promise<any> {
         let index = -1;
 
-        function runner(i: number): Promise<any> {
+        async function runner(i: number): Promise<any> {
             if (i <= index) return Promise.reject(new Error('next() called multiple times'));
             index = i;
 
@@ -26,10 +26,27 @@ export const compose = (middleware: Middleware[]) => {
             }
 
             const fn = middleware[i];
+            const debug = context._debug;
+            let debugId: string | undefined;
+            let previousNode: string | undefined;
+
+            if (debug) {
+                debugId = (fn as any)._debugId || fn.name || 'anonymous';
+                previousNode = debug.getCurrentNode();
+                debug.trackEdge(previousNode, debugId);
+                debug.setNode(debugId);
+            }
+
+            const start = performance.now();
             try {
-                return Promise.resolve(fn(context, () => runner(i + 1)));
+                const res = await Promise.resolve(fn(context, () => runner(i + 1)));
+                if (debug) debug.trackStep(debugId, 'middleware', performance.now() - start, 'success');
+                return res;
             } catch (err) {
+                if (debug) debug.trackStep(debugId, 'middleware', performance.now() - start, 'error', err);
                 return Promise.reject(err);
+            } finally {
+                if (debug && previousNode) debug.setNode(previousNode);
             }
         }
 

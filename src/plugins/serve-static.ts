@@ -6,11 +6,11 @@ import type { Middleware, StaticServeOptions } from '../types';
 
 const eta = new Eta();
 
-export function serveStatic<T extends Record<string, any>>(ctx: ShokupanContext<T>, config: StaticServeOptions<T>, prefix: string) {
+export function serveStatic<T extends Record<string, any>>(config: StaticServeOptions<T>, prefix: string) {
     const rootPath = resolve(config.root || ".");
     const normalizedPrefix = prefix.endsWith('/') && prefix !== '/' ? prefix.slice(0, -1) : prefix;
 
-    const serveStaticMiddleware: Middleware = async () => {
+    const serveStaticMiddleware: Middleware = async (ctx: ShokupanContext<any>) => {
         // 1. Calculate relative path
         // ctx.path is full path.
         // If prefix is /static, and path is /static/foo.css, relative is /foo.css
