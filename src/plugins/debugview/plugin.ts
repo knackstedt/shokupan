@@ -119,6 +119,12 @@ export class DebugDashboard extends ShokupanRouter {
             return ctx.json({ registry });
         });
 
+        // Middleware Tracking Endpoint
+        this.get("/middleware", async (ctx) => {
+            const result = await datastore.query("SELECT * FROM middleware_tracking ORDER BY timestamp DESC LIMIT 100");
+            return ctx.json({ middleware: result[0] || [] });
+        });
+
         // Replay/Failed Requests Endpoints
         this.get("/failures", async (ctx) => {
             const result = await datastore.query("SELECT * FROM failed_requests ORDER BY timestamp DESC LIMIT 50");

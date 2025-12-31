@@ -238,6 +238,19 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      */
     enableMiddlewareTracking: boolean;
     /**
+     * Maximum number of middleware executions to store in the datastore.
+     * Only applies when enableMiddlewareTracking is true.
+     * @default 10000
+     */
+    middlewareTrackingMaxCapacity?: number;
+    /**
+     * Time-to-live for middleware tracking entries in milliseconds.
+     * Entries older than this will be cleaned up.
+     * Only applies when enableMiddlewareTracking is true.
+     * @default 86400000 (1 day)
+     */
+    middlewareTrackingTTL?: number;
+    /**
      * HTTP logger function.
      */
     httpLogger: (ctx: ShokupanContext<T>) => void;

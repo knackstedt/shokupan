@@ -9,6 +9,7 @@ import { $appRoot, $childControllers, $childRouters, $controllerPath, $dispatch,
 
 import { type GuardAPISpec, HTTPMethods, type JSXRenderer, type Method, type MethodAPISpec, type Middleware, type OpenAPIOptions, type ProcessResult, type RequestOptions, type RouteMetadata, RouteParamType, type ShokupanController, type ShokupanHandler, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions } from './types';
 import { asyncContext } from './util/async-hooks';
+import { datastore } from './util/datastore';
 import { traceHandler } from './util/instrumentation';
 import { getCallerInfo } from './util/stack';
 
@@ -762,14 +763,66 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
         const trackingHandler = wrappedHandler;
         wrappedHandler = async (ctx: ShokupanContext<T>) => {
-            if (ctx.app?.applicationConfig.enableMiddlewareTracking) {
-                ctx.handlerStack.push({
-                    name: handler.name || 'anonymous',
-                    file,
-                    line
-                });
+            const startTime = performance.now();
+            let error: any = undefined;
+
+            try {
+                if (ctx.app?.applicationConfig.enableMiddlewareTracking) {
+                    ctx.handlerStack.push({
+                        name: handler.name || 'anonymous',
+                        file,
+                        line
+                    });
+                }
+                return await trackingHandler(ctx);
+            } catch (e) {
+                error = e;
+                throw e;
+            } finally {
+                // Store in datastore after execution
+                if (ctx.app?.applicationConfig.enableMiddlewareTracking) {
+                    const duration = performance.now() - startTime;
+                    const config = ctx.app.applicationConfig;
+
+                    // Store middleware execution in datastore
+                    try {
+                        const timestamp = Date.now();
+                        const key = `${timestamp}-${handler.name || 'anonymous'}-${Math.random().toString(36).substring(7)}`;
+
+                        await datastore.set('middleware_tracking', key, {
+                            name: handler.name || 'anonymous',
+                            path: ctx.path,
+                            timestamp,
+                            duration,
+                            file,
+                            line,
+                            error: error ? String(error) : undefined,
+                            metadata: {
+                                isBuiltin: (handler as any).isBuiltin,
+                                pluginName: (handler as any).pluginName
+                            }
+                        });
+
+                        // Cleanup old entries based on TTL and capacity
+                        const ttl = config.middlewareTrackingTTL ?? 86400000; // 1 day default
+                        const maxCapacity = config.middlewareTrackingMaxCapacity ?? 10000;
+                        const cutoff = Date.now() - ttl;
+
+                        // Delete entries older than TTL
+                        await datastore.query(`DELETE middleware_tracking WHERE timestamp < ${cutoff}`);
+
+                        // Enforce capacity limit
+                        const results = await datastore.query('SELECT count() FROM middleware_tracking GROUP ALL');
+                        if (results && results[0] && results[0].count > maxCapacity) {
+                            const toDelete = results[0].count - maxCapacity;
+                            await datastore.query(`DELETE middleware_tracking ORDER BY timestamp ASC LIMIT ${toDelete}`);
+                        }
+                    } catch (datastoreError) {
+                        // Silently fail datastore operations to not break request flow
+                        console.error('Failed to store middleware tracking:', datastoreError);
+                    }
+                }
             }
-            return trackingHandler(ctx);
         };
         (wrappedHandler as any).originalHandler = (trackingHandler as any).originalHandler || trackingHandler;
         // ---------------------------------
