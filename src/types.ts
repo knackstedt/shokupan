@@ -96,7 +96,7 @@ export type ShokupanRouteConfig = DeepPartial<{
     /**
      * Hooks for this route/router.
      */
-    hooks: ShokupanHooks;
+    hooks: ShokupanHooks | ShokupanHooks[];
     /**
      * Whether to enforce that only controller classes (constructors) are accepted by the router.
      */
@@ -300,7 +300,7 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
     /**
      * Lifecycle hooks.
      */
-    hooks: ShokupanHooks<T>;
+    hooks: ShokupanHooks<T> | ShokupanHooks<T>[];
 
 
     // Open for extension

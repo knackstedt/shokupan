@@ -137,7 +137,7 @@ export class DebugDashboard extends ShokupanRouter {
             // We can't easily replay against the running server instance from inside without a loopback fetch.
             // We can use Shokupan.processRequest if we have access to app.
             const app = (this as any)[$appRoot];
-            if (!app) return unkownError(ctx);
+            if (!app) return unknownError(ctx);
 
             // Construct request
             try {
@@ -183,6 +183,7 @@ export class DebugDashboard extends ShokupanRouter {
 
     private instrumentApp(app: any) {
         if (!app.getComponentRegistry) return;
+
         const registry = app.getComponentRegistry();
         this.assignIdsToRegistry(registry, 'root');
         this.instrumented = true;
@@ -196,55 +197,40 @@ export class DebugDashboard extends ShokupanRouter {
             `${type}_${parent}_${idx}_${name.replace(/[^a-zA-Z0-9]/g, '')}`;
 
         // Middleware
-        if (node.middleware) {
-            node.middleware.forEach((mw: any, idx: number) => {
-                const id = makeId('mw', parentId, idx, mw.name);
-                mw.id = id; // Assign to registry object for frontend
-                if (mw._fn) (mw._fn as any)._debugId = id; // Assign to function for runtime tracking
-                delete mw._fn; // Clean up
-            });
-
-            // Derive last middleware ID for parenting? 
-            // Frontend logic determines edges. Here we just strictly ID nodes.
-        }
-
-        let lastId = parentId; // For recursive parenting if needed? 
-        // Actually ID generation strategy in frontend uses 'root' or parent router ID.
-        // We stick to passed parentId.
+        node.middleware?.forEach((mw: any, idx: number) => {
+            const id = makeId('mw', parentId, idx, mw.name);
+            mw.id = id; // Assign to registry object for frontend
+            if (mw._fn) (mw._fn as any)._debugId = id; // Assign to function for runtime tracking
+            delete mw._fn; // Clean up
+        });
 
         // Controllers
-        if (node.controllers) {
-            node.controllers.forEach((ctrl: any, idx: number) => {
-                const id = makeId('ctrl', parentId, idx, ctrl.name);
-                ctrl.id = id;
-                // Controllers don't have a single function. Attributes are on routes.
-                // But we can store metadata if needed.
-            });
-        }
+        node.controllers?.forEach((ctrl: any, idx: number) => {
+            const id = makeId('ctrl', parentId, idx, ctrl.name);
+            ctrl.id = id;
+            // Controllers don't have a single function. Attributes are on routes.
+            // But we can store metadata if needed.
+        });
 
         // Routes (in this node/router/controller)
-        if (node.routes) {
-            node.routes.forEach((r: any, idx: number) => {
-                // Route ID: logic?
-                // Frontend doesn't explicitly ID route nodes unless they are loose.
-                // But we need to track them.
-                const id = makeId('route', parentId, idx, r.handlerName || 'handler');
-                r.id = id;
-                if (r._fn) (r._fn as any)._debugId = id;
-                delete r._fn;
-            });
-        }
+        node.routes?.forEach((r: any, idx: number) => {
+            // Route ID: logic?
+            // Frontend doesn't explicitly ID route nodes unless they are loose.
+            // But we need to track them.
+            const id = makeId('route', parentId, idx, r.handlerName || 'handler');
+            r.id = id;
+            if (r._fn) (r._fn as any)._debugId = id;
+            delete r._fn;
+        });
 
         // Child Routers
-        if (node.routers) {
-            node.routers.forEach((r: any, idx: number) => {
-                const id = makeId('router', parentId, idx, r.path);
-                r.id = id;
-                // Does router have a function? wrappedHandler?
-                // Routers are containers mainly.
-                this.assignIdsToRegistry(r.children, id);
-            });
-        }
+        node.routers?.forEach((r: any, idx: number) => {
+            const id = makeId('router', parentId, idx, r.path);
+            r.id = id;
+            // Does router have a function? wrappedHandler?
+            // Routers are containers mainly.
+            this.assignIdsToRegistry(r.children, id);
+        });
     }
 
     public recordNodeMetric(id: string, type: string, duration: number, isError: boolean) {
@@ -274,7 +260,7 @@ export class DebugDashboard extends ShokupanRouter {
         if (['vscode', 'cursor', 'antigravity'].some(t => term.includes(t))) {
             return 'vscode://file/{{absolute}}:{{line}}';
         }
-        return 'vscode://file/{{absolute}}:{{line}}';
+        return 'file:///{{absolute}}:{{line}}';
     }
 
     public getHooks(): ShokupanHooks {
@@ -365,6 +351,6 @@ export class DebugDashboard extends ShokupanRouter {
         }
     }
 }
-function unkownError(ctx: any): any {
+function unknownError(ctx: any): any {
     return ctx.json({ error: "Unknown Error" }, 500);
 }

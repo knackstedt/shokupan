@@ -551,13 +551,23 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     private applyHooks(match: { handler: ShokupanHandler<T>; params: Record<string, string>; }) {
         if (!this.config?.hooks) return match;
         const hooks = this.config.hooks;
+        const hookList = Array.isArray(hooks) ? hooks : [hooks];
 
         // Optimize: Check if any relevant hooks are actually defined
-        if (!hooks.onRequestStart && !hooks.onRequestEnd && !hooks.onError) return match;
+        const hasStart = hookList.some(h => !!h.onRequestStart);
+        const hasEnd = hookList.some(h => !!h.onRequestEnd);
+        const hasError = hookList.some(h => !!h.onError);
+
+        if (!hasStart && !hasEnd && !hasError) return match;
         const originalHandler = match.handler;
 
         match.handler = async (ctx: ShokupanContext<T>) => {
-            if (hooks?.onRequestStart) await hooks.onRequestStart(ctx);
+            if (hasStart) {
+                for (let i = 0; i < hookList.length; i++) {
+                    const h = hookList[i];
+                    if (typeof h.onRequestStart === 'function') await h.onRequestStart(ctx);
+                }
+            }
 
             const debug = ctx._debug;
             let debugId: string | undefined;
@@ -573,17 +583,19 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             const start = performance.now();
             try {
                 const res = await originalHandler(ctx);
-                if (debug) debug.trackStep(debugId, 'handler', performance.now() - start, 'success');
-                if (hooks?.onRequestEnd) await hooks.onRequestEnd(ctx);
+                debug?.trackStep(debugId, 'handler', performance.now() - start, 'success');
+
+                for (let i = 0; i < hookList.length; i++) {
+                    const h = hookList[i];
+                    if (typeof h.onRequestEnd === 'function') await h.onRequestEnd(ctx);
+                }
                 return res;
             } catch (err) {
-                if (debug) debug.trackStep(debugId, 'handler', performance.now() - start, 'error', err);
-                if (hooks?.onError) {
-                    try {
-                        await hooks.onError(err, ctx);
-                    } catch (e) {
-                        console.error("Error in router onError hook:", e);
-                    }
+                debug?.trackStep(debugId, 'handler', performance.now() - start, 'error', err);
+
+                for (let i = 0; i < hookList.length; i++) {
+                    const h = hookList[i];
+                    if (typeof h.onError === 'function') await h.onError(err, ctx);
                 }
                 throw err;
             } finally {
@@ -591,7 +603,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             }
         };
         // Preserve original handler reference for analysis if needed
-        (match.handler as any).originalHandler = (originalHandler as any).originalHandler || originalHandler;
+        (match.handler as any).originalHandler = (originalHandler as any).originalHandler ?? originalHandler;
 
         return match;
     }
