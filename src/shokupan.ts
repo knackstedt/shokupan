@@ -318,7 +318,9 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
             try {
                 // Request Start Hook
-                await this.executeHook('onRequestStart', ctx);
+                if (this.hasHook('onRequestStart')) {
+                    await this.executeHook('onRequestStart', ctx);
+                }
 
                 // Compose middleware + router dispatch
                 const fn = this.composedMiddleware ??= compose(this.middleware);
@@ -374,10 +376,14 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 }
 
                 // Request End Hook - Processing finished, response ready
-                await this.executeHook('onRequestEnd', ctx);
+                if (this.hasHook('onRequestEnd')) {
+                    await this.executeHook('onRequestEnd', ctx);
+                }
 
                 // Response Start Hook - About to send response
-                await this.executeHook('onResponseStart', ctx, response);
+                if (this.hasHook('onResponseStart')) {
+                    await this.executeHook('onResponseStart', ctx, response);
+                }
 
                 return response;
 
@@ -392,7 +398,9 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 if (err.errors) body.errors = err.errors;
 
                 // Error Hook
-                await this.executeHook('onError', err, ctx);
+                if (this.hasHook('onError')) {
+                    await this.executeHook('onError', err, ctx);
+                }
 
                 return ctx.json(body, status);
             }
@@ -402,7 +410,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         let executionPromise = handle();
         const timeoutMs = this.applicationConfig.requestTimeout;
 
-        if (timeoutMs && timeoutMs > 0 && await this.hasHook('onRequestTimeout')) {
+        if (timeoutMs && timeoutMs > 0 && this.hasHook('onRequestTimeout')) {
             let timeoutId: any;
             const timeoutPromise = new Promise<Response>((_, reject) => {
                 timeoutId = setTimeout(async () => {
@@ -427,7 +435,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             .then(async (res) => {
                 // Response End Hook - Response returned
                 // Note: We can't guarantee it's fully sent to client here, but it's handed off to Bun
-                if (await this.hasHook('onResponseEnd')) {
+                if (this.hasHook('onResponseEnd')) {
                     await this.executeHook('onResponseEnd', ctx, res);
                 }
                 return res;
@@ -435,7 +443,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     }
 
     private ensureHooksInitialized() {
-        if (this.hooksInitialized) return;
 
         const hooks = this.applicationConfig.hooks;
         if (hooks) {
@@ -464,7 +471,11 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     }
 
     private async executeHook(name: keyof ShokupanHooks, ...args: any[]) {
-        this.ensureHooksInitialized();
+        // Optimization: Use hasHook check before calling this usually
+        // But we ensure initialized here too just in case
+        if (!this.hooksInitialized) {
+            this.ensureHooksInitialized();
+        }
         const fns = this.hookCache.get(name);
         if (!fns) return;
 
@@ -474,8 +485,10 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         }
     }
 
-    private async hasHook(name: keyof ShokupanHooks) {
-        this.ensureHooksInitialized();
+    private hasHook(name: keyof ShokupanHooks) {
+        if (!this.hooksInitialized) {
+            this.ensureHooksInitialized();
+        }
         return this.hookCache.has(name);
     }
 }

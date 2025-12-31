@@ -770,6 +770,11 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
         const trackingHandler = wrappedHandler;
         wrappedHandler = async (ctx: ShokupanContext<T>) => {
+            // Optimization: Skip all tracking overhead if disabled
+            if (!ctx.app?.applicationConfig.enableMiddlewareTracking) {
+                return trackingHandler(ctx);
+            }
+
             const startTime = performance.now();
             let error: any = undefined;
 

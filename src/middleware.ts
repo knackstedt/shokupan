@@ -26,27 +26,30 @@ export const compose = (middleware: Middleware[]) => {
             }
 
             const fn = middleware[i];
-            const debug = context._debug;
-            let debugId: string | undefined;
-            let previousNode: string | undefined;
 
-            if (debug) {
-                debugId = (fn as any)._debugId || fn.name || 'anonymous';
-                previousNode = debug.getCurrentNode();
-                debug.trackEdge(previousNode, debugId);
-                debug.setNode(debugId);
+            // Fast path: No debug tracking
+            if (!context._debug) {
+                return fn(context, () => runner(i + 1));
             }
+
+            // Slow path: Debug tracking
+            const debug = context._debug;
+            const debugId = (fn as any)._debugId || fn.name || 'anonymous';
+            const previousNode = debug.getCurrentNode();
+
+            debug.trackEdge(previousNode, debugId);
+            debug.setNode(debugId);
 
             const start = performance.now();
             try {
                 const res = await Promise.resolve(fn(context, () => runner(i + 1)));
-                if (debug) debug.trackStep(debugId, 'middleware', performance.now() - start, 'success');
+                debug.trackStep(debugId, 'middleware', performance.now() - start, 'success');
                 return res;
             } catch (err) {
-                if (debug) debug.trackStep(debugId, 'middleware', performance.now() - start, 'error', err);
+                debug.trackStep(debugId, 'middleware', performance.now() - start, 'error', err);
                 return Promise.reject(err);
             } finally {
-                if (debug && previousNode) debug.setNode(previousNode);
+                if (previousNode) debug.setNode(previousNode);
             }
         }
 
