@@ -518,17 +518,24 @@ export class OpenAPIAnalyzer {
                 node = node.expression;
             }
 
-            // Case 1: return ctx.json(...)
+
+            // Case 1: return ctx.json(...) or ctx.text(...)
             if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
                 const callObj = node.expression.expression.getText(sourceFile);
                 const callProp = node.expression.name.getText(sourceFile);
 
-                if ((callObj === 'ctx' || callObj.endsWith('.ctx')) && callProp === 'json') {
-                    if (node.arguments.length > 0) {
-                        responseSchema = this.convertExpressionToSchema(node.arguments[0], sourceFile, scope);
-                        responseType = 'object';
+                if (callObj === 'ctx' || callObj.endsWith('.ctx')) {
+                    if (callProp === 'json') {
+                        if (node.arguments.length > 0) {
+                            responseSchema = this.convertExpressionToSchema(node.arguments[0], sourceFile, scope);
+                            responseType = 'object';
+                        }
+                        return;
                     }
-                    return;
+                    else if (callProp === 'text') {
+                        responseType = 'string';
+                        return;
+                    }
                 }
             }
 
