@@ -3,7 +3,7 @@ import "./otel";
 import { Compression } from '../plugins/compression';
 import { Cors } from '../plugins/cors';
 import { DebugDashboard } from '../plugins/debugview/plugin';
-import { RateLimit } from '../plugins/rate-limit';
+import { RateLimitMiddleware } from '../plugins/rate-limit';
 import { ScalarPlugin } from '../plugins/scalar';
 import { SecurityHeaders } from '../plugins/security-headers';
 import { Session } from '../plugins/session';
@@ -89,12 +89,13 @@ app.use(Compression({
 }));
 
 // Rate Limiting: Prevent abuse
-// app.use(RateLimit({
+// app.use(RateLimitMiddleware({
 //     windowMs: 60 * 1000, // 1 minute
 //     max: 100, // 100 requests per minute
 //     message: { error: 'Too many requests, please try again later.' },
 //     headers: true
 // }));
+
 
 // Security Headers: Set secure HTTP headers
 app.use(SecurityHeaders({
@@ -214,12 +215,13 @@ app.mount('/validation/ajv', new AjvValidationRouter());
 app.mount('/validation/valibot', new ValibotValidationRouter());
 app.mount('/validation/class-validator', new ClassValidatorRouter());
 
-app.use(RateLimit({
+app.use(RateLimitMiddleware({
     windowMs: 60 * 1000, // 1 minute
     max: 500, // 100 requests per minute
     message: { error: 'Too many requests, please try again later.' },
     headers: true
 }));
+
 
 // ============================================================================
 // MOUNT FEATURE EXAMPLES

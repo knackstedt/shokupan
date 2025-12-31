@@ -10,7 +10,10 @@ import { $appRoot, $dispatch, $isApplication } from './symbol';
 import type { Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig } from './types';
 import { asyncContext } from "./util/async-hooks";
 
+
+import { SystemCpuMonitor } from "./util/cpu-monitor";
 import { getCallerInfo } from './util/stack';
+
 
 const defaults: ShokupanConfig = {
     port: 3000,
@@ -26,6 +29,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     readonly applicationConfig: ShokupanConfig = {};
     public openApiSpec?: any;
     private composedMiddleware?: Middleware;
+    private cpuMonitor?: SystemCpuMonitor;
 
     get logger() {
         return this.applicationConfig.logger;
@@ -142,7 +146,14 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
         }
 
+
+        if (this.applicationConfig.autoBackpressureFeedback) {
+            this.cpuMonitor = new SystemCpuMonitor();
+            this.cpuMonitor.start();
+        }
+
         const serveOptions = {
+
             port: finalPort,
             hostname: this.applicationConfig.hostname,
             development: this.applicationConfig.development,
@@ -286,6 +297,18 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         const ctx = new ShokupanContext<T>(request, server, undefined, this, this.applicationConfig.enableMiddlewareTracking);
 
         const handle = async () => {
+
+            // Auto-Backpressure Check
+            if (this.cpuMonitor && this.cpuMonitor.getUsage() > (this.applicationConfig.autoBackpressureLevel ?? 60)) {
+                // Return 429 immediately
+                const msg = "Too Many Requests (CPU Backpressure)";
+                const res = ctx.text(msg, 429);
+                // Trigger hooks so metrics are recorded
+                if (this.applicationConfig.hooks?.onResponseEnd) {
+                    await this.applicationConfig.hooks.onResponseEnd(ctx as any, res);
+                }
+                return res;
+            }
 
             try {
                 // Request Start Hook

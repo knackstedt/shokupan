@@ -4,11 +4,13 @@ import type { Middleware, NextFn } from "../types";
 export interface RateLimitOptions {
     windowMs?: number;
     max?: number;
+    limit?: number; // Alias for max
     message?: string | object;
     statusCode?: number;
     headers?: boolean;
     keyGenerator?: (ctx: ShokupanContext) => string;
     skip?: (ctx: ShokupanContext) => boolean;
+    mode?: 'user' | 'absolute';
 }
 
 interface HitRecord {
@@ -16,21 +18,24 @@ interface HitRecord {
     resetTime: number;
 }
 
-export function RateLimit(options: RateLimitOptions = {}): Middleware {
+export function RateLimitMiddleware(options: RateLimitOptions = {}): Middleware {
     const windowMs = options.windowMs || 60 * 1000; // 1 minute
-    const max = options.max || 5; // 5 requests per window
+    const max = options.limit || options.max || 5; // 5 requests per window
     const message = options.message || "Too many requests, please try again later.";
     const statusCode = options.statusCode || 429;
     const headers = options.headers !== false;
+    const mode = options.mode || 'user';
+
     const keyGenerator = options.keyGenerator || ((ctx) => {
-        // Use IP if available (Bun specific property on server, but not exposed in generic Request easily without server context)
-        // Fallback to simpler key or x-forwarded-for
-        return ctx.headers.get("x-forwarded-for") || ctx.url.hostname || "unknown";
+        if (mode === 'absolute') {
+            return 'global';
+        }
+        // Use IP if available
+        return ctx.headers.get("x-forwarded-for") || ctx.request.headers.get("x-forwarded-for") || (ctx.server as any)?.requestIP?.(ctx.request)?.address || "unknown";
     });
     const skip = options.skip || (() => false);
 
     // In-memory store
-    // Note: For production with multiple instances, use Redis or similar external store.
     const hits = new Map<string, HitRecord>();
 
     // Cleanup interval
@@ -43,6 +48,9 @@ export function RateLimit(options: RateLimitOptions = {}): Middleware {
         }
     }, windowMs);
 
+    // Ensure interval doesn't block process exit
+    if (interval.unref) interval.unref();
+
     const rateLimitMiddleware: Middleware = async function RateLimitMiddleware(ctx: ShokupanContext, next: NextFn) {
         if (skip(ctx)) return next();
 
@@ -50,6 +58,7 @@ export function RateLimit(options: RateLimitOptions = {}): Middleware {
         const now = Date.now();
         let record = hits.get(key);
 
+        // Initialize record if not exists or expired
         if (!record || record.resetTime <= now) {
             record = {
                 hits: 0,
@@ -61,37 +70,43 @@ export function RateLimit(options: RateLimitOptions = {}): Middleware {
         record.hits++;
 
         const remaining = Math.max(0, max - record.hits);
-        const resetTime = Math.ceil(record.resetTime / 1000);
+        const resetTime = Math.ceil(record.resetTime / 1000); // Epoch seconds
+        const retryAfter = Math.ceil((record.resetTime - now) / 1000); // Seconds until reset
 
-        if (headers) {
-            // We need to set headers on the response. 
-            // Similar to Helmet, we need to intercept the response or set it on context if supported.
-            // For now, let's assume we can attach to the eventual response wrapper or helper.
-            // Since we can't modify `ctx.response` directly before it exists, we wrap.
-        }
+        // Helper to set headers
+        const setHeaders = (res: Response | any) => {
+            if (!headers || !res || !res.headers) return;
+            try {
+                res.headers.set("X-RateLimit-Limit", String(max));
+                res.headers.set("X-RateLimit-Remaining", String(remaining));
+                res.headers.set("X-RateLimit-Reset", String(resetTime));
+            } catch (e) { /* ignore */ }
+        };
 
         if (record.hits > max) {
+
+            // Dispatch 429
+            const body = typeof message === 'object' ? JSON.stringify(message) : String(message);
+            const res = typeof message === 'object' ? ctx.json(message, statusCode) : ctx.text(String(message), statusCode);
+
             if (headers) {
-                // Return immediate response
-                const res = typeof message === 'object' ? ctx.json(message, statusCode) : ctx.text(String(message), statusCode);
-                res.headers.set("X-RateLimit-Limit", String(max));
-                res.headers.set("X-RateLimit-Remaining", "0");
-                res.headers.set("X-RateLimit-Reset", String(resetTime));
-                return res;
+                setHeaders(res);
+                res.headers.set("Retry-After", String(retryAfter));
             }
-            return typeof message === 'object' ? ctx.json(message, statusCode) : ctx.text(String(message), statusCode);
+
+            return res;
         }
 
         const response = await next();
 
+        // If response is a Response object, attach headers
         if (response instanceof Response && headers) {
-            response.headers.set("X-RateLimit-Limit", String(max));
-            response.headers.set("X-RateLimit-Remaining", String(remaining));
-            response.headers.set("X-RateLimit-Reset", String(resetTime));
+            setHeaders(response);
         }
 
         return response;
     };
+
     (rateLimitMiddleware as any).isBuiltin = true;
     (rateLimitMiddleware as any).pluginName = 'RateLimit';
 

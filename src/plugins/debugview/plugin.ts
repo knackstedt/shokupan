@@ -17,7 +17,11 @@ interface RequestMetrics {
 
     // Request logs
     logs: RequestLog[];
+
+    // Rate limited counts grouped by URL path
+    rateLimitedCounts: Record<string, number>;
 }
+
 
 export interface RequestLog {
     method: string;
@@ -52,8 +56,10 @@ export class DebugDashboard extends ShokupanRouter {
         activeRequests: 0,
         averageTotalTime_ms: 0,
         recentTimings: [],
-        logs: []
+        logs: [],
+        rateLimitedCounts: {}
     };
+
 
     private eta = new Eta();
     private startTime = Date.now();
@@ -172,9 +178,15 @@ export class DebugDashboard extends ShokupanRouter {
 
                 if (response.status >= 400) {
                     this.metrics.failedRequests++;
+
+                    if (response.status === 429) {
+                        const path = ctx.path;
+                        this.metrics.rateLimitedCounts[path] = (this.metrics.rateLimitedCounts[path] || 0) + 1;
+                    }
                 } else {
                     this.metrics.successfulRequests++;
                 }
+
 
                 // Add log entry
                 this.metrics.logs.push({

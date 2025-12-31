@@ -101,6 +101,15 @@ export type ShokupanRouteConfig = DeepPartial<{
      * Whether to enforce that only controller classes (constructors) are accepted by the router.
      */
     controllersOnly: boolean;
+
+    /**
+     * Whether to enable automatic backpressure based on system CPU load.
+     */
+    autoBackpressureFeedback: boolean;
+    /**
+     * The CPU usage percentage threshold (0-100) at which to start rejecting requests.
+     */
+    autoBackpressureLevel: number;
 }>;
 
 export type ShokupanRoute = {
@@ -209,6 +218,17 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      * @default false
      */
     enableTracing?: boolean;
+
+    /**
+     * Whether to enable automatic backpressure based on system CPU load.
+     * @default false
+     */
+    autoBackpressureFeedback?: boolean;
+    /**
+     * The CPU usage percentage threshold (0-100) at which to start rejecting requests.
+     * @default 60
+     */
+    autoBackpressureLevel?: number;
 
     /**
      * Whether to enable middleware and handler tracking.

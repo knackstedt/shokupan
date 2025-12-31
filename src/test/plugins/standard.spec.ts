@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Compression } from "../../plugins/compression";
 import { Cors } from "../../plugins/cors";
-import { RateLimit } from "../../plugins/rate-limit";
 import { SecurityHeaders } from "../../plugins/security-headers";
 import { Shokupan } from "../../shokupan";
 
@@ -58,10 +57,11 @@ describe("Plugins", () => {
 
     test("Rate Limit", async () => {
         const app = new Shokupan();
-        app.use(RateLimit({
+        app.use(RateLimitMiddleware({
             windowMs: 1000,
             max: 2
         }));
+
 
         app.get("/", (ctx) => ctx.text("ok"));
 

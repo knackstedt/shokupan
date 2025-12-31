@@ -1,3 +1,4 @@
+import { RateLimitMiddleware, type RateLimitOptions } from "./plugins/rate-limit";
 import { $controllerPath, $middleware, $routeArgs, $routeMethods, $routeSpec } from "./symbol";
 import type { GuardAPISpec, MethodAPISpec } from "./types";
 import { type Method, type Middleware, RouteParamType } from "./types";
@@ -98,3 +99,10 @@ export const Patch = createMethodDecorator("PATCH");
 export const Options = createMethodDecorator("OPTIONS");
 export const Head = createMethodDecorator("HEAD");
 export const All = createMethodDecorator("ALL");
+
+/**
+ * Decorator: Applies a rate limit to a class or method.
+ */
+export function RateLimit(options: RateLimitOptions) {
+    return Use(RateLimitMiddleware(options));
+}
