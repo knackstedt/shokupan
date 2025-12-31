@@ -4,6 +4,7 @@ import { compose } from './middleware';
 import { generateOpenApi } from './plugins/openapi';
 import { serveStatic } from './plugins/serve-static';
 import { ShokupanRequest } from './request';
+import { RouterTrie } from './router/trie';
 import type { Shokupan } from './shokupan';
 import { $appRoot, $childControllers, $childRouters, $controllerPath, $dispatch, $isApplication, $isMounted, $isRouter, $middleware, $mountPath, $parent, $routeArgs, $routeMethods, $routes, $routeSpec } from './symbol';
 
@@ -44,6 +45,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     }
 
     public [$routes]: ShokupanRoute[] = []; // Public via Symbol for OpenAPI generator
+    private trie = new RouterTrie<T>();
     public metadata?: RouteMetadata; // Metadata for the router itself
 
     private currentGuards: { handler: ShokupanHandler<T>; spec?: GuardAPISpec; }[] = [];
@@ -627,29 +629,13 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         // console.log(`[Router] find ${method} ${path} (routes: ${this.routes.length}, children: ${this[$childRouters].length})`);
 
 
-        // Helper to search specific routes
-        const findInRoutes = (routes: any[], m: string) => {
-            for (const route of routes) {
-                if (route.method !== "ALL" && route.method !== m) continue;
-                const match = route.regex.exec(path);
-                if (match) {
-                    const params: Record<string, string> = {};
-                    route.keys.forEach((key: string, index: number) => {
-                        params[key] = match[index + 1];
-                    });
-                    return { handler: route.bakedHandler || route.handler, params };
-                }
-            }
-            return null;
-        };
-
         // 1. Check local routes
-        let result = findInRoutes(this[$routes], method);
+        let result = this.trie.search(method, path);
         if (result) return result;
 
         // Fallback: If HEAD not found, try GET
         if (method === "HEAD") {
-            result = findInRoutes(this[$routes], "GET");
+            result = this.trie.search("GET", path);
             if (result) return result;
         }
 
@@ -798,7 +784,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                 return await trackingHandler(ctx);
             } catch (e) {
                 error = e;
-                throw e;
+                throw e; // Bubble up to error hook
             } finally {
                 // Store in datastore after execution
                 if (ctx.app?.applicationConfig.enableMiddlewareTracking) {
@@ -846,9 +832,6 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             }
         };
         (wrappedHandler as any).originalHandler = (trackingHandler as any).originalHandler || trackingHandler;
-        // ---------------------------------
-
-        // ---------------------------------
 
         // Bake in Hooks if present (Optimization)
         let bakedHandler = wrappedHandler;
@@ -856,25 +839,27 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             bakedHandler = this.wrapWithHooks(wrappedHandler, this.config.hooks);
         }
 
+        // Store for OpenAPI (still use list)
         this[$routes].push({
             method,
             path,
-            regex,
-            keys,
-            handler: wrappedHandler,
+            regex: regex ?? new RegExp(''),
+            keys: keys ?? [],
+            handler,
             bakedHandler,
             handlerSpec: spec,
             group,
-            guards: routeGuards.length > 0 ? routeGuards : undefined,
-            requestTimeout: effectiveTimeout,
+            hooks: this.config?.hooks as any,
+            requestTimeout,
+            renderer,
             metadata: {
                 file,
-                line,
-                name: handler.name || 'anonymous',
-                isBuiltin: (handler as any).isBuiltin,
-                pluginName: (handler as any).pluginName
+                line
             }
         });
+
+        // Insert into Trie
+        this.trie.insert(method, path, bakedHandler);
 
         return this;
     }
