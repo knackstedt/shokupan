@@ -32,15 +32,14 @@ Shokupan is designed to make building APIs delightful again. With zero-config de
 
 ```typescript
 import { Shokupan } from 'shokupan';
+const app = new Shokupan();
 
-const app = new Shokupan({
-    port: 3000,
-    development: true
-});
+app.get('/', (ctx) => ({ message: 'Hello, World!' }));
+app.get('/hello', (ctx) => "world");
 
-app.get('/', (ctx) => {
-    return { message: 'Hello, World!' };
-});
+app.mount('/scalar', new ScalarPlugin({
+    enableStaticAnalysis: true
+}));
 
 app.listen();
 ```

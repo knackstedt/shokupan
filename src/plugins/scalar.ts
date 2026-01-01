@@ -10,14 +10,15 @@ const eta = new Eta();
 
 export type ScalarPluginOptions = {
     baseDocument?: DeepPartial<OpenAPI.Document>;
-    config: Partial<ApiReferenceConfiguration>;
+    config?: Partial<ApiReferenceConfiguration>;
     enableStaticAnalysis?: boolean;
 };
 
 export class ScalarPlugin extends ShokupanRouter<any> {
     constructor(
-        private readonly pluginOptions: ScalarPluginOptions
+        private readonly pluginOptions: ScalarPluginOptions = {}
     ) {
+        pluginOptions.config ??= {};
         super();
         this.init();
     }
