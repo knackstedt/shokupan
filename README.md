@@ -1541,6 +1541,10 @@ app.use(useExpress(compression()));
 ## 🧪 Testing
 
 Shokupan applications are easy to test using Bun's built-in test runner.
+It can directly pass requests to the application or a router without requiring the 
+server to fully start, bind to a port or listen for connections. This makes mocking 
+the server unnecessary and allows for faster and more reliable testing. Additionally
+you can directly test authenticated endpoints without the need for a session or cookie.
 
 ```typescript
 import { describe, it, expect } from 'bun:test';
@@ -1571,13 +1575,13 @@ Since Shokupan is built on Bun, deployment is straightforward.
 ### Using Bun
 
 ```bash
-bun run src/index.ts
+bun run src/main.ts
 ```
 
 ### Docker
 
 ```dockerfile
-FROM oven/bun:1
+FROM oven/bun:1-alpine
 
 WORKDIR /app
 
@@ -1586,7 +1590,7 @@ RUN bun install --production
 
 EXPOSE 3000
 
-CMD ["bun", "run", "src/index.ts"]
+CMD ["bun", "run", "src/main.ts"]
 ```
 
 ## 🛠️ CLI Tools
@@ -1703,7 +1707,13 @@ const app = new Shokupan(config?: ShokupanConfig);
 
 ### ShokupanRouter Class
 
-Router for grouping routes.
+Router for grouping operations, applying middleware, and mounting controllers. Additionally
+they are effective for creating sub-applications that are independently tested. Routers can 
+have OpenAPI spec applied to all endpoints of the router. Additionally they can be mounted
+onto the main application or other routers.
+
+When a router is mounted to an app, if you are using the DebugView plugin you will be able to
+see it under the Registry tab and the Graph tab.
 
 ```typescript
 const router = new ShokupanRouter(config?: ShokupanRouteConfig);
@@ -1811,7 +1821,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
+4. Publish the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
 ## 📝 License
@@ -1823,8 +1833,8 @@ MIT License - see the [LICENSE](LICENSE) file for details.
 - Inspired by [Express](https://expressjs.com/), [Koa](https://koajs.com/), [NestJS](https://nestjs.com/), and [Elysia](https://elysiajs.com/)
 - Built for the amazing [Bun](https://bun.sh/) runtime
 - Powered by [Arctic](https://github.com/pilcrowonpaper/arctic) for OAuth2 support
-- Tested, Benchmarked and Documented by Antigravity
+- Tests and Benchmarks created with Antigravity
 
 ---
 
-**Made with 🍞 by the Shokupan team**
+**Made with ❤️ by the Shokupan team**
