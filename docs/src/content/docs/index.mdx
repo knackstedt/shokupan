@@ -1,9 +1,9 @@
 ---
 title: Shokupan
-description: A low-lift modern web framework for Bun
+description: A delightful, type-safe web framework for Bun
 template: splash
 hero:
-  tagline: High-performance, feature-rich web framework built specifically for Bun
+  tagline: The web framework that feels like a fresh start.
   image:
     file: ../../assets/logo.svg
   actions:
@@ -22,11 +22,17 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 ## Features
 
 <CardGrid stagger>
-  <Card title="Built for Bun" icon="rocket">
-    Native [Bun](https://bun.sh/) performance with optimized routing and minimal overhead
+  <Card title="Type Safe" icon="laptop">
+    End-to-end type safety with decorators. Pass data around without ever losing your types.
   </Card>
-  <Card title="TypeScript First" icon="laptop">
-    Full type safety with decorators and generics for a superior developer experience
+  <Card title="Zero Config" icon="rocket">
+    Stop configuring build tools. Shokupan just works, letting you focus on your product.
+  </Card>
+  <Card title="Debug Dashboard" icon="magnifier">
+    Visualize your routes and debug requests with a beautiful built-in dashboard.
+  </Card>
+  <Card title="Snappy Performance" icon="star">
+     Built on Bun for instant startup times and low-latency responses.
   </Card>
   <Card title="Auto OpenAPI" icon="open-book">
     Generate [OpenAPI](https://www.openapis.org/) specs automatically from your routes
@@ -54,9 +60,6 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
   </Card>
   <Card title="Easy Migration" icon="right-arrow">
     Simple migration from [Express](https://expressjs.com/) or [NestJS](https://nestjs.com/)
-  </Card>
-  <Card title="Modern Stack" icon="star">
-    Combines the best of Express.js familiarity with modern architecture
   </Card>
 </CardGrid>
 

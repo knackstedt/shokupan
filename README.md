@@ -1,24 +1,29 @@
 # Shokupan 🍞
 
-> A low-lift modern web framework for Bun
+> A delightful, type-safe web framework for Bun
 
-Shokupan is a high-performance, feature-rich web framework built specifically for Bun. It combines the familiarity of Express.js with modern NestJS-style architecture (Dependency Injection, Controllers) and seamless compatibility with the vast ecosystem of Express plugins — all while maintaining exceptional performance and built-in OpenAPI support.
+Shokupan is a high-performance, feature-rich web framework built specifically for Bun. It combines the familiarity of Express.js with modern NestJS-style architecture (Dependency Injection, Controllers) and seamless compatibility with the vast ecosystem of Express plugins.
+
+**Built for Developer Experience**
+Shokupan is designed to make building APIs delightful again. With zero-config defaults, instant startup times, and full type safety out of the box, you can focus on building your product, not configuring your framework.
 
 ### Note: Shokupan is still in alpha and is not guaranteed to be stable. Please use with caution. We will be adding more features and APIs in the future. Please file an issue if you find any bugs or have suggestions for improvement.
 
 ## ✨ Features
 
-- 🚀 **Built for Bun** - Native [Bun](https://bun.sh/) performance with optimized routing
-- 🎯 **TypeScript First** - Full type safety with decorators and generics
-- 📝 **Auto OpenAPI** - Generate [OpenAPI](https://www.openapis.org/) specs automatically from routes
-- 🔌 **Rich Plugin System** - CORS, Sessions, Auth, Validation, Rate Limiting, and more
-- 🌐 **Flexible Routing** - Express-style routes or decorator-based controllers
-- 🔀 **Express Compatible** - Works with [Express](https://expressjs.com/) middleware patterns
-- 📊 **Built-in Telemetry** - [OpenTelemetry](https://opentelemetry.io/) instrumentation out of the box
-- 🔐 **OAuth2 Support** - GitHub, Google, Microsoft, Apple, Auth0, Okta
-- ✅ **Multi-validator Support** - Zod, Ajv, TypeBox, Valibot
-- 📚 **OpenAPI Docs** - Beautiful OpenAPI documentation with [Scalar](https://scalar.dev/)
-- ⏩ **Short shift** - Very simple migration from [Express](https://expressjs.com/) or [NestJS](https://nestjs.com/) to Shokupan
+- 🎯 **TypeScript First** - End-to-end type safety with decorators and generics. No manual types needed.
+- 🛠️ **Zero Config** - Works effectively out of the box. No complex setup or boilerplate.
+- 🚀 **Built for Bun** - Native [Bun](https://bun.sh/) performance with instant startup.
+- 🔍 **Debug Dashboard** - Visual inspector for your routes, middleware, and request flow.
+- 📝 **Auto OpenAPI** - Generate [OpenAPI](https://www.openapis.org/) specs automatically from routes.
+- 🔌 **Rich Plugin System** - CORS, Sessions, Auth, Validation, Rate Limiting, and more.
+- 🌐 **Flexible Routing** - Express-style routes or decorator-based controllers.
+- 🔀 **Express Compatible** - Works with [Express](https://expressjs.com/) middleware patterns.
+- 📊 **Built-in Telemetry** - [OpenTelemetry](https://opentelemetry.io/) instrumentation out of the box.
+- 🔐 **OAuth2 Support** - GitHub, Google, Microsoft, Apple, Auth0, Okta.
+- ✅ **Multi-validator Support** - Zod, Ajv, TypeBox, Valibot.
+- 📚 **OpenAPI Docs** - Beautiful OpenAPI documentation with [Scalar](https://scalar.dev/).
+- ⏩ **Short shift** - Very simple migration from [Express](https://expressjs.com/) or [NestJS](https://nestjs.com/) to Shokupan.
 
 ## 📦 Installation
 
