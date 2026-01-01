@@ -43,40 +43,20 @@ async function recordFailedRequest(ctx: ShokupanContext, error: any, maxCapacity
         const requestPath = ctx.path;
         const method = ctx.method;
 
-        // Body might be already read or not. 
-        // If it was consumed, we might not be able to get it easily unless we cached it.
-        // ShokupanContext often doesn't cache body unless we did ctx.json() or similar.
-        // But the requirement says "request... body".
-        // We'll try to get it if available on ctx, or serialized options?
-        // In Shokupan, `ctx.request` is a `ShokupanRequest` which wraps `Request`.
-        // If `body` was passed in `processRequest`, it's in the underlying request.
-        // But `Request.body` is a stream.
-        // If we read it now, we might consume it if it wasn't consumed?
-        // Use a safe approach: Check if it's already read?
-        // Actually, for "failed requests", often the failure happens *during* processing, 
-        // possibly after body parsing. 
-        // If body parsing failed, we might catch that too.
-
-        let body: any = "unknown/consumed";
+        let body: any = "unknown";
         try {
-            // We can try to clone if not used? 
-            // Or just store a string representation if we have it?
-            // For now, let's assume we can't reliably get the body if it's a stream and already read.
-            // But if it was JSON, maybe we can?
-            // Let's leave it as a placeholder or try best effort.
-            // If the user sent a body object in `processRequest`, `ShokupanRequest` constructor 
-            // stringified it.
-            // Let's use a simplified approach as "body" might be large.
-            // The prompt asks to store "body".
-            // We'll try to assume it's small enough or available.
-        } catch (e) { }
+            // Attempt to capture body if available on strict context or if previously parsed
+            if ((ctx as any)._body !== undefined) {
+                body = (ctx as any)._body;
+            }
+        } catch { }
 
         const errorMsg = error.message || String(error);
 
         const data: any = {
             path: requestPath,
             method: method,
-            body: body, // TODO: Improve capture
+            body: body,
             error: errorMsg,
             timestamp
         };
@@ -98,8 +78,6 @@ async function recordFailedRequest(ctx: ShokupanContext, error: any, maxCapacity
             }
         }
 
-        // Generate Unique ID
-        // unique by: request path, method, body, error message, and timestamp.
         const hashInput = `${requestPath}|${method}|${JSON.stringify(body)}|${errorMsg}|${timestamp}`;
         const id = createHash('sha256').update(hashInput).digest('hex');
 
@@ -115,7 +93,7 @@ async function recordFailedRequest(ctx: ShokupanContext, error: any, maxCapacity
         }
 
         // Cleanup Background Task
-        cleanup(maxCapacity, ttl).catch(e => console.error("FailedRequestRecorder cleanup error:", e));
+        cleanup(maxCapacity, ttl).catch(() => { });
 
     } catch (e) {
         console.error("Failed to record failed request:", e);

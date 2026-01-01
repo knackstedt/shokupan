@@ -15,14 +15,18 @@ type ValidatorCache = Map<string, {
     };
 }>;
 
-// WeakMap to store compiled validators per application instance
-const compiledValidators = new WeakMap<any, ValidatorCache>();
+const compiledValidators = new WeakMap<any, {
+    paths: Map<string, {
+        regex: RegExp;
+        paramNames: string[];
+    }>;
+    validators: ValidatorCache;
+}>();
 
 export function openApiValidator(): Middleware {
     return async (ctx, next) => {
         const app = ctx.app;
         if (!app || !app.openApiSpec) {
-            // No spec available, skip validation
             return next();
         }
 
@@ -32,55 +36,34 @@ export function openApiValidator(): Middleware {
             compiledValidators.set(app, cache);
         }
 
-        // Match request to OpenAPI path
-        const method = ctx.req.method.toLowerCase();
-
-        // Find the matching path in the spec
-        // The spec paths are like /users/{id}
-        // The request path is like /users/123
-        // We need to find which spec path matches ctx.path
-
-        // Optimization: Checking against route definition if available?
-        // But the middleware matches before router dispatch usually? 
-        // Actually, if we use this middleware at app level, we don't know the route yet.
-        // But wait, the OpenAPI spec mirrors the defined routes.
-
-        // Simple matcher:
-        // iterate all keys in cache (which are paths), convert {param} to regex, and match.
-        // This is O(N) where N is number of routes. Acceptable for now.
-        // A better approach would be to have the Router inject the matched spec path, but we are a plugin.
-
         let matchPath: string | undefined;
         let matchParams: Record<string, string> = {};
 
         // Try exact match first
-        if (cache.has(ctx.path)) {
+        if (cache.validators.has(ctx.path)) {
             matchPath = ctx.path;
         } else {
             // Regex match
-            for (const specPath of cache.keys()) {
-                // Convert /users/{id} to ^/users/([^/]+)$
-                // This is a naive implementation, ideally we reuse router's logic or pre-compile regexes
-                const regexStr = "^" + specPath.replace(/{([^}]+)}/g, "([^/]+)") + "$";
-                const regex = new RegExp(regexStr);
+            for (const [path, { regex, paramNames }] of cache.paths) {
                 const match = regex.exec(ctx.path);
-
                 if (match) {
-                    matchPath = specPath;
+                    matchPath = path;
+                    // Extract params
+                    paramNames.forEach((name, i) => {
+                        matchParams[name] = match[i + 1];
+                    });
                     break;
                 }
             }
         }
 
         if (!matchPath) {
-            // Path not found in spec, skip validation (or 404?)
             return next();
         }
 
-        const validators = cache.get(matchPath)?.[method];
+        const method = ctx.req.method.toLowerCase();
+        const validators = cache.validators.get(matchPath)?.[method];
         if (!validators) {
-            // Method not allowed or not in spec
-            // Let the router handle 405 or 404
             return next();
         }
 
@@ -110,29 +93,9 @@ export function openApiValidator(): Middleware {
 
         // Validate Params
         if (validators.params) {
-            // We need to extract params again because we matched manually or rely on Router?
-            // If the router matched, ctx.params is set.
-            // But this middleware might run BEFORE router dispatch if added via app.use().
-            // If it matches BEFORE router, ctx.params is empty.
-            // We need to parse params based on the matchPath.
-
-            let params = ctx.params;
-            if (Object.keys(params).length === 0 && matchPath) {
-                const paramNames = (matchPath.match(/{([^}]+)}/g) || []).map(s => s.slice(1, -1));
-                if (paramNames.length > 0) {
-                    const regexStr = "^" + matchPath.replace(/{([^}]+)}/g, "([^/]+)") + "$";
-                    const regex = new RegExp(regexStr);
-                    const match = regex.exec(ctx.path);
-                    if (match) {
-                        params = {};
-                        paramNames.forEach((name, i) => {
-                            params[name] = match[i + 1];
-                        });
-                        // Update context params? Maybe not matching side-effects
-                        // ctx.params = params; 
-                    }
-                }
-            }
+            // Merge extracted params with context params (if any)
+            // Prioritize context params if router already parsed them, otherwise use matchParams
+            const params = { ...matchParams, ...ctx.params };
 
             const valid = validators.params(params);
             if (!valid && validators.params.errors) {
@@ -159,21 +122,35 @@ export function openApiValidator(): Middleware {
     };
 }
 
-export function compileValidators(spec: any): ValidatorCache {
-    const cache: ValidatorCache = new Map();
+export function compileValidators(spec: any): { paths: Map<string, { regex: RegExp, paramNames: string[]; }>, validators: ValidatorCache; } {
+    const validators: ValidatorCache = new Map();
+    const paths = new Map<string, { regex: RegExp, paramNames: string[]; }>();
 
     for (const [path, pathItem] of Object.entries(spec.paths || {})) {
+        // Compile Path Regex
+        if (path.includes('{')) {
+            const paramNames: string[] = [];
+            const regexStr = "^" + path.replace(/{([^}]+)}/g, (_, name) => {
+                paramNames.push(name);
+                return "([^/]+)";
+            }) + "$";
+            paths.set(path, {
+                regex: new RegExp(regexStr),
+                paramNames
+            });
+        }
+
         const pathValidators: any = {};
 
         for (const [method, operation] of Object.entries(pathItem as any)) {
             if (method === 'parameters' || method === 'summary' || method === 'description') continue;
 
             const oper = operation as any;
-            const validators: any = {};
+            const opValidators: any = {};
 
             // 1. Compile Request Body
             if (oper.requestBody?.content?.['application/json']?.schema) {
-                validators.body = ajv.compile(oper.requestBody.content['application/json'].schema);
+                opValidators.body = ajv.compile(oper.requestBody.content['application/json'].schema);
             }
 
             // 2. Compile Parameters (Query, Path, Header)
@@ -200,7 +177,7 @@ export function compileValidators(spec: any): ValidatorCache {
             }
 
             if (Object.keys(queryProps).length > 0) {
-                validators.query = ajv.compile({
+                opValidators.query = ajv.compile({
                     type: 'object',
                     properties: queryProps,
                     required: queryRequired.length > 0 ? queryRequired : undefined
@@ -208,7 +185,7 @@ export function compileValidators(spec: any): ValidatorCache {
             }
 
             if (Object.keys(pathProps).length > 0) {
-                validators.params = ajv.compile({
+                opValidators.params = ajv.compile({
                     type: 'object',
                     properties: pathProps,
                     required: pathRequired.length > 0 ? pathRequired : undefined
@@ -216,20 +193,20 @@ export function compileValidators(spec: any): ValidatorCache {
             }
 
             if (Object.keys(headerProps).length > 0) {
-                validators.headers = ajv.compile({
+                opValidators.headers = ajv.compile({
                     type: 'object',
                     properties: headerProps,
                     required: headerRequired.length > 0 ? headerRequired : undefined
                 });
             }
 
-            pathValidators[method] = validators;
+            pathValidators[method] = opValidators;
         }
 
-        cache.set(path, pathValidators);
+        validators.set(path, pathValidators);
     }
 
-    return cache;
+    return { paths, validators };
 }
 
 /**
