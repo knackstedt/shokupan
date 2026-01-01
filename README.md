@@ -2,8 +2,6 @@
 
 > A delightful, type-safe web framework for Bun
 
-Shokupan is a high-performance, feature-rich web framework built specifically for Bun. It combines the familiarity of Express.js with modern NestJS-style architecture (Dependency Injection, Controllers) and seamless compatibility with the vast ecosystem of Express plugins.
-
 **Built for Developer Experience**
 Shokupan is designed to make building APIs delightful again. With zero-config defaults, instant startup times, and full type safety out of the box, you can focus on building your product, not configuring your framework.
 
@@ -24,12 +22,6 @@ Shokupan is designed to make building APIs delightful again. With zero-config de
 - ✅ **Multi-validator Support** - Zod, Ajv, TypeBox, Valibot.
 - 📚 **OpenAPI Docs** - Beautiful OpenAPI documentation with [Scalar](https://scalar.dev/).
 - ⏩ **Short shift** - Very simple migration from [Express](https://expressjs.com/) or [NestJS](https://nestjs.com/) to Shokupan.
-
-## 📦 Installation
-
-```bash
-bun add shokupan
-```
 
 ## 🚀 Quick Start
 
