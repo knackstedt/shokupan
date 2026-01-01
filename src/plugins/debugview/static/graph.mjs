@@ -123,6 +123,8 @@ const GraphComponent = () => {
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [zoom, setZoom] = useState(1);
+    const [isFullscreen, setIsFullscreen] = useState(false);
 
     // Search Filter
     useEffect(() => {
@@ -406,7 +408,7 @@ const GraphComponent = () => {
                     },
                     type: node.type,
                     parentNode: parentId,
-                    // draggable: false,
+                    draggable: false,
                     extent: 'parent'
                 });
 
@@ -440,17 +442,72 @@ const GraphComponent = () => {
 
     if (loading) return React.createElement('div', { style: { color: '#fff', padding: '20px' } }, 'Laying out graph...');
 
-    return React.createElement(ReactFlow, {
-        nodes,
-        edges,
-        onNodesChange,
-        onEdgesChange,
-        nodeTypes, // Register custom types
-        fitView: true,
-        minZoom: 0.1,
+    return React.createElement('div', {
+        style: isFullscreen ? {
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            zIndex: 9999,
+            backgroundColor: '#1e293b' // Match theme
+        } : {
+            width: '100%',
+            height: '600px', // Ensure explicit height if container doesn't provide it, though normally #cy does.
+            position: 'relative'
+        }
     },
-        React.createElement(Background, { color: '#334155', gap: 16 }),
-        React.createElement(Controls)
+        React.createElement(ReactFlow, {
+            nodes,
+            edges,
+            onNodesChange,
+            onEdgesChange,
+            nodeTypes, // Register custom types
+            fitView: true,
+            minZoom: 0.1,
+            onMove: (_, viewport) => setZoom(viewport.zoom),
+            onInit: (instance) => setZoom(instance.getZoom())
+        },
+            React.createElement(Background, { color: '#334155', gap: 16 }),
+            React.createElement(Controls),
+            React.createElement('div', {
+                style: {
+                    position: 'absolute',
+                    top: '10px',
+                    right: '10px',
+                    zIndex: 5,
+                    display: 'flex',
+                    gap: '8px',
+                    alignItems: 'center'
+                }
+            },
+                React.createElement('div', {
+                    style: {
+                        background: 'rgba(30, 41, 59, 0.8)',
+                        color: 'white',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontFamily: 'monospace',
+                        border: '1px solid #475569'
+                    }
+                }, `${Math.round(zoom * 100)}%`),
+                React.createElement('button', {
+                    onClick: () => setIsFullscreen(!isFullscreen),
+                    style: {
+                        background: '#3b82f6',
+                        color: 'white',
+                        border: 'none',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        transition: 'background 0.2s'
+                    }
+                }, isFullscreen ? "Exit Fullscreen" : "Fullscreen")
+            )
+        )
     );
 };
 

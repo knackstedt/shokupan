@@ -195,7 +195,7 @@ function renderRegistry(node, container) {
             div.appendChild(header);
 
             // Render Routes belonging to this controller
-            const routes = controllerGroups.get(name) || [];
+            const routes = item.children.routes || [];
             if (routes.length > 0) {
                 const routesContainer = document.createElement('div');
                 routesContainer.className = 'tree-node';
