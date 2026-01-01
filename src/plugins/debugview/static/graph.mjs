@@ -1,4 +1,4 @@
-import { Background, Controls, Handle, ReactFlow, useEdgesState, useNodesState } from 'https://esm.sh/@xyflow/react@12.3.6?deps=react@18.3.1,react-dom@18.3.1';
+import { Background, Controls, Handle, MarkerType, ReactFlow, useEdgesState, useNodesState } from 'https://esm.sh/@xyflow/react@12.3.6?deps=react@18.3.1,react-dom@18.3.1';
 import ELK from 'https://esm.sh/elkjs@0.9.3/lib/elk.bundled.js';
 import { createRoot } from 'https://esm.sh/react-dom@18.3.1/client?deps=react@18.3.1';
 import React, { useEffect, useState } from 'https://esm.sh/react@18.3.1';
@@ -173,34 +173,71 @@ const GraphComponent = () => {
                 }
                 return {};
             }
+            function getEdgeStyle(item) {
+                return {
+
+                };
+            }
 
             function calculateNodeBounds(container) {
                 const routes = container.children?.routes || [];
-                const staticLabelHeight = 31;
-                const maxWidth = 500;
-                const padding = 20;
-                const itemGap = 4;
-                const verbWidth = 58;
 
+                // Create a temporary container that matches GroupNode styling
+                const wrapper = document.createElement("div");
+                wrapper.style.visibility = "hidden";
+                wrapper.style.position = "absolute";
+                wrapper.style.width = "fit-content";
+                wrapper.style.maxWidth = "500px"; // Arbitrary max width
+                document.body.appendChild(wrapper);
 
-                let pathWidth = 0;
-                let height = staticLabelHeight + padding * 2;
-                for (let i = 0; i < routes.length; i++) {
-                    const route = routes[i];
+                // Mimic GroupNode container
+                const nodeEl = document.createElement("div");
+                nodeEl.style.padding = "10px";
+                nodeEl.style.fontFamily = "Inter, system-ui, sans-serif"; // App font
+                nodeEl.style.fontSize = "12px";
+                wrapper.appendChild(nodeEl);
 
-                    const tempEl = document.createElement("span");
-                    tempEl.textContent = route.path;
-                    document.body.appendChild(tempEl);
-                    const bounds = tempEl.getBoundingClientRect();
-                    document.body.removeChild(tempEl);
+                // Mimic Header
+                const header = document.createElement("div");
+                header.style.fontWeight = "bold";
+                header.style.borderBottom = "1px solid rgba(255,255,255,0.1)";
+                header.style.paddingBottom = "5px";
+                header.style.marginBottom = "5px";
+                // Label logic matches GroupNode
+                header.textContent = container.type === "controller"
+                    ? (container.name + (container.metadata?.pluginName ? `\n[${container.metadata.pluginName}]` : ''))
+                    : "Router: " + container.path;
+                nodeEl.appendChild(header);
 
-                    pathWidth = Math.max(pathWidth, bounds.width + verbWidth);
-                    height += bounds.height + itemGap;
+                // Mimic Routes
+                for (const route of routes) {
+                    const row = document.createElement("div");
+                    row.style.display = "flex";
+                    row.style.alignItems = "center";
+                    row.style.gap = "8px";
+                    row.style.margin = "2px 0";
+
+                    const badge = document.createElement("span");
+                    badge.textContent = route.method;
+                    badge.style.padding = "2px 6px";
+                    badge.style.fontSize = "10px";
+                    badge.style.fontWeight = "bold";
+                    row.appendChild(badge);
+
+                    const path = document.createElement("span");
+                    path.textContent = route.path;
+                    path.style.fontFamily = "monospace";
+                    // path.style.color... doesn't affect size
+                    row.appendChild(path);
+
+                    nodeEl.appendChild(row);
                 }
 
-                const width = Math.min(maxWidth, pathWidth + padding);
+                const rect = nodeEl.getBoundingClientRect();
+                const width = Math.ceil(rect.width) + 20; // Safety buffer
+                const height = Math.ceil(rect.height);
 
-                console.log(container, { width, height });
+                document.body.removeChild(wrapper);
 
                 return { width, height };
             }
@@ -279,8 +316,9 @@ const GraphComponent = () => {
                         id,
                         sources: [sourceId],
                         targets: [id],
+                        type: "straight",
                         style: {
-                            ...getNodeStyle(id),
+                            ...getEdgeStyle(mw),
                             backgroundColor: 'blue'
                         }
                     });
@@ -294,7 +332,7 @@ const GraphComponent = () => {
                         sources: [lastMiddlewareId || parentId],
                         targets: [id],
                         style: {
-                            ...getNodeStyle(id),
+                            ...getEdgeStyle(r),
                             backgroundColor: 'blue'
                         }
                     });
@@ -307,7 +345,7 @@ const GraphComponent = () => {
                         sources: [lastMiddlewareId || parentId],
                         targets: [id],
                         style: {
-                            ...getNodeStyle(id),
+                            ...getEdgeStyle(ctrl),
                             backgroundColor: 'blue'
                         }
                     });
@@ -324,35 +362,22 @@ const GraphComponent = () => {
                 id: "entrypoint-http", width: 64, height: 64, type: "entrypoint"
             });
 
-            const nodeNodeGap = "400";
-            const nodeEdgeGap = "200";
+            const nodeNodeGap = '20';
+            const nodeEdgeGap = '20';
             const graph = {
                 id: 'root',
                 layoutOptions: {
                     'elk.algorithm': 'layered',
                     'elk.direction': 'DOWN',
-                    'elk.padding': '[top=50,left=50,bottom=50,right=50]',
-                    'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
-                    'elk.spacing.nodeNode': '800',
-                    'elk.layered.spacing.nodeNodeBetweenLayers': '500',
-                    //"NETWORK_SIMPLEX" | "BRANDES_KOEPF" | "LINEAR_SEGMENTS"
-                    'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
                     'elk.spacing.nodeNode': nodeNodeGap,
                     'elk.layered.spacing.nodeNodeBetweenLayers': nodeNodeGap,
                     'elk.spacing.edgeNode': nodeEdgeGap,
                     'elk.layered.spacing.edgeEdgeBetweenLayers': nodeEdgeGap,
                     'elk.layered.spacing.edgeNodeBetweenLayers': nodeEdgeGap,
                     'elk.layered.wrapping.additionalEdgeSpacing': nodeEdgeGap,
-                    'elk.spacing.nodeSelfLoop': nodeEdgeGap,
+                    'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
                 },
-                children: [
-                    {
-                        id: 'root',
-                        type: 'app',
-                        labels: [{ text: 'Application' }],
-                        children: elkNodes
-                    }
-                ],
+                children: elkNodes,
                 edges: elkEdges
             };
 
@@ -396,9 +421,12 @@ const GraphComponent = () => {
                 id: e.id,
                 source: e.sources[0],
                 target: e.targets[0],
-                type: 'smoothstep',
+                type: e.type || 'smoothstep',
                 animated: true,
-                style: { stroke: '#475569', strokeWidth: 2 }
+                style: { stroke: '#475569', strokeWidth: 2 },
+                markerEnd: {
+                    type: MarkerType.ArrowClosed,
+                },
             }));
 
             setNodes(flowNodes);
