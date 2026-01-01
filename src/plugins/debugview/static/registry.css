@@ -1,0 +1,104 @@
+.tree-node {
+    margin-left: 1rem;
+    border-left: 1px solid #334155;
+    padding-left: 0.5rem;
+}
+
+.tree-item {
+    margin: 0.25rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.tree-icon {
+    color: var(--text-secondary);
+    font-size: 0.8em;
+}
+
+.tree-label {
+    color: var(--text-primary);
+}
+
+.tree-meta {
+    color: var(--text-secondary);
+    font-size: 0.8em;
+    margin-left: 0.5rem;
+    font-style: italic;
+}
+
+.badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7em;
+    font-weight: bold;
+}
+
+.badge-GET {
+    background: #0f172a;
+    color: #3b82f6;
+    border: 1px solid #3b82f6;
+}
+
+.badge-POST {
+    background: #0f172a;
+    color: #22c55e;
+    border: 1px solid #22c55e;
+}
+
+.badge-PUT {
+    background: #0f172a;
+    color: #eab308;
+    border: 1px solid #eab308;
+}
+
+.badge-DELETE {
+    background: #0f172a;
+    color: #ef4444;
+    border: 1px solid #ef4444;
+}
+
+.badge-ROUTER {
+    background: #334155;
+    color: #f8fafc;
+}
+
+.badge-CONTROLLER {
+    background: #475569;
+    color: #f8fafc;
+}
+
+
+/* Tooltip Styling */
+.tooltip {
+    position: relative;
+    display: inline-block;
+}
+
+.tooltip .tooltip-text {
+    visibility: hidden;
+    width: 220px;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    text-align: left;
+    border-radius: 6px;
+    padding: 8px;
+    position: absolute;
+    z-index: 1000;
+    bottom: 125%;
+    /* Position above */
+    left: 50%;
+    margin-left: -110px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    border: 1px solid var(--card-border);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    backdrop-filter: blur(12px);
+    font-size: 0.85rem;
+    pointer-events: none;
+}
+
+.tooltip:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}

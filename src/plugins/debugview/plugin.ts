@@ -81,7 +81,10 @@ export class DebugDashboard extends ShokupanRouter {
         edgeMetrics: {}
     };
 
-    private eta = new Eta();
+    private eta = new Eta({
+        views: __dirname + "/static",
+        cache: true
+    });
     private startTime = Date.now();
     private instrumented = false;
 
@@ -91,10 +94,6 @@ export class DebugDashboard extends ShokupanRouter {
         this.get("/metrics", (ctx) => {
             const uptimeSeconds = Math.floor((Date.now() - this.startTime) / 1000);
             const uptime = `${Math.floor(uptimeSeconds / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m ${uptimeSeconds % 60}s`;
-
-            // Ensure we have latest registry with IDs if possible (though ids are static after instrumentation)
-            // But we need to serve the registry TO the frontend so it knows the IDs.
-            // The frontend fetches /registry separately.
 
             return ctx.json({
                 metrics: this.metrics,
@@ -107,12 +106,6 @@ export class DebugDashboard extends ShokupanRouter {
             if (!this.instrumented && app) {
                 this.instrumentApp(app);
             }
-            // We need to return the registry WITH IDs. 
-            // instrumentApp modifies the functions, but doesn't persist the registry tree structure itself (getComponentRegistry returns new).
-            // So we need to re-generate the registry and re-assign IDs (or just generate them again deterministically).
-            // Actually, we can just call getComponentRegistry() and instrument it again (idempotent for IDs usually, or just re-assign).
-            // Better: getComponentRegistry() returns new objects. We traverse them, assign IDs to the objects based on structure, 
-            // AND ensure the functions match.
             const registry = app?.getComponentRegistry ? app.getComponentRegistry() : null;
             if (registry) {
                 this.assignIdsToRegistry(registry, 'root');
@@ -162,23 +155,17 @@ export class DebugDashboard extends ShokupanRouter {
         this.get("/", async (ctx) => {
             const uptimeSeconds = Math.floor((Date.now() - this.startTime) / 1000);
             const uptime = `${Math.floor(uptimeSeconds / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m ${uptimeSeconds % 60}s`;
-            const app = (this as any)[$appRoot];
-            const registry = app?.getComponentRegistry ? app.getComponentRegistry() : null;
-            if (registry) {
-                this.assignIdsToRegistry(registry, 'root');
-            }
 
             const linkPattern = this.getLinkPattern();
             const template = await readFile(__dirname + "/template.eta", 'utf8');
-            const html = this.eta.renderString(template, {
+
+            return ctx.html(this.eta.renderString(template, {
                 metrics: this.metrics,
                 uptime,
-                registry,
                 rootPath: process.cwd(),
                 linkPattern,
                 getRequestHeaders: this.dashboardConfig.getRequestHeaders?.toString()
-            });
-            return ctx.html(html);
+            }));
         });
     }
 

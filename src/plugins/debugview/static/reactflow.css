@@ -1,0 +1,13 @@
+.react-flow__controls-button {
+    color: #000 !important;
+    fill: #000 !important;
+    border-bottom: 1px solid #eee;
+}
+
+.react-flow__controls-button svg {
+    fill: currentColor;
+}
+
+.react-flow__node.react-flow__node-router {
+    height: fit-content !important;
+}
