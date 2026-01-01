@@ -72,7 +72,7 @@
 /* Tooltip Styling */
 .tooltip {
     position: relative;
-    display: inline-block;
+    display: block;
 }
 
 .tooltip .tooltip-text {

@@ -150,6 +150,7 @@ w
     // Injected function from server config
     const getRequestHeaders = <%~ it.getRequestHeaders || "undefined" %>;
     </script>
+    <script><%~ include("poll.js") %></script>
     <script type="module"><%~ include("graph.mjs") %></script>
     <script><%~ include("charts.js") %></script>
     <script><%~ include("registry.js") %></script>

@@ -117,7 +117,6 @@ function renderRegistry(node, container) {
         // Middleware
         if (item.kind === 'middleware') {
             const div = document.createElement('div');
-            div.innerHTML = `<div class="tree-item"><span class="badge" style="background: #9333ea; color: white;">MIDDLEWARE</span></div>`;
             const mwContainer = document.createElement('div');
             mwContainer.className = 'tree-node';
 
@@ -125,7 +124,7 @@ function renderRegistry(node, container) {
             mwDiv.className = 'tree-item tooltip'; // Add tooltip class
             const meta = createFileMeta(item.metadata, item.name);
             const tooltipHtml = getTooltipHtml(item.id);
-            mwDiv.innerHTML = `<span class="tree-label">${item.name}</span>${meta}${tooltipHtml}`;
+            mwDiv.innerHTML = `<span class="badge" style="background: #9333ea; color: white;">MIDDLEWARE</span> <span class="tree-label">${item.name}</span>${meta}${tooltipHtml}`;
 
             mwContainer.appendChild(mwDiv);
             div.appendChild(mwDiv);
