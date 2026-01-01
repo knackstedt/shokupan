@@ -186,6 +186,113 @@ For fair comparisons:
 - Use the same payload size across frameworks
 - Avoid I/O operations in route handlers
 
+---
+
+## Advanced Benchmark Suite
+
+The advanced benchmark suite tests frameworks under more realistic and challenging scenarios beyond basic request handling.
+
+### Running Advanced Benchmarks
+
+Execute the full advanced benchmark suite:
+
+```bash
+bun run bench:advanced
+```
+
+### Advanced Scenarios
+
+1. **Compression (gzip, brotli, deflate, zstd, store)**
+   - Tests compression performance across different algorithms
+   - Measures throughput and latency with compressed responses
+   - Some frameworks may not support all algorithms
+
+2. **Large Payloads**
+   - **Request**: POST with 10MB body
+   - **Response**: 5MB JSON response
+   - **Headers**: 100+ headers stress test
+
+3. **Math Middleware Chain**
+   - 10 middleware performing MD5 hashing on request data
+   - Tests middleware overhead and CPU-bound operations
+   - Measures framework efficiency in chaining middleware
+
+4. **Route Scaling (1000 Handlers)**
+   - Registers 1000 unique routes
+   - Tests routing performance at scale
+   - Identifies O(n) vs O(1) route lookup implementations
+
+5. **Fully-Loaded Performance**
+   - Combines OpenTelemetry tracing, validators, and AsyncLocalStorage
+   - Measures overhead of production-ready configurations
+   - Compares baseline vs fully-instrumented performance
+
+6. **Long-Pending Parallelization**
+   - 1000+ concurrent requests with 5-minute delays
+   - Tests connection handling and timeout behavior
+   - Identifies frameworks' parallelization capabilities
+
+### Filtering Options
+
+**Filter by Framework:**
+```bash
+bun advanced-runner.ts --filter shokupan
+```
+
+**Filter by Scenario:**
+```bash
+bun advanced-runner.ts --scenario compression-gzip
+```
+
+**Combine Filters:**
+```bash
+bun advanced-runner.ts --filter fastify --scenario large-payload-response
+```
+
+### Advanced Reports
+
+Results are saved to `advanced-results.json` and displayed in `advanced-report.html` with:
+- Interactive tabs for each scenario
+- Framework capability matrix (which scenarios are supported)
+- Detailed metrics including percentiles
+- Historical tracking (last 10 runs)
+
+### Framework Limitations
+
+Not all frameworks support all scenarios. Common limitations:
+
+- **Compression**: Some frameworks lack brotli/zstd support
+- **Math Middleware**: NestJS has limited dynamic middleware support
+- **Long-Pending**: Some frameworks may not handle 1000+ connections efficiently
+
+Failed scenarios are marked as "FAILED" in the report with error details.
+
+### Project Structure
+
+```
+benchmark/
+├── cases/                  # Basic framework implementations
+├── advanced-cases/         # Advanced scenario implementations
+│   ├── shokupan.ts
+│   ├── fastify.ts
+│   ├── express.ts
+│   ├── koa.ts
+│   ├── hapi.ts
+│   ├── nest.ts
+│   ├── hono.ts
+│   └── elysia.ts
+├── data.ts                 # Basic test data
+├── advanced-data.ts        # Large payloads and utilities
+├── runner.ts               # Basic benchmark runner
+├── advanced-runner.ts      # Advanced benchmark runner
+├── worker.ts               # Basic worker process
+├── advanced-worker.ts      # Advanced worker process
+├── report.html             # Basic benchmark report
+└── advanced-report.html    # Advanced benchmark report
+```
+
+---
+
 ## License
 
 Same as parent Shokupan project.

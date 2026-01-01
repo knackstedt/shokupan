@@ -1,0 +1,143 @@
+import { Compression } from "../../plugins/compression";
+import { Shokupan } from "../../shokupan";
+import type { Middleware, NextFn } from "../../types";
+import { asyncContext } from "../../util/async-hooks";
+import { COMPRESSIBLE_JSON, LARGE_JSON, md5, serializeRequest } from "../advanced-data";
+
+export async function startAdvanced(port: number, scenario: string) {
+    const app = new Shokupan({
+        port,
+        logger: {
+            verbose: false,
+            info: () => { },
+            debug: () => { },
+            warning: () => { },
+            error: () => { },
+            fatal: () => { }
+        } as any
+    });
+
+    switch (scenario) {
+        case "compression-gzip":
+        case "compression-brotli":
+        case "compression-zstd":
+        case "compression-deflate":
+            // Use compression middleware
+            app.use(Compression({ threshold: 1024 }));
+            app.get("/compressed", (ctx) => {
+                return ctx.json(COMPRESSIBLE_JSON);
+            });
+            app.get("/compressed-large", (ctx) => {
+                return ctx.json(LARGE_JSON);
+            });
+            break;
+
+        case "compression-store":
+            // No compression, just return data
+            app.get("/compressed", (ctx) => {
+                return ctx.json(COMPRESSIBLE_JSON);
+            });
+            app.get("/compressed-large", (ctx) => {
+                return ctx.json(LARGE_JSON);
+            });
+            break;
+
+        case "large-payload-request":
+            app.post("/large-request", async (ctx) => {
+                const body = await ctx.request.text();
+                return ctx.json({ received: body.length });
+            });
+            break;
+
+        case "large-payload-response":
+            app.get("/large-response", (ctx) => {
+                return ctx.json(LARGE_JSON);
+            });
+            break;
+
+        case "large-payload-headers":
+            app.get("/large-headers", (ctx) => {
+                // Add 100 large headers to response
+                const headers = new Headers();
+                for (let i = 0; i < 100; i++) {
+                    headers.set(`X-Custom-Header-${i}`, `Value-${i}-`.padEnd(200, 'x'));
+                }
+                return new Response("OK", { headers });
+            });
+            break;
+
+        case "math-middleware":
+            // Add 10 MD5 middleware
+            for (let i = 0; i < 10; i++) {
+                const hashMiddleware: Middleware = async (ctx, next: NextFn) => {
+                    const url = ctx.url.toString();
+                    const headersObj = Object.fromEntries(ctx.headers.entries());
+                    // Skip body reading for GET requests (no body to read)
+                    const hash = md5(serializeRequest(url, headersObj, ""));
+                    ctx.set(`X-Hash-${i}`, hash);
+                    return next();
+                };
+                app.use(hashMiddleware);
+            }
+            app.get("/compute", (ctx) => {
+                return ctx.text("OK");
+            });
+            break;
+
+        case "scaling":
+            // Register 1000 routes
+            for (let i = 0; i < 1000; i++) {
+                app.get(`/route-${i}`, (ctx) => {
+                    return ctx.text(`Route ${i}`);
+                });
+            }
+            break;
+
+        case "fully-loaded":
+            // AsyncLocalStorage middleware
+            const asyncStorageMiddleware: Middleware = async (ctx, next: NextFn) => {
+                return asyncContext.run(new Map([['requestId', Math.random().toString()]]), async () => {
+                    return next();
+                });
+            };
+            app.use(asyncStorageMiddleware);
+
+            // Simple validator middleware (simulating Zod)
+            const validatorMiddleware: Middleware = async (ctx, next: NextFn) => {
+                if (ctx.request.method === "POST") {
+                    const body = await ctx.request.clone().json().catch(() => null);
+                    if (!body || typeof body.data !== 'string') {
+                        return ctx.json({ error: "Invalid body" }, 400);
+                    }
+                }
+                return next();
+            };
+            app.use(validatorMiddleware);
+
+            app.post("/validate", async (ctx) => {
+                const body = await ctx.request.json();
+                return ctx.json({ validated: true, data: body });
+            });
+            app.get("/validate", (ctx) => {
+                return ctx.json({ validated: true });
+            });
+            break;
+
+        case "long-pending":
+            app.get("/delayed", async (ctx) => {
+                // 100ms delay to test concurrent handling
+                await new Promise(r => setTimeout(r, 100));
+                return ctx.text("done");
+            });
+            break;
+
+        default:
+            throw new Error(`Unknown scenario: ${scenario}`);
+    }
+
+    const server = await app.listen(port);
+
+    return async () => {
+        server.stop();
+    };
+}
