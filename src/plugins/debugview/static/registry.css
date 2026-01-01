@@ -1,7 +1,7 @@
 .tree-node {
     margin-left: 1rem;
-    border-left: 1px solid #334155;
-    padding-left: 0.5rem;
+    border-left: 1px solid #40516a;
+    padding-left: 1rem;
 }
 
 .tree-item {
@@ -27,6 +27,15 @@
     font-style: italic;
 }
 
+.path-param {
+    color: var(--text-emphasis);
+}
+
+.path-end,
+.path-param {
+    font-weight: bold;
+}
+
 .badge {
     padding: 2px 6px;
     border-radius: 4px;
@@ -50,6 +59,24 @@
     background: #0f172a;
     color: #eab308;
     border: 1px solid #eab308;
+}
+
+.badge-PATCH {
+    background: #0f172a;
+    color: #08d3ea;
+    border: 1px solid #08eae6;
+}
+
+.badge-HEAD {
+    background: #0f172a;
+    color: #e3ea08;
+    border: 1px solid #e3ea08;
+}
+
+.badge-OPTIONS {
+    background: #0f172a;
+    color: #838383;
+    border: 1px solid #838383;
 }
 
 .badge-DELETE {

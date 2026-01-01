@@ -16,7 +16,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="text/javascript" src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
 </head>
-w
 <body>
     <div class="container">
         <header>
@@ -30,7 +29,7 @@ w
                 <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
                 <button class="tab-btn" onclick="switchTab('registry')">Registry</button>
                 <button class="tab-btn" onclick="switchTab('graph')">Graph</button>
-                <button class="tab-btn" onclick="switchTab('middleware')">Middleware</button>
+                <button class="tab-btn" onclick="switchTab('requests')">Requests</button>
                 <button class="tab-btn" onclick="switchTab('failures')">Failures</button>
             </div>
         </header>
@@ -122,15 +121,22 @@ w
             <div id="cy"></div>
         </div>
 
-        <!-- Middleware Tab -->
-        <div id="tab-middleware" class="tab-content">
+        <!-- Requests Tab -->
+        <div id="tab-requests" class="tab-content">
              <div class="card" style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
-                <div class="card-title">Middleware Executions (Last 100)</div>
+                <div class="card-title">Recent Requests (Last 100)</div>
                 <div>
-                    <button onclick="fetchMiddleware()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px 10px; border-radius: 4px; cursor: pointer;">Refresh</button>
+                    <button onclick="fetchRequests()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px 10px; border-radius: 4px; cursor: pointer;">Refresh</button>
                 </div>
              </div>
-             <div id="middleware-table-container"></div>
+             <div id="requests-list-container" style="height: 300px; margin-bottom: 2rem;"></div>
+             
+             <div id="request-details-container" class="card" style="display: none;">
+                <div class="card-title">Request Details</div>
+                <div id="request-details-content"></div>
+                <div class="card-title" style="margin-top: 1rem;">Middleware Trace</div>
+                <div id="middleware-trace-container"></div>
+             </div>
         </div>
 
         <!-- Failures Tab -->
@@ -155,6 +161,7 @@ w
     <script><%~ include("charts.js") %></script>
     <script><%~ include("registry.js") %></script>
     <script><%~ include("failures.js") %></script>
+    <script><%~ include("requests.js") %></script>
 </body>
 
 </html>

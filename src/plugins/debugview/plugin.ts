@@ -36,6 +36,7 @@ export interface RequestLog {
     status: number;
     duration: number;
     timestamp: number;
+    handlerStack?: any[];
 }
 
 export interface DebugDashboardConfig {
@@ -83,7 +84,7 @@ export class DebugDashboard extends ShokupanRouter {
 
     private eta = new Eta({
         views: __dirname + "/static",
-        cache: true
+        cache: false
     });
     private startTime = Date.now();
     private instrumented = false;
@@ -102,21 +103,27 @@ export class DebugDashboard extends ShokupanRouter {
         });
 
         this.get("/registry", (ctx) => {
-            const app = (this as any)[$appRoot];
+            const app = (this)[$appRoot];
             if (!this.instrumented && app) {
                 this.instrumentApp(app);
             }
-            const registry = app?.getComponentRegistry ? app.getComponentRegistry() : null;
+            const registry = app?.getComponentRegistry?.();
             if (registry) {
                 this.assignIdsToRegistry(registry, 'root');
             }
             return ctx.json({ registry });
         });
 
-        // Middleware Tracking Endpoint
-        this.get("/middleware", async (ctx) => {
-            const result = await datastore.query("SELECT * FROM middleware_tracking ORDER BY timestamp DESC LIMIT 100");
-            return ctx.json({ middleware: result[0] || [] });
+        // Requests Listing Endpoint
+        this.get("/requests", async (ctx) => {
+            const result = await datastore.query("SELECT * FROM requests ORDER BY timestamp DESC LIMIT 100");
+            return ctx.json({ requests: result[0] || [] });
+        });
+
+        // Request Details Endpoint
+        this.get("/requests/:id", async (ctx) => {
+            const result = await datastore.query("SELECT * FROM requests WHERE id = $id", { id: ctx.params['id'] });
+            return ctx.json({ request: result[0]?.[0] });
         });
 
         // Replay/Failed Requests Endpoints
@@ -309,13 +316,23 @@ export class DebugDashboard extends ShokupanRouter {
                     this.metrics.successfulRequests++;
                 }
 
-                this.metrics.logs.push({
+                const logEntry: RequestLog = {
                     method: ctx.request.method,
                     url: ctx.path,
                     status: response.status,
                     duration,
-                    timestamp: Date.now()
-                });
+                    timestamp: Date.now(),
+                    handlerStack: (ctx as any).handlerStack
+                };
+
+                this.metrics.logs.push(logEntry);
+
+                // Persist to datastore for detailed view
+                try {
+                    await datastore.set('requests', Date.now().toString(), logEntry);
+                } catch (e) {
+                    console.error("Failed to record request log", e);
+                }
 
                 const retention = this.dashboardConfig.retentionMs ?? 7200000;
                 const cutoff = Date.now() - retention;

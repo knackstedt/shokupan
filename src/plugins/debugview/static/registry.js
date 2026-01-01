@@ -113,6 +113,25 @@ function renderRegistry(node, container) {
         `;
     }
 
+    function renderPath(path) {
+        const parts = path.split('/').slice(1);
+
+        let out = '';
+        parts.forEach((part, index) => {
+            if (part.startsWith(":")) {
+                out += `/<span class="path-segment path-param">${part}</span>`;
+                return;
+            }
+            if (index === parts.length - 1) {
+                out += `/<span class="path-segment path-end">${part}</span>`;
+                return;
+            };
+            out += `/<span class="path-segment">${part}</span>`;
+        });
+
+        return out;
+    }
+
     allItems.forEach(item => {
         // Middleware
         if (item.kind === 'middleware') {
@@ -140,7 +159,7 @@ function renderRegistry(node, container) {
             const tooltipHtml = getTooltipHtml(item.id);
             header.innerHTML = `
                 <span class="badge badge-ROUTER">ROUTER</span>
-                <span class="tree-label">${item.path}</span>
+                <span class="tree-label">${renderPath(item.path)}</span>
                 ${meta}
                 ${tooltipHtml}
             `;
@@ -169,7 +188,7 @@ function renderRegistry(node, container) {
             const tooltipHtml = getTooltipHtml(item.id);
             header.innerHTML = `
                 <span class="badge badge-CONTROLLER">CTRL</span>
-                <span class="tree-label" style="font-weight: bold;">${name} <span style="color:var(--text-secondary); font-weight:normal;">(${cPath})</span></span>
+                <span class="tree-label" style="font-weight: bold;">${name} <span style="color:var(--text-secondary); font-weight:normal;">(${renderPath(cPath)})</span></span>
                 ${meta}
                 ${tooltipHtml}
             `;
@@ -192,7 +211,7 @@ function renderRegistry(node, container) {
                     const tHtml = getTooltipHtml(r.id);
                     rDiv.innerHTML = `
                         <span class="badge ${badgeClass}" style="width: 50px; text-align: center; display: inline-block;">${method}</span>
-                        <span class="tree-label">${r.path}</span>
+                        <span class="tree-label">${renderPath(r.path)}</span>
                         ${rMeta}
                         ${tHtml}
                     `;
@@ -223,7 +242,7 @@ function renderRegistry(node, container) {
 
             div.innerHTML = `
                 <span class="badge ${badgeClass}" style="width: 50px; text-align: center; display: inline-block;">${method}</span>
-                <span class="tree-label">${item.path}</span>
+                <span class="tree-label">${renderPath(item.path)}</span>
                 ${meta}
                 ${tHtml}
             `;
@@ -235,7 +254,7 @@ function renderRegistry(node, container) {
 
 const registryContainer = document.getElementById('registry-tree');
 
-fetch(url)
+fetch(url, { headers })
     .then(res => res.json())
     .then(({ registry }) => {
         renderRegistry(window.registryData = registry, registryContainer);
