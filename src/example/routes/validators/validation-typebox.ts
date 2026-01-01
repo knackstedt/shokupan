@@ -1,12 +1,17 @@
 import { Type } from '@sinclair/typebox';
+import { TypeCompiler } from '@sinclair/typebox/compiler';
 import { validate } from '../../../plugins/validation';
 import { ShokupanRouter } from '../../../router';
+
+// Helper to compile schemas for Shokupan validation
+const C = (schema: any) => TypeCompiler.Compile(schema);
 
 /**
  * TypeBox Validation Examples
  * 
  * This router demonstrates schema validation using TypeBox.
  * TypeBox is a JSON schema type builder with static type resolution.
+ * Shokupan requires TypeBox schemas to be compiled using TypeCompiler.
  */
 export class TypeBoxValidationRouter extends ShokupanRouter {
     constructor() {
@@ -23,7 +28,7 @@ export class TypeBoxValidationRouter extends ShokupanRouter {
                 tags: ['Validation', 'TypeBox']
             },
             validate({
-                body: Type.Object({
+                body: C(Type.Object({
                     name: Type.String({ minLength: 3, maxLength: 50 }),
                     email: Type.String({ format: 'email' }),
                     age: Type.Integer({ minimum: 18, maximum: 120 }),
@@ -32,7 +37,7 @@ export class TypeBoxValidationRouter extends ShokupanRouter {
                         Type.Literal('admin'),
                         Type.Literal('moderator')
                     ]))
-                })
+                }))
             }),
             async (ctx) => {
                 const userData = await ctx.body();
@@ -52,7 +57,7 @@ export class TypeBoxValidationRouter extends ShokupanRouter {
                 tags: ['Validation', 'TypeBox']
             },
             validate({
-                query: Type.Object({
+                query: C(Type.Object({
                     q: Type.String({ minLength: 1 }),
                     page: Type.Optional(Type.String({ pattern: '^\\d+$' })),
                     limit: Type.Optional(Type.String({ pattern: '^\\d+$' })),
@@ -60,7 +65,7 @@ export class TypeBoxValidationRouter extends ShokupanRouter {
                         Type.Literal('true'),
                         Type.Literal('false')
                     ]))
-                })
+                }))
             }),
             (ctx) => {
                 const query = ctx.query;
@@ -81,9 +86,9 @@ export class TypeBoxValidationRouter extends ShokupanRouter {
                 tags: ['Validation', 'TypeBox']
             },
             validate({
-                params: Type.Object({
+                params: C(Type.Object({
                     id: Type.String({ format: 'uuid' })
-                })
+                }))
             }),
             (ctx) => {
                 const { id } = ctx.params;
@@ -108,7 +113,7 @@ export class TypeBoxValidationRouter extends ShokupanRouter {
                 tags: ['Validation', 'TypeBox']
             },
             validate({
-                body: Type.Object({
+                body: C(Type.Object({
                     customerId: Type.String({ format: 'uuid' }),
                     items: Type.Array(
                         Type.Object({
@@ -129,7 +134,7 @@ export class TypeBoxValidationRouter extends ShokupanRouter {
                         Type.Literal('paypal'),
                         Type.Literal('bank_transfer')
                     ])
-                })
+                }))
             }),
             async (ctx) => {
                 const order = await ctx.body();
@@ -152,15 +157,15 @@ export class TypeBoxValidationRouter extends ShokupanRouter {
                 tags: ['Validation', 'TypeBox']
             },
             validate({
-                params: Type.Object({
+                params: C(Type.Object({
                     id: Type.String({ pattern: '^\\d+$' })
-                }),
-                body: Type.Object({
+                })),
+                body: C(Type.Object({
                     name: Type.Optional(Type.String({ minLength: 3 })),
                     email: Type.Optional(Type.String({ format: 'email' })),
                     age: Type.Optional(Type.Integer({ minimum: 18 })),
                     bio: Type.Union([Type.String(), Type.Null()])
-                })
+                }))
             }),
             async (ctx) => {
                 const { id } = ctx.params;
@@ -183,7 +188,7 @@ export class TypeBoxValidationRouter extends ShokupanRouter {
                 tags: ['Validation', 'TypeBox']
             },
             validate({
-                body: Type.Object({
+                body: C(Type.Object({
                     users: Type.Array(
                         Type.Object({
                             name: Type.String({ minLength: 3 }),
@@ -192,7 +197,7 @@ export class TypeBoxValidationRouter extends ShokupanRouter {
                         }),
                         { minItems: 1, maxItems: 100 }
                     )
-                })
+                }))
             }),
             async (ctx) => {
                 const { users } = await ctx.body();
@@ -212,12 +217,12 @@ export class TypeBoxValidationRouter extends ShokupanRouter {
                 tags: ['Validation', 'TypeBox']
             },
             validate({
-                body: Type.Object({
+                body: C(Type.Object({
                     productId: Type.String(),
                     price: Type.Number({ minimum: 0.01, maximum: 999999.99 }),
                     discount: Type.Optional(Type.Number({ minimum: 0, maximum: 100 })),
                     currency: Type.String({ minLength: 3, maxLength: 3 })
-                })
+                }))
             }),
             async (ctx) => {
                 const pricing = await ctx.body();
