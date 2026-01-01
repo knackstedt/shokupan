@@ -754,6 +754,26 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             ? { regex: customRegex, keys: [] }
             : this.parsePath(path);
 
+        // Merge specs from guards
+        if (this.currentGuards.length > 0) {
+            spec = spec || {};
+            for (const guard of this.currentGuards) {
+                if (guard.spec) {
+                    // Merge Responses
+                    if (guard.spec.responses) {
+                        spec.responses = spec.responses || {};
+                        Object.assign(spec.responses, guard.spec.responses);
+                    }
+
+                    // Merge Security
+                    if (guard.spec.security) {
+                        spec.security = spec.security || [];
+                        spec.security.push(...guard.spec.security);
+                    }
+                }
+            }
+        }
+
         // Wrap handler with current guards if any exist
         let wrappedHandler = handler;
         const routeGuards = [...this.currentGuards];

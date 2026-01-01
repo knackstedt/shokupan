@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Compression } from "../../plugins/compression";
 import { Cors } from "../../plugins/cors";
+import { RateLimitMiddleware } from "../../plugins/rate-limit";
 import { SecurityHeaders } from "../../plugins/security-headers";
 import { Shokupan } from "../../shokupan";
 

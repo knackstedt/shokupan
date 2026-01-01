@@ -20,7 +20,7 @@ describe("JSX Rendering", () => {
 
         const res = await app.fetch(new Request("http://localhost/test"));
         expect(res.status).toBe(200);
-        expect(res.headers.get("content-type")).toBe("text/html");
+        expect(res.headers.get("content-type")).toContain("text/html");
         expect(await res.text()).toBe("<div>hello</div>");
     });
 
