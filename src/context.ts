@@ -38,6 +38,7 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
         public readonly server?: Server<any>,
         state?: State,
         public readonly app?: Shokupan,
+        public readonly signal?: AbortSignal, // Optional as it might not be provided in tests or simple creates
         enableMiddlewareTracking: boolean = false
     ) {
         this.state = state || {} as State;
@@ -113,7 +114,19 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     /**
      * Request query params
      */
-    get query() { return Object.fromEntries(this.url.searchParams); }
+    get query() {
+        const q: Record<string, any> = {};
+        for (const [key, value] of this.url.searchParams) {
+            if (q[key] === undefined) {
+                q[key] = value;
+            } else if (Array.isArray(q[key])) {
+                q[key].push(value);
+            } else {
+                q[key] = [q[key], value];
+            }
+        }
+        return q;
+    }
 
     /**
      * Client IP address
@@ -178,28 +191,36 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
      * @param options Cookie options
      */
     public setCookie(name: string, value: string, options: CookieOptions = {}) {
+        // Robust Cookie Serialization
         let cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}`;
-
         if (options.maxAge) cookie += `; Max-Age=${Math.floor(options.maxAge)}`;
+        if (options.domain) cookie += `; Domain=${options.domain}`;
+        if (options.path) cookie += `; Path=${options.path || '/'}`;
         if (options.expires) cookie += `; Expires=${options.expires.toUTCString()}`;
         if (options.httpOnly) cookie += `; HttpOnly`;
         if (options.secure) cookie += `; Secure`;
-        if (options.domain) cookie += `; Domain=${options.domain}`;
-        if (options.path) cookie += `; Path=${options.path || '/'}`;
-        if (options.sameSite) {
-            const sameSite = typeof options.sameSite === 'string'
-                ? options.sameSite.toLowerCase()
-                : options.sameSite
-                    ? 'strict'
-                    : 'lax'; // Default logic if boolean true, though usually explicit string is better
-            // Ideally follow specific behavior: express-session/cookies uses boolean to mean strict/lax sometimes?
-            // Let's stick to standard strings mostly, but maybe map boolean to Strict/Lax?
-            // Standard: SameSite=Lax (default if missing but we are setting it only if present)
-            // If strictly boolean true -> Strict, false -> (don't set? or None? usually don't set)
-            cookie += `; SameSite=${typeof options.sameSite === 'boolean' ? 'Strict' : (options.sameSite.charAt(0).toUpperCase() + options.sameSite.slice(1))}`;
+
+        let sameSite = options.sameSite;
+        if (sameSite === true) sameSite = 'Strict';
+        if (sameSite === undefined || sameSite === false) {
+            // Do not set SameSite if undefined/false? Or Default to Lax?
+            // Modern browsers default to Lax.
+            // We'll leave it omit unless specified.
+        } else {
+            const stringSameSite = typeof sameSite === 'string' ? sameSite.toLowerCase() : sameSite;
+            switch (stringSameSite) {
+                case 'lax': cookie += '; SameSite=Lax'; break;
+                case 'strict': cookie += '; SameSite=Strict'; break;
+                case 'none': cookie += '; SameSite=None'; break;
+                default: cookie += '; SameSite=Lax'; break;
+            }
         }
+
         if (options.priority) {
-            cookie += `; Priority=${options.priority.charAt(0).toUpperCase() + options.priority.slice(1)}`;
+            const p = options.priority.toLowerCase();
+            if (p === 'low') cookie += '; Priority=Low';
+            else if (p === 'medium') cookie += '; Priority=Medium';
+            else if (p === 'high') cookie += '; Priority=High';
         }
 
         this.response.append('Set-Cookie', cookie);
@@ -257,11 +278,12 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
      * Read request body
      */
     async body<T = any>(): Promise<T> {
-        const contentType = this.request.headers.get("content-type");
-        if (contentType?.includes("application/json")) {
+        const contentType = this.request.headers.get("content-type") || "";
+
+        if (contentType.includes("application/json") || contentType.includes("+json")) {
             return this.request.json() as any;
         }
-        if (contentType?.includes("multipart/form-data") || contentType?.includes("application/x-www-form-urlencoded")) {
+        if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
             return this.request.formData() as any;
         }
         return this.request.text() as any;

@@ -341,14 +341,42 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                             for (const arg of sortedArgs) {
                                 switch (arg.type) {
                                     case RouteParamType.BODY:
-                                        args[arg.index] = await ctx.req.json().catch(() => ({}));
+                                        try {
+                                            if (ctx.req.headers.get("content-type")?.includes("application/json")) {
+                                                args[arg.index] = await ctx.req.json();
+                                            } else {
+                                                // Fallback or empty if not JSON? 
+                                                // If @Body is used, valid JSON is expected.
+                                                // If empty body, json() throws.
+                                                const text = await ctx.req.text();
+                                                if (!text) {
+                                                    args[arg.index] = {};
+                                                } else {
+                                                    args[arg.index] = JSON.parse(text);
+                                                }
+                                            }
+                                        } catch (e) {
+                                            const err: any = new Error("Invalid JSON body");
+                                            err.status = 400;
+                                            throw err;
+                                        }
                                         break;
                                     case RouteParamType.PARAM:
                                         args[arg.index] = arg.name ? ctx.params[arg.name] : ctx.params;
                                         break;
                                     case RouteParamType.QUERY: {
                                         const url = new URL(ctx.req.url);
-                                        args[arg.index] = arg.name ? url.searchParams.get(arg.name) : Object.fromEntries(url.searchParams);
+                                        if (arg.name) {
+                                            const vals = url.searchParams.getAll(arg.name);
+                                            args[arg.index] = vals.length > 1 ? vals : vals[0];
+                                        } else {
+                                            const query: Record<string, any> = {};
+                                            for (const key of url.searchParams.keys()) {
+                                                const vals = url.searchParams.getAll(key);
+                                                query[key] = vals.length > 1 ? vals : vals[0];
+                                            }
+                                            args[arg.index] = query;
+                                        }
                                         break;
                                     }
                                     case RouteParamType.HEADER:
@@ -669,7 +697,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                 keys.push(key);
                 return "([^/]+)";
             })
-            .replace(/\*/g, ".*"); // Wildcard support
+            .replace(/\*\*/g, ".*")   // Recursive wildcard
+            .replace(/\*/g, "[^/]+"); // Single segment wildcard
 
         return {
             regex: new RegExp(`^${pattern}$`),

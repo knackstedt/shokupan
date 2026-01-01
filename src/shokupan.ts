@@ -302,7 +302,8 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         // But ShokupanContext expects ShokupanRequest.
         const request = req as unknown as ShokupanRequest<T>;
 
-        const ctx = new ShokupanContext<T>(request, server, undefined, this, this.applicationConfig.enableMiddlewareTracking);
+        const controller = new AbortController();
+        const ctx = new ShokupanContext<T>(request, server, undefined, this, controller.signal, this.applicationConfig.enableMiddlewareTracking);
 
         const handle = async () => {
 
@@ -347,26 +348,28 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 else if ((result === null || result === undefined) && ctx._finalResponse instanceof Response) {
                     response = ctx._finalResponse;
                 }
-                else if ((result === null || result === undefined) && ctx.response.status === 404) {
-                    // If status is 404 (default) and no result, try to see if it was modified?
-                    // Actually ShokupanContext sets default status 200? No context.response wraps a base response?
-                    // Wait, context has internal response object.
-
-                    // If simply nothing was returned and status wasn't set to something else, assume 404 Not Found
-                    // But if user set status 200 manually?
-
-                    // Simple logic:
-                    const span = asyncContext.getStore()?.get("span");
-                    if (span) span.setAttribute("http.status_code", 404);
-                    response = ctx.text("Not Found", 404);
-                }
+                // (Logic moved to main block below)
                 else if (result === null || result === undefined) {
-                    // Fallback to whatever is in ctx
-                    // Or if ctx has a body set?
-                    // For now default not found logic above covers most "no match" cases.
-                    // But if match found and handler returned null?
-                    if (ctx._finalResponse) response = ctx._finalResponse;
-                    else response = ctx.text("Not Found", 404);
+                    // Handler returned nothing (void/null/undefined)
+
+                    // 1. Check if response was explicitly set via helper (e.g. ctx.text())
+                    if (ctx._finalResponse instanceof Response) {
+                        response = ctx._finalResponse;
+                    }
+                    // 2. Check if user manipulated ctx.response state manually (status/headers)
+                    // If status is NOT 200 (default), or headers are set, maybe we should construct a response?
+                    // But usually returning nothing implies 404 in this framework unless explicit.
+                    // However, if one sets `ctx.response.status = 201`, they expect 201?
+                    // Currently `ShokupanResponse` doesn't automatically generate a body.
+                    // So we'd send empty body with that status.
+                    else if (ctx.response.status !== 200 || ctx.response.hasPopulatedHeaders) {
+                        // Construct response from context state
+                        response = ctx.send(null, { status: ctx.response.status, headers: ctx.response.headers });
+                    }
+                    // 3. Fallback: Not Found
+                    else {
+                        response = ctx.text("Not Found", 404);
+                    }
                 }
                 else if (typeof result === "object") {
                     response = ctx.json(result);
@@ -410,12 +413,14 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         let executionPromise = handle();
         const timeoutMs = this.applicationConfig.requestTimeout;
 
-        if (timeoutMs && timeoutMs > 0 && this.hasHook('onRequestTimeout')) {
+        if (timeoutMs && timeoutMs > 0) {
             let timeoutId: any;
             const timeoutPromise = new Promise<Response>((_, reject) => {
                 timeoutId = setTimeout(async () => {
-                    await this.executeHook('onRequestTimeout', ctx);
-
+                    controller.abort(); // Signal cancellation to handlers
+                    if (this.hasHook('onRequestTimeout')) {
+                        await this.executeHook('onRequestTimeout', ctx);
+                    }
                     reject(new Error("Request Timeout"));
                 }, timeoutMs);
             });

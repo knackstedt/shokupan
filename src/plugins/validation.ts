@@ -163,7 +163,44 @@ const safelyGetBody = async (ctx: ShokupanContext) => {
 
 // --- Main Middleware ---
 
+// --- Main Middleware ---
+
+function getValidator(schema: any): (data: any) => Promise<any> | any {
+    if (isZod(schema)) {
+        return (data) => validateZod(schema, data);
+    }
+    if (isTypeBox(schema)) {
+        return (data) => validateTypeBox(schema, data);
+    }
+    if (isAjv(schema)) {
+        return (data) => validateAjv(schema, data);
+    }
+    if (isValibotWrapper(schema)) {
+        return (data) => validateValibotWrapper(schema, data);
+    }
+    if (isClass(schema)) {
+        return (data) => validateClassValidator(schema, data);
+    }
+    if (typeof schema === 'function') {
+        return schema;
+    }
+    throw new Error("Unknown validator type provided. Please use a supported library (Zod, Ajv, TypeBox) or a custom function.");
+}
+
 export function validate(config: ValidationConfig): Middleware {
+    // Pre-compilation: Resolve validators for each part
+    const validators: {
+        params?: (data: any) => any;
+        query?: (data: any) => any;
+        headers?: (data: any) => any;
+        body?: (data: any) => any;
+    } = {};
+
+    if (config.params) validators.params = getValidator(config.params);
+    if (config.query) validators.query = getValidator(config.query);
+    if (config.headers) validators.headers = getValidator(config.headers);
+    if (config.body) validators.body = getValidator(config.body);
+
     return async (ctx: ShokupanContext, next) => {
         // Prepare data for beforeValidate hook
         const dataToValidate: any = {};
@@ -188,34 +225,28 @@ export function validate(config: ValidationConfig): Middleware {
         }
 
         // Validate Params
-        if (config.params) {
-            ctx.params = await runValidation(config.params, ctx.params);
+        if (validators.params) {
+            ctx.params = await validators.params(ctx.params);
         }
 
         // Validate Query
         let validQuery: any;
-        if (config.query && queryObj) {
-            validQuery = await runValidation(config.query, queryObj);
-            // We can't easily replace ctx.query as it is likely a getter wrapping URL
-            // But we can store it in state
-            // Or try to update URL search params?
-            // If validation coerced types (e.g. string -> number), updating URL search params converts back to string.
-            // So we attach to state.
-            // (ctx.state as any).query = validQuery;
+        if (validators.query && queryObj) {
+            validQuery = await validators.query(queryObj);
         }
 
         // Validate Headers
-        if (config.headers) {
+        if (validators.headers) {
             const headersObj = Object.fromEntries(ctx.req.headers.entries());
-            await runValidation(config.headers, headersObj);
+            await validators.headers(headersObj);
         }
 
         // Validate Body
         let validBody: any;
-        if (config.body) {
+        if (validators.body) {
             // Re-use body accessed above or get again (it's cached)
             const b = body ?? await safelyGetBody(ctx);
-            validBody = await runValidation(config.body, b);
+            validBody = await validators.body(b);
 
             // Update cached body with validated/sanitized version
             const req = ctx.req as any;
@@ -236,49 +267,10 @@ export function validate(config: ValidationConfig): Middleware {
             if (config.params) validatedData.params = ctx.params;
             if (config.query) validatedData.query = validQuery;
             if (config.body) validatedData.body = validBody;
-            // headers not easily updated on ctx in a way we can retrieve as "validated object" unless we return it
 
             await ctx.app.applicationConfig.hooks.afterValidate(ctx, validatedData);
         }
 
         return next();
     };
-}
-
-async function runValidation(schema: any, data: any): Promise<any> {
-    if (isZod(schema)) {
-        return validateZod(schema, data);
-    }
-    if (isTypeBox(schema)) {
-        return validateTypeBox(schema, data);
-    }
-    if (isAjv(schema)) {
-        return validateAjv(schema, data);
-    }
-    if (isValibotWrapper(schema)) {
-        return validateValibotWrapper(schema, data);
-    }
-
-    // Check custom function first? Or check Class first?
-    // isClass might yield true for simple functions if our check is loose.
-    // But if we use class-syntax check it's safer.
-    // Let's try isClass specific check.
-    if (isClass(schema)) {
-        return validateClassValidator(schema, data);
-    }
-    if (isTypeBox(schema)) {
-        return validateTypeBox(schema, data);
-    }
-    if (isAjv(schema)) {
-        return validateAjv(schema, data);
-    }
-    if (isValibotWrapper(schema)) {
-        return validateValibotWrapper(schema, data);
-    }
-
-    if (typeof schema === 'function') {
-        return schema(data);
-    }
-
-    throw new Error("Unknown validator type provided. Please use a supported library (Zod, Ajv, TypeBox) or a custom function.");
 }
