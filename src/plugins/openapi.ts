@@ -6,6 +6,20 @@ import { deepMerge } from '../util/deep-merge';
 /**
  * Analyze a handler function to infer request/response types
  */
+const REGEX_QUERY_INT = /parseInt\(ctx\.query\.(\w+)\)/g;
+const REGEX_QUERY_FLOAT = /parseFloat\(ctx\.query\.(\w+)\)/g;
+const REGEX_QUERY_NUMBER = /Number\(ctx\.query\.(\w+)\)/g;
+const REGEX_QUERY_BOOL = /(?:Boolean\(ctx\.query\.(\w+)\)|!+ctx\.query\.(\w+))/g;
+const REGEX_QUERY_GENERIC = /ctx\.query\.(\w+)/g;
+const REGEX_PARAM_INT = /parseInt\(ctx\.params\.(\w+)\)/g;
+const REGEX_PARAM_FLOAT = /parseFloat\(ctx\.params\.(\w+)\)/g;
+const REGEX_PARAM_GENERIC = /ctx\.params\.(\w+)/;
+const REGEX_HEADER_GET = /ctx\.get\(['"](\w+)['"]\)/g;
+const REGEX_ERROR_STATUS = /ctx\.(?:json|text|html)\([^)]+,\s*(\d{3,})\)/g;
+
+/**
+ * Analyze a handler function to infer request/response types
+ */
 function analyzeHandler(handler: ShokupanHandler): { inferredSpec?: any; } {
     const handlerSource = handler.toString();
     const inferredSpec: any = {};
@@ -17,54 +31,39 @@ function analyzeHandler(handler: ShokupanHandler): { inferredSpec?: any; } {
         };
     }
 
-
-    // Detect query parameters with type detection
     const queryParams = new Map<string, { type: string; format?: string; }>();
 
-    const queryIntMatch = handlerSource.match(/parseInt\(ctx\.query\.(\w+)\)/g);
-    if (queryIntMatch) {
-        queryIntMatch.forEach(match => {
-            const paramName = match.match(/ctx\.query\.(\w+)/)?.[1];
-            if (paramName) queryParams.set(paramName, { type: 'integer', format: 'int32' });
-        });
+    // Query Integers
+    for (const match of handlerSource.matchAll(REGEX_QUERY_INT)) {
+        if (match[1]) queryParams.set(match[1], { type: 'integer', format: 'int32' });
     }
 
-    const queryFloatMatch = handlerSource.match(/parseFloat\(ctx\.query\.(\w+)\)/g);
-    if (queryFloatMatch) {
-        queryFloatMatch.forEach(match => {
-            const paramName = match.match(/ctx\.query\.(\w+)/)?.[1];
-            if (paramName) queryParams.set(paramName, { type: 'number', format: 'float' });
-        });
+    // Query Floats
+    for (const match of handlerSource.matchAll(REGEX_QUERY_FLOAT)) {
+        if (match[1]) queryParams.set(match[1], { type: 'number', format: 'float' });
     }
 
-    const queryNumberMatch = handlerSource.match(/Number\(ctx\.query\.(\w+)\)/g);
-    if (queryNumberMatch) {
-        queryNumberMatch.forEach(match => {
-            const paramName = match.match(/ctx\.query\.(\w+)/)?.[1];
-            if (paramName && !queryParams.has(paramName)) {
-                queryParams.set(paramName, { type: 'number' });
-            }
-        });
+    // Query Numbers
+    for (const match of handlerSource.matchAll(REGEX_QUERY_NUMBER)) {
+        if (match[1] && !queryParams.has(match[1])) {
+            queryParams.set(match[1], { type: 'number' });
+        }
     }
 
-    const queryBoolMatch = handlerSource.match(/(?:Boolean\(ctx\.query\.(\w+)\)|!+ctx\.query\.(\w+))/g);
-    if (queryBoolMatch) {
-        queryBoolMatch.forEach(match => {
-            const paramName = match.match(/ctx\.query\.(\w+)/)?.[1];
-            if (paramName && !queryParams.has(paramName)) {
-                queryParams.set(paramName, { type: 'boolean' });
-            }
-        });
+    // Query Booleans
+    for (const match of handlerSource.matchAll(REGEX_QUERY_BOOL)) {
+        const name = match[1] || match[2];
+        if (name && !queryParams.has(name)) {
+            queryParams.set(name, { type: 'boolean' });
+        }
     }
 
-    const queryMatch = handlerSource.match(/ctx\.query\.(\w+)/g);
-    if (queryMatch) {
-        queryMatch.forEach(match => {
-            const paramName = match.split('.')[2];
-            if (paramName && !queryParams.has(paramName)) {
-                queryParams.set(paramName, { type: 'string' });
-            }
-        });
+    // Generic Query Strings
+    for (const match of handlerSource.matchAll(REGEX_QUERY_GENERIC)) {
+        const name = match[1];
+        if (name && !queryParams.has(name)) {
+            queryParams.set(name, { type: 'string' });
+        }
     }
 
     if (queryParams.size > 0) {
@@ -78,23 +77,16 @@ function analyzeHandler(handler: ShokupanHandler): { inferredSpec?: any; } {
         });
     }
 
-    // Detect path parameters
     const pathParams = new Map<string, { type: string; format?: string; }>();
 
-    const paramIntMatch = handlerSource.match(/parseInt\(ctx\.params\.(\w+)\)/g);
-    if (paramIntMatch) {
-        paramIntMatch.forEach(match => {
-            const paramName = match.match(/ctx\.params\.(\w+)/)?.[1];
-            if (paramName) pathParams.set(paramName, { type: 'integer', format: 'int32' });
-        });
+    // Path Integers
+    for (const match of handlerSource.matchAll(REGEX_PARAM_INT)) {
+        if (match[1]) pathParams.set(match[1], { type: 'integer', format: 'int32' });
     }
 
-    const paramFloatMatch = handlerSource.match(/parseFloat\(ctx\.params\.(\w+)\)/g);
-    if (paramFloatMatch) {
-        paramFloatMatch.forEach(match => {
-            const paramName = match.match(/ctx\.params\.(\w+)/)?.[1];
-            if (paramName) pathParams.set(paramName, { type: 'number', format: 'float' });
-        });
+    // Path Floats
+    for (const match of handlerSource.matchAll(REGEX_PARAM_FLOAT)) {
+        if (match[1]) pathParams.set(match[1], { type: 'number', format: 'float' });
     }
 
     if (pathParams.size > 0) {
@@ -109,94 +101,67 @@ function analyzeHandler(handler: ShokupanHandler): { inferredSpec?: any; } {
         });
     }
 
-    // Detect headers
-    const headerMatch = handlerSource.match(/ctx\.get\(['"](\w+)['"]\)/g);
-    if (headerMatch) {
-        if (!inferredSpec.parameters) inferredSpec.parameters = [];
-        headerMatch.forEach(match => {
-            const headerName = match.match(/['"](\w+)['"]/)?.[1];
-            if (headerName) {
-                inferredSpec.parameters.push({
-                    name: headerName,
-                    in: 'header',
-                    schema: { type: 'string' }
-                });
-            }
-        });
+    // Detect Headers
+    for (const match of handlerSource.matchAll(REGEX_HEADER_GET)) {
+        if (match[1]) {
+            if (!inferredSpec.parameters) inferredSpec.parameters = [];
+            inferredSpec.parameters.push({
+                name: match[1],
+                in: 'header',
+                schema: { type: 'string' }
+            });
+        }
     }
 
-    // Detect response formats from ctx methods
+    // Detect response formats
     const responses: any = {};
 
-    // Detect ctx.json() → application/json
     if (handlerSource.includes('ctx.json(')) {
         responses['200'] = {
             description: 'Successful response',
-            content: {
-                'application/json': { schema: { type: 'object' } }
-            }
+            content: { 'application/json': { schema: { type: 'object' } } }
         };
     }
 
-    // Detect ctx.html() → text/html
     if (handlerSource.includes('ctx.html(')) {
         responses['200'] = {
             description: 'Successful response',
-            content: {
-                'text/html': { schema: { type: 'string' } }
-            }
+            content: { 'text/html': { schema: { type: 'string' } } }
         };
     }
 
-    // Detect ctx.text() → text/plain
     if (handlerSource.includes('ctx.text(')) {
         responses['200'] = {
             description: 'Successful response',
-            content: {
-                'text/plain': { schema: { type: 'string' } }
-            }
+            content: { 'text/plain': { schema: { type: 'string' } } }
         };
     }
 
-    // Detect ctx.file() → application/octet-stream
     if (handlerSource.includes('ctx.file(')) {
         responses['200'] = {
             description: 'File download',
-            content: {
-                'application/octet-stream': { schema: { type: 'string', format: 'binary' } }
-            }
+            content: { 'application/octet-stream': { schema: { type: 'string', format: 'binary' } } }
         };
     }
 
-    // Detect ctx.redirect() → 3xx redirect
     if (handlerSource.includes('ctx.redirect(')) {
-        responses['302'] = {
-            description: 'Redirect'
-        };
+        responses['302'] = { description: 'Redirect' };
     }
 
-    // Detect plain object return (fallback to JSON) - Pattern: return { ... }
+    // Fallback to JSON for plain object returns
     if (!responses['200'] && /return\s+\{/.test(handlerSource)) {
         responses['200'] = {
             description: 'Successful response',
-            content: {
-                'application/json': { schema: { type: 'object' } }
-            }
+            content: { 'application/json': { schema: { type: 'object' } } }
         };
     }
 
-    // Detect error responses with status codes
-    // Pattern: ctx.json({...}, 400) or ctx.text('error', 500)
-    const errorStatusMatch = handlerSource.match(/ctx\.(?:json|text|html)\([^)]+,\s*(\d{3,})\)/g);
-    if (errorStatusMatch) {
-        errorStatusMatch.forEach(match => {
-            const statusCode = match.match(/,\s*(\d{3,})\)/)?.[1];
-            if (statusCode && statusCode !== '200') {
-                responses[statusCode] = {
-                    description: `Error response (${statusCode})`
-                };
-            }
-        });
+    // Detect Error Responses
+    for (const match of handlerSource.matchAll(REGEX_ERROR_STATUS)) {
+        const statusCode = match[1];
+        if (statusCode && statusCode !== '200') {
+            responses[statusCode] = { description: `Error response (${statusCode})` };
+        }
     }
 
     if (Object.keys(responses).length > 0) {
@@ -350,11 +315,8 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                 tags: [tag]
             };
 
-
-
             // Merge metadata from guards (if any)
             if (route.guards) {
-                // Iterate guards to harvest security requirements or responses
                 for (const guard of route.guards) {
                     if (guard.spec) {
                         // Merge security (deduplicated)
@@ -368,7 +330,7 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                             }
                             operation.security = existing;
                         }
-                        // Merge responses (e.g. 401/403)
+                        // Merge responses
                         if (guard.spec.responses) {
                             operation.responses = { ...operation.responses, ...guard.spec.responses };
                         }
@@ -377,8 +339,6 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
             }
 
             // --- Step 4: Base Data from AST ---
-            // Find matching AST route
-            // Matching logic: Method + Path (normalized) + Handler Source Matching
 
             // 1. Exact Match (Method + Path)
             let astMatch = astRoutes.find(r =>
@@ -388,7 +348,6 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
 
             // 2. Fallback: Match by Handler Source (ignores Path mismatch due to mounting prefixes)
             if (!astMatch) {
-                // Unwrap: If handler is wrapped (e.g. Controller), check originalHandler
                 let runtimeSource = route.handler.toString();
                 if ((route.handler as any).originalHandler) {
                     runtimeSource = (route.handler as any).originalHandler.toString();
@@ -402,7 +361,7 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                 // Find one that matches source
                 astMatch = sameMethodRoutes.find(r => {
                     const astHandlerSrc = (r.handlerSource || r.handlerName || '').replace(/\s+/g, ' ');
-                    if (!astHandlerSrc || astHandlerSrc.length < 20) return false; // fast fail on empty/short
+                    if (!astHandlerSrc || astHandlerSrc.length < 20) return false;
 
                     const match = runtimeHandlerSrc.includes(astHandlerSrc) ||
                         astHandlerSrc.includes(runtimeHandlerSrc) ||
@@ -410,19 +369,10 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
 
                     return match;
                 });
-
-                if (astMatch) {
-                    // console.log(`[OpenAPI] MATCHED via source!`);
-                }
             }
 
 
-            // Disambiguate if multiple routes share the same path/method (but from different apps/files)
-            // AND we haven't found a source-based match yet (or we verified exact path match but need to be sure)
-            // Actually, if we found a source-based match in step 2, we are good.
-            // If we found an exact path match in step 1, we might still have ambiguity if multiple files define same path?
-            // Existing disambiguation logic relied on exact path. Let's keep it for exact path cases.
-
+            // Disambiguate if multiple routes share the same path/method
             const potentialMatches = astRoutes.filter(r =>
                 r.method.toUpperCase() === route.method.toUpperCase() &&
                 r.path === fullPath
@@ -430,19 +380,15 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
 
             if (potentialMatches.length > 1) {
                 const runtimeHandlerSrc = route.handler.toString().replace(/\s+/g, ' ');
-                // console.log(`[OpenAPI] Disambiguating ${potentialMatches.length} matches for ${fullPath}...`);
 
                 // Try to find the best match by checking if AST handler snippet is in Runtime handler source
                 const preciseMatch = potentialMatches.find(r => {
                     const astHandlerSrc = (r.handlerSource || r.handlerName || '').replace(/\s+/g, ' ');
 
                     // Relaxed matching: check if ONE includes the other (source code containment)
-                    // limit length to avoid huge string comparisons if not needed
                     const match = runtimeHandlerSrc.includes(astHandlerSrc) || astHandlerSrc.includes(runtimeHandlerSrc) ||
-                        (r.handlerSource && runtimeHandlerSrc.includes(r.handlerSource.substring(0, 50))); /* Fallback to prefix match */
+                        (r.handlerSource && runtimeHandlerSrc.includes(r.handlerSource.substring(0, 50)));
 
-                    // console.log(`- comparing with AST source: "${astHandlerSrc.substring(0, 50)}..."`);
-                    // console.log(`  MATCH: ${match}`);
                     return match;
                 });
 
@@ -450,9 +396,6 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                     astMatch = preciseMatch;
                 }
             }
-
-            // Clean up debug logs
-            // if (fullPath === "/" && route.method.toUpperCase() === "GET") { ... }
 
             if (astMatch) {
                 if (astMatch.summary) operation.summary = astMatch.summary;
@@ -491,14 +434,11 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                 // Merge Parameters (Query, Path, Header) from AST
                 const params: any[] = [];
                 if (astMatch.requestTypes?.query) {
-                    // AST gives us { param: type }, we need to convert to OpenAPI param
-                    // This part of AST analyzer might need improvement to give types, currently it gives string map?
-                    // Let's assume the analyzer gives us schema-like objects or we infer basic string
                     for (const [name, _type] of Object.entries(astMatch.requestTypes.query)) {
-                        params.push({ name, in: 'query', schema: { type: 'string' } }); // simplifying for now
+                        params.push({ name, in: 'query', schema: { type: 'string' } });
                     }
                 }
-                // ... similar for headers
+
                 if (params.length > 0) {
                     operation.parameters = params;
                 }
@@ -521,7 +461,6 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                 pathParams.forEach(p => {
                     const idx = mergedParams.findIndex(ep => ep.in === 'path' && ep.name === p.name);
                     if (idx >= 0) {
-                        // Overwrite or keep? Usually runtime path keys are the source of truth for existence
                         mergedParams[idx] = deepMerge(mergedParams[idx], p);
                     } else {
                         mergedParams.push(p);
@@ -530,23 +469,7 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                 operation.parameters = mergedParams;
             }
 
-            // Runtime analysis (analyzeHandler) - this is the "detectable code usage" part from step 2/3 but done at runtime
-            // The prompt says Step 2 & 3 is AST. But existing code had `analyzeHandler`.
-            // Let's keep `analyzeHandler` as a fallback or supplementary to AST if AST missed it 
-            // OR if the user meant Step 2/3 to BE the AST part (which is "Step 4" in my plan corresponding to user's point 4).
-            // User point 5: "Decorators included in this library".
-
-            // We have route.guards (Decorators sometimes add guards or metadata)
-            // But we don't have a direct "Decorators" list on the route object itself unless we stored it.
-            // `route.handlerSpec` seems to be used for manual overrides in `types.ts`?
-            // Wait, existing code used `analyzeHandler`. The user said "Step 2: ... generates OpenAPI data ... input fields".
-            // And "Step 4: ... AST ...".
-            // Actually, point 1 says "reads the TS files". So Step 2/3 ARE AST.
-            // Point 5 is "Decorators".
-
-            // So `analyzeHandler` (regex based) is probably less reliable than AST and might be redundant if AST works.
-            // But if AST fails (e.g. dynamic code), `analyzeHandler` is good.
-            // Let's treat `analyzeHandler` as part of Step 5 (Runtime/Decorator logic) or just merge it in.
+            // Runtime analysis (analyzeHandler)
             const { inferredSpec } = analyzeHandler(route.handler);
             if (inferredSpec) {
                 if (inferredSpec.parameters) {

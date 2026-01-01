@@ -123,9 +123,6 @@ export class AuthPlugin extends ShokupanRouter<any> {
 
             const provider = this.getProviderInstance(providerName, providerConfig);
             if (!provider) {
-                // Try treating as generic oauth2 if it has configured urls? 
-                // But for now strict mapping based on key unless we add logic.
-                // We'll skip if unknown.
                 continue;
             }
 
