@@ -23,6 +23,9 @@ Shokupan is designed to make building APIs delightful again. With zero-config de
 - 📚 **OpenAPI Docs** - Beautiful OpenAPI documentation with [Scalar](https://scalar.dev/).
 - ⏩ **Short shift** - Very simple migration from [Express](https://expressjs.com/) or [NestJS](https://nestjs.com/) to Shokupan.
 
+![Shokupan Debug Dashboard](docs/src/assets/debug_dashboard_overview.png)
+
+
 ## 🚀 Quick Start
 
 > Bun and TypeScript are recommended for Shokupan, though it also supports Node.js and standard JavaScript.

@@ -1,5 +1,6 @@
 import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
+import starlightChangelogs from 'starlight-changelogs';
 import starlightImageZoom from 'starlight-image-zoom';
 import starlightLinksValidator from 'starlight-links-validator';
 
@@ -12,6 +13,16 @@ export default defineConfig({
             plugins: [
                 starlightImageZoom({ showCaptions: true }),
                 starlightLinksValidator(),
+                starlightChangelogs({
+                    slug: 'changelog',
+                    authors: {
+                        'knackstedt': {
+                            name: 'knackstedt',
+                            url: 'https://github.com/knackstedt',
+                            title: 'Maintainer',
+                        }
+                    },
+                }),
             ],
             title: 'Shokupan',
             description: 'A low-lift modern web framework for Bun',
