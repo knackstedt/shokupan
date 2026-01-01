@@ -39,21 +39,22 @@ export function Compression(options: CompressionOptions = {}): Middleware {
             if (response.headers.has("Content-Encoding")) return response;
 
             // Optimized path: use raw body from context if available
-            let body: ArrayBuffer;
+            // Optimized path: use raw body from context if available
+            let body: ArrayBuffer | Uint8Array;
             let bodySize: number;
 
             if (ctx._rawBody !== undefined) {
                 // Fast path: we have the raw body from ctx.json() or ctx.text()
                 if (typeof ctx._rawBody === "string") {
                     const encoded = new TextEncoder().encode(ctx._rawBody);
-                    body = encoded.buffer as ArrayBuffer;
+                    body = encoded;
                     bodySize = encoded.byteLength;
                 } else if (ctx._rawBody instanceof Uint8Array) {
-                    body = ctx._rawBody.buffer as ArrayBuffer;
-                    bodySize = ctx._rawBody.byteLength;
-                } else {
                     body = ctx._rawBody;
                     bodySize = ctx._rawBody.byteLength;
+                } else {
+                    body = ctx._rawBody as ArrayBuffer;
+                    bodySize = body.byteLength;
                 }
             } else {
                 // Fallback: read from response (slower)
@@ -66,7 +67,7 @@ export function Compression(options: CompressionOptions = {}): Middleware {
                 return new Response(body, {
                     status: response.status,
                     statusText: response.statusText,
-                    headers: response.headers
+                    headers: new Headers(response.headers)
                 });
             }
 

@@ -14,6 +14,8 @@ export interface HandlerStackItem {
     file: string;
     line: number;
     stateChanges?: Record<string, any>;
+    startTime?: number;
+    duration?: number;
 }
 
 export interface DebugCollector {

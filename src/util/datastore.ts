@@ -15,6 +15,7 @@ const ready = db.connect(engine, { namespace: "vendor", database: "shokupan" }).
         DEFINE TABLE OVERWRITE users SCHEMALESS COMMENT "Created by Shokupan";
         DEFINE TABLE OVERWRITE idempotency_keys SCHEMALESS COMMENT "Created by Shokupan";
         DEFINE TABLE OVERWRITE middleware_tracking SCHEMALESS COMMENT "Created by Shokupan";
+        DEFINE TABLE OVERWRITE requests SCHEMALESS COMMENT "Created by Shokupan";
     `);
 });
 

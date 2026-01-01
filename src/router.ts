@@ -8,7 +8,7 @@ import { RouterTrie } from './router/trie';
 import type { Shokupan } from './shokupan';
 import { $appRoot, $childControllers, $childRouters, $controllerPath, $dispatch, $isApplication, $isMounted, $isRouter, $middleware, $mountPath, $parent, $routeArgs, $routeMethods, $routes, $routeSpec } from './symbol';
 
-import { type GuardAPISpec, HTTPMethods, type JSXRenderer, type Method, type MethodAPISpec, type Middleware, type OpenAPIOptions, type ProcessResult, type RequestOptions, type RouteMetadata, RouteParamType, type ShokupanController, type ShokupanHandler, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions } from './types';
+import { type GuardAPISpec, HTTPMethods, type JSXRenderer, type Method, type MethodAPISpec, type Middleware, type OpenAPIOptions, type ProcessResult, type RequestOptions, type RouteMetadata, RouteParamType, type ShokupanController, type ShokupanHandler, type ShokupanHooks, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions } from './types';
 import { asyncContext } from './util/async-hooks';
 import { datastore } from './util/datastore';
 import { traceHandler } from './util/instrumentation';
@@ -51,18 +51,38 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     private currentGuards: { handler: ShokupanHandler<T>; spec?: GuardAPISpec; }[] = [];
 
     // Registry Accessor
-    public getComponentRegistry() {
-        // Collect local routes
-        const routes = this[$routes].map(r => ({
-            type: 'route',
-            path: r.path,
-            method: r.method,
-            metadata: r.metadata,
-            handlerName: r.handler.name,
-            tags: r.handlerSpec?.tags,
-            order: r.order,
-            _fn: r.handler // Expose handler for debugging instrumentation
-        }));
+    public getComponentRegistry(): {
+        metadata: RouteMetadata,
+        middleware: { name: string, metadata: RouteMetadata, order: number, _fn: Middleware; }[],
+        routes: { type: 'route', path: string, method: Method, metadata: RouteMetadata, handlerName: string, tags: string[], order: number, _fn: ShokupanHandler<T>; }[],
+        routers: { type: 'router', path: string, metadata: RouteMetadata, children: { routes: any[]; }; }[],
+        controllers: { type: 'controller', path: string, name: string, metadata: RouteMetadata; children: { routes: any[]; }; }[];
+    } {
+        // Separation logic: Group routes by controller instance
+        const controllerRoutesMap = new Map<any, any[]>();
+        const localRoutes: any[] = [];
+
+        for (const r of this[$routes]) {
+            const entry = {
+                type: 'route' as 'route',
+                path: r.path,
+                method: r.method,
+                metadata: r.metadata,
+                handlerName: r.handler.name,
+                tags: r.handlerSpec?.tags,
+                order: r.order,
+                _fn: r.handler
+            };
+
+            if (r.controller) {
+                if (!controllerRoutesMap.has(r.controller)) {
+                    controllerRoutesMap.set(r.controller, []);
+                }
+                controllerRoutesMap.get(r.controller)!.push(entry);
+            } else {
+                localRoutes.push(entry);
+            }
+        }
 
         // Collect middleware (if exists, e.g. on Shokupan app)
         const mw = this.middleware;
@@ -74,29 +94,29 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         })) : [];
 
         // Collect child routers
-        const routers = this[$childRouters].map(r => ({
-            type: 'router',
+        const routers = this[$childRouters].map((r: ShokupanRouter<T>) => ({
+            type: 'router' as 'router',
             path: r[$mountPath],
             metadata: r.metadata,
             children: r.getComponentRegistry()
         }));
 
         // Collect child controllers
-        const controllers = this[$childControllers].map(c => {
-            // Controllers attached via instance... 
-            // We might need to store metadata on instance during mount?
+        const controllers = this[$childControllers].map((c: ShokupanController<T>) => {
+            const routes = controllerRoutesMap.get(c) || [];
             return {
-                type: 'controller',
+                type: 'controller' as 'controller',
                 path: (c as any)[$mountPath] || '/',
                 name: c.constructor.name,
-                metadata: (c as any).metadata // Check if we can store this
+                metadata: (c as any).metadata,
+                children: { routes }
             };
         });
 
         return {
             metadata: this.metadata,
             middleware,
-            routes,
+            routes: localRoutes,
             routers,
             controllers
         };
@@ -239,7 +259,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             const methodMiddlewareMap = (instance as any)[$middleware] || (proto && (proto as any)[$middleware]);
 
             let routesAttached = 0;
-            for (const name of methods) {
+            for (const name of Array.from(methods)) {
                 if (name === "constructor") continue;
                 if (["arguments", "caller", "callee"].includes(name)) continue;
 
@@ -423,7 +443,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                     // Merge with existing spec from decorator if available
                     const spec = { tags: [tagName], ...userSpec };
 
-                    this.add({ method, path: normalizedPath, handler: finalHandler, spec });
+                    this.add({ method, path: normalizedPath, handler: finalHandler, spec, controller: instance });
                 }
             }
             if (routesAttached === 0) {
@@ -719,7 +739,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * @param handler - Route handler function
      * @param requestTimeout - Timeout for this route in milliseconds
      */
-    public add({ method, path, spec, handler, regex: customRegex, group, requestTimeout, renderer }: {
+    public add({ method, path, spec, handler, regex: customRegex, group, requestTimeout, renderer, controller }: {
         method: Method,
         path: string,
         spec?: MethodAPISpec,
@@ -728,6 +748,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         group?: string;
         requestTimeout?: number;
         renderer?: JSXRenderer;
+        controller?: any;
     }) {
         const { regex, keys } = customRegex
             ? { regex: customRegex, keys: [] }
@@ -889,7 +910,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             metadata: {
                 file,
                 line
-            }
+            },
+            controller
         });
 
         // Insert into Trie

@@ -86,12 +86,22 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             const c = ctx as any;
             if (c.handlerStack && c.app?.applicationConfig.enableMiddlewareTracking) {
                 const metadata = (middleware as any).metadata || {};
-                c.handlerStack.push({
+                const start = performance.now();
+                const item = {
                     name: metadata.pluginName ? `${metadata.pluginName} (${metadata.name})` : metadata.name || middleware.name || 'middleware',
                     file: metadata.file || file,
                     line: metadata.line || line,
-                    isBuiltin: metadata.isBuiltin
-                });
+                    isBuiltin: metadata.isBuiltin,
+                    startTime: start,
+                    duration: -1
+                };
+                c.handlerStack.push(item);
+
+                try {
+                    return await middleware(ctx, next);
+                } finally {
+                    item.duration = performance.now() - start;
+                }
             }
             return middleware(ctx, next);
         };

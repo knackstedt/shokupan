@@ -179,6 +179,10 @@ export type ShokupanRoute = {
      * Order of the middleware
      */
     order?: number;
+    /**
+     * Controller instance this route belongs to
+     */
+    controller?: any;
 };
 
 export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> = DeepPartial<{
