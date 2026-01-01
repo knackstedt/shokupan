@@ -3,8 +3,12 @@
     "version": "0.4.3",
     "description": "Shokupan is a low-lift modern web framework for Bun.",
     "author": "Andrew G. Knackstedt",
+    "publishConfig": {
+        "access": "public",
+        "provenance": true
+    },
     "repository": {
-        "url": "https://github.com/knackstedt/shokupan"
+        "url": "git+https://github.com/knackstedt/shokupan.git"
     },
     "license": "MIT",
     "keywords": [
@@ -26,8 +30,8 @@
         "bench:advanced": "cd src/benchmarking && bun advanced-runner.ts"
     },
     "bin": {
-        "shokupan": "./dist/cli.js",
-        "skp": "./dist/cli.js"
+        "shokupan": "dist/cli.js",
+        "skp": "dist/cli.js"
     },
     "files": [
         "dist",
