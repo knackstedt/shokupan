@@ -1,5 +1,7 @@
 import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
+import starlightImageZoom from 'starlight-image-zoom';
+import starlightLinksValidator from 'starlight-links-validator';
 
 // https://astro.build/config
 export default defineConfig({
@@ -7,11 +9,15 @@ export default defineConfig({
     base: '/shokupan',
     integrations: [
         starlight({
+            plugins: [
+                starlightImageZoom({ showCaptions: true }),
+                starlightLinksValidator(),
+            ],
             title: 'Shokupan',
             description: 'A low-lift modern web framework for Bun',
-            social: {
-                github: 'https://github.com/knackstedt/shokupan',
-            },
+            social: [
+                { label: 'GitHub', href: 'https://github.com/knackstedt/shokupan', icon: 'github' },
+            ],
             editLink: {
                 baseUrl: 'https://github.com/knackstedt/shokupan/edit/main/docs/',
             },

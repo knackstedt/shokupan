@@ -30,6 +30,9 @@ app.listen();
 // Documentation available at: http://localhost:3000/docs
 ```
 
+![Scalar API Documentation](../../../assets/scalar_health_check.png)
+
+
 ## Configuration
 
 ```typescript

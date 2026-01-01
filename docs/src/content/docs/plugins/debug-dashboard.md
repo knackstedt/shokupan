@@ -11,10 +11,12 @@ The `DebugDashboard` provides a visual interface to inspect your running applica
 - View middleware execution logs if `enableMiddlewareTracking` is on.
 - Inspect and replay failed requests captured by `FailedRequestRecorder`.
 
+![Debug Dashboard Overview](../../../assets/debug_dashboard_overview.png)
+
 ## Installation
 
 ```typescript
-import { DebugDashboard } from 'shokupan/plugins/debugview';
+import { DebugDashboard } from 'shokupan';
 
 // Mount the dashboard at a path of your choice
 app.mount('/debug', new DebugDashboard({
@@ -33,6 +35,18 @@ app.mount('/debug', new DebugDashboard({
 
 ### Middleware Graph
 Visualizes the structure of your application, showing how routers, controllers, and middleware are connected.
+
+![Middleware Graph](../../../assets/debug_graph_view.png)
+
+### Component Registry
+Inspect all registered routes and controllers in a flat or hierarchical view.
+
+![Component Registry](../../../assets/debug_registry_view.png)
+
+### Requests View
+Analyze incoming requests, their duration, and the time spent in each middleware.
+
+![Requests View](../../../assets/debug_requests_view.png)
 
 ### Failed Requests
 Lists requests that resulted in errors. You can click on a failure to see details and replay it.
