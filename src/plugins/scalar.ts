@@ -39,7 +39,7 @@ export class ScalarPlugin extends ShokupanRouter<any> {
                 <body>
                     <div id="app"></div>
 
-                    <script src="<%= it.path %>scalar.js"></script>
+                    <script src="https://unpkg.com/@scalar/api-reference@1.25.108/dist/browser/standalone.js"></script>
                     <script>
                         Scalar.createApiReference('#app', [{ ...<%~ JSON.stringify(it.config.baseDocument) %>,
                             url: "<%= it.path %>openapi.json",
@@ -49,10 +49,6 @@ export class ScalarPlugin extends ShokupanRouter<any> {
                 </body>
 
                 </html>`, { path, config: this.pluginOptions }));
-        });
-
-        this.get("/scalar.js", (ctx) => {
-            return ctx.file(__dirname + "/../../node_modules/@scalar/api-reference/dist/browser/standalone.js");
         });
 
         this.get("/openapi.json", async (ctx) => {
