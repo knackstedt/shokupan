@@ -17,12 +17,10 @@ describe("Express Compatibility", () => { // Skipping initially until implementa
             return { prop: ctx.state.testProp };
         });
 
-        const server = await app.listen();
-        const res = await fetch(`http://localhost:${server.port}/test-mutation`);
+        const res = await app.fetch(new Request("http://localhost/test-mutation"));
         const data = await res.json();
 
         expect(data).toEqual({ prop: "mutated" });
-        server.stop();
     });
 
     it("should redirect res.set to response headers", async () => {
@@ -39,11 +37,9 @@ describe("Express Compatibility", () => { // Skipping initially until implementa
             return "ok";
         });
 
-        const server = await app.listen();
-        const res = await fetch(`http://localhost:${server.port}/test-headers`);
+        const res = await app.fetch(new Request("http://localhost/test-headers"));
 
         expect(res.headers.get("x-custom-header")).toBe("custom-value");
         expect(res.headers.get("x-another-header")).toBe("another-value");
-        server.stop();
     });
 });

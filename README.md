@@ -31,7 +31,7 @@ Shokupan is designed to make building APIs delightful again. With zero-config de
 > Bun and TypeScript are recommended for Shokupan, though it also supports Node.js and standard JavaScript.
 
 ```typescript
-import { Shokupan } from 'shokupan';
+import { Shokupan, ScalarPlugin } from 'shokupan';
 const app = new Shokupan();
 
 app.get('/', (ctx) => ({ message: 'Hello, World!' }));

@@ -22,12 +22,8 @@ describe("Middleware Tracking", () => {
             return ctx.json({ stack: ctx.handlerStack });
         });
 
-        const server = await app.listen(0);
-        const port = server.port;
-        const res = await fetch(`http://localhost:${port}/tracking`);
+        const res = await app.fetch(new Request("http://localhost/tracking"));
         const data = await res.json() as any;
-
-        server.stop();
 
         expect(res.status).toBe(200);
         expect(data.stack).toBeDefined();
@@ -60,12 +56,8 @@ describe("Middleware Tracking", () => {
             return ctx.json({ stack: ctx.handlerStack });
         });
 
-        const server = await app.listen(0);
-        const port = server.port;
-        const res = await fetch(`http://localhost:${port}/no-tracking`);
+        const res = await app.fetch(new Request("http://localhost/no-tracking"));
         const data = await res.json() as any;
-
-        server.stop();
 
         expect(res.status).toBe(200);
         expect(data.stack).toBeDefined();

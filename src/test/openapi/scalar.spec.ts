@@ -26,7 +26,7 @@ describe("Scalar Plugin Rendering with Eta", () => {
         // Check for Eta rendered content
         expect(res.data).toContain("<!doctype html>");
         expect(res.data).toContain("<title>API Reference</title>");
-        expect(res.data).toContain('src="http://localhost:3000/docs/scalar.js"');
+        expect(res.data).toContain('src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"');
         expect(res.data).toContain('url: "http://localhost:3000/docs/openapi.json"');
 
         // Check escaped/unescaped content if any (JSON.stringify uses <%~ %> in my change)

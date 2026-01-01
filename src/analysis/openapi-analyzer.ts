@@ -7,7 +7,7 @@ import ts from 'typescript';
  */
 interface CollectedFile {
     path: string;
-    type: 'ts' | 'js' | 'map';
+    type: 'ts' | 'tsx' | 'cts' | 'dts' | 'mts' | 'js' | 'jsx' | 'mjs' | 'cjs' | 'map';
     content?: string;
 }
 
@@ -113,18 +113,14 @@ export class OpenAPIAnalyzer {
 
                 // Skip node_modules for source files (we'll handle deps separately)
                 if (entry.isDirectory()) {
-                    if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'dist') {
+                    if (["node_modules", ".git", "dist"].includes(entry.name)) {
                         continue;
                     }
                     await this.scanDirectory(fullPath);
                 } else {
                     const ext = path.extname(entry.name);
-                    if (ext === '.ts') {
-                        this.files.push({ path: fullPath, type: 'ts' });
-                    } else if (ext === '.js') {
-                        this.files.push({ path: fullPath, type: 'js' });
-                    } else if (ext === '.map') {
-                        this.files.push({ path: fullPath, type: 'map' });
+                    if ([".ts", ".tsx", ".cts", ".dts", ".mts", ".js", ".jsx", ".mjs", ".cjs", ".map"].includes(ext)) {
+                        this.files.push({ path: fullPath, type: ext.slice(1) as any });
                     }
                 }
             }
@@ -205,9 +201,18 @@ export class OpenAPIAnalyzer {
             // Skip node_modules and declaration files/tests
             if (sourceFile.fileName.includes('node_modules')) continue;
             if (sourceFile.isDeclarationFile) continue;
-            if (sourceFile.fileName.includes('.test.ts') || sourceFile.fileName.includes('.spec.ts')) continue;
 
-            // console.log(`[Analyzer] Visiting file: ${sourceFile.fileName}`);
+            // Allow analyzing test files if we are pointing explicitly to a test directory (fixtures)
+            // OR if the file is in a fixtures directory (used for OpenAPI spec generation from test apps)
+            const isTestEnv = this.rootDir.includes('/test/') || this.rootDir.includes('/tests/') || this.rootDir.includes('/fixtures/');
+            const isFixtureFile = sourceFile.fileName.includes('/fixtures/');
+
+            if (!isTestEnv && !isFixtureFile) {
+                if (sourceFile.fileName.includes('/test/') || sourceFile.fileName.includes('/tests/')) continue;
+                if (sourceFile.fileName.includes('/base_test/')) continue;
+                if (sourceFile.fileName.includes('.test.ts') || sourceFile.fileName.includes('.spec.ts')) continue;
+            }
+
             ts.forEachChild(sourceFile, (node) => {
                 this.visitNode(node, sourceFile, typeChecker);
             });
@@ -224,8 +229,10 @@ export class OpenAPIAnalyzer {
             let isController = false;
             let className = node.name?.getText(sourceFile);
 
-            if ((node as any).decorators) {
-                const controllerDecorator = (node as any).decorators.find((d: any) => {
+            const decorators: ts.Decorator[] = (node as any).decorators || node.modifiers?.filter((m: any) => ts.isDecorator(m));
+
+            if (decorators) {
+                const controllerDecorator = decorators.find((d: any) => {
                     const expr = d.expression;
                     if (ts.isCallExpression(expr)) {
                         const identifier = expr.expression.getText(sourceFile);
@@ -241,15 +248,13 @@ export class OpenAPIAnalyzer {
                 const hasRouteDecorators = node.members.some(m => {
                     // Trust 175 as MethodDeclaration if TS matches mostly, or just check members
                     if (ts.isMethodDeclaration(m) || m.kind === 175 || m.kind === 170 || m.kind === 171) {
-                        // Note: 171 is standard MethodDeclaration in some versions, 175 in others?
-                        // Or maybe 171 is Decorator.
                         const decs = (m as any).decorators || (m as any).modifiers?.filter((mod: any) => ts.isDecorator(mod));
                         if (decs) {
                             return decs.some((d: any) => {
                                 const expr = d.expression;
                                 if (ts.isCallExpression(expr)) {
                                     const identifier = expr.expression.getText(sourceFile);
-                                    return ['Get', 'Post', 'Put', 'Delete', 'Patch', 'Options', 'Head'].includes(identifier);
+                                    return ['get', 'post', 'put', 'delete', 'patch', 'options', 'head'].includes(identifier.toLowerCase());
                                 }
                                 return false;
                             });
@@ -329,7 +334,7 @@ export class OpenAPIAnalyzer {
                 const expr = d.expression;
                 if (ts.isCallExpression(expr)) {
                     const identifier = expr.expression.getText(sourceFile);
-                    return ['Get', 'Post', 'Put', 'Delete', 'Patch', 'Options', 'Head'].includes(identifier);
+                    return ['get', 'post', 'put', 'delete', 'patch', 'options', 'head'].includes(identifier.toLowerCase());
                 }
                 return false;
             });
@@ -390,7 +395,7 @@ export class OpenAPIAnalyzer {
 
                         // Check if this is our application instance
                         if (objName === app.name) {
-                            if (['get', 'post', 'put', 'delete', 'patch', 'options', 'head'].includes(methodName)) {
+                            if (['get', 'post', 'put', 'delete', 'patch', 'options', 'head'].includes(methodName.toLowerCase())) {
                                 // Extract route info
                                 const route = this.extractRouteFromCall(node, sourceFile, methodName.toUpperCase());
                                 if (route) {
@@ -491,6 +496,7 @@ export class OpenAPIAnalyzer {
         const requestTypes: RouteInfo['requestTypes'] = {};
         let responseType: string | undefined;
         let responseSchema: any | undefined;
+        let hasExplicitReturnType = false;
 
         // Simple scope to track variable types (name -> schema)
         const scope = new Map<string, any>();
@@ -508,6 +514,16 @@ export class OpenAPIAnalyzer {
                     }
                 }
             });
+
+            // Check for explicit return type annotation
+            if (handler.type) {
+                const returnSchema = this.convertTypeNodeToSchema(handler.type, sourceFile);
+                if (returnSchema) {
+                    responseSchema = returnSchema;
+                    responseType = returnSchema.type;
+                    hasExplicitReturnType = true;
+                }
+            }
         }
 
         // Helper to analyze an expression that is being returned (either explicitly or implicitly)
@@ -541,7 +557,8 @@ export class OpenAPIAnalyzer {
 
             // Case 2: Direct object return
             // Only use this if we haven't found a better schema yet, or if it looks specific
-            if (!responseSchema || responseSchema.type === 'object') {
+            // And if we don't have an explicit return type
+            if (!hasExplicitReturnType && (!responseSchema || responseSchema.type === 'object')) {
                 const schema = this.convertExpressionToSchema(node, sourceFile, scope);
                 if (schema && (schema.type !== 'object' || Object.keys(schema.properties || {}).length > 0)) {
                     responseSchema = schema;
@@ -798,11 +815,15 @@ export class OpenAPIAnalyzer {
                 const typeRef = typeNode as ts.TypeReferenceNode;
                 const typeName = typeRef.typeName.getText(sourceFile);
 
-                if (typeName === 'Array' && typeRef.typeArguments && typeRef.typeArguments.length > 0) {
+                if (typeName === 'Array' && typeRef.typeArguments?.length > 0) {
                     return {
                         type: 'array',
                         items: this.convertTypeNodeToSchema(typeRef.typeArguments[0], sourceFile)
                     };
+                }
+
+                if (typeName === 'Promise' && typeRef.typeArguments?.length > 0) {
+                    return this.convertTypeNodeToSchema(typeRef.typeArguments[0], sourceFile);
                 }
 
                 // For other references, we default to string or object as fallback
@@ -1090,25 +1111,6 @@ export class OpenAPIAnalyzer {
                 schemas: {}
             }
         };
-    }
-
-    /**
-     * Convert a type string to an OpenAPI schema
-     */
-    private typeToSchema(type: string): any {
-        switch (type) {
-            case 'string':
-                return { type: 'string' };
-            case 'number':
-                return { type: 'number' };
-            case 'boolean':
-                return { type: 'boolean' };
-            case 'array':
-                return { type: 'array', items: {} };
-            case 'object':
-            default:
-                return { type: 'object' };
-        }
     }
 }
 
