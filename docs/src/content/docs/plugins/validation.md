@@ -315,6 +315,6 @@ app.post('/products',
 
 ## Next Steps
 
-- [Controllers](/core/controllers/) - Use validation with controllers
-- [Authentication](/plugins/authentication/) - Secure your API
-- [OpenAPI](/advanced/openapi/) - Generate API docs from schemas
+- [Controllers](/shokupan/core/controllers/) - Use validation with controllers
+- [Authentication](/shokupan/plugins/authentication/) - Secure your API
+- [OpenAPI](/shokupan/advanced/openapi/) - Generate API docs from schemas

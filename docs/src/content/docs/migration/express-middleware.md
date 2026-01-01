@@ -28,4 +28,4 @@ app.use(Cors());
 
 ## Next Steps
 
-- [Plugins](/plugins/cors/) - Native Shokupan plugins
+- [Plugins](/shokupan/plugins/cors/) - Native Shokupan plugins

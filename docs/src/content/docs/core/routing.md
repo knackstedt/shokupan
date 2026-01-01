@@ -262,6 +262,6 @@ app.get('/users/:id', {
 
 ## Next Steps
 
-- [Controllers](/core/controllers/) - Use decorators for organized routing
-- [Middleware](/core/middleware/) - Add cross-cutting concerns
-- [Context API](/api/context/) - Full context reference
+- [Controllers](/shokupan/core/controllers/) - Use decorators for organized routing
+- [Middleware](/shokupan/core/middleware/) - Add cross-cutting concerns
+- [Context API](/shokupan/api/context/) - Full context reference

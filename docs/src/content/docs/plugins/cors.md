@@ -204,6 +204,6 @@ app.use(Cors({
 
 ## Next Steps
 
-- [Security Headers](/plugins/security-headers/) - Add security headers
-- [Authentication](/plugins/authentication/) - Secure your API
-- [Rate Limiting](/plugins/rate-limiting/) - Prevent abuse
+- [Security Headers](/shokupan/plugins/security-headers/) - Add security headers
+- [Authentication](/shokupan/plugins/authentication/) - Secure your API
+- [Rate Limiting](/shokupan/plugins/rate-limiting/) - Prevent abuse

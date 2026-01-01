@@ -308,6 +308,6 @@ const auth = new AuthPlugin({
 
 ## Next Steps
 
-- [Sessions](/plugins/sessions/) - Session management
-- [Validation](/plugins/validation/) - Validate user input
-- [Rate Limiting](/plugins/rate-limiting/) - Protect auth endpoints
+- [Sessions](/shokupan/plugins/sessions/) - Session management
+- [Validation](/shokupan/plugins/validation/) - Validate user input
+- [Rate Limiting](/shokupan/plugins/rate-limiting/) - Protect auth endpoints

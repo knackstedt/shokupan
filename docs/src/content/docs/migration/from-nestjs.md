@@ -32,4 +32,4 @@ app.mount('/users', UserController);
 
 ## Next Steps
 
-- [Controllers](/core/controllers/) - Full controller documentation
+- [Controllers](/shokupan/core/controllers/) - Full controller documentation

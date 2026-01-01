@@ -76,5 +76,5 @@ describe('UserController', () => {
 
 ## Next Steps
 
-- [Deployment](/guides/deployment/) - Deploy your app
-- [CLI Tools](/guides/cli/) - Code generation
+- [Deployment](/shokupan/guides/deployment/) - Deploy your app
+- [CLI Tools](/shokupan/guides/cli/) - Code generation

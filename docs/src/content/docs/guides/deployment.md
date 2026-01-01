@@ -9,7 +9,33 @@ description: Deploy your Shokupan application
 bun run src/index.ts
 ```
 
-## Docker
+## Node.js & Deno
+Shokupan is built for Bun, but can run on Node.js and Deno using the server adapter.
+
+### Node.js
+Use the `createHttpServer` factory:
+
+```typescript
+import { Shokupan, createHttpServer } from 'shokupan';
+
+const app = new Shokupan({
+    serverFactory: createHttpServer()
+});
+
+app.listen(3000);
+```
+
+Then run with `node`:
+```bash
+node dist/index.js
+```
+
+### Deno
+Deno support is experimental but uses the same adapter pattern if needed, or runs natively if Deno implements `Bun.serve` compatibility layer in the future. Currently, use the Node compatibility layer in Deno:
+```bash
+deno run -A dist/index.js
+```
+
 
 ```dockerfile
 FROM oven/bun:1

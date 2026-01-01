@@ -30,8 +30,23 @@ app.get('/info', (ctx) => {
         // Headers (Headers object)
         headers: ctx.headers,
         
-        // Client IP address
-        ip: ctx.ip
+        // Client IP address (string)
+        ip: ctx.ip,
+        
+        // Host (string)
+        host: ctx.host, // localhost:3000
+        
+        // Hostname (string)
+        hostname: ctx.hostname, // localhost
+        
+        // Protocol (string)
+        protocol: ctx.protocol, // http
+        
+        // Secure context (boolean)
+        secure: ctx.secure, // false
+        
+        // Origin (string)
+        origin: ctx.origin // http://localhost:3000
     };
 });
 ```
@@ -213,14 +228,20 @@ app.get('/text', (ctx) => {
 
 ### HTML Response
 
+### JSX Response
+
+Render JSX elements directly:
+
 ```typescript
-app.get('/html', (ctx) => {
-    return ctx.html('<h1>Hello, World!</h1>');
+app.get('/jsx', (ctx) => {
+    return ctx.jsx(<div>Hello, World!</div>);
     
-    // With status
-    return ctx.html('<h1>Created</h1>', 201);
+    // With props
+    return ctx.jsx(<MyComponent name="Alice" />);
 });
 ```
+
+To use JSX, ensure you have configured a JSX renderer in your `ShokupanConfig` (if not using the default) or are using a transpiler that supports it.
 
 ### File Response
 
@@ -378,6 +399,6 @@ app.get('/typed', (ctx: ShokupanContext<MyContext>) => {
 
 ## Next Steps
 
-- [Routing](/core/routing/) - Learn about routing patterns
-- [Middleware](/core/middleware/) - Create custom middleware
-- [API Reference](/api/context/) - Complete Context API reference
+- [Routing](/shokupan/core/routing/) - Learn about routing patterns
+- [Middleware](/shokupan/core/middleware/) - Create custom middleware
+- [API Reference](/shokupan/api/context/) - Complete Context API reference

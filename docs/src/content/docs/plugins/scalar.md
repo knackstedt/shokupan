@@ -158,6 +158,6 @@ app.mount('/docs', new ScalarPlugin({...}));
 
 ## Next Steps
 
-- [OpenAPI Generation](/advanced/openapi/) - Advanced OpenAPI features
-- [Validation](/plugins/validation/) - Generate schemas from validators
-- [Controllers](/core/controllers/) - Document controller endpoints
+- [OpenAPI Generation](/shokupan/advanced/openapi/) - Advanced OpenAPI features
+- [Validation](/shokupan/plugins/validation/) - Generate schemas from validators
+- [Controllers](/shokupan/core/controllers/) - Document controller endpoints

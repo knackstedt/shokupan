@@ -22,6 +22,7 @@ export default defineConfig({
                         { label: 'Introduction', link: '/' },
                         { label: 'Installation', link: '/getting-started/installation/' },
                         { label: 'Quick Start', link: '/getting-started/quick-start/' },
+                        { label: 'Configuration', link: '/getting-started/configuration/' },
                     ],
                 },
                 {
@@ -37,15 +38,19 @@ export default defineConfig({
                 {
                     label: 'Plugins',
                     items: [
+                        { label: 'Authentication', link: '/plugins/authentication/' },
                         { label: 'CORS', link: '/plugins/cors/' },
                         { label: 'Compression', link: '/plugins/compression/' },
+                        { label: 'Debug Dashboard', link: '/plugins/debug-dashboard/' },
+                        { label: 'Failed Request Recorder', link: '/plugins/failed-request-recorder/' },
+                        { label: 'Idempotency', link: '/plugins/idempotency/' },
+                        { label: 'OpenAPI Validation', link: '/plugins/openapi-validation/' },
+                        { label: 'Proxy', link: '/plugins/proxy/' },
                         { label: 'Rate Limiting', link: '/plugins/rate-limiting/' },
+                        { label: 'Scalar (OpenAPI)', link: '/plugins/scalar/' },
                         { label: 'Security Headers', link: '/plugins/security-headers/' },
                         { label: 'Sessions', link: '/plugins/sessions/' },
-                        { label: 'Authentication', link: '/plugins/authentication/' },
                         { label: 'Validation', link: '/plugins/validation/' },
-                        { label: 'OpenAPI Validation', link: '/plugins/openapi-validation/' },
-                        { label: 'Scalar (OpenAPI)', link: '/plugins/scalar/' },
                     ],
                 },
                 {
@@ -60,9 +65,10 @@ export default defineConfig({
                 {
                     label: 'Guides',
                     items: [
-                        { label: 'Testing', link: '/guides/testing/' },
-                        { label: 'Deployment', link: '/guides/deployment/' },
+                        { label: 'Advanced Features', link: '/guides/advanced/' },
                         { label: 'CLI Tools', link: '/guides/cli/' },
+                        { label: 'Deployment', link: '/guides/deployment/' },
+                        { label: 'Testing', link: '/guides/testing/' },
                     ],
                 },
                 {

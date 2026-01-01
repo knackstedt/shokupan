@@ -64,5 +64,5 @@ app.use(async (ctx, next) => {
 
 ## Next Steps
 
-- [Routing](/core/routing/) - Learn Shokupan patterns
-- [Controllers](/core/controllers/) - Use decorators
+- [Routing](/shokupan/core/routing/) - Learn Shokupan patterns
+- [Controllers](/shokupan/core/controllers/) - Use decorators

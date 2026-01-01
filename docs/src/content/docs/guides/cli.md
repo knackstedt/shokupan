@@ -71,5 +71,5 @@ skp g plugin custom
 
 ## Next Steps
 
-- [Controllers](/core/controllers/) - Learn about controllers
-- [Middleware](/core/middleware/) - Create custom middleware
+- [Controllers](/shokupan/core/controllers/) - Learn about controllers
+- [Middleware](/shokupan/core/middleware/) - Create custom middleware
