@@ -3,10 +3,12 @@
     "version": "0.0.0",
     "type": "module",
     "scripts": {
-        "bench": "bun runner.ts"
+        "bench": "bun runner.ts",
+        "bench:advanced": "bun advanced-runner.ts"
     },
     "private": false,
     "dependencies": {
+        "@fastify/compress": "^8.3.1",
         "@grpc/grpc-js": "^1.14.3",
         "@grpc/proto-loader": "^0.8.0",
         "@hapi/hapi": "^21.4.4",
@@ -27,6 +29,7 @@
         "amqplib": "^0.10.9",
         "autocannon": "^8.0.0",
         "axios": "^1.13.2",
+        "compression": "^1.8.1",
         "elysia": "^1.4.19",
         "express": "^5.2.1",
         "fastify": "^5.6.2",
@@ -35,6 +38,8 @@
         "ioredis": "^5.8.2",
         "kafkajs": "^2.2.4",
         "koa": "^3.1.1",
+        "koa-bodyparser": "^4.4.1",
+        "koa-compress": "^5.1.1",
         "mqtt": "^5.14.1",
         "nats": "^2.29.3",
         "rxjs": "^7.8.2",

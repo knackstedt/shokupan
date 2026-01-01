@@ -1,4 +1,5 @@
 import type { BodyInit, Server } from 'bun';
+import { readFile } from 'node:fs/promises';
 import type { ShokupanRequest } from './request';
 import { ShokupanResponse } from './response';
 import type { Shokupan } from './shokupan';
@@ -378,11 +379,25 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     /**
      * Respond with a file
      */
-    public file(path: string, fileOptions?: BlobPropertyBag, responseOptions?: ResponseInit) {
+    public async file(path: string, fileOptions?: BlobPropertyBag, responseOptions?: ResponseInit) {
         const headers = this.mergeHeaders(responseOptions?.headers as any);
         const status = responseOptions?.status ?? this.response.status;
-        this._finalResponse = new Response(Bun.file(path, fileOptions), { status, headers });
-        return this._finalResponse;
+
+        if (typeof Bun !== "undefined") {
+            this._finalResponse = new Response(Bun.file(path, fileOptions), { status, headers });
+            return this._finalResponse;
+        } else {
+            // Node.js fallback using fs
+            const fileBuffer = await readFile(path);
+
+            // Set content-type from fileOptions if provided
+            if (fileOptions?.type) {
+                headers.set('content-type', fileOptions.type);
+            }
+
+            this._finalResponse = new Response(fileBuffer, { status, headers });
+            return this._finalResponse;
+        }
     }
 
     /**

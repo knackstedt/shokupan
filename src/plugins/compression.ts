@@ -15,7 +15,13 @@ export function Compression(options: CompressionOptions = {}): Middleware {
         // Check if compression is supported
         let method: 'br' | 'gzip' | 'zstd' | 'deflate' | null = null;
         if (acceptEncoding.includes("br")) method = "br";
-        else if (acceptEncoding.includes("zstd")) method = "zstd";
+        else if (acceptEncoding.includes("zstd")) {
+            // Validate zstd is only used in Bun runtime
+            if (typeof Bun === 'undefined') {
+                throw new Error("zstd compression is only available in Bun runtime. Client requested zstd but server is running on Node.js.");
+            }
+            method = "zstd";
+        }
         else if (acceptEncoding.includes("gzip")) method = "gzip";
         else if (acceptEncoding.includes("deflate")) method = "deflate";
 
@@ -84,6 +90,7 @@ export function Compression(options: CompressionOptions = {}): Middleware {
                     }));
                     break;
                 case "zstd":
+                    // Note: Runtime check happens earlier in method selection
                     compressed = await Bun.zstdCompress(body);
                     break;
                 default: // deflate

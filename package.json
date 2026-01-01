@@ -21,7 +21,8 @@
         "dev": "bun --watch --inspect src/example/main.ts",
         "debug:otel": "sh scripts/debug-otel.sh",
         "build": "vite build",
-        "bench": "cd src/benchmarking && bun runner.ts"
+        "bench": "cd src/benchmarking && bun runner.ts",
+        "bench:advanced": "cd src/benchmarking && bun advanced-runner.ts"
     },
     "bin": {
         "shokupan": "./dist/cli.js",
