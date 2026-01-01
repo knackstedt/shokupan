@@ -28,6 +28,8 @@ bun add shokupan
 
 ## 🚀 Quick Start
 
+> Bun and TypeScript are recommended for Shokupan, though it also supports Node.js and standard JavaScript.
+
 ```typescript
 import { Shokupan } from 'shokupan';
 
@@ -829,6 +831,119 @@ app.mount('/docs', new ScalarPlugin({
 
 The Scalar plugin automatically generates OpenAPI documentation from your routes and controllers!
 
+### Proxy
+
+Create a reverse proxy to forward requests to another server:
+
+```typescript
+import { Proxy } from 'shokupan';
+
+app.use('/api/v1', Proxy({
+    target: 'https://api.example.com',
+    changeOrigin: true,
+    pathRewrite: (path) => path.replace('/api/v1', ''),
+    headers: {
+        'X-Custom-Header': 'Proxy'
+    }
+}));
+
+// Proxy WebSockets
+app.use('/socket', Proxy({
+    target: 'ws://ws.example.com',
+    ws: true
+}));
+```
+
+### OpenAPI Validator
+
+Validate incoming requests against your generated OpenAPI specification:
+
+```typescript
+import { enableOpenApiValidation } from 'shokupan';
+
+const app = new Shokupan({ enableOpenApiGen: true });
+
+// Enable validation middleware
+// This validates Body, Query, Params, and Headers against your OpenAPI definitions
+enableOpenApiValidation(app);
+
+app.post('/users', {
+    parameters: [
+        { name: 'apiKey', in: 'header', required: true, schema: { type: 'string' } }
+    ],
+    requestBody: {
+        content: {
+            'application/json': {
+                schema: {
+                    type: 'object',
+                    required: ['name'],
+                    properties: {
+                        name: { type: 'string', minLength: 3 }
+                    }
+                }
+            }
+        }
+    }
+}, (ctx) => {
+    return { success: true };
+});
+
+// Invalid requests will throw a ValidationError (400 Bad Request)
+```
+
+### Idempotency
+
+Ensure that multiple identical requests do not result in different outcomes (e.g., duplicate payments). This middleware caches the response of the first request and returns it for subsequent requests with the same idempotency key.
+
+```typescript
+import { Idempotency } from 'shokupan';
+
+app.post('/payments', 
+    Idempotency({
+        header: 'Idempotency-Key', // default
+        ttl: 24 * 60 * 60 * 1000   // default 24h
+    }),
+    async (ctx) => {
+        // Process payment...
+        return { status: 'charged' };
+    }
+);
+```
+
+### Failed Request Recorder
+
+Automatically record failed requests (500s) for debugging and replay purposes.
+
+```typescript
+import { FailedRequestRecorder } from 'shokupan';
+
+app.use(FailedRequestRecorder({
+    maxCapacity: 1000,
+    ttl: 86400000 // 1 day
+}));
+```
+
+This works great when combined with the Debug Dashboard.
+
+### Debug Dashboard
+
+A visual dashboard to inspect your application, view metrics, analyze the middleware graph, and replay failed requests.
+
+```typescript
+import { DebugDashboard } from 'shokupan/plugins/debugview';
+
+// Mount the dashboard
+app.mount('/debug', new DebugDashboard({
+    retentionMs: 2 * 60 * 60 * 1000, // Keep 2 hours of logs
+    getRequestHeaders: () => ({
+        'Authorization': 'Bearer ...' // Headers to using when replaying requests and accessing data APIs
+    })
+}));
+
+// Available at http://localhost:3000/debug
+```
+
+
 ## 🚀 Advanced Features
 
 ### Dependency Injection
@@ -999,7 +1114,39 @@ provider.addSpanProcessor(
 provider.register();
 ```
 
+### Server Factory (Node.js & Deno)
+
+Run Shokupan on Node.js or Deno using the server adapter:
+
+```typescript
+import { Shokupan, createHttpServer } from 'shokupan';
+
+const app = new Shokupan({
+    // Use Node.js http module
+    serverFactory: createHttpServer()
+});
+
+app.get('/', () => ({ message: 'Running on Node!' }));
+
+app.listen(3000);
+```
+
+### Automatic Backpressure
+
+Protect your server from overload by shedding load when CPU usage is high:
+
+```typescript
+const app = new Shokupan({
+    // Monitor CPU and reject requests when usage > 80%
+    autoBackpressureFeedback: true,
+    autoBackpressureLevel: 80 
+});
+```
+
+When the threshold is reached, the server will return `429 Too Many Requests`.
+
 ## 📦 Migration Guides
+
 
 ### From Express
 
@@ -1530,6 +1677,14 @@ const app = new Shokupan(config?: ShokupanConfig);
 - `hostname?: string` - Hostname (default: "localhost")
 - `development?: boolean` - Development mode (default: auto-detect)
 - `enableAsyncLocalStorage?: boolean` - Enable async context tracking
+- `enableTracing?: boolean` - Enable OpenTelemetry tracing
+- `enableOpenApiGen?: boolean` - Enable OpenAPI spec generation (default: true)
+- `controllersOnly?: boolean` - If true, only allows controllers, disabling app.get/post/etc (default: false)
+- `requestTimeout?: number` - Global request timeout (ms)
+- `readTimeout?: number` - Request body read timeout (ms)
+- `serverFactory?: ServerFactory` - Custom server factory (for Node.js/Deno support)
+- `autoBackpressureFeedback?: boolean` - Enable automatic load shedding based on CPU usage
+- `autoBackpressureLevel?: number` - CPU usage % threshold for backpressure (default: 60)
 - `logger?: Logger` - Custom logger instance
 
 **Methods:**
@@ -1592,6 +1747,13 @@ Request context object.
 - `state: Record<string, any>` - Shared state object
 - `session: any` - Session data (with session plugin)
 - `response: ShokupanResponse` - Response builder
+- `ip: string` - Client IP address
+- `hostname: string` - Hostname (e.g. "localhost")
+- `host: string` - Host (e.g. "localhost:3000")
+- `protocol: string` - Protocol (http/https)
+- `secure: boolean` - Whether the request is secure over HTTPS
+- `origin: string` - Origin URL
+- `signal: AbortSignal` - Request abort signal (for standard fetch requests)
 
 **Methods:**
 - `set(name: string, value: string): ShokupanContext` - Set a response header
@@ -1602,6 +1764,7 @@ Request context object.
 - `json(data: any, status?: number): ShokupanContext` - Return JSON response
 - `text(data: string, status?: number): ShokupanContext` - Return text response
 - `html(data: string, status?: number): ShokupanContext` - Return HTML response
+- `jsx(element: any): ShokupanContext` - Render a JSX element
 - `redirect(url: string, status?: number): ShokupanContext` - Redirect response
 - `file(path: string, fileOptions?: BlobPropertyBag, responseOptions?: ResponseInit): Response` - Return file response
 
@@ -1639,7 +1802,6 @@ Container.clear();
 - 🚧 **Framework Plugins** - Drop-in adapters for [Express](https://expressjs.com/), [Koa](https://koajs.com/), and [Elysia](https://elysiajs.com/)
 - 🚧 **Enhanced WebSockets** - Event support and HTTP simulation
 - 🚧 **Benchmarks** - Comprehensive performance comparisons
-- 🚧 **Scaling** - Automatic clustering support
 - 🚧 **RPC Support** - [tRPC](https://trpc.io/) and [gRPC](https://grpc.io/) integration
 - 🚧 **Binary Formats** - [Protobuf](https://protobuf.dev/) and [MessagePack](https://msgpack.org/) support
 - 🚧 **Reliability** - Circuit breaker pattern for resilience
@@ -1664,6 +1826,7 @@ MIT License - see the [LICENSE](LICENSE) file for details.
 - Inspired by [Express](https://expressjs.com/), [Koa](https://koajs.com/), [NestJS](https://nestjs.com/), and [Elysia](https://elysiajs.com/)
 - Built for the amazing [Bun](https://bun.sh/) runtime
 - Powered by [Arctic](https://github.com/pilcrowonpaper/arctic) for OAuth2 support
+- Tested, Benchmarked and Documented by Antigravity
 
 ---
 
