@@ -38,8 +38,7 @@ export class ScalarPlugin extends ShokupanRouter<any> {
 
                 <body>
                     <div id="app"></div>
-
-                    <script src="https://unpkg.com/@scalar/api-reference@1.25.108/dist/browser/standalone.js"></script>
+                    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
                     <script>
                         Scalar.createApiReference('#app', [{ ...<%~ JSON.stringify(it.config.baseDocument) %>,
                             url: "<%= it.path %>openapi.json",
