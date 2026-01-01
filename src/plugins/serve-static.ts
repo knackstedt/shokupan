@@ -1,5 +1,5 @@
 import { Eta } from 'eta';
-import { readdir, stat } from 'fs/promises';
+import { readdir, readFile, stat } from 'fs/promises';
 import { basename, join, resolve } from 'path';
 import type { ShokupanContext } from '../context';
 import type { Middleware, StaticServeOptions } from '../types';
@@ -160,8 +160,21 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
 
         // Serving File
         // @ts-ignore
-        const file = Bun.file(finalPath);
-        let response = new Response(file);
+        let response: Response;
+
+        if (typeof Bun !== "undefined") {
+            response = new Response(Bun.file(finalPath));
+        } else {
+            // Node.js fallback using fs
+            const fileBuffer = await readFile(finalPath);
+
+            // Set content-type from fileOptions if provided
+            // if (fileOptions?.type) {
+            //     headers.set('content-type', fileOptions.type);
+            // }
+
+            response = new Response(fileBuffer);
+        }
 
         if (config.hooks?.onResponse) {
             const hooked = await config.hooks.onResponse(ctx, response);

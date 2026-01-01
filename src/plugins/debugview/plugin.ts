@@ -1,4 +1,5 @@
 import { Eta } from "eta";
+import { readFile } from 'node:fs/promises';
 import type { DebugCollector } from "../../context";
 import { ShokupanRouter } from "../../router";
 import { $appRoot } from "../../symbol";
@@ -168,7 +169,7 @@ export class DebugDashboard extends ShokupanRouter {
             }
 
             const linkPattern = this.getLinkPattern();
-            const template = await Bun.file(__dirname + "/template.eta").text();
+            const template = await readFile(__dirname + "/template.eta", 'utf8');
             const html = this.eta.renderString(template, {
                 metrics: this.metrics,
                 uptime,
