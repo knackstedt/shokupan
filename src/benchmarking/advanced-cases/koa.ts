@@ -35,8 +35,14 @@ export async function startAdvanced(port: number, scenario: string) {
             break;
 
         case "large-payload-request":
-            router.post("/large-request", (ctx) => {
-                ctx.body = { received: JSON.stringify(ctx.request.body).length };
+            // Manually handle text/plain bodies instead of using bodyparser
+            router.post("/large-request", async (ctx) => {
+                const chunks: Buffer[] = [];
+                for await (const chunk of ctx.req) {
+                    chunks.push(chunk);
+                }
+                const body = Buffer.concat(chunks).toString('utf-8');
+                ctx.body = { received: body.length };
             });
             break;
 

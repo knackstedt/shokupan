@@ -52,11 +52,14 @@ export async function startAdvanced(port: number, scenario: string) {
                 path: '/large-request',
                 options: {
                     payload: {
-                        maxBytes: 50 * 1024 * 1024
+                        maxBytes: 50 * 1024 * 1024,
+                        parse: true,
+                        allow: 'text/plain'
                     }
                 },
                 handler: (request) => {
-                    return { received: JSON.stringify(request.payload).length };
+                    const bodyLength = typeof request.payload === 'string' ? request.payload.length : Buffer.byteLength(request.payload || '');
+                    return { received: bodyLength };
                 }
             });
             break;

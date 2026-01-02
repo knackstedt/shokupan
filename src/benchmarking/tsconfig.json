@@ -1,6 +1,15 @@
 {
     "compilerOptions": {
         "noPropertyAccessFromIndexSignature": false,
+        "module": "es2022"
     },
+    "files": [
+        "**/*.ts"
+    ],
+    "exclude": [
+        "./node_modules",
+        "./database",
+        "./dist"
+    ],
     "extends": "../../tsconfig.json"
 }

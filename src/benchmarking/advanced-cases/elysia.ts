@@ -25,7 +25,8 @@ export async function startAdvanced(port: number, scenario: string) {
 
         case "large-payload-request":
             app.post("/large-request", async ({ body }) => {
-                return { received: JSON.stringify(body).length };
+                const bodyLength = typeof body === 'string' ? body.length : Buffer.byteLength(JSON.stringify(body));
+                return { received: bodyLength };
             });
             break;
 

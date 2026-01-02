@@ -2,11 +2,35 @@ import * as clack from "@clack/prompts";
 import autocannon from "autocannon";
 import { spawn } from "bun";
 import fs from "fs";
+import getPort from "get-port";
 import path from "path";
 
 const FRAMEWORKS = ["shokupan", "fastify", "express", "koa", "hapi", "nest", "hono", "elysia"];
 const RUNTIMES = ["bun", "node"];
 const BUN_ONLY_FRAMEWORKS = ["elysia"]; // Frameworks that only work on Bun
+
+// Framework/scenario exclusions - scenarios that frameworks don't support
+const FRAMEWORK_EXCLUSIONS: Record<string, string[]> = {
+    "express": ["compression-brotli", "compression-zstd"],
+    "koa": ["compression-brotli", "compression-zstd"],
+    "hapi": ["compression-brotli", "compression-zstd"],
+    "nest": ["compression-gzip", "compression-brotli", "compression-deflate", "compression-zstd", "math-middleware"],
+    "fastify": ["compression-zstd"],
+    "hono": ["compression-brotli", "compression-zstd"],
+    "elysia": ["compression-gzip", "compression-brotli", "compression-deflate", "compression-zstd"],
+};
+
+// Runtime-specific exclusions - scenarios that don't work on specific runtimes
+const RUNTIME_EXCLUSIONS: Record<string, Record<string, string[]>> = {
+    "node": {
+        // Shokupan on Node.js has issues with POST requests due to undici Request duplex requirement
+        "shokupan": ["large-payload-request", "fully-loaded"]
+    }
+};
+
+const s = clack.spinner({
+    indicator: "dots"
+});
 
 
 // Advanced scenarios
@@ -66,8 +90,8 @@ const SCENARIOS: Record<string, ScenarioConfig> = {
         connections: 50,
         duration: 10,
         method: "POST",
-        body: "x".repeat(10 * 1024 * 1024), // 10MB
-        headers: { "Content-Type": "application/json" }
+        body: "x".repeat(10 * 1024 * 1024), // 10MB plain text
+        headers: { "Content-Type": "text/plain" }
     },
     "large-payload-response": {
         name: "Large Response Payload (5MB JSON)",
@@ -217,10 +241,25 @@ function calculatePercentile(latencies: number[], percentile: number): number {
 }
 
 async function runBenchmark(framework: string, runtime: string, scenario: string) {
-    const port = 3000 + Math.floor(Math.random() * 10000);
     const scenarioConfig = SCENARIOS[scenario as keyof typeof SCENARIOS];
 
-    console.log(`\\n--- Benchmarking ${framework} on ${runtime} for ${scenarioConfig.name} (port ${port}) ---`);
+    // Check if this framework/scenario combination is excluded
+    const frameworkExclusions = FRAMEWORK_EXCLUSIONS[framework] || [];
+    const runtimeExclusions = RUNTIME_EXCLUSIONS[runtime]?.[framework] || [];
+    const allExclusions = [...frameworkExclusions, ...runtimeExclusions];
+
+    if (allExclusions.includes(scenario)) {
+        const reason = frameworkExclusions.includes(scenario)
+            ? `${framework} doesn't support ${scenarioConfig.name}`
+            : `${framework} on ${runtime} doesn't support ${scenarioConfig.name}`;
+        return {
+            error: `Skipped - ${reason}`
+        } as any;
+    }
+
+    const port = await getPort();
+
+    console.log(`\x1b[36m--- Benchmarking ${framework} on ${runtime} for ${scenarioConfig.name} (port ${port}) ---\x1b[0m`);
 
     let cmd: string[];
     let caseFile: string;
@@ -292,7 +331,7 @@ async function runBenchmark(framework: string, runtime: string, scenario: string
             });
             if (healthCheck.ok || healthCheck.status < 500) {
                 serverReady = true;
-                console.log(`Server is ready on port ${port}`);
+                s.message(`Server is ready on port ${port}`);
                 break;
             }
             lastError = `HTTP ${healthCheck.status}`;
@@ -311,7 +350,7 @@ async function runBenchmark(framework: string, runtime: string, scenario: string
 
     try {
         for (const endpoint of scenarioConfig.endpoints) {
-            console.log(`Testing ${endpoint}...`);
+            s.message(`Testing ${endpoint}...`);
             const url = `http://localhost:${port}${endpoint}`;
             try {
                 const res = await runAutocannon(url, {
@@ -482,7 +521,6 @@ async function main() {
         }
     }
 
-    const s = clack.spinner();
     s.start("Starting benchmarks...");
 
     await compileForNode(targetFrameworks);
@@ -511,9 +549,9 @@ async function main() {
                 try {
                     s.message(`${framework} on ${runtime} - ${SCENARIOS[scenario].name}`);
 
-                    console.log(`\n${"=".repeat(60)}`);
-                    console.log(`Framework: ${framework} | Runtime: ${runtime} | Scenario: ${scenario}`);
-                    console.log("=".repeat(60));
+                    console.log(`\x1b[30m${"=".repeat(60)}\x1b[0m`);
+                    console.log(`\x1b[0mFramework: \x1b[36m${framework}\x1b[0m | \x1b[0mRuntime: \x1b[36m${runtime}\x1b[0m | \x1b[0mScenario: \x1b[36m${scenario}\x1b[0m`);
+                    console.log(`\x1b[30m${"=".repeat(60)}\x1b[0m`);
 
                     const res = await runBenchmark(framework, runtime, scenario);
                     fullResults[framework][runtime][scenario] = res as any;
@@ -708,6 +746,11 @@ function generateReport(history: HistoryEntry[], skipAutoOpen = false) {
             font-style: italic;
         }
 
+        .skipped {
+            color: #ffa94d;
+            font-style: italic;
+        }
+
         .success {
             color: var(--success-color);
         }
@@ -785,12 +828,18 @@ function generateReport(history: HistoryEntry[], skipAutoOpen = false) {
                         const scenarioData = scenarios[scenario];
                         
                         if (scenarioData && scenarioData.error) {
-                            html += \`<tr><td>\${framework}</td><td>\${runtime}</td><td colspan="6"><span class="error">\${scenarioData.error}</span></td><td class="error">FAILED</td></tr>\`;
+                            const isSkipped = scenarioData.error.startsWith('Skipped');
+                            const statusClass = isSkipped ? 'skipped' : 'error';
+                            const statusText = isSkipped ? 'SKIPPED' : 'FAILED';
+                            html += \`<tr><td>\${framework}</td><td>\${runtime}</td><td colspan="6"><span class="\${statusClass}">\${scenarioData.error}</span></td><td class="\${statusClass}">\${statusText}</td></tr>\`;
                         } else if (scenarioData) {
                             Object.entries(scenarioData).forEach(([endpoint, result]) => {
                                 if (result.error) {
+                                    const isSkipped = result.error.startsWith('Skipped');
+                                    const statusClass = isSkipped ? 'skipped' : 'error';
+                                    const statusText = isSkipped ? 'SKIPPED' : 'FAILED';
                                     html += \`<tr><td>\${framework}</td><td>\${runtime}</td><td>\${endpoint}</td>\`;
-                                    html += \`<td colspan="5"><span class="error">\${result.error}</span></td><td class="error">FAILED</td></tr>\`;
+                                    html += \`<td colspan="5"><span class="\${statusClass}">\${result.error}</span></td><td class="\${statusClass}">\${statusText}</td></tr>\`;
                                 } else {
                                     html += \`<tr><td>\${framework}</td><td>\${runtime}</td><td>\${endpoint}</td>\`;
                                     html += \`<td><span class="metric">\${result.requests.toFixed(0)}</span></td>\`;

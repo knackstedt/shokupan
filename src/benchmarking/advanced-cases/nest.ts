@@ -35,7 +35,8 @@ class AppController {
 
     @Post('/large-request')
     postLargeRequest(@Body() body: any) {
-        return { received: JSON.stringify(body).length };
+        const bodyLength = typeof body === 'string' ? body.length : Buffer.byteLength(JSON.stringify(body));
+        return { received: bodyLength };
     }
 
     @Get('/large-response')

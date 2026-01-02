@@ -34,8 +34,10 @@ export async function startAdvanced(port: number, scenario: string) {
             break;
 
         case "large-payload-request":
+            app.use(express.text({ limit: '50mb', type: 'text/plain' }));
             app.post("/large-request", (req, res) => {
-                res.json({ received: JSON.stringify(req.body).length });
+                const bodyLength = typeof req.body === 'string' ? req.body.length : Buffer.byteLength(req.body || '');
+                res.json({ received: bodyLength });
             });
             break;
 
