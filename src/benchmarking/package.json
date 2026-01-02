@@ -12,6 +12,7 @@
         "@grpc/grpc-js": "^1.14.3",
         "@grpc/proto-loader": "^0.8.0",
         "@hapi/hapi": "^21.4.4",
+        "@hono/node-server": "^1.15.1",
         "@koa/router": "^15.1.1",
         "@nestjs/common": "^11.1.11",
         "@nestjs/core": "^11.1.11",

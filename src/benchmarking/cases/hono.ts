@@ -17,12 +17,27 @@ export async function start(port: number) {
         return c.text(`Dynamic content for ${id}`);
     });
 
-    const server = Bun.serve({
-        port,
-        fetch: app.fetch,
-    });
+    // Check if running on Bun or Node
+    if (typeof Bun !== "undefined") {
+        // Use Bun.serve for Bun runtime
+        const server = Bun.serve({
+            port,
+            fetch: app.fetch,
+        });
 
-    return async () => {
-        server.stop();
-    };
+        return async () => {
+            server.stop();
+        };
+    } else {
+        // Use Node.js adapter for Node runtime
+        const { serve } = await import("@hono/node-server");
+        const server = serve({
+            fetch: app.fetch,
+            port,
+        });
+
+        return async () => {
+            server.close();
+        };
+    }
 }

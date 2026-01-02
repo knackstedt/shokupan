@@ -1,3 +1,4 @@
+import * as clack from "@clack/prompts";
 import autocannon from "autocannon";
 import { spawn } from "bun";
 import fs from "fs";
@@ -7,6 +8,8 @@ import path from "path";
 const FRAMEWORKS = ["shokupan", "fastify", "express", "koa", "hapi", "nest", "hono", "elysia"];
 const RUNTIMES = ["bun", "node"];
 const ENDPOINTS = ["static", "json", "dynamic/123"];
+const BUN_ONLY_FRAMEWORKS = ["elysia"]; // Frameworks that only work on Bun
+
 
 const CASES_DIR = path.join(import.meta.dir, "cases");
 const DIST_DIR = path.join(import.meta.dir, "dist");
@@ -31,10 +34,6 @@ type HistoryEntry = {
     results: FrameworkResults;
 };
 
-// Helper to get arguments
-const args = process.argv.slice(2);
-const filterIndex = args.indexOf("--filter");
-const filter = filterIndex !== -1 ? args[filterIndex + 1] : null;
 
 async function compileForNode(targetFrameworks: string[]) {
     console.log("Compiling cases for Node.js...");
@@ -227,6 +226,8 @@ async function runBenchmark(framework: string, runtime: string) {
 }
 
 async function main() {
+    const args = process.argv.slice(2);
+
     if (args.includes("--report-only")) {
         console.log("Generating report from existing history...");
         let history: HistoryEntry[] = [];
@@ -241,9 +242,24 @@ async function main() {
         return;
     }
 
-    let targetFrameworks = FRAMEWORKS;
+    const hasAllFlag = args.includes("--all");
 
-    if (filter) {
+    if (!hasAllFlag) {
+        clack.intro("🚀 Basic Benchmark Suite for Web Frameworks");
+    }
+
+    let targetFrameworks: string[];
+
+    const filterIndex = args.indexOf("--filter");
+    const hasFilterArg = filterIndex !== -1;
+
+    if (hasAllFlag) {
+        // Run all frameworks non-interactively (for CI/CD)
+        targetFrameworks = FRAMEWORKS;
+        console.log("Running full benchmark suite for all frameworks...");
+    } else if (hasFilterArg) {
+        // Legacy CLI mode
+        const filter = args[filterIndex + 1];
         if (FRAMEWORKS.includes(filter)) {
             targetFrameworks = [filter];
             console.log(`Running benchmarks only for: ${filter}`);
@@ -251,16 +267,84 @@ async function main() {
             console.error(`Unknown framework: ${filter}. Available: ${FRAMEWORKS.join(", ")}`);
             process.exit(1);
         }
+    } else {
+        // Interactive mode
+        const frameworkSelection = await clack.multiselect({
+            message: "Select frameworks to benchmark:",
+            options: FRAMEWORKS.map(f => ({ value: f, label: f })),
+            initialValues: ["shokupan"],
+            required: true
+        });
+
+        if (clack.isCancel(frameworkSelection)) {
+            clack.cancel("Benchmark cancelled.");
+            process.exit(0);
+        }
+
+        targetFrameworks = frameworkSelection as string[];
     }
 
+    // Calculate time estimate
+    // Basic benchmark: 3 endpoints × 2 runtimes × 5s duration + ~5-8s startup/teardown per test
+    const totalTests = targetFrameworks.length * RUNTIMES.length;
+    const avgTimePerTest = ENDPOINTS.length * 5 + 8; // ~23 seconds per framework-runtime pair
+    const estimatedSeconds = Math.ceil(totalTests * avgTimePerTest);
+    const estimatedMinutes = Math.floor(estimatedSeconds / 60);
+    const remainingSeconds = estimatedSeconds % 60;
+
+    const timeEstimate = estimatedMinutes > 0
+        ? `${estimatedMinutes} minute${estimatedMinutes !== 1 ? 's' : ''}${remainingSeconds > 0 ? ` ${remainingSeconds}s` : ''}`
+        : `${remainingSeconds} second${remainingSeconds !== 1 ? 's' : ''}`;
+
+    if (hasAllFlag) {
+        // Non-interactive mode for CI/CD
+        console.log(`\nFrameworks: ${targetFrameworks.join(", ")}`);
+        console.log(`Endpoints: ${ENDPOINTS.join(", ")}`);
+        console.log(`Total tests: ${totalTests} (${targetFrameworks.length} frameworks × ${RUNTIMES.length} runtimes)`);
+        console.log(`Estimated duration: ${timeEstimate}\n`);
+    } else {
+        // Interactive mode with confirmation
+        clack.note(
+            `Frameworks: ${targetFrameworks.join(", ")}\n` +
+            `Endpoints: ${ENDPOINTS.join(", ")}\n` +
+            `Total tests: ${totalTests} (${targetFrameworks.length} frameworks × ${RUNTIMES.length} runtimes)\n` +
+            `Estimated duration: ${timeEstimate}`,
+            "Benchmark Configuration"
+        );
+
+        const shouldContinue = await clack.confirm({
+            message: "Start benchmarking?",
+            initialValue: true
+        });
+
+        if (clack.isCancel(shouldContinue) || !shouldContinue) {
+            clack.cancel("Benchmark cancelled.");
+            process.exit(0);
+        }
+    }
+
+    const s = clack.spinner();
+    s.start("Starting benchmarks...");
+
     await compileForNode(targetFrameworks);
+    s.message("Compilation complete");
 
     const fullResults: FrameworkResults = {};
 
     for (const framework of targetFrameworks) {
         fullResults[framework] = {};
         for (const runtime of RUNTIMES) {
+            // Skip Bun-only frameworks on Node.js
+            if (runtime === "node" && BUN_ONLY_FRAMEWORKS.includes(framework)) {
+                console.log(`Skipping ${framework} on ${runtime} (Bun-only framework)`);
+                fullResults[framework][runtime] = {
+                    error: "Skipped - Bun-only framework"
+                } as any;
+                continue;
+            }
+
             try {
+                s.message(`${framework} on ${runtime}`);
                 const res = await runBenchmark(framework, runtime);
                 fullResults[framework][runtime] = res as any;
             } catch (e) {
@@ -269,6 +353,8 @@ async function main() {
             }
         }
     }
+
+    s.stop("Benchmarks complete!");
 
     // Load History
     let history: HistoryEntry[] = [];
@@ -299,10 +385,16 @@ async function main() {
 
     fs.writeFileSync(HISTORY_PATH, JSON.stringify(history, null, 2));
 
-    generateReport(history);
+    clack.log.success(`Results saved to ${HISTORY_PATH}`);
+
+    s.start("Generating HTML report...");
+    generateReport(history, hasAllFlag);
+    s.stop(`Report generated: ${REPORT_PATH}`);
+
+    clack.outro("✨ All done!");
 }
 
-function generateReport(history: HistoryEntry[]) {
+function generateReport(history: HistoryEntry[], skipAutoOpen = false) {
     // We reverse history so index 0 is the Latest
     const sortedHistory = [...history].reverse();
     // Embed the data for client-side processing
@@ -985,8 +1077,11 @@ function generateReport(history: HistoryEntry[]) {
     fs.writeFileSync(REPORT_PATH, html);
     console.log(`Report generated at ${REPORT_PATH}`);
 
-    const openCmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
-    spawn([openCmd, REPORT_PATH]);
+    // Only auto-open in interactive mode (not in CI/CD)
+    if (!skipAutoOpen) {
+        const openCmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
+        spawn([openCmd, REPORT_PATH]);
+    }
 }
 
 main();
