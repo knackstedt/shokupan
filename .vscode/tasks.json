@@ -43,5 +43,71 @@
                 }
             }
         },
+        {
+            "label": "▶ benchmark (lite)",
+            "type": "shell",
+            "command": "bun",
+            "args": [
+                "run",
+                "bench",
+                "--",
+                "--all"
+            ],
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "bun",
+                "pattern": [
+                    {
+                        "severity": 1,
+                        "message": 3,
+                        "file": 2,
+                        "kind": "file",
+                        "regexp": "^([^ ]+)  ([A-Z]+) ([^ ]+): (.+)$"
+                    }
+                ],
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": {
+                        "regexp": "Running full benchmark suite for all frameworks..."
+                    },
+                    "endsPattern": {
+                        "regexp": "✨ All done!"
+                    }
+                }
+            }
+        },
+        {
+            "label": "▶ benchmark (full)",
+            "type": "shell",
+            "command": "bun",
+            "args": [
+                "run",
+                "bench:advanced",
+                "--",
+                "--all"
+            ],
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "bun",
+                "pattern": [
+                    {
+                        "severity": 1,
+                        "message": 3,
+                        "file": 2,
+                        "kind": "file",
+                        "regexp": "^([^ ]+)  ([A-Z]+) ([^ ]+): (.+)$"
+                    }
+                ],
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": {
+                        "regexp": "Running full benchmark suite for all frameworks..."
+                    },
+                    "endsPattern": {
+                        "regexp": "✨ All done!"
+                    }
+                }
+            }
+        }
     ]
 }

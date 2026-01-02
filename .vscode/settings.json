@@ -1,5 +1,11 @@
 {
     "cSpell.words": [
         "Shokupan"
-    ]
+    ],
+    "javascript.format.semicolons": "insert",
+    "typescript.format.semicolons": "insert",
+    "typescript.preferences.preferTypeOnlyAutoImports": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": "explicit"
+    }
 }
