@@ -1,8 +1,9 @@
 import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
-import starlightChangelogs from 'starlight-changelogs';
 import starlightImageZoom from 'starlight-image-zoom';
-import starlightLinksValidator from 'starlight-links-validator';
+import starlightLlmsTxt from 'starlight-llms-txt';
+import starlightThemeFlexoki from 'starlight-theme-flexoki';
+import starlightTypeDoc, { typeDocSidebarGroup } from 'starlight-typedoc';
 
 // https://astro.build/config
 export default defineConfig({
@@ -12,16 +13,11 @@ export default defineConfig({
         starlight({
             plugins: [
                 starlightImageZoom({ showCaptions: true }),
-                starlightLinksValidator(),
-                starlightChangelogs({
-                    slug: 'changelog',
-                    authors: {
-                        'knackstedt': {
-                            name: 'knackstedt',
-                            url: 'https://github.com/knackstedt',
-                            title: 'Maintainer',
-                        }
-                    },
+                starlightThemeFlexoki(),
+                starlightLlmsTxt(),
+                starlightTypeDoc({
+                    entryPoints: ['../src/index.ts'],
+                    tsconfig: '../tsconfig.json'
                 }),
             ],
             title: 'Shokupan',
@@ -40,6 +36,7 @@ export default defineConfig({
                         { label: 'Installation', link: '/getting-started/installation/' },
                         { label: 'Quick Start', link: '/getting-started/quick-start/' },
                         { label: 'Configuration', link: '/getting-started/configuration/' },
+                        { label: 'Releases', link: '/releases' },
                     ],
                 },
                 {
@@ -94,6 +91,7 @@ export default defineConfig({
                         { label: 'Roadmap', link: '/reference/roadmap/' },
                     ],
                 },
+                typeDocSidebarGroup
             ],
             customCss: [
                 './src/styles/custom.css',

@@ -1,35 +1,9 @@
 /* Custom styles for Shokupan documentation */
 
-:root {
-  --sl-hue-accent: 38;
-  --sl-color-accent-low: #5C3D2E;
-  --sl-color-accent: #D98C45;
-  --sl-color-accent-high: #F5E6CA;
-  --sl-color-text-accent: #D98C45;
-
-  /* Light Mode Backgrounds */
-  --sl-color-bg: #FFFCF9;
-  --sl-color-bg-nav: #F7EFE5;
-  --sl-color-bg-sidebar: #F7EFE5;
-  --sl-color-hairline-light: #E0D0C0;
-}
+:root {}
 
 /* Dark mode adjustments */
-:root[data-theme='dark'] {
-  --sl-color-accent-low: #3E2723;
-  --sl-color-accent: #ffb400;
-  --sl-color-accent-high: #FFF3E0;
-
-  /* Dark Mode Backgrounds */
-  --sl-color-bg: #1F1F1F;
-  --sl-color-bg-nav: #181818;
-  --sl-color-bg-sidebar: #181818;
-  --sl-color-hairline-light: #313131;
-  --sl-color-black: #181818;
-  --sl-color-gray-6: #242626;
-}
+:root[data-theme='dark'] {}
 
 /* Code block improvements */
-.expressive-code {
-  margin: 1.5rem 0;
-}
+.expressive-code {}
