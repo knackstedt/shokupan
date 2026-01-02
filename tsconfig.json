@@ -29,8 +29,7 @@
             "ESNext"
         ],
         "typeRoots": [
-            "src/types",
-            "./node_modules/@types"
+            "src/types"
         ]
     },
     "include": [
@@ -38,9 +37,9 @@
     ],
     "exclude": [
         "node_modules",
-        "benchmarking",
         "dist",
-        "test",
-        "example"
+        "src/benchmarking",
+        "src/test",
+        "src/example"
     ]
 }

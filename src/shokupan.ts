@@ -11,6 +11,7 @@ import type { Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig,
 import { asyncContext } from "./util/async-hooks";
 
 
+import type { Server } from 'bun';
 import { SystemCpuMonitor } from "./util/cpu-monitor";
 import { getCallerInfo } from './util/stack';
 
@@ -209,7 +210,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             ? await factory(serveOptions)
             : Bun.serve(serveOptions);
 
-        console.log(`Shokupan server listening on http://${server.hostname}:${server.port}`);
+        console.log(`Shokupan server listening on http://${serveOptions.hostname}:${serveOptions.port}`);
         return server;
     }
 
@@ -274,7 +275,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
      * @param server - The server instance.
      * @returns The response to send.
      */
-    public async fetch(req: Request, server?: import("bun").Server<any>): Promise<Response> {
+    public async fetch(req: Request, server?: Server): Promise<Response> {
         if (this.applicationConfig.enableTracing) {
             const tracer = trace.getTracer("shokupan.application");
             const store = asyncContext.getStore();
@@ -307,7 +308,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         return this.handleRequest(req, server);
     }
 
-    private async handleRequest(req: Request, server?: import("bun").Server<any>): Promise<Response> {
+    private async handleRequest(req: Request, server?: Server): Promise<Response> {
         // Cast to ShokupanRequest if needed, though at runtime it's just a Request
         // But ShokupanContext expects ShokupanRequest.
         const request = req as unknown as ShokupanRequest<T>;
@@ -485,7 +486,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         this.hooksInitialized = true;
     }
 
-    private async executeHook(name: keyof ShokupanHooks, ...args: any[]) {
+    public async executeHook(name: keyof ShokupanHooks, ...args: any[]) {
         // Optimization: Use hasHook check before calling this usually
         // But we ensure initialized here too just in case
         if (!this.hooksInitialized) {
@@ -495,12 +496,11 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         if (!fns) return;
 
         for (const fn of fns) {
-            // @ts-ignore
             await fn(...args);
         }
     }
 
-    private hasHook(name: keyof ShokupanHooks) {
+    public hasHook(name: keyof ShokupanHooks) {
         if (!this.hooksInitialized) {
             this.ensureHooksInitialized();
         }

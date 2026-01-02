@@ -1,5 +1,6 @@
 import type { OpenAPI } from '@scalar/openapi-types';
 import type { Server } from 'bun';
+import type { Server as NodeServer } from 'node:http';
 import type { ShokupanContext } from './context';
 import { $isRouter } from "./symbol";
 
@@ -68,7 +69,7 @@ export enum RouteParamType {
 }
 
 export interface ServerFactory {
-    (options: any): Server<any> | Promise<Server<any>>;
+    (options: any): Server | Promise<Server> | NodeServer | Promise<NodeServer>;
 }
 
 export type NextFn = () => Promise<any>;

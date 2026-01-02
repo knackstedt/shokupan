@@ -38,7 +38,7 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
 
     constructor(
         public readonly request: ShokupanRequest<any>,
-        public readonly server?: Server<any>,
+        public readonly server?: Server,
         state?: State,
         public readonly app?: Shokupan,
         public readonly signal?: AbortSignal, // Optional as it might not be provided in tests or simple creates
