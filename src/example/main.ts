@@ -8,7 +8,7 @@ import { ScalarPlugin } from '../plugins/scalar';
 import { SecurityHeaders } from '../plugins/security-headers';
 import { Session } from '../plugins/session';
 import { Shokupan } from '../shokupan';
-import { DecoratorController } from './controllers/decorator-controller';
+import { DecoratorTestController } from './controllers/decorator-controller';
 import { UserController } from './controllers/implicit-controller';
 import { appLevelHooks, HooksExampleRouter, PerRouteHooksRouter } from './routes/hooks-example';
 import { JSXExampleRouter } from './routes/jsx-example';
@@ -228,7 +228,7 @@ app.use(RateLimitMiddleware({
 // ============================================================================
 
 // Decorator-based controller
-app.mount('/decorators', DecoratorController);
+app.mount('/decorator_test', DecoratorTestController);
 
 // Dependency Injection examples
 // Note: DIExampleController and DIStatsRouter require full DI setup

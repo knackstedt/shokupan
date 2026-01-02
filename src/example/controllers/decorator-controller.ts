@@ -9,7 +9,7 @@ import { Body, Ctx, Delete, Get, Param, Patch, Post, Put, Query } from '../../de
  * - Parameter decorators: @Body, @Query, @Param, @Header, @Ctx
  * - OpenAPI metadata via decorators
  */
-export class DecoratorController {
+export class DecoratorTestController {
 
     // Example 1: Basic GET route
     @Get('/')
@@ -18,6 +18,11 @@ export class DecoratorController {
             message: 'Decorator controller root',
             decorators: ['@Get']
         };
+    }
+
+    @Get('/product')
+    getProduct(): Promise<{ id: number, price: number; }> {
+        return Promise.resolve({ id: 1, price: 100 });
     }
 
     // Example 2: GET with path parameter
