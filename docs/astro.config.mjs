@@ -1,3 +1,4 @@
+import sitemap from '@astrojs/sitemap';
 import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
 import starlightImageZoom from 'starlight-image-zoom';
@@ -10,7 +11,20 @@ export default defineConfig({
     site: 'https://knackstedt.github.io',
     base: '/shokupan',
     integrations: [
+        sitemap({
+            customPages: [
+                'https://knackstedt.github.io/shokupan/llms.txt',
+                'https://knackstedt.github.io/shokupan/llms-full.txt',
+                'https://knackstedt.github.io/shokupan/llms-small.txt',
+            ],
+            changefreq: 'weekly',
+            priority: 0.7,
+            lastmod: new Date()
+        }),
         starlight({
+            components: {
+                SocialIcons: './src/components/SocialIcons.astro',
+            },
             plugins: [
                 starlightImageZoom({ showCaptions: true }),
                 starlightThemeFlexoki(),

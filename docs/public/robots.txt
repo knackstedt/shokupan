@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://knackstedt.github.io/shokupan/sitemap-index.xml
