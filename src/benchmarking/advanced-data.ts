@@ -75,10 +75,10 @@ export function md5(input: string): string {
 }
 
 /**
- * Serialize request data for hashing
+ * Serialize request data for hashing performance test
  */
-export function serializeRequest(url: string, headers: Record<string, string>, body: string): string {
-    return `${url}||${JSON.stringify(headers)}||${body}`;
+export function serializeRequest(url: string, headers: string, body: string): string {
+    return `${url}||${headers}||${body}`;
 }
 
 /**

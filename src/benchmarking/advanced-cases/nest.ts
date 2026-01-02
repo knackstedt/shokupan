@@ -15,7 +15,7 @@ class MD5Middleware implements NestMiddleware {
         const url = req.url;
         const headersObj = req.headers as Record<string, string>;
         const body = JSON.stringify(req.body || "");
-        const hash = md5(serializeRequest(url, headersObj, body));
+        const hash = md5(serializeRequest(url, JSON.stringify(headersObj), body));
         res.setHeader(`X-Hash-${this.index}`, hash);
         next();
     }

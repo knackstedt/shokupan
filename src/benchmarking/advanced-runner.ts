@@ -1,3 +1,4 @@
+import * as clack from "@clack/prompts";
 import autocannon from "autocannon";
 import { spawn } from "bun";
 import fs from "fs";
@@ -5,6 +6,8 @@ import path from "path";
 
 const FRAMEWORKS = ["shokupan", "fastify", "express", "koa", "hapi", "nest", "hono", "elysia"];
 const RUNTIMES = ["bun", "node"];
+const BUN_ONLY_FRAMEWORKS = ["elysia"]; // Frameworks that only work on Bun
+
 
 // Advanced scenarios
 type ScenarioConfig = {
@@ -141,11 +144,6 @@ type HistoryEntry = {
     results: AllResults;
 };
 
-const args = process.argv.slice(2);
-const filterIndex = args.indexOf("--filter");
-const filter = filterIndex !== -1 ? args[filterIndex + 1] : null;
-const scenarioIndex = args.indexOf("--scenario");
-const scenarioFilter = scenarioIndex !== -1 ? args[scenarioIndex + 1] : null;
 
 async function compileForNode(targetFrameworks: string[]) {
     console.log("Compiling advanced cases for Node.js...");
@@ -360,32 +358,135 @@ async function runBenchmark(framework: string, runtime: string, scenario: string
 }
 
 async function main() {
-    console.log("🚀 Advanced Benchmark Suite for Web Frameworks\\n");
+    clack.intro("🚀 Advanced Benchmark Suite for Web Frameworks");
 
-    let targetFrameworks = FRAMEWORKS;
-    let targetScenarios = Object.keys(SCENARIOS);
+    // Check for CLI arguments first (backwards compatibility)
+    const args = process.argv.slice(2);
+    const filterIndex = args.indexOf("--filter");
+    const hasFilterArg = filterIndex !== -1;
+    const scenarioIndex = args.indexOf("--scenario");
+    const hasScenarioArg = scenarioIndex !== -1;
+    const hasAllFlag = args.includes("--all");
 
-    if (filter) {
-        if (FRAMEWORKS.includes(filter)) {
-            targetFrameworks = [filter];
-            console.log(`Filtering frameworks: ${filter}`);
-        } else {
-            console.error(`Unknown framework: ${filter}. Available: ${FRAMEWORKS.join(", ")}`);
-            process.exit(1);
+    let targetFrameworks: string[];
+    let targetScenarios: string[];
+
+    if (hasAllFlag) {
+        // Run all frameworks and scenarios non-interactively (for CI/CD)
+        targetFrameworks = FRAMEWORKS;
+        targetScenarios = Object.keys(SCENARIOS);
+        console.log("Running full advanced benchmark suite for all frameworks and scenarios...");
+    } else if (hasFilterArg || hasScenarioArg) {
+        // Legacy CLI mode
+        targetFrameworks = FRAMEWORKS;
+        targetScenarios = Object.keys(SCENARIOS);
+
+        if (hasFilterArg) {
+            const filter = args[filterIndex + 1];
+            if (FRAMEWORKS.includes(filter)) {
+                targetFrameworks = [filter];
+                console.log(`Filtering frameworks: ${filter}`);
+            } else {
+                console.error(`Unknown framework: ${filter}. Available: ${FRAMEWORKS.join(", ")}`);
+                process.exit(1);
+            }
+        }
+
+        if (hasScenarioArg) {
+            const scenarioFilter = args[scenarioIndex + 1];
+            if (SCENARIOS[scenarioFilter as keyof typeof SCENARIOS]) {
+                targetScenarios = [scenarioFilter];
+                console.log(`Filtering scenarios: ${scenarioFilter}`);
+            } else {
+                console.error(`Unknown scenario: ${scenarioFilter}. Available: ${Object.keys(SCENARIOS).join(", ")}`);
+                process.exit(1);
+            }
+        }
+    } else {
+        // Interactive mode
+        const frameworkSelection = await clack.multiselect({
+            message: "Select frameworks to benchmark:",
+            options: FRAMEWORKS.map(f => ({ value: f, label: f })),
+            initialValues: ["shokupan"],
+            required: true
+        });
+
+        if (clack.isCancel(frameworkSelection)) {
+            clack.cancel("Benchmark cancelled.");
+            process.exit(0);
+        }
+
+        targetFrameworks = frameworkSelection as string[];
+
+        const scenarioSelection = await clack.multiselect({
+            message: "Select scenarios to run:",
+            options: Object.entries(SCENARIOS).map(([key, config]) => ({
+                value: key,
+                label: config.name,
+                hint: `${config.connections} conns, ${config.duration}s`
+            })),
+            initialValues: Object.keys(SCENARIOS).slice(0, 3),
+            required: true
+        });
+
+        if (clack.isCancel(scenarioSelection)) {
+            clack.cancel("Benchmark cancelled.");
+            process.exit(0);
+        }
+
+        targetScenarios = scenarioSelection as string[];
+    }
+
+    // Calculate time estimate
+    const totalTests = targetFrameworks.length * RUNTIMES.length * targetScenarios.length;
+
+    // Estimate based on actual configuration:
+    // - ~2-5s for server startup per test
+    // - Duration from scenario config
+    // - ~1s for teardown
+    // - Full advanced suite (8 frameworks × 2 runtimes × 11 scenarios) ≈ 55 minutes
+    // That's 176 total tests, so roughly 18-19 seconds per test
+    const avgTimePerTest = 55 * 60 / (8 * 2 * 11); // ~18.75 seconds
+    const estimatedSeconds = Math.ceil(totalTests * avgTimePerTest);
+    const estimatedMinutes = Math.floor(estimatedSeconds / 60);
+    const remainingSeconds = estimatedSeconds % 60;
+
+    const timeEstimate = estimatedMinutes > 0
+        ? `${estimatedMinutes} minute${estimatedMinutes !== 1 ? 's' : ''}${remainingSeconds > 0 ? ` ${remainingSeconds}s` : ''}`
+        : `${remainingSeconds} second${remainingSeconds !== 1 ? 's' : ''}`;
+
+    if (hasAllFlag) {
+        // Non-interactive mode for CI/CD
+        console.log(`\nFrameworks: ${targetFrameworks.join(", ")}`);
+        console.log(`Scenarios: ${targetScenarios.map(s => SCENARIOS[s].name).join(", ")}`);
+        console.log(`Total tests: ${totalTests} (${targetFrameworks.length} frameworks × ${RUNTIMES.length} runtimes × ${targetScenarios.length} scenarios)`);
+        console.log(`Estimated duration: ${timeEstimate}\n`);
+    } else {
+        // Interactive mode with confirmation
+        clack.note(
+            `Frameworks: ${targetFrameworks.join(", ")}\n` +
+            `Scenarios: ${targetScenarios.map(s => SCENARIOS[s].name).join(", ")}\n` +
+            `Total tests: ${totalTests} (${targetFrameworks.length} frameworks × ${RUNTIMES.length} runtimes × ${targetScenarios.length} scenarios)\n` +
+            `Estimated duration: ${timeEstimate}`,
+            "Benchmark Configuration"
+        );
+
+        const shouldContinue = await clack.confirm({
+            message: "Start benchmarking?",
+            initialValue: true
+        });
+
+        if (clack.isCancel(shouldContinue) || !shouldContinue) {
+            clack.cancel("Benchmark cancelled.");
+            process.exit(0);
         }
     }
 
-    if (scenarioFilter) {
-        if (SCENARIOS[scenarioFilter as keyof typeof SCENARIOS]) {
-            targetScenarios = [scenarioFilter];
-            console.log(`Filtering scenarios: ${scenarioFilter}`);
-        } else {
-            console.error(`Unknown scenario: ${scenarioFilter}. Available: ${Object.keys(SCENARIOS).join(", ")}`);
-            process.exit(1);
-        }
-    }
+    const s = clack.spinner();
+    s.start("Starting benchmarks...");
 
     await compileForNode(targetFrameworks);
+    s.message("Compilation complete");
 
     const fullResults: AllResults = {};
 
@@ -395,9 +496,22 @@ async function main() {
         for (const runtime of RUNTIMES) {
             fullResults[framework][runtime] = {};
 
+            // Skip Bun-only frameworks on Node.js
+            if (runtime === "node" && BUN_ONLY_FRAMEWORKS.includes(framework)) {
+                console.log(`\nSkipping ${framework} on ${runtime} for all scenarios (Bun-only framework)`);
+                for (const scenario of targetScenarios) {
+                    fullResults[framework][runtime][scenario] = {
+                        error: "Skipped - Bun-only framework"
+                    } as any;
+                }
+                continue;
+            }
+
             for (const scenario of targetScenarios) {
                 try {
-                    console.log(`\\n${"=".repeat(60)}`);
+                    s.message(`${framework} on ${runtime} - ${SCENARIOS[scenario].name}`);
+
+                    console.log(`\n${"=".repeat(60)}`);
                     console.log(`Framework: ${framework} | Runtime: ${runtime} | Scenario: ${scenario}`);
                     console.log("=".repeat(60));
 
@@ -412,6 +526,8 @@ async function main() {
             }
         }
     }
+
+    s.stop("Benchmarks complete!");
 
     // Save results
     let history: HistoryEntry[] = [];
@@ -435,19 +551,22 @@ async function main() {
 
     fs.writeFileSync(HISTORY_PATH, JSON.stringify(history, null, 2));
 
-    console.log(`\\n✅ Benchmarks complete! Results saved to ${HISTORY_PATH}`);
-    console.log(`📊 Generating HTML report...`);
+    clack.log.success(`Results saved to ${HISTORY_PATH}`);
 
-    generateReport(history);
+    s.start("Generating HTML report...");
+    generateReport(history, hasAllFlag);
+    s.stop(`Report generated: ${REPORT_PATH}`);
 
-    console.log(`\\n🎉 Report generated: ${REPORT_PATH}`);
+    clack.outro("✨ All done!");
 
-    // Auto-open the report
-    const openCmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
-    spawn([openCmd, REPORT_PATH]);
+    // Only auto-open in interactive mode (not in CI/CD)
+    if (!hasAllFlag) {
+        const openCmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
+        spawn([openCmd, REPORT_PATH]);
+    }
 }
 
-function generateReport(history: HistoryEntry[]) {
+function generateReport(history: HistoryEntry[], skipAutoOpen = false) {
     const sortedHistory = [...history].reverse();
     const historyJson = JSON.stringify(sortedHistory);
 

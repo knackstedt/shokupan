@@ -90,7 +90,7 @@ export async function startAdvanced(port: number, scenario: string) {
                     const url = request.url.toString();
                     const headersObj = request.headers as Record<string, string>;
                     const body = JSON.stringify(request.payload || "");
-                    const hash = md5(serializeRequest(url, headersObj, body));
+                    const hash = md5(serializeRequest(url, JSON.stringify(headersObj), body));
                     request.headers[`x-hash-${i}`] = hash;
                     return h.continue;
                 });

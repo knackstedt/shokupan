@@ -2,6 +2,11 @@ import { Elysia } from "elysia";
 import { COMPRESSIBLE_JSON, LARGE_JSON, md5, serializeRequest } from "../advanced-data";
 
 export async function startAdvanced(port: number, scenario: string) {
+    // Elysia is Bun-only - it doesn't work on Node.js
+    if (typeof Bun === "undefined") {
+        throw new Error("Elysia only supports Bun runtime");
+    }
+
     const app = new Elysia();
 
     switch (scenario) {
@@ -44,7 +49,7 @@ export async function startAdvanced(port: number, scenario: string) {
                     const url = request.url;
                     const headersObj = Object.fromEntries(request.headers.entries());
                     // Body parsing in Elysia happens later, so we'll use empty string
-                    const hash = md5(serializeRequest(url, headersObj, ""));
+                    const hash = md5(serializeRequest(url, JSON.stringify(headersObj), ""));
                     set.headers[`X-Hash-${i}`] = hash;
                 });
             }

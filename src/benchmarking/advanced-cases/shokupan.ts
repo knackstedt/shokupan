@@ -73,7 +73,7 @@ export async function startAdvanced(port: number, scenario: string) {
                     const url = ctx.url.toString();
                     const headersObj = Object.fromEntries(ctx.headers.entries());
                     // Skip body reading for GET requests (no body to read)
-                    const hash = md5(serializeRequest(url, headersObj, ""));
+                    const hash = md5(serializeRequest(url, JSON.stringify(headersObj), ""));
                     ctx.set(`X-Hash-${i}`, hash);
                     return next();
                 };
