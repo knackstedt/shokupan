@@ -34,7 +34,10 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Install dependencies
+      - name: Install dependencies 1
+        run: bun install
+
+      - name: Install dependencies 2
         working-directory: ./docs
         run: bun install
 
