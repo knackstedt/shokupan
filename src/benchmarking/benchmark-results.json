@@ -1,586 +1,601 @@
 [
   {
-    "timestamp": 1767144257554,
+    "timestamp": 1767315446224,
     "results": {
       "shokupan": {
         "bun": {
           "static": {
-            "requests": 168358.4,
-            "latency": 0.08,
-            "throughput": 19023462.4
+            "requests": 251148.8,
+            "latency": 0.02,
+            "throughput": 32147046.4,
+            "percentiles": {
+              "p1": 0.18025,
+              "p5": 0.254769,
+              "p25": 0.335129,
+              "p75": 0.4094,
+              "p95": 0.69061,
+              "p99": 0.933169
+            }
           },
           "json": {
-            "requests": 160934.4,
-            "latency": 0.09,
-            "throughput": 84823244.8
+            "requests": 233152,
+            "latency": 0.01,
+            "throughput": 122873446.4,
+            "percentiles": {
+              "p1": 0.2294,
+              "p5": 0.29813,
+              "p25": 0.387679,
+              "p75": 0.41963,
+              "p95": 0.739789,
+              "p99": 0.897429
+            }
           },
           "dynamic/123": {
-            "requests": 165465.6,
-            "latency": 0.08,
-            "throughput": 20684800
+            "requests": 246540.8,
+            "latency": 0.01,
+            "throughput": 34527641.6,
+            "percentiles": {
+              "p1": 0.212269,
+              "p5": 0.28188,
+              "p25": 0.36602,
+              "p75": 0.396599,
+              "p95": 0.706399,
+              "p99": 0.868479
+            }
           }
         },
         "node": {
           "static": {
-            "requests": 163392,
-            "latency": 0.09,
-            "throughput": 18463948.8
+            "requests": 71945.61,
+            "latency": 1.1,
+            "throughput": 12590284.8,
+            "percentiles": {
+              "p1": 0.99993,
+              "p5": 1.221779,
+              "p25": 1.252419,
+              "p75": 1.329139,
+              "p95": 1.467729,
+              "p99": 3.273447
+            }
           },
           "json": {
-            "requests": 156096,
-            "latency": 0.1,
-            "throughput": 82267340.8
+            "requests": 70380.8,
+            "latency": 1.02,
+            "throughput": 40399667.21,
+            "percentiles": {
+              "p1": 1.055929,
+              "p5": 1.312329,
+              "p25": 1.343369,
+              "p75": 1.453658,
+              "p95": 1.674778,
+              "p99": 2.381298
+            }
           },
           "dynamic/123": {
-            "requests": 171148.8,
-            "latency": 0.07,
-            "throughput": 21389312
+            "requests": 73734.4,
+            "latency": 1.02,
+            "throughput": 13789593.6,
+            "percentiles": {
+              "p1": 1.022929,
+              "p5": 1.250879,
+              "p25": 1.281599,
+              "p75": 1.379228,
+              "p95": 1.611578,
+              "p99": 2.193968
+            }
           }
         }
       },
       "fastify": {
         "bun": {
           "static": {
-            "requests": 143187.21,
-            "latency": 0.15,
-            "throughput": 18327961.61
+            "requests": 211468.8,
+            "latency": 0.02,
+            "throughput": 27068006.4,
+            "percentiles": {
+              "p1": 0.24044,
+              "p5": 0.32843,
+              "p25": 0.42585,
+              "p75": 0.47311,
+              "p95": 0.778149,
+              "p99": 0.97283
+            }
           },
           "json": {
-            "requests": 132454.4,
-            "latency": 0.18,
-            "throughput": 71794688
+            "requests": 188633.6,
+            "latency": 0.02,
+            "throughput": 102242713.6,
+            "percentiles": {
+              "p1": 0.25439,
+              "p5": 0.37349,
+              "p25": 0.47821,
+              "p75": 0.5327,
+              "p95": 0.85743,
+              "p99": 1.047439
+            }
           },
           "dynamic/123": {
-            "requests": 140633.6,
-            "latency": 0.15,
-            "throughput": 19688652.8
+            "requests": 202867.2,
+            "latency": 0.02,
+            "throughput": 28395110.4,
+            "percentiles": {
+              "p1": 0.24394,
+              "p5": 0.32907,
+              "p25": 0.431999,
+              "p75": 0.49711,
+              "p95": 0.82878,
+              "p99": 1.062669
+            }
           }
         },
         "node": {
           "static": {
-            "requests": 131660.8,
-            "latency": 0.19,
-            "throughput": 16852582.4
-          },
-          "json": {
-            "requests": 125574.4,
-            "latency": 0.21,
-            "throughput": 68059136
-          },
-          "dynamic/123": {
-            "requests": 136512,
-            "latency": 0.17,
-            "throughput": 19111936
-          }
-        }
-      },
-      "express": {
-        "bun": {
-          "static": {
-            "requests": 69689.61,
-            "latency": 0.82,
-            "throughput": 13311590.4
-          },
-          "json": {
-            "requests": 65526.4,
-            "latency": 0.96,
-            "throughput": 39837696
-          },
-          "dynamic/123": {
-            "requests": 78217.61,
-            "latency": 0.69,
-            "throughput": 15954739.2
-          }
-        },
-        "node": {
-          "static": {
-            "requests": 62179.2,
-            "latency": 1.01,
-            "throughput": 11876761.6
-          },
-          "json": {
-            "requests": 61708.8,
-            "latency": 1.09,
-            "throughput": 37520998.4
-          },
-          "dynamic/123": {
-            "requests": 82886.4,
-            "latency": 0.6,
-            "throughput": 16909926.4
-          }
-        }
-      },
-      "koa": {
-        "bun": {
-          "static": {
-            "requests": 55145.6,
-            "latency": 1.29,
-            "throughput": 7058636.8
-          },
-          "json": {
-            "requests": 48361.6,
-            "latency": 1.56,
-            "throughput": 26212761.6
-          },
-          "dynamic/123": {
-            "requests": 54128,
-            "latency": 1.34,
-            "throughput": 7578009.6
-          }
-        },
-        "node": {
-          "static": {
-            "requests": 52856,
-            "latency": 1.36,
-            "throughput": 6765568
-          },
-          "json": {
-            "requests": 50096,
-            "latency": 1.48,
-            "throughput": 27153203.2
-          },
-          "dynamic/123": {
-            "requests": 56742.4,
-            "latency": 1.23,
-            "throughput": 7945011.2
-          }
-        }
-      },
-      "hapi": {
-        "bun": {
-          "static": {
-            "requests": 24779.2,
-            "latency": 3.54,
-            "throughput": 4310835.2
-          },
-          "json": {
-            "requests": 30464,
-            "latency": 2.79,
-            "throughput": 17943756.8
-          },
-          "dynamic/123": {
-            "requests": 35574.4,
-            "latency": 2.32,
-            "throughput": 6616268.8
-          }
-        },
-        "node": {
-          "static": {
-            "requests": 39840,
-            "latency": 2.03,
-            "throughput": 6931865.6
-          },
-          "json": {
-            "requests": 32534.4,
-            "latency": 2.59,
-            "throughput": 19158630.4
-          },
-          "dynamic/123": {
-            "requests": 35905.6,
-            "latency": 2.3,
-            "throughput": 6677708.8
-          }
-        }
-      },
-      "nest": {
-        "bun": {
-          "static": {
-            "requests": 40140.81,
-            "latency": 2,
-            "throughput": 7667712
-          },
-          "json": {
-            "requests": 39812.81,
-            "latency": 2.03,
-            "throughput": 24200806.4
-          },
-          "dynamic/123": {
-            "requests": 34870.4,
-            "latency": 2.38,
-            "throughput": 7112704
-          }
-        },
-        "node": {
-          "static": {
-            "requests": 31577.6,
-            "latency": 2.67,
-            "throughput": 6031769.6
-          },
-          "json": {
-            "requests": 46494.4,
-            "latency": 1.69,
-            "throughput": 28264038.4
-          },
-          "dynamic/123": {
-            "requests": 36187.2,
-            "latency": 2.27,
-            "throughput": 7382220.8
-          }
-        }
-      },
-      "hono": {
-        "bun": {
-          "static": {
-            "requests": 162624,
-            "latency": 0.08,
-            "throughput": 20652032
-          },
-          "json": {
-            "requests": 161804.8,
-            "latency": 0.08,
-            "throughput": 85268889.6
-          },
-          "dynamic/123": {
-            "requests": 167257.6,
-            "latency": 0.07,
-            "throughput": 23250534.4
-          }
-        },
-        "node": {
-          "static": {
-            "requests": 162828.8,
-            "latency": 0.08,
-            "throughput": 20671692.8
-          },
-          "json": {
-            "requests": 161292.8,
-            "latency": 0.08,
-            "throughput": 85019852.8
-          },
-          "dynamic/123": {
-            "requests": 166643.21,
-            "latency": 0.07,
-            "throughput": 23158784
-          }
-        }
-      },
-      "elysia": {
-        "bun": {
-          "static": {
-            "requests": 151052.8,
-            "latency": 0.11,
-            "throughput": 19177472
-          },
-          "json": {
-            "requests": 152460.8,
-            "latency": 0.1,
-            "throughput": 80353689.6
-          },
-          "dynamic/123": {
-            "requests": 155712,
-            "latency": 0.09,
-            "throughput": 21644902.4
-          }
-        },
-        "node": {
-          "static": {
-            "requests": 152025.6,
-            "latency": 0.1,
-            "throughput": 19305267.2
-          },
-          "json": {
-            "requests": 154585.6,
-            "latency": 0.09,
-            "throughput": 81454694.41
-          },
-          "dynamic/123": {
-            "requests": 150796.8,
-            "latency": 0.11,
-            "throughput": 20963328
-          }
-        }
-      }
-    }
-  },
-  {
-    "timestamp": 1767144571835,
-    "results": {
-      "shokupan": {
-        "bun": {
-          "static": {
-            "requests": 164364.8,
-            "latency": 0.09,
-            "throughput": 18571264
-          },
-          "json": {
-            "requests": 163392,
-            "latency": 0.08,
-            "throughput": 86081536
-          },
-          "dynamic/123": {
-            "requests": 172864,
-            "latency": 0.07,
-            "throughput": 21615411.2
-          }
-        },
-        "node": {
-          "static": {
-            "requests": 172864,
-            "latency": 0.07,
-            "throughput": 19534643.2
-          },
-          "json": {
-            "requests": 164262.4,
-            "latency": 0.08,
-            "throughput": 86566502.4
-          },
-          "dynamic/123": {
-            "requests": 175398.4,
+            "requests": 157504,
             "latency": 0.06,
-            "throughput": 21926707.2
-          }
-        }
-      },
-      "fastify": {
-        "bun": {
-          "static": {
-            "requests": 144723.21,
-            "latency": 0.15,
-            "throughput": 18524569.61
+            "throughput": 27720089.6,
+            "percentiles": {
+              "p1": 0.27095,
+              "p5": 0.418049,
+              "p25": 0.57141,
+              "p75": 0.631629,
+              "p95": 0.965079,
+              "p99": 1.361539
+            }
           },
           "json": {
-            "requests": 138387.21,
-            "latency": 0.16,
-            "throughput": 75019059.2
+            "requests": 143040,
+            "latency": 0.07,
+            "throughput": 84390707.2,
+            "percentiles": {
+              "p1": 0.29947,
+              "p5": 0.488299,
+              "p25": 0.644479,
+              "p75": 0.709329,
+              "p95": 1.048779,
+              "p99": 1.389859
+            }
           },
           "dynamic/123": {
-            "requests": 147596.8,
-            "latency": 0.13,
-            "throughput": 20665139.2
-          }
-        },
-        "node": {
-          "static": {
-            "requests": 144659.21,
-            "latency": 0.15,
-            "throughput": 18516377.61
-          },
-          "json": {
-            "requests": 135296,
-            "latency": 0.17,
-            "throughput": 73315123.2
-          },
-          "dynamic/123": {
-            "requests": 146675.21,
-            "latency": 0.13,
-            "throughput": 20534067.2
+            "requests": 158912,
+            "latency": 0.03,
+            "throughput": 29872947.2,
+            "percentiles": {
+              "p1": 0.267659,
+              "p5": 0.447839,
+              "p25": 0.591669,
+              "p75": 0.62726,
+              "p95": 0.933899,
+              "p99": 1.16918
+            }
           }
         }
       },
       "express": {
         "bun": {
           "static": {
-            "requests": 75580.8,
-            "latency": 0.71,
-            "throughput": 14435123.2
+            "requests": 142886.4,
+            "latency": 0.09,
+            "throughput": 27294105.6,
+            "percentiles": {
+              "p1": 0.28808,
+              "p5": 0.487899,
+              "p25": 0.61003,
+              "p75": 0.707059,
+              "p95": 1.114079,
+              "p99": 1.496969
+            }
           },
           "json": {
-            "requests": 60025.6,
-            "latency": 1.13,
-            "throughput": 36492083.21
+            "requests": 127878.4,
+            "latency": 0.13,
+            "throughput": 77745356.8,
+            "percentiles": {
+              "p1": 0.31835,
+              "p5": 0.546239,
+              "p25": 0.68589,
+              "p75": 0.79273,
+              "p95": 1.207009,
+              "p99": 1.675499
+            }
           },
           "dynamic/123": {
-            "requests": 76704,
-            "latency": 0.71,
-            "throughput": 15646720
+            "requests": 134291.21,
+            "latency": 0.11,
+            "throughput": 27392409.6,
+            "percentiles": {
+              "p1": 0.31703,
+              "p5": 0.51771,
+              "p25": 0.652709,
+              "p75": 0.76194,
+              "p95": 1.153769,
+              "p99": 1.553729
+            }
           }
         },
         "node": {
           "static": {
-            "requests": 67372.8,
-            "latency": 0.88,
-            "throughput": 12867993.6
+            "requests": 29300.8,
+            "latency": 2.83,
+            "throughput": 6974259.2,
+            "percentiles": {
+              "p1": 2.675167,
+              "p5": 2.810217,
+              "p25": 2.884768,
+              "p75": 3.583687,
+              "p95": 4.636606,
+              "p99": 5.967496
+            }
           },
           "json": {
-            "requests": 62313.6,
-            "latency": 1.05,
-            "throughput": 37884723.21
+            "requests": 29336,
+            "latency": 2.94,
+            "throughput": 19213516.8,
+            "percentiles": {
+              "p1": 2.774998,
+              "p5": 2.945138,
+              "p25": 3.009108,
+              "p75": 3.655277,
+              "p95": 4.533936,
+              "p99": 5.309605
+            }
           },
           "dynamic/123": {
-            "requests": 74307.2,
-            "latency": 0.75,
-            "throughput": 15156838.4
+            "requests": 30001.6,
+            "latency": 2.74,
+            "throughput": 7529676.8,
+            "percentiles": {
+              "p1": 2.722738,
+              "p5": 2.867358,
+              "p25": 2.923717,
+              "p75": 3.584517,
+              "p95": 4.440596,
+              "p99": 5.351215
+            }
           }
         }
       },
       "koa": {
         "bun": {
           "static": {
-            "requests": 49528,
-            "latency": 1.5,
-            "throughput": 6339584
+            "requests": 128953.6,
+            "latency": 0.13,
+            "throughput": 16506060.8,
+            "percentiles": {
+              "p1": 0.324919,
+              "p5": 0.547009,
+              "p25": 0.674349,
+              "p75": 0.79473,
+              "p95": 1.170289,
+              "p99": 1.633069
+            }
           },
           "json": {
-            "requests": 38496,
-            "latency": 2.1,
-            "throughput": 20864204.8
+            "requests": 123507.2,
+            "latency": 0.13,
+            "throughput": 66941747.2,
+            "percentiles": {
+              "p1": 0.36985,
+              "p5": 0.595689,
+              "p25": 0.702349,
+              "p75": 0.85614,
+              "p95": 1.211449,
+              "p99": 1.560118
+            }
           },
           "dynamic/123": {
-            "requests": 49468.8,
-            "latency": 1.51,
-            "throughput": 6925926.4
+            "requests": 130496,
+            "latency": 0.12,
+            "throughput": 18273075.2,
+            "percentiles": {
+              "p1": 0.356429,
+              "p5": 0.573389,
+              "p25": 0.679329,
+              "p75": 0.791199,
+              "p95": 1.127789,
+              "p99": 1.451239
+            }
           }
         },
         "node": {
           "static": {
-            "requests": 50964.8,
-            "latency": 1.44,
-            "throughput": 6523494.4
+            "requests": 116601.6,
+            "latency": 0.13,
+            "throughput": 20402995.2,
+            "percentiles": {
+              "p1": 0.41036,
+              "p5": 0.63854,
+              "p25": 0.781439,
+              "p75": 0.864099,
+              "p95": 1.204329,
+              "p99": 1.722888
+            }
           },
           "json": {
-            "requests": 48923.2,
-            "latency": 1.52,
-            "throughput": 26513408
+            "requests": 109241.6,
+            "latency": 0.15,
+            "throughput": 64339968,
+            "percentiles": {
+              "p1": 0.502239,
+              "p5": 0.721539,
+              "p25": 0.864739,
+              "p75": 0.9434,
+              "p95": 1.188269,
+              "p99": 1.556529
+            }
           },
           "dynamic/123": {
-            "requests": 57155.2,
-            "latency": 1.22,
-            "throughput": 8002355.2
+            "requests": 114400,
+            "latency": 0.12,
+            "throughput": 21395865.61,
+            "percentiles": {
+              "p1": 0.45903,
+              "p5": 0.704299,
+              "p25": 0.818619,
+              "p75": 0.895479,
+              "p95": 1.187559,
+              "p99": 1.510059
+            }
           }
         }
       },
       "hapi": {
         "bun": {
           "static": {
-            "requests": 35388.81,
-            "latency": 2.34,
-            "throughput": 6158950.4
+            "requests": 108115.2,
+            "latency": 0.24,
+            "throughput": 18813747.2,
+            "percentiles": {
+              "p1": 0.42752,
+              "p5": 0.697589,
+              "p25": 0.789829,
+              "p75": 0.96951,
+              "p95": 1.354759,
+              "p99": 1.902979
+            }
           },
           "json": {
-            "requests": 34147.2,
-            "latency": 2.44,
-            "throughput": 20111360
+            "requests": 101420.8,
+            "latency": 0.31,
+            "throughput": 59745894.4,
+            "percentiles": {
+              "p1": 0.47162,
+              "p5": 0.72803,
+              "p25": 0.841569,
+              "p75": 1.039429,
+              "p95": 1.458249,
+              "p99": 2.033228
+            }
           },
           "dynamic/123": {
-            "requests": 36880,
-            "latency": 2.23,
-            "throughput": 6859571.2
+            "requests": 103699.2,
+            "latency": 0.28,
+            "throughput": 19285606.4,
+            "percentiles": {
+              "p1": 0.484079,
+              "p5": 0.737789,
+              "p25": 0.822169,
+              "p75": 1.01928,
+              "p95": 1.422679,
+              "p99": 1.865488
+            }
           }
         },
         "node": {
           "static": {
-            "requests": 27724.8,
-            "latency": 3.11,
-            "throughput": 4824883.2
+            "requests": 103443.2,
+            "latency": 0.25,
+            "throughput": 22863872,
+            "percentiles": {
+              "p1": 0.45917,
+              "p5": 0.705669,
+              "p25": 0.865739,
+              "p75": 0.981159,
+              "p95": 1.371649,
+              "p99": 1.911398
+            }
           },
           "json": {
-            "requests": 31596.8,
-            "latency": 2.68,
-            "throughput": 18609766.4
+            "requests": 97273.6,
+            "latency": 0.36,
+            "throughput": 61862707.2,
+            "percentiles": {
+              "p1": 0.530749,
+              "p5": 0.7703,
+              "p25": 0.94605,
+              "p75": 1.062389,
+              "p95": 1.471359,
+              "p99": 1.938999
+            }
           },
           "dynamic/123": {
-            "requests": 38180.81,
-            "latency": 2.13,
-            "throughput": 7102873.6
+            "requests": 104262.4,
+            "latency": 0.26,
+            "throughput": 24292556.8,
+            "percentiles": {
+              "p1": 0.49519,
+              "p5": 0.736509,
+              "p25": 0.88832,
+              "p75": 1.00036,
+              "p95": 1.324039,
+              "p99": 1.687139
+            }
           }
         }
       },
       "nest": {
         "bun": {
           "static": {
-            "requests": 43940.8,
-            "latency": 1.79,
-            "throughput": 8392704
+            "requests": 118496,
+            "latency": 0.16,
+            "throughput": 22637772.8,
+            "percentiles": {
+              "p1": 0.369969,
+              "p5": 0.606829,
+              "p25": 0.730709,
+              "p75": 0.860949,
+              "p95": 1.342669,
+              "p99": 1.840799
+            }
           },
           "json": {
-            "requests": 41899.2,
-            "latency": 1.91,
-            "throughput": 25478758.4
+            "requests": 109612.8,
+            "latency": 0.19,
+            "throughput": 66633728,
+            "percentiles": {
+              "p1": 0.422889,
+              "p5": 0.6603,
+              "p25": 0.80398,
+              "p75": 0.93265,
+              "p95": 1.411959,
+              "p99": 1.853708
+            }
           },
           "dynamic/123": {
-            "requests": 32036.8,
-            "latency": 2.63,
-            "throughput": 6536806.4
+            "requests": 108051.2,
+            "latency": 0.21,
+            "throughput": 22044672,
+            "percentiles": {
+              "p1": 0.45586,
+              "p5": 0.71292,
+              "p25": 0.811339,
+              "p75": 0.952739,
+              "p95": 1.424569,
+              "p99": 1.856649
+            }
           }
         },
         "node": {
           "static": {
-            "requests": 46788.8,
-            "latency": 1.66,
-            "throughput": 8936652.81
+            "requests": 27057.6,
+            "latency": 3.33,
+            "throughput": 6438502.4,
+            "percentiles": {
+              "p1": 2.919628,
+              "p5": 3.044757,
+              "p25": 3.146398,
+              "p75": 3.887437,
+              "p95": 4.837176,
+              "p99": 6.107866
+            }
           },
           "json": {
-            "requests": 43764.8,
-            "latency": 1.82,
-            "throughput": 26609254.4
+            "requests": 26593.6,
+            "latency": 3.32,
+            "throughput": 17417830.4,
+            "percentiles": {
+              "p1": 3.117638,
+              "p5": 3.199507,
+              "p25": 3.290697,
+              "p75": 4.022357,
+              "p95": 4.960826,
+              "p99": 5.783786
+            }
           },
           "dynamic/123": {
-            "requests": 34712,
-            "latency": 2.39,
-            "throughput": 7079936
+            "requests": 26577.6,
+            "latency": 3.33,
+            "throughput": 6671155.2,
+            "percentiles": {
+              "p1": 3.075277,
+              "p5": 3.187387,
+              "p25": 3.275498,
+              "p75": 4.053247,
+              "p95": 5.002147,
+              "p99": 5.863586
+            }
           }
         }
       },
       "hono": {
         "bun": {
           "static": {
-            "requests": 159372.8,
-            "latency": 0.08,
-            "throughput": 20242432
+            "requests": 239091.2,
+            "latency": 0.01,
+            "throughput": 30364467.2,
+            "percentiles": {
+              "p1": 0.25599,
+              "p5": 0.333639,
+              "p25": 0.37069,
+              "p75": 0.41215,
+              "p95": 0.65779,
+              "p99": 0.896239
+            }
           },
           "json": {
-            "requests": 158144,
-            "latency": 0.09,
-            "throughput": 83329024
+            "requests": 227776,
+            "latency": 0.02,
+            "throughput": 120055398.4,
+            "percentiles": {
+              "p1": 0.2019,
+              "p5": 0.2701,
+              "p25": 0.35522,
+              "p75": 0.47591,
+              "p95": 0.740079,
+              "p99": 1.009869
+            }
           },
           "dynamic/123": {
-            "requests": 164134.4,
-            "latency": 0.07,
-            "throughput": 22817996.8
+            "requests": 244262.4,
+            "latency": 0.01,
+            "throughput": 33957478.4,
+            "percentiles": {
+              "p1": 0.246179,
+              "p5": 0.312939,
+              "p25": 0.367759,
+              "p75": 0.40485,
+              "p95": 0.650329,
+              "p99": 0.864429
+            }
           }
         },
         "node": {
-          "static": {
-            "requests": 155814.4,
-            "latency": 0.09,
-            "throughput": 19790233.61
-          },
-          "json": {
-            "requests": 161062.4,
-            "latency": 0.08,
-            "throughput": 84901888
-          },
-          "dynamic/123": {
-            "requests": 168844.8,
-            "latency": 0.07,
-            "throughput": 23473356.8
-          }
+          "error": "Process died immediately"
         }
       },
       "elysia": {
         "bun": {
           "static": {
-            "requests": 154560,
-            "latency": 0.1,
-            "throughput": 19632947.2
+            "requests": 236044.8,
+            "latency": 0.01,
+            "throughput": 29974528,
+            "percentiles": {
+              "p1": 0.28784,
+              "p5": 0.36802,
+              "p25": 0.38299,
+              "p75": 0.41325,
+              "p95": 0.60379,
+              "p99": 0.90188
+            }
           },
           "json": {
-            "requests": 154560,
-            "latency": 0.09,
-            "throughput": 81454694.41
+            "requests": 233356.8,
+            "latency": 0.01,
+            "throughput": 122978304,
+            "percentiles": {
+              "p1": 0.275889,
+              "p5": 0.36018,
+              "p25": 0.386,
+              "p75": 0.42252,
+              "p95": 0.64105,
+              "p99": 0.886149
+            }
           },
           "dynamic/123": {
-            "requests": 152102.4,
-            "latency": 0.1,
-            "throughput": 21140275.2
+            "requests": 240627.2,
+            "latency": 0.01,
+            "throughput": 33452851.2,
+            "percentiles": {
+              "p1": 0.27586,
+              "p5": 0.36439,
+              "p25": 0.381799,
+              "p75": 0.406409,
+              "p95": 0.57616,
+              "p99": 0.864779
+            }
           }
         },
         "node": {
-          "static": {
-            "requests": 153228.8,
-            "latency": 0.1,
-            "throughput": 19452723.2
-          },
-          "json": {
-            "requests": 148134.4,
-            "latency": 0.1,
-            "throughput": 78059929.6
-          },
-          "dynamic/123": {
-            "requests": 146092.8,
-            "latency": 0.12,
-            "throughput": 20311244.8
-          }
+          "error": "Process died immediately"
         }
       }
     }
