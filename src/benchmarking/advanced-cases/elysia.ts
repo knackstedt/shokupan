@@ -78,9 +78,10 @@ export async function startAdvanced(port: number, scenario: string) {
                 }
             });
 
-            app.post("/validate", ({ body }) => {
+            app.post("/validate", ({ body, set }) => {
                 if (!body || typeof (body as any).data !== 'string') {
-                    throw new Error("Invalid body");
+                    set.status = 400;
+                    return { error: "Invalid body" };
                 }
                 return { validated: true, data: body };
             });

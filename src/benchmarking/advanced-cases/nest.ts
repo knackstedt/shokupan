@@ -64,11 +64,11 @@ class AppController {
     }
 
     @Post('/validate')
-    postValidate(@Body() body: any) {
+    postValidate(@Body() body: any, @Res() res: any) {
         if (!body || typeof body.data !== 'string') {
-            throw new Error("Invalid body");
+            return res.status(400).json({ error: "Invalid body" });
         }
-        return { validated: true, data: body };
+        return res.json({ validated: true, data: body });
     }
 
     @Get('/validate')
