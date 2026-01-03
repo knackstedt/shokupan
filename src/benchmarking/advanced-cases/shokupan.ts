@@ -44,7 +44,7 @@ export async function startAdvanced(port: number, scenario: string) {
 
         case "large-payload-request":
             app.post("/large-request", async (ctx) => {
-                const body = await ctx.request.text();
+                const body = await ctx.body<string>(); // Use cached pre-parsed body
                 return ctx.json({ received: body.length });
             });
             break;

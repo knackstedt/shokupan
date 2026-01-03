@@ -97,10 +97,14 @@ export async function startAdvanced(port: number, scenario: string) {
         throw new Error("NestJS compression scenarios not fully supported");
     }
 
-    const app = await NestFactory.create(AppModule, {
+    const app = await NestFactory.create<NestExpressApplication>(AppModule, {
         logger: false,
-        bodyParser: true,
+        bodyParser: false, // Disable default to configure manually
     });
+
+    // Configure body parser to accept large payloads (default is 100KB)
+    app.useBodyParser('json', { limit: '15mb' });
+    app.useBodyParser('text', { limit: '15mb' });
 
     // Handle scenarios that need middleware
     if (scenario === "math-middleware") {

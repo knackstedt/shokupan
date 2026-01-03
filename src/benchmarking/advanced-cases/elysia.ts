@@ -24,9 +24,10 @@ export async function startAdvanced(port: number, scenario: string) {
             break;
 
         case "large-payload-request":
-            app.post("/large-request", async ({ body }) => {
-                const bodyLength = typeof body === 'string' ? body.length : Buffer.byteLength(JSON.stringify(body));
-                return { received: bodyLength };
+            app.post("/large-request", async ({ request }) => {
+                // For text/plain content-type, body is not auto-parsed, need to read from request
+                const body = await request.text();
+                return { received: body.length };
             });
             break;
 

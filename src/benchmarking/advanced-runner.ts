@@ -26,7 +26,7 @@ const FRAMEWORK_EXCLUSIONS: Record<string, string[]> = {
 const RUNTIME_EXCLUSIONS: Record<string, Record<string, string[]>> = {
     "node": {
         // Shokupan on Node.js has issues with POST requests due to undici Request duplex requirement
-        "shokupan": ["large-payload-request", "fully-loaded", "compression-zstd"]
+        "shokupan": ["fully-loaded", "compression-zstd"]
     },
     "bun": {
         // Express body-parser has issues with large payloads on Bun

@@ -32,7 +32,7 @@ export async function startAdvanced(port: number, scenario: string) {
             break;
 
         case "large-payload-request":
-            app.addContentTypeParser('text/plain', { parseAs: 'string' }, async (req, body) => {
+            app.addContentTypeParser('text/plain', { parseAs: 'string', bodyLimit: 15 * 1024 * 1024 }, async (req, body) => {
                 return body;
             });
             app.post("/large-request", async (request, reply) => {
