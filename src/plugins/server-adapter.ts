@@ -20,8 +20,10 @@ export function createHttpServer(): ServerFactory {
                         req.on('end', () => controller.close());
                         req.on('error', err => controller.error(err));
                     }
-                }) as any
-            });
+                }) as any,
+                // Required for Node.js undici when sending a body
+                duplex: 'half'
+            } as any);
 
             const response = await options.fetch(request, fauxServer);
 
@@ -90,8 +92,10 @@ export function createHttpsServer(sslOptions: https.ServerOptions): ServerFactor
                         req.on('end', () => controller.close());
                         req.on('error', err => controller.error(err));
                     }
-                }) as any
-            });
+                }) as any,
+                // Required for Node.js undici when sending a body
+                duplex: 'half'
+            } as any);
 
             const response = await options.fetch(request, fauxServer);
 
