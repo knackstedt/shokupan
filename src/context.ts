@@ -36,6 +36,11 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     public _finalResponse?: Response;
     public _rawBody?: string | ArrayBuffer | Uint8Array; // Raw body for compression optimization
 
+    // Body caching to avoid double parsing
+    private _cachedBody?: any;
+    private _bodyType?: 'json' | 'text' | 'formData' | 'arrayBuffer' | 'blob';
+    private _bodyParsed: boolean = false;
+
     constructor(
         public readonly request: ShokupanRequest<any>,
         public readonly server?: Server,
@@ -278,18 +283,30 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     }
 
     /**
-     * Read request body
+     * Read request body with caching to avoid double parsing.
+     * The body is only parsed once and cached for subsequent reads.
      */
     async body<T = any>(): Promise<T> {
+        // Return cached body if already parsed
+        if (this._bodyParsed) {
+            return this._cachedBody as T;
+        }
+
         const contentType = this.request.headers.get("content-type") || "";
 
         if (contentType.includes("application/json") || contentType.includes("+json")) {
-            return this.request.json() as any;
+            this._cachedBody = await this.request.json();
+            this._bodyType = 'json';
+        } else if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
+            this._cachedBody = await this.request.formData();
+            this._bodyType = 'formData';
+        } else {
+            this._cachedBody = await this.request.text();
+            this._bodyType = 'text';
         }
-        if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
-            return this.request.formData() as any;
-        }
-        return this.request.text() as any;
+
+        this._bodyParsed = true;
+        return this._cachedBody as T;
     }
 
     /**

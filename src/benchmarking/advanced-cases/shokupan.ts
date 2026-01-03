@@ -105,7 +105,8 @@ export async function startAdvanced(port: number, scenario: string) {
             // Simple validator middleware (simulating Zod)
             const validatorMiddleware: Middleware = async (ctx, next: NextFn) => {
                 if (ctx.request.method === "POST") {
-                    const body = await ctx.request.clone().json().catch(() => null);
+                    // Use ctx.body() which now caches the parsed body
+                    const body = await ctx.body().catch(() => null) as any;
                     if (!body || typeof body.data !== 'string') {
                         return ctx.json({ error: "Invalid body" }, 400);
                     }
@@ -115,7 +116,8 @@ export async function startAdvanced(port: number, scenario: string) {
             app.use(validatorMiddleware);
 
             app.post("/validate", async (ctx) => {
-                const body = await ctx.request.json();
+                // Use ctx.body() again - this will return the cached result
+                const body = await ctx.body();
                 return ctx.json({ validated: true, data: body });
             });
             app.get("/validate", (ctx) => {
