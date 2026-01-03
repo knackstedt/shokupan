@@ -1,7 +1,6 @@
 import { Compression } from "../../plugins/compression";
 import { Shokupan } from "../../shokupan";
 import type { Middleware, NextFn } from "../../types";
-import { asyncContext } from "../../util/async-hooks";
 import { COMPRESSIBLE_JSON, LARGE_JSON, md5, serializeRequest } from "../advanced-data";
 
 export async function startAdvanced(port: number, scenario: string) {
@@ -14,7 +13,8 @@ export async function startAdvanced(port: number, scenario: string) {
             warning: () => { },
             error: () => { },
             fatal: () => { }
-        } as any
+        } as any,
+        enableAsyncLocalStorage: scenario === "fully-loaded"
     });
 
     switch (scenario) {
@@ -94,18 +94,9 @@ export async function startAdvanced(port: number, scenario: string) {
             break;
 
         case "fully-loaded":
-            // AsyncLocalStorage middleware
-            const asyncStorageMiddleware: Middleware = async (ctx, next: NextFn) => {
-                return asyncContext.run(new Map([['requestId', Math.random().toString()]]), async () => {
-                    return next();
-                });
-            };
-            app.use(asyncStorageMiddleware);
-
             // Simple validator middleware (simulating Zod)
             const validatorMiddleware: Middleware = async (ctx, next: NextFn) => {
                 if (ctx.request.method === "POST") {
-                    // Use ctx.body() which now caches the parsed body
                     const body = await ctx.body().catch(() => null) as any;
                     if (!body || typeof body.data !== 'string') {
                         return ctx.json({ error: "Invalid body" }, 400);
@@ -116,7 +107,6 @@ export async function startAdvanced(port: number, scenario: string) {
             app.use(validatorMiddleware);
 
             app.post("/validate", async (ctx) => {
-                // Use ctx.body() again - this will return the cached result
                 const body = await ctx.body();
                 return ctx.json({ validated: true, data: body });
             });
