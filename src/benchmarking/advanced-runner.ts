@@ -1,8 +1,9 @@
 import * as clack from "@clack/prompts";
 import autocannon from "autocannon";
 import { spawn } from "bun";
+import { Eta } from 'eta';
 import fs from "fs";
-import getPort from "get-port";
+import getPort, { portNumbers } from "get-port";
 import ora from "ora";
 import path from "path";
 
@@ -26,6 +27,12 @@ const RUNTIME_EXCLUSIONS: Record<string, Record<string, string[]>> = {
     "node": {
         // Shokupan on Node.js has issues with POST requests due to undici Request duplex requirement
         "shokupan": ["large-payload-request", "fully-loaded", "compression-zstd"]
+    },
+    "bun": {
+        // Express body-parser has issues with large payloads on Bun
+        "express": ["large-payload-request"],
+        // Koa compression middleware has stream issues on Bun
+        "koa": ["compression-gzip", "compression-deflate"]
     }
 };
 
@@ -38,6 +45,7 @@ type ScenarioConfig = {
     endpoints: string[];
     connections: number;
     duration: number;
+    durationEstimate?: number;
     method?: string;
     body?: string;
     headers?: Record<string, string>;
@@ -51,6 +59,7 @@ const SCENARIOS: Record<string, ScenarioConfig> = {
         endpoints: ["/compressed", "/compressed-large"],
         connections: 100,
         duration: 10,
+        durationEstimate: 23,
         headers: { "Accept-Encoding": "gzip" }
     },
     "compression-brotli": {
@@ -58,6 +67,7 @@ const SCENARIOS: Record<string, ScenarioConfig> = {
         endpoints: ["/compressed", "/compressed-large"],
         connections: 100,
         duration: 10,
+        durationEstimate: 23,
         headers: { "Accept-Encoding": "br" }
     },
     "compression-deflate": {
@@ -65,6 +75,7 @@ const SCENARIOS: Record<string, ScenarioConfig> = {
         endpoints: ["/compressed", "/compressed-large"],
         connections: 100,
         duration: 10,
+        durationEstimate: 23,
         headers: { "Accept-Encoding": "deflate" }
     },
     "compression-zstd": {
@@ -72,6 +83,7 @@ const SCENARIOS: Record<string, ScenarioConfig> = {
         endpoints: ["/compressed", "/compressed-large"],
         connections: 100,
         duration: 10,
+        durationEstimate: 23,
         headers: { "Accept-Encoding": "zstd" }
     },
     "compression-store": {
@@ -79,6 +91,7 @@ const SCENARIOS: Record<string, ScenarioConfig> = {
         endpoints: ["/compressed", "/compressed-large"],
         connections: 100,
         duration: 10,
+        durationEstimate: 23,
         headers: {}
     },
 
@@ -88,6 +101,7 @@ const SCENARIOS: Record<string, ScenarioConfig> = {
         endpoints: ["/large-request"],
         connections: 50,
         duration: 10,
+        durationEstimate: 13,
         method: "POST",
         body: "x".repeat(10 * 1024 * 1024), // 10MB plain text
         headers: { "Content-Type": "text/plain" }
@@ -96,13 +110,15 @@ const SCENARIOS: Record<string, ScenarioConfig> = {
         name: "Large Response Payload (5MB JSON)",
         endpoints: ["/large-response"],
         connections: 50,
-        duration: 10
+        duration: 10,
+        durationEstimate: 13
     },
     "large-payload-headers": {
         name: "Large Headers (100 headers)",
         endpoints: ["/large-headers"],
         connections: 100,
-        duration: 10
+        duration: 10,
+        durationEstimate: 13
     },
 
     // Math middleware test
@@ -110,7 +126,8 @@ const SCENARIOS: Record<string, ScenarioConfig> = {
         name: "10 MD5 Middleware Chain",
         endpoints: ["/compute"],
         connections: 100,
-        duration: 10
+        duration: 10,
+        durationEstimate: 13
     },
 
     // Scaling test
@@ -118,15 +135,17 @@ const SCENARIOS: Record<string, ScenarioConfig> = {
         name: "1000 Route Handlers (Scaling)",
         endpoints: Array.from({ length: 10 }, (_, i) => `/route-${Math.floor(Math.random() * 1000)}`),
         connections: 100,
-        duration: 10
+        duration: 10,
+        durationEstimate: 110
     },
 
     // Fully loaded test
     "fully-loaded": {
-        name: "Fully Loaded (OTel + Validators + ALS)",
+        name: "Fully Loaded (Validators + ALS)",
         endpoints: ["/validate"],
         connections: 100,
         duration: 10,
+        durationEstimate: 13,
         method: "POST",
         body: JSON.stringify({ data: "test" }),
         headers: { "Content-Type": "application/json" }
@@ -134,10 +153,11 @@ const SCENARIOS: Record<string, ScenarioConfig> = {
 
     // Long pending test - tests high concurrency with small delays
     "long-pending": {
-        name: "High Concurrency (1000 concurrent, 100ms delay)",
+        name: "High Concurrency (10000 concurrent, 100ms delay)",
         endpoints: ["/delayed"],
-        connections: 1000,
+        connections: 10000,
         duration: 10,
+        durationEstimate: 13.5,
         timeout: 30 // Allow enough time for responses
     }
 };
@@ -240,6 +260,7 @@ function calculatePercentile(latencies: number[], percentile: number): number {
 }
 
 async function runBenchmark(framework: string, runtime: string, scenario: string) {
+    const startTime = Date.now();
     const scenarioConfig = SCENARIOS[scenario as keyof typeof SCENARIOS];
 
     // Check if this framework/scenario combination is excluded
@@ -252,11 +273,33 @@ async function runBenchmark(framework: string, runtime: string, scenario: string
             ? `${framework} doesn't support ${scenarioConfig.name}`
             : `${framework} on ${runtime} doesn't support ${scenarioConfig.name}`;
         return {
-            error: `Skipped - ${reason}`
+            error: `Skipped - ${reason}`,
+            duration: Date.now() - startTime
         } as any;
     }
 
-    const port = await getPort();
+    // Get port with retries and wider range for high-concurrency scenarios
+    let port: number | undefined;
+    let portAttempts = 0;
+    const maxPortAttempts = 10;
+
+    while (!port && portAttempts < maxPortAttempts) {
+        try {
+            port = await getPort({ port: portNumbers(30000, 60000) });
+            break;
+        } catch (e) {
+            portAttempts++;
+            if (portAttempts >= maxPortAttempts) {
+                throw new Error(`No available ports found after ${maxPortAttempts} attempts`);
+            }
+            // Wait a bit before retrying to let ports get released
+            await new Promise(r => setTimeout(r, 100));
+        }
+    }
+
+    if (!port) {
+        throw new Error("No available ports found");
+    }
 
     console.log(`Benchmark starting: \x1b[36m${scenarioConfig.name}\x1b[0m (port \x1b[36m${port}\x1b[0m)`);
 
@@ -397,7 +440,10 @@ async function runBenchmark(framework: string, runtime: string, scenario: string
         await new Promise(r => setTimeout(r, 500));
     }
 
-    return results;
+    return {
+        ...results,
+        duration: Date.now() - startTime
+    };
 }
 
 async function main() {
@@ -460,13 +506,12 @@ async function main() {
         }
 
         targetFrameworks = frameworkSelection as string[];
-
         const scenarioSelection = await clack.multiselect({
             message: "Select scenarios to run:",
             options: Object.entries(SCENARIOS).map(([key, config]) => ({
                 value: key,
                 label: config.name,
-                hint: `${config.connections} conns, ${config.duration}s`
+                hint: `${config.connections} conns, ${config.durationEstimate * targetFrameworks.length * 2}s`
             })),
             initialValues: Object.keys(SCENARIOS).slice(0, 3),
             required: true
@@ -480,17 +525,13 @@ async function main() {
         targetScenarios = scenarioSelection as string[];
     }
 
-    // Calculate time estimate
-    const totalTests = targetFrameworks.length * RUNTIMES.length * targetScenarios.length;
+    const testCount = targetFrameworks.length * RUNTIMES.length * targetScenarios.length;;
+    const durationEstimate = (targetFrameworks.length * 2 - BUN_ONLY_FRAMEWORKS.length) * targetScenarios.map(s => {
+        return SCENARIOS[s].durationEstimate;
+    }).reduce((acc, val) => acc + val, 0);
 
     // Estimate based on actual configuration:
-    // - ~2-5s for server startup per test
-    // - Duration from scenario config
-    // - ~1s for teardown
-    // - Full advanced suite (8 frameworks × 2 runtimes × 11 scenarios) ≈ 55 minutes
-    // That's 176 total tests, so roughly 18-19 seconds per test
-    const avgTimePerTest = 55 * 60 / (8 * 2 * 11); // ~18.75 seconds
-    const estimatedSeconds = Math.ceil(totalTests * avgTimePerTest);
+    const estimatedSeconds = Math.ceil(durationEstimate);
     const estimatedMinutes = Math.floor(estimatedSeconds / 60);
     const remainingSeconds = estimatedSeconds % 60;
 
@@ -501,15 +542,15 @@ async function main() {
     if (hasAllFlag) {
         // Non-interactive mode for CI/CD
         console.log(`\nFrameworks: ${targetFrameworks.join(", ")}`);
-        console.log(`Scenarios: ${targetScenarios.map(s => SCENARIOS[s].name).join(", ")}`);
-        console.log(`Total tests: ${totalTests} (${targetFrameworks.length} frameworks × ${RUNTIMES.length} runtimes × ${targetScenarios.length} scenarios)`);
+        console.log(`Scenarios: \n    ${targetScenarios.map(s => SCENARIOS[s].name).join("\n    ")}`);
+        console.log(`Total tests: ${testCount} (${targetFrameworks.length} frameworks × ${RUNTIMES.length} runtimes × ${targetScenarios.length} scenarios)`);
         console.log(`Estimated duration: ${timeEstimate}\n`);
     } else {
         // Interactive mode with confirmation
         clack.note(
             `Frameworks: ${targetFrameworks.join(", ")}\n` +
-            `Scenarios: ${targetScenarios.map(s => SCENARIOS[s].name).join(", ")}\n` +
-            `Total tests: ${totalTests} (${targetFrameworks.length} frameworks × ${RUNTIMES.length} runtimes × ${targetScenarios.length} scenarios)\n` +
+            `Scenarios: \n    ${targetScenarios.map(s => SCENARIOS[s].name).join("\n    ")}\n` +
+            `Total tests: ${testCount} (${targetFrameworks.length} frameworks × ${RUNTIMES.length} runtimes × ${targetScenarios.length} scenarios)\n` +
             `Estimated duration: ${timeEstimate}`,
             "Benchmark Configuration"
         );
@@ -531,6 +572,7 @@ async function main() {
     spinner.text = "Compilation complete";
 
     const fullResults: AllResults = {};
+    const benchStartTime = Date.now();
 
     for (const framework of targetFrameworks) {
         fullResults[framework] = {};
@@ -557,8 +599,18 @@ async function main() {
                     console.log(`\x1b[0mFramework: \x1b[36m${framework}\x1b[0m | \x1b[0mRuntime: \x1b[36m${runtime === "bun" ? "\x1b[33mbun\x1b[0m" : "\x1b[32mnode\x1b[0m"}\x1b[0m | \x1b[0mScenario: \x1b[36m${scenario}\x1b[0m`);
                     console.log(`\x1b[30m${"=".repeat(60)}\x1b[0m`);
 
+                    const testStartTime = Date.now();
                     const res = await runBenchmark(framework, runtime, scenario);
+                    const testDuration = (Date.now() - testStartTime) / 1000;
+
                     fullResults[framework][runtime][scenario] = res as any;
+
+                    // Log test completion time
+                    if (res.error) {
+                        console.log(`\x1b[90m  ${res.error.startsWith('Skipped') ? 'Skipped' : 'Failed'} (${testDuration.toFixed(2)}s)\x1b[0m`);
+                    } else {
+                        console.log(`\x1b[32m  ✓ Completed in ${testDuration.toFixed(2)}s\x1b[0m`);
+                    }
                 } catch (e: any) {
                     console.error(`Failed ${framework}/${runtime}/${scenario}:`, e.message);
                     fullResults[framework][runtime][scenario] = {
@@ -569,7 +621,11 @@ async function main() {
         }
     }
 
-    spinner.succeed("Benchmarks complete!");
+    spinner.succeed(" Benchmarks complete!");
+    const benchDuration = (Date.now() - benchStartTime) / 1000;
+    console.log(`\n\x1b[30m${"=".repeat(60)}\x1b[0m`);
+    console.log(`\x1b[0mBenchmarks completed in ${benchDuration.toFixed(2)}s\x1b[0m`);
+    console.log(`\x1b[30m${"=".repeat(60)}\x1b[0m`);
 
     // Save results
     let history: HistoryEntry[] = [];
@@ -593,11 +649,9 @@ async function main() {
 
     fs.writeFileSync(HISTORY_PATH, JSON.stringify(history, null, 2));
 
-    clack.log.success(`Results saved to ${HISTORY_PATH}`);
-
     spinner.start("Generating HTML report...");
     generateReport(history, hasAllFlag);
-    spinner.succeed(`Report generated: ${REPORT_PATH}`);
+    spinner.succeed(` Report generated: ${REPORT_PATH}`);
 
     clack.outro("✨ All done!");
 
@@ -610,10 +664,9 @@ async function main() {
 
 function generateReport(history: HistoryEntry[], skipAutoOpen = false) {
     const sortedHistory = [...history].reverse();
-    const historyJson = JSON.stringify(sortedHistory);
-
-    // Extract actual scenarios that  were run from the latest entry
     const latest = sortedHistory[0];
+
+    // Extract actual scenarios that were run
     const runScenarios = new Set<string>();
     Object.values(latest.results).forEach(frameworkRes => {
         Object.values(frameworkRes).forEach(runtimeRes => {
@@ -624,550 +677,24 @@ function generateReport(history: HistoryEntry[], skipAutoOpen = false) {
     });
     const actualScenarios = Array.from(runScenarios);
 
-    const html = `
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Benchmark Results</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        :root {
-            --bg-color: #1a1b1e;
-            --text-color: #e4e5e7;
-            --card-bg: #25262b;
-            --border-color: #373a40;
-            --primary-color: #339af0;
-            --success-color: #51cf66;
-            --accent-color: #cc5de8;
-        }
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-            background-color: #22355a;
-        }
+    // Read template files
+    const templatePath = path.join(__dirname, 'report', 'template.eta');
+    const template = fs.readFileSync(templatePath, 'utf-8');
 
-        ::-webkit-scrollbar-thumb {
-            border-radius: 10px;
-            background-color: #2a406a;
-            box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-        }
+    // Render template with data
+    const eta = new Eta({
+        views: path.join(__dirname, 'report')
+    });
+    const html = eta.renderString(template, {
+        dataJson: JSON.stringify(sortedHistory),
+        scenarioNamesJson: JSON.stringify(Object.fromEntries(Object.entries(SCENARIOS).map(([k, v]) => [k, v.name]))),
+        actualScenariosJson: JSON.stringify(actualScenarios)
+    });
 
-        *:hover::-webkit-scrollbar-thumb {
-            background-color: #22468a;
-        }
-
-        ::-webkit-scrollbar-track {
-            border-radius: 10px;
-            background-color: #0b0f17;
-        }
-
-        ::-webkit-scrollbar-corner {
-            box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-        }
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: system-ui, -apple-system, sans-serif;
-            margin: 0;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 1800px;
-            margin: 0 auto;
-        }
-
-        h1 {
-            background: linear-gradient(45deg, var(--primary-color), var(--success-color));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 10px;
-        }
-
-        .subtitle {
-            color: #909296;
-            margin-bottom: 20px;
-        }
-
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-
-        .tab {
-            padding: 10px 20px;
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            cursor: pointer;
-            color: var(--text-color);
-            transition: all 0.2s;
-        }
-
-        .tab:hover {
-            background: #2c2e33;
-            border-color: var(--primary-color);
-        }
-
-        .tab.active {
-            background: var(--primary-color);
-            color: white;
-            border-color: var(--primary-color);
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .chart-container {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            height: 400px;
-        }
-
-        .chart-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        h2 {
-            color: var(--primary-color);
-            margin-bottom: 15px;
-        }
-
-        .table-container {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            overflow: hidden;
-            margin-top: 20px;
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th, td {
-            padding: 12px 16px;
-            text-align: left;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        th {
-            background: #2c2e33;
-            color: var(--primary-color);
-            font-weight: 600;
-            font-size: 0.9rem;
-            cursor: pointer;
-            user-select: none;
-            position: relative;
-        }
-
-        th:hover {
-            background: #353940;
-        }
-
-        th .sort-icon {
-            float: right;
-            opacity: 0.3;
-            font-size: 0.8rem;
-            margin-left: 8px;
-        }
-
-        th.sorted-asc .sort-icon::after {
-            content: '▲';
-            opacity: 1;
-        }
-
-        th.sorted-desc .sort-icon::after {
-            content: '▼';
-            opacity: 1;
-        }
-
-        th:not(.sorted-asc):not(.sorted-desc) .sort-icon::after {
-            content: '▼';
-        }
-
-        .filter-row th {
-            padding: 8px 16px;
-            cursor: default;
-            background: #1f2023;
-        }
-
-        .filter-row th:hover {
-            background: #1f2023;
-        }
-
-        .filter-input {
-            width: 100%;
-            padding: 6px 10px;
-            background: var(--bg-color);
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            color: var(--text-color);
-            font-size: 0.85rem;
-        }
-
-        .filter-input:focus {
-            outline: none;
-            border-color: var(--primary-color);
-        }
-
-        tr:last-child td { border-bottom: none; }
-        tr:hover td { background: rgba(255,255,255,0.03); }
-
-        .error {
-            color: #fa5252;
-            font-style: italic;
-        }
-
-        .skipped {
-            color: #ffa94d;
-            font-style: italic;
-        }
-
-        .success {
-            color: var(--success-color);
-        }
-
-        .metric {
-            font-family: 'Monaco', 'Courier New', monospace;
-            background: rgba(51, 154, 240, 0.1);
-            padding: 2px 6px;
-            border-radius: 3px;
-            color: var(--primary-color);
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🚀 Advanced Benchmark Results</h1>
-        <p class="subtitle">Comprehensive framework performance analysis across advanced scenarios</p>
-        
-        <div class="tabs" id="tabs"></div>
-        <div id="content"></div>
-    </div>
-
-    <script>
-        const data = ${historyJson};
-        const actualScenarios = ${JSON.stringify(actualScenarios)};
-        const allScenarios = ${JSON.stringify(Object.keys(SCENARIOS))};
-        const scenarioNames = ${JSON.stringify(Object.fromEntries(Object.entries(SCENARIOS).map(([k, v]) => [k, v.name])))}; 
-        
-        if (data.length === 0) {
-            document.getElementById('content').innerHTML = '<p>No benchmark data available yet. Run the benchmarks first!</p>';
-        } else {
-            const latest = data[0].results;
-            const frameworks = Object.keys(latest);
-            const colors = {
-                'shokupan': '#339af0',
-                'fastify': '#51cf66',
-                'express': '#ff6b6b',
-                'koa': '#ffd43b',
-                'hapi': '#da77f2',
-                'nest': '#ff922b',
-                'hono': '#63e6be',
-                'elysia': '#cc5de8'
-            };
-            
-            // Create tabs only for scenarios that were run
-            const tabsContainer = document.getElementById('tabs');
-            const contentContainer = document.getElementById('content');
-            
-            actualScenarios.forEach((scenario, index) => {
-                const tab = document.createElement('button');
-                tab.className = 'tab' + (index === 0 ? ' active' : '');
-                tab.textContent = scenarioNames[scenario] || scenario;
-                tab.onclick = (e) => showScenario(scenario, e);
-                tabsContainer.appendChild(tab);
-                
-                const content = document.createElement('div');
-                content.className = 'tab-content' + (index === 0 ? ' active' : '');
-                content.id = \`scenario-\${scenario}\`;
-                contentContainer.appendChild(content);
-            });
-            
-            function showScenario(scenario, event) {
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                event.target.classList.add('active');
-                document.getElementById(\`scenario-\${scenario}\`).classList.add('active');
-            }
-            
-            // Populate each scenario's charts and table
-            actualScenarios.forEach((scenario, scenarioIndex) => {
-                const container = document.getElementById(\`scenario-\${scenario}\`);
-                let html = \`<h2>\${scenarioNames[scenario] || scenario}</h2>\`;
-                
-                // Add charts
-                html += '<div class="chart-grid">';
-                html += \`<div class="chart-container"><canvas id="chart-reqs-\${scenarioIndex}"></canvas></div>\`;
-                html += \`<div class="chart-container"><canvas id="chart-latency-\${scenarioIndex}"></canvas></div>\`;
-                html += '</div>';
-                
-                // Build table data
-                const tableData = [];
-                Object.entries(latest).forEach(([framework, runtimes]) => {
-                    Object.entries(runtimes).forEach(([runtime, scenarios]) => {
-                        const scenarioData = scenarios[scenario];
-                        
-                        if (scenarioData && scenarioData.error) {
-                            tableData.push({
-                                framework,
-                                runtime,
-                                endpoint: '-',
-                                requests: 0,
-                                latency: 0,
-                                throughput: 0,
-                                p95: 0,
-                                p99: 0,
-                                status: scenarioData.error.startsWith('Skipped') ? 'SKIPPED' : 'FAILED',
-                                error: scenarioData.error,
-                                statusClass: scenarioData.error.startsWith('Skipped') ? 'skipped' : 'error'
-                            });
-                        } else if (scenarioData) {
-                            Object.entries(scenarioData).forEach(([endpoint, result]) => {
-                                if (result.error) {
-                                    tableData.push({
-                                        framework,
-                                        runtime,
-                                        endpoint,
-                                        requests: 0,
-                                        latency: 0,
-                                        throughput: 0,
-                                        p95: 0,
-                                        p99: 0,
-                                        status: result.error.startsWith('Skipped') ? 'SKIPPED' : 'FAILED',
-                                        error: result.error,
-                                        statusClass: result.error.startsWith('Skipped') ? 'skipped' : 'error'
-                                    });
-                                } else {
-                                    tableData.push({
-                                        framework,
-                                        runtime,
-                                        endpoint,
-                                        requests: result.requests || 0,
-                                        latency: result.latency ||  0,
-                                        throughput: result.throughput || 0,
-                                        p95: result.percentiles?.p95 || 0,
-                                        p99: result.percentiles?.p99 || 0,
-                                        status: 'OK',
-                                        statusClass: 'success'
-                                    });
-                                }
-                            });
-                        }
-                    });
-                });
-                
-                // Create sortable/filterable table
-                html += '<div class="table-container"><table id="table-' + scenarioIndex + '"><thead><tr>';
-                const columns = [
-                    {key: 'framework', label: 'Framework'},
-                    {key: 'runtime', label: 'Runtime'},
-                    {key: 'endpoint', label: 'Endpoint'},
-                    {key: 'requests', label: 'Req/s'},
-                    {key: 'latency', label: 'Latency (ms)'},
-                    {key: 'throughput', label: 'Throughput (B/s)'},
-                    {key: 'p95', label: 'P95 (ms)'},
-                    {key: 'p99', label: 'P99 (ms)'},
-                    {key: 'status', label: 'Status'}
-                ];
-                
-                columns.forEach(col => {
-                    html += \`<th data-column="\${col.key}"><span class="sort-icon"></span>\${col.label}</th>\`;
-                });
-                html += '</tr><tr class="filter-row">';
-                columns.forEach(col => {
-                    html += \`<th><input type="text" class="filter-input" data-column="\${col.key}" placeholder="Filter..."></th>\`;
-                });
-                html += '</tr></thead><tbody id="tbody-' + scenarioIndex + '"></tbody></table></div>';
-                
-                container.innerHTML = html;
-                
-                // Initialize table
-                const table = document.getElementById('table-' + scenarioIndex);
-                const tbody = document.getElementById('tbody-' + scenarioIndex);
-                let currentSort = {column: 'requests', direction: 'desc'};
-                let filters = {};
-                
-               function renderTable() {
-                    let filteredData = [...tableData];
-                    
-                    // Apply filters
-                    Object.entries(filters).forEach(([column, value]) => {
-                        if (value) {
-                            filteredData = filteredData.filter(row => {
-                                const cellValue = String(row[column]).toLowerCase();
-                                return cellValue.includes(value.toLowerCase());
-                            });
-                        }
-                    });
-                    
-                    // Apply sort
-                    filteredData.sort((a, b) => {
-                        let aVal = a[currentSort.column];
-                        let bVal = b[currentSort.column];
-                        
-                        if (typeof aVal === 'number') {
-                            return currentSort.direction === 'asc' ? aVal - bVal : bVal - aVal;
-                        } else {
-                            aVal = String(aVal).toLowerCase();
-                            bVal = String(bVal).toLowerCase();
-                            if (currentSort.direction === 'asc') {
-                                return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
-                            } else {
-                                return bVal < aVal ? -1 : bVal > aVal ? 1 : 0;
-                            }
-                        }
-                    });
-                    
-                    // Render rows
-                    tbody.innerHTML = filteredData.map(row => {
-                        if (row.error) {
-                            return \`<tr>
-                                <td>\${row.framework}</td>
-                                <td>\${row.runtime}</td>
-                                <td colspan="6"><span class="\${row.statusClass}">\${row.error}</span></td>
-                                <td class="\${row.statusClass}">\${row.status}</td>
-                            </tr>\`;
-                        } else {
-                            return \`<tr>
-                                <td>\${row.framework}</td>
-                                <td>\${row.runtime}</td>
-                                <td>\${row.endpoint}</td>
-                                <td><span class="metric">\${row.requests.toFixed(0)}</span></td>
-                                <td><span class="metric">\${row.latency.toFixed(2)}</span></td>
-                                <td><span class="metric">\${(row.throughput / 1024 / 1024).toFixed(2)}</span></td>
-                                <td><span class="metric">\${row.p95.toFixed(2)}</span></td>
-                                <td><span class="metric">\${row.p99.toFixed(2)}</span></td>
-                                <td class="\${row.statusClass}">✓ \${row.status}</td>
-                            </tr>\`;
-                        }
-                    }).join('');
-                }
-                
-                // Add sort handlers
-                table.querySelectorAll('thead tr:first-child th').forEach(th => {
-                    th.addEventListener('click', () => {
-                        const column = th.dataset.column;
-                        if (currentSort.column === column) {
-                            currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
-                        } else {
-                            currentSort.column = column;
-                            currentSort.direction = 'desc';
-                        }
-                        
-                        // Update sort icons
-                        table.querySelectorAll('thead tr:first-child th').forEach(h => {
-                            h.classList.remove('sorted-asc', 'sorted-desc');
-                        });
-                        th.classList.add('sorted-' + currentSort.direction);
-                        
-                        renderTable();
-                    });
-                });
-                
-                // Add filter handlers
-                table.querySelectorAll('.filter-input').forEach(input => {
-                    input.addEventListener('input', (e) => {
-                        filters[e.target.dataset.column] = e.target.value;
-                        renderTable();
-                    });
-                });
-                
-                // Initial render with default sort
-                table.querySelector(\`th[data-column="\${currentSort.column}"]\`).classList.add('sorted-desc');
-                renderTable();
-                
-                // Create charts
-                setTimeout(() => {
-                    const validData = tableData.filter(d => !d.error && d.requests > 0);
-                    const groupedData = {};
-                    
-                    validData.forEach(row => {
-                        const key = \`\${row.framework} (\${row.runtime})\`;
-                        if (!groupedData[key]) {
-                            groupedData[key] = {requests: [], latency: []};
-                        }
-                        groupedData[key].requests.push(row.requests);
-                        groupedData[key].latency.push(row.latency);
-                    });
-                    
-                    const labels = Object.keys(groupedData);
-                    const avgRequests = labels.map(k => groupedData[k].requests.reduce((a,b) => a+b, 0) / groupedData[k].requests.length);
-                    const avgLatency = labels.map(k => groupedData[k].latency.reduce((a,b) => a+b, 0) / groupedData[k].latency.length);
-                    
-                    // Requests chart
-                    new Chart(document.getElementById(\`chart-reqs-\${scenarioIndex}\`), {
-                        type: 'bar',
-                        data: {
-                            labels: labels,
-                            datasets: [{
-                                label: 'Requests/sec',
-                                data: avgRequests,
-                                backgroundColor: labels.map(l => colors[l.split(' ')[0]] || '#909296')
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                title: {display: true, text: 'Average Requests per Second', color: '#e4e5e7'},
-                                legend: {display: false}
-                            },
-                            scales: {
-                                y: {beginAtZero: true, ticks: {color: '#909296'}, grid: {color: '#373a40'}},
-                                x: {ticks: {color: '#909296'}, grid: {color: '#373a40'}}
-                            }
-                        }
-                    });
-                    
-                    // Latency chart
-                    new Chart(document.getElementById(\`chart-latency-\${scenarioIndex}\`), {
-                        type: 'bar',
-                        data: {
-                            labels: labels,
-                            datasets: [{
-                                label: 'Latency (ms)',
-                                data: avgLatency,
-                                backgroundColor: labels.map(l => colors[l.split(' ')[0]] || '#909296')
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                title: {display: true, text: 'Average Latency (lower is better)', color: '#e4e5e7'},
-                                legend: {display: false}
-                            },
-                            scales: {
-                                y: {beginAtZero: true, ticks: {color: '#909296'}, grid: {color: '#373a40'}},
-                                x: {ticks: {color: '#909296'}, grid: {color: '#373a40'}}
-                            }
-                        }
-                    });
-                }, 100);
-            });
-        }
-    </script>
-</body>
-</html>
-`;
     fs.writeFileSync(REPORT_PATH, html);
 }
 
-main().catch(console.error);
+main().catch(err => {
+    console.error(err);
+    process.exit(1);
+});

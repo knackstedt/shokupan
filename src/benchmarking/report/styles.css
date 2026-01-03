@@ -1,0 +1,227 @@
+:root {
+    --bg-color: #1a1b1e;
+    --text-color: #e4e5e7;
+    --card-bg: #25262b;
+    --border-color: #373a40;
+    --primary-color: #339af0;
+    --success-color: #51cf66;
+    --accent-color: #cc5de8;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+    background-color: #22355a;
+}
+
+::-webkit-scrollbar-thumb {
+    border-radius: 10px;
+    background-color: #2a406a;
+    box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+}
+
+*:hover::-webkit-scrollbar-thumb {
+    background-color: #22468a;
+}
+
+::-webkit-scrollbar-track {
+    border-radius: 10px;
+    background-color: #0b0f17;
+}
+
+::-webkit-scrollbar-corner {
+    box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: system-ui, -apple-system, sans-serif;
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1800px;
+    margin: 0 auto;
+}
+
+h1 {
+    background: linear-gradient(45deg, var(--primary-color), var(--success-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    color: #909296;
+    margin-bottom: 20px;
+}
+
+.tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.tab {
+    padding: 10px 20px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text-color);
+    transition: all 0.2s;
+}
+
+.tab:hover {
+    background: #2c2e33;
+    border-color: var(--primary-color);
+}
+
+.tab.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.chart-container {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    height: 400px;
+}
+
+.chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+h2 {
+    color: var(--primary-color);
+    margin-bottom: 15px;
+}
+
+.table-container {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 20px;
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th,
+td {
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+th {
+    background: #2c2e33;
+    color: var(--primary-color);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+}
+
+th:hover {
+    background: #353940;
+}
+
+th .sort-icon {
+    float: right;
+    opacity: 0.3;
+    font-size: 0.8rem;
+    margin-left: 8px;
+}
+
+th.sorted-asc .sort-icon::after {
+    content: '▲';
+    opacity: 1;
+}
+
+th.sorted-desc .sort-icon::after {
+    content: '▼';
+    opacity: 1;
+}
+
+th:not(.sorted-asc):not(.sorted-desc) .sort-icon::after {
+    content: '▼';
+}
+
+.filter-row th {
+    padding: 8px 16px;
+    cursor: default;
+    background: #1f2023;
+}
+
+.filter-row th:hover {
+    background: #1f2023;
+}
+
+.filter-input {
+    width: 100%;
+    padding: 6px 10px;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-color);
+    font-size: 0.85rem;
+}
+
+.filter-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+tr:last-child td {
+    border-bottom: none;
+}
+
+tr:hover td {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.error {
+    color: #fa5252;
+    font-style: italic;
+}
+
+.skipped {
+    color: #ffa94d;
+    font-style: italic;
+}
+
+.success {
+    color: var(--success-color);
+}
+
+.metric {
+    font-family: 'Monaco', 'Courier New', monospace;
+    background: rgba(51, 154, 240, 0.1);
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: var(--primary-color);
+}

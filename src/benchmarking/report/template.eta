@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Benchmark Results</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style><%~ include("styles.css") %></style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Advanced Benchmark Results</h1>
+        <p class="subtitle">Comprehensive framework performance analysis across advanced scenarios</p>
+        
+        <div class="tabs" id="tabs"></div>
+        <div id="content"></div>
+    </div>
+
+    <script>
+        // Data injected from backend
+        const benchmarkData = <%~ it.dataJson %>;
+        const scenarioNames = <%~ it.scenarioNamesJson %>;
+        const actualScenarios = <%~ it.actualScenariosJson %>;
+        
+        // Configuration
+        const COLORS = {
+            'shokupan': '#339af0',
+            'fastify': '#51cf66',
+            'express': '#ff6b6b',
+            'koa': '#ffd43b',
+            'hapi': '#da77f2',
+            'nest': '#ff922b',
+            'hono': '#63e6be',
+            'elysia': '#cc5de8'
+        };
+        
+        const COMPOSITE_VIEWS = {
+            'compression-overview': {
+                name: '🗜️ Compression Overview',
+                scenarios: ['compression-gzip', 'compression-brotli', 'compression-deflate', 'compression-zstd', 'compression-store']
+            },
+            'large-payload-overview': {
+                name: '📦 Large Payload Overview',
+                scenarios: ['large-payload-request', 'large-payload-response', 'large-payload-headers']
+            }
+        };
+        
+        const TABLE_COLUMNS = [
+            {key: 'framework', label: 'Framework'},
+            {key: 'runtime', label: 'Runtime'},
+            {key: 'scenario', label: 'Scenario'},
+            {key: 'endpoint', label: 'Endpoint'},
+            {key: 'requests', label: 'Req/s'},
+            {key: 'latency', label: 'Latency (ms)'},
+            {key: 'throughput', label: 'Throughput (MB/s)'},
+            {key: 'p95', label: 'P95 (ms)'},
+            {key: 'p99', label: 'P99 (ms)'},
+            {key: 'status', label: 'Status'}
+        ];
+    </script>
+    <script><%~ include("report.js") %></script>
+</body>
+</html>
