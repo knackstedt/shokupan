@@ -23,7 +23,7 @@ export class ScalarPlugin extends ShokupanRouter<any> {
         this.init();
     }
 
-    init() {
+    private init() {
         this.get("/", ctx => {
             let path = ctx.url.toString();
             if (!path.endsWith("/")) path += "/";

@@ -733,11 +733,16 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     /**
      * Adds a route to the router.
      * 
-     * @param method - HTTP method
-     * @param path - URL path
-     * @param spec - OpenAPI specification for the route
-     * @param handler - Route handler function
-     * @param requestTimeout - Timeout for this route in milliseconds
+     * @param arg - Route configuration object
+     * @param arg.method - HTTP method
+     * @param arg.path - URL path
+     * @param arg.spec - OpenAPI specification for the route
+     * @param arg.handler - Route handler function
+     * @param arg.regex - Custom regex for path matching
+     * @param arg.group - Group for the route
+     * @param arg.requestTimeout - Timeout for this route in milliseconds
+     * @param arg.renderer - JSX renderer for the route
+     * @param arg.controller - Controller for the route
      */
     public add({ method, path, spec, handler, regex: customRegex, group, requestTimeout, renderer, controller }: {
         method: Method,
@@ -946,7 +951,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * Adds a GET route to the router.
      * 
      * @param path - URL path    
-     * @param handler - Route handler function 
+     * @param handlers - Route handler functions 
      */
     public get(path: string, ...handlers: ShokupanHandler<T>[]);
     /**
@@ -966,7 +971,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * Adds a POST route to the router.
      * 
      * @param path - URL path    
-     * @param handler - Route handler function 
+     * @param handlers - Route handler functions 
      */
     public post(path: string, ...handlers: ShokupanHandler<T>[]);
     /**
@@ -986,7 +991,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * Adds a PUT route to the router.
      * 
      * @param path - URL path    
-     * @param handler - Route handler function 
+     * @param handlers - Route handler functions 
      */
     public put(path: string, ...handlers: ShokupanHandler<T>[]);
     /**
@@ -1006,7 +1011,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * Adds a DELETE route to the router.
      * 
      * @param path - URL path    
-     * @param handler - Route handler function 
+     * @param handlers - Route handler functions 
      */
     public delete(path: string, ...handlers: ShokupanHandler<T>[]);
     /**
@@ -1026,7 +1031,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * Adds a PATCH route to the router.
      * 
      * @param path - URL path    
-     * @param handler - Route handler function 
+     * @param handlers - Route handler functions 
      */
     public patch(path: string, ...handlers: ShokupanHandler<T>[]);
     /**
@@ -1046,7 +1051,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * Adds a OPTIONS route to the router.
      * 
      * @param path - URL path    
-     * @param handler - Route handler function 
+     * @param handlers - Route handler functions 
      */
     public options(path: string, ...handlers: ShokupanHandler<T>[]);
     /**
@@ -1066,7 +1071,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * Adds a HEAD route to the router.
      * 
      * @param path - URL path    
-     * @param handler - Route handler function 
+     * @param handlers - Route handler functions 
      */
     public head(path: string, ...handlers: ShokupanHandler<T>[]);
     /**
