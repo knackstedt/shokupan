@@ -40,6 +40,7 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     private _cachedBody?: any;
     private _bodyType?: 'json' | 'text' | 'formData' | 'arrayBuffer' | 'blob';
     private _bodyParsed: boolean = false;
+    private _bodyParseError?: Error;
 
     constructor(
         public readonly request: ShokupanRequest<any>,
@@ -287,6 +288,11 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
      * The body is only parsed once and cached for subsequent reads.
      */
     async body<T = any>(): Promise<T> {
+        // If there was an error during pre-parsing, throw it now
+        if (this._bodyParseError) {
+            throw this._bodyParseError;
+        }
+
         // Return cached body if already parsed
         if (this._bodyParsed) {
             return this._cachedBody as T;
@@ -301,12 +307,73 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
             this._cachedBody = await this.request.formData();
             this._bodyType = 'formData';
         } else {
-            this._cachedBody = await this.request.text();
+            // For large payloads, reading from stream is much faster than request.text()
+            // This bypasses the slow Request API and reads chunks directly
+            this._cachedBody = await this.readRawBody();
             this._bodyType = 'text';
         }
 
         this._bodyParsed = true;
         return this._cachedBody as T;
+    }
+
+    /**
+     * Pre-parse the request body before handler execution.
+     * This improves performance and enables Node.js compatibility for large payloads.
+     * Errors are deferred until the body is actually accessed in the handler.
+     */
+    async parseBody(): Promise<void> {
+        // Skip if already parsed
+        if (this._bodyParsed) {
+            return;
+        }
+
+        // Skip for methods that typically don't have bodies
+        if (this.request.method === 'GET' || this.request.method === 'HEAD') {
+            return;
+        }
+
+        try {
+            await this.body(); // Trigger body parsing and caching
+        } catch (error) {
+            // Store error for later throwing when body is accessed
+            this._bodyParseError = error as Error;
+        }
+    }
+
+    /**
+     * Read raw body from ReadableStream efficiently.
+     * This is much faster than request.text() for large payloads.
+     */
+    private async readRawBody(): Promise<string> {
+        const reader = this.request.body?.getReader();
+        if (!reader) {
+            return '';
+        }
+
+        const chunks: Uint8Array[] = [];
+        let totalSize = 0;
+
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+                totalSize += value.length;
+            }
+        } finally {
+            reader.releaseLock();
+        }
+
+        // Efficiently combine chunks into single buffer
+        const result = new Uint8Array(totalSize);
+        let offset = 0;
+        for (const chunk of chunks) {
+            result.set(chunk, offset);
+            offset += chunk.length;
+        }
+
+        return new TextDecoder().decode(result);
     }
 
     /**

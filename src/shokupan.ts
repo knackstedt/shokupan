@@ -346,6 +346,13 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                     // For now, only app-level hooks are fully supported here.
                     if (match) {
                         ctx.params = match.params;
+
+                        // Pre-parse body for methods that typically have bodies
+                        // This improves performance and enables Node.js compatibility
+                        if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+                            await ctx.parseBody();
+                        }
+
                         return match.handler(ctx);
                     }
                     return null;
