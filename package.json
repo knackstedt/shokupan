@@ -64,8 +64,6 @@
         "@opentelemetry/sdk-trace-node": "^2.2.0",
         "@opentelemetry/semantic-conventions": "^1.38.0",
         "@scalar/openapi-types": "^0.5.3",
-        "@surrealdb/node": "^2.4.0",
-        "surrealdb": "^2.0.0-alpha.14",
         "tslib": "^2.8.1"
     },
     "peerDependencies": {
@@ -79,7 +77,9 @@
         "parse-json": "^8.0.0",
         "reflect-metadata": "^0.2.0",
         "secure-json-parse": "^4.0.0",
-        "@scalar/api-reference": "^1.0.0"
+        "@scalar/api-reference": "^1.0.0",
+        "@surrealdb/node": "^2.4.0",
+        "surrealdb": "^2.0.0-alpha.14"
     },
     "peerDependenciesMeta": {
         "ajv": {
@@ -113,6 +113,12 @@
             "optional": true
         },
         "@scalar/api-reference": {
+            "optional": true
+        },
+        "@surrealdb/node": {
+            "optional": true
+        },
+        "surrealdb": {
             "optional": true
         }
     },
