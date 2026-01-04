@@ -33,19 +33,6 @@ describe("Compression Middleware Reproduction", () => {
             headers: { "Accept-Encoding": "gzip" }
         }));
 
-        // If next() returns undefined, Compression middleware goes to 'debugger' line
-        // and returns original 'response' variable (which is undefined? wait no)
-        // In compression.ts: const response = await next();
-        // If next() returns undefined, response is undefined.
-        // Then: if (response instanceof Response) -> false.
-        // else -> debugger; return response; (returns undefined).
-        // 
-        // If middleware returns undefined, what does Shokupan.handle do?
-        // In Shokupan.handleRequest (which calls router.processRequest? No, app.handle calls app.processRequest?)
-
-        // If the whole chain returns undefined, the final response is undefined?
-        // Usually framework handles that (e.g. 404 Not Found if no result).
-
         expect(res).toBeDefined();
         // We expect it to be 404 or something, but if it crashes or returns undefined, we want to know.
     });
