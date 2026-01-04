@@ -120,41 +120,9 @@ async function validateClassValidator(schema: any, data: any) {
 // --- Body Helper ---
 
 const safelyGetBody = async (ctx: ShokupanContext) => {
-    const req = ctx.req as any;
-
-    // Check if already parsed
-    if (req._bodyParsed) {
-        return req._bodyValue;
-    }
-
+    // Use context's built-in body caching mechanism
     try {
-        let data: any;
-        // Standard Request consumes stream
-        // ShokupanRequest (internal) has properties
-        if (typeof req.json === 'function') {
-            data = await req.json();
-        }
-        else {
-            // Fallback if req is plain object with body property (internal usage)
-            data = req.body;
-            if (typeof data === 'string') {
-                try { data = JSON.parse(data); } catch { }
-            }
-        }
-
-        // Cache it
-        req._bodyParsed = true;
-        req._bodyValue = data;
-
-        // Monkey patch json() to return cached data
-        // This ensures subsequent calls (e.g. in handlers) get the same data
-        // and don't fail due to stream locked
-        Object.defineProperty(req, 'json', {
-            value: async () => req._bodyValue,
-            configurable: true
-        });
-
-        return data;
+        return await ctx.body();
     } catch (e) {
         return {}; // Return empty object if parsing fails (flexible)
     }
@@ -248,13 +216,15 @@ export function validate(config: ValidationConfig): Middleware {
             const b = body ?? await safelyGetBody(ctx);
             validBody = await validators.body(b);
 
-            // Update cached body with validated/sanitized version
-            const req = ctx.req as any;
-            req._bodyValue = validBody;
+            // Update context's cached body with validated/transformed version
+            (ctx as any)._cachedBody = validBody;
 
-            // Ensure json() returns the validated body
+            // Monkey-patch req.json() to return the validated body
+            // This ensures handlers can call ctx.req.json() and get the validated data
+            const req = ctx.req as any;
             Object.defineProperty(req, 'json', {
                 value: async () => validBody,
+                writable: true,
                 configurable: true
             });
 
