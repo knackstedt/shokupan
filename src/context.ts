@@ -8,6 +8,15 @@ import type { CookieOptions, JSXRenderer } from './types';
 // Shim for HeadersInit if not available globally in some envs
 type HeadersInit = Headers | Record<string, string> | [string, string][];
 
+const VALID_HTTP_STATUSES = new Set<number>([
+    100, 101, 102, 103,
+    200, 201, 202, 203, 204, 205, 206, 207, 208, 226,
+    300, 301, 302, 303, 304, 305, 306, 307, 308,
+    400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 421, 422, 423, 424, 425, 426, 428, 429, 431, 451,
+    500, 501, 502, 503, 504, 505, 506, 507, 508, 510, 511
+]);
+
+const VALID_REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 export interface HandlerStackItem {
     name: string;
@@ -40,7 +49,8 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     private _cachedBody?: any;
     private _bodyType?: 'json' | 'text' | 'formData' | 'arrayBuffer' | 'blob';
     private _bodyParsed: boolean = false;
-    private _bodyParseError?: Error;
+    public _bodyParseError?: Error;
+
 
     // Cached URL properties to avoid repeated parsing
     private _cachedHostname?: string;
@@ -284,24 +294,6 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
         return h;
     }
 
-    /**
-     * Send a response
-     * @param body Response body
-     * @param options Response options
-     * @returns Response
-     */
-    public send(body?: BodyInit, options?: ResponseInit) {
-        const headers = this.mergeHeaders(options?.headers as any);
-        const status = options?.status ?? this.response.status;
-
-        // Store raw body for compression middleware
-        if (typeof body === "string" || body instanceof ArrayBuffer || body instanceof Uint8Array) {
-            this._rawBody = body;
-        }
-
-        this._finalResponse = new Response(body, { status, headers });
-        return this._finalResponse;
-    }
 
     /**
      * Read request body with caching to avoid double parsing.
@@ -418,10 +410,39 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     }
 
     /**
+     * Send a response
+     * @param body Response body
+     * @param options Response options
+     * @returns Response
+     */
+    public send(body?: BodyInit, options?: ResponseInit) {
+        const headers = this.mergeHeaders(options?.headers as any);
+        const status = options?.status ?? this.response.status ?? 200;
+
+        // Validate redirect status code
+        if (this.app.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(status)) {
+            throw new Error(`Invalid HTTP status code: ${status}`);
+        }
+
+        // Store raw body for compression middleware
+        if (typeof body === "string" || body instanceof ArrayBuffer || body instanceof Uint8Array) {
+            this._rawBody = body;
+        }
+
+        this._finalResponse = new Response(body, { status, headers });
+        return this._finalResponse;
+    }
+
+    /**
      * Respond with a JSON object
      */
     json(data: any, status?: number, headers?: HeadersInit) {
-        const finalStatus = status ?? this.response.status;
+        const finalStatus = status ?? this.response.status ?? 200;
+        // Validate redirect status code
+        if (!VALID_HTTP_STATUSES.has(finalStatus)) {
+            throw new Error(`Invalid HTTP status code: ${finalStatus}`);
+        }
+
         const jsonString = JSON.stringify(data);
 
         // Store raw body for compression middleware
@@ -447,7 +468,12 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
      * Respond with a text string
      */
     text(data: string, status?: number, headers?: HeadersInit) {
-        const finalStatus = status ?? this.response.status;
+        const finalStatus = status ?? this.response.status ?? 200;
+
+        // Validate redirect status code
+        if (this.app.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(finalStatus)) {
+            throw new Error(`Invalid HTTP status code: ${finalStatus}`);
+        }
 
         // Store raw body for compression middleware
         this._rawBody = data;
@@ -472,7 +498,13 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
      * Respond with HTML content
      */
     html(html: string, status?: number, headers?: HeadersInit) {
-        const finalStatus = status ?? this.response.status;
+        const finalStatus = status ?? this.response.status ?? 200;
+
+        // Validate redirect status code
+        if (this.app.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(finalStatus)) {
+            throw new Error(`Invalid HTTP status code: ${finalStatus}`);
+        }
+
         const finalHeaders = this.mergeHeaders(headers);
         finalHeaders.set("content-type", "text/html; charset=utf-8");
 
@@ -487,6 +519,11 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
      * Respond with a redirect
      */
     redirect(url: string, status = 302) {
+        // Validate redirect status code
+        if (this.app.applicationConfig.validateStatusCodes && !VALID_REDIRECT_STATUSES.has(status)) {
+            throw new Error(`Invalid redirect status code: ${status}`);
+        }
+
         const headers = this.mergeHeaders();
         headers.set('Location', url);
         this._finalResponse = new Response(null, { status, headers });
@@ -498,6 +535,11 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
      * DOES NOT CHAIN!
      */
     status(status: number) {
+        // Validate redirect status code
+        if (this.app.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(status)) {
+            throw new Error(`Invalid HTTP status code: ${status}`);
+        }
+
         const headers = this.mergeHeaders();
         this._finalResponse = new Response(null, { status, headers });
         return this._finalResponse;
@@ -509,6 +551,11 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     public async file(path: string, fileOptions?: BlobPropertyBag, responseOptions?: ResponseInit) {
         const headers = this.mergeHeaders(responseOptions?.headers as any);
         const status = responseOptions?.status ?? this.response.status;
+
+        // Validate redirect status code
+        if (this.app.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(status)) {
+            throw new Error(`Invalid HTTP status code: ${status}`);
+        }
 
         if (typeof Bun !== "undefined") {
             this._finalResponse = new Response(Bun.file(path, fileOptions), { status, headers });
@@ -539,6 +586,12 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
      * @param headers HTTP Headers
      */
     public async jsx(element: any, args?: Parameters<JSXRenderer>[1], status?: number, headers?: HeadersInit) {
+        status ??= 200;
+
+        // Validate redirect status code
+        if (this.app.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(status)) {
+            throw new Error(`Invalid HTTP status code: ${status}`);
+        }
         if (!this.renderer) {
             throw new Error("No JSX renderer configured");
         }

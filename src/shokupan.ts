@@ -165,8 +165,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
         }
 
-
-        if (this.applicationConfig.autoBackpressureFeedback) {
+        if (this.applicationConfig.autoBackpressureFeedback === true) {
             this.cpuMonitor = new SystemCpuMonitor();
             this.cpuMonitor.start();
         }

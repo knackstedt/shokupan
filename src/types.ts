@@ -100,11 +100,13 @@ export type ShokupanRouteConfig = DeepPartial<{
     hooks: ShokupanHooks | ShokupanHooks[];
     /**
      * Whether to enforce that only controller classes (constructors) are accepted by the router.
+     * @default false
      */
     controllersOnly: boolean;
 
     /**
      * Whether to enable automatic backpressure based on system CPU load.
+     * @default false
      */
     autoBackpressureFeedback: boolean;
     /**
@@ -252,7 +254,7 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      */
     autoBackpressureFeedback?: boolean;
     /**
-     * The CPU usage percentage threshold (0-100) at which to start rejecting requests.
+     * The CPU usage percentage threshold (0-100) at which to start rejecting requests (429).
      * @default 60
      */
     autoBackpressureLevel?: number;
@@ -310,6 +312,7 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
     /**
      * Timeout for writing the response (milliseconds).
      * Not currently supported by Bun.serve natively.
+     * @experimental
      */
     writeTimeout: number;
 
@@ -329,8 +332,16 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      */
     hooks: ShokupanHooks<T> | ShokupanHooks<T>[];
 
+    /**
+     * Whether to validate response status codes.
+     * @default true
+     */
+    validateStatusCodes: boolean;
 
-    // Open for extension
+    /**
+     * Any other config options are allowed, but will be ignored. 
+     * @deprecated
+     */
     [key: string]: any;
 }>;
 

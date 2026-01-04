@@ -139,7 +139,20 @@ function analyzeHandler(handler: ShokupanHandler): { inferredSpec?: any; } {
     }
 
     if (handlerSource.includes('ctx.redirect(')) {
-        responses['302'] = { description: 'Redirect' };
+        let hasSpecificRedirect = false;
+        const redirectMatches = Array.from(handlerSource.matchAll(/ctx\.redirect\([^,]+,\s*(\d{3})\)/g));
+        for (const match of redirectMatches) {
+            const status = match[1];
+            // Ensure the status is a valid redirect code
+            if (/^30[12378]$/.test(status)) {
+                responses[status] = { description: `Redirect (${status})` };
+                hasSpecificRedirect = true;
+            }
+        }
+
+        if (!hasSpecificRedirect) {
+            responses['302'] = { description: 'Redirect' };
+        }
     }
 
     // Fallback to JSON for plain object returns

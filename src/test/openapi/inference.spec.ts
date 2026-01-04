@@ -103,6 +103,21 @@ describe('OpenAPI Runtime Analysis & Inference', () => {
             expect(response.content['text/plain'].schema.type).toBe('string');
         });
 
+        test('should detect HTML response from ctx.jsx()', async () => {
+            const app = new Shokupan();
+
+            app.get('/component', (ctx) => {
+                return ctx.jsx({ type: 'div', props: null, children: [] });
+            });
+
+            const spec = await app.generateApiSpec();
+            const response = spec.paths['/component'].get.responses['200'];
+
+            expect(response).toBeDefined();
+            expect(response.content['text/html']).toBeDefined();
+            expect(response.content['text/html'].schema.type).toBe('string');
+        });
+
         test('should detect file response from ctx.file()', async () => {
             const app = new Shokupan();
 
@@ -129,6 +144,26 @@ describe('OpenAPI Runtime Analysis & Inference', () => {
 
             expect(spec.paths['/old-path'].get.responses['302']).toBeDefined();
             expect(spec.paths['/old-path'].get.responses['302'].description).toBe('Redirect');
+        });
+
+        test('should detect specific redirect status from ctx.redirect(url, status)', async () => {
+            const app = new Shokupan();
+
+            app.get('/moved', (ctx) => {
+                return ctx.redirect('/new-location', 301);
+            });
+
+            app.get('/temp', (ctx) => {
+                return ctx.redirect('/temp-location', 307);
+            });
+
+            const spec = await app.generateApiSpec();
+
+            expect(spec.paths['/moved'].get.responses['301']).toBeDefined();
+            expect(spec.paths['/moved'].get.responses['301'].description).toBe('Redirect (301)');
+
+            expect(spec.paths['/temp'].get.responses['307']).toBeDefined();
+            expect(spec.paths['/temp'].get.responses['307'].description).toBe('Redirect (307)');
         });
 
         test('should detect error responses with status codes', async () => {
