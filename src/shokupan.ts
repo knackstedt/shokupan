@@ -65,7 +65,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
      * Adds middleware to the application.
      */
     public use(middleware: Middleware) {
-        let trackedMiddleware = middleware;
 
         // --- Middleware Tracking Logic ---
         const { file, line } = getCallerInfo();
@@ -81,36 +80,43 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             };
         }
 
-        // Create wrapper but preserve metadata for registry
-        trackedMiddleware = async (ctx, next) => {
-            // Cast to any to access handlerStack if types are strict, but ShokupanContext should have it.
-            const c = ctx as any;
-            if (c.handlerStack && c.app?.applicationConfig.enableMiddlewareTracking) {
-                const metadata = (middleware as any).metadata || {};
-                const start = performance.now();
-                const item = {
-                    name: metadata.pluginName ? `${metadata.pluginName} (${metadata.name})` : metadata.name || middleware.name || 'middleware',
-                    file: metadata.file || file,
-                    line: metadata.line || line,
-                    isBuiltin: metadata.isBuiltin,
-                    startTime: start,
-                    duration: -1
-                };
-                c.handlerStack.push(item);
+        if (this.applicationConfig.enableMiddlewareTracking) {
+            // Wrap with tracking
+            // Create wrapper but preserve metadata for registry
+            const trackedMiddleware = async (ctx, next) => {
+                // Cast to any to access handlerStack if types are strict, but ShokupanContext should have it.
+                const c = ctx as any;
+                if (c.handlerStack && c.app?.applicationConfig.enableMiddlewareTracking) {
+                    const metadata = (middleware as any).metadata || {};
+                    const start = performance.now();
+                    const item = {
+                        name: metadata.pluginName ? `${metadata.pluginName} (${metadata.name})` : metadata.name || middleware.name || 'middleware',
+                        file: metadata.file || file,
+                        line: metadata.line || line,
+                        isBuiltin: metadata.isBuiltin,
+                        startTime: start,
+                        duration: -1
+                    };
+                    c.handlerStack.push(item);
 
-                try {
-                    return await middleware(ctx, next);
-                } finally {
-                    item.duration = performance.now() - start;
+                    try {
+                        return await middleware(ctx, next);
+                    } finally {
+                        item.duration = performance.now() - start;
+                    }
                 }
-            }
-            return middleware(ctx, next);
-        };
-        (trackedMiddleware as any).metadata = (middleware as any).metadata;
-        Object.defineProperty(trackedMiddleware, 'name', { value: (middleware as any).name || 'middleware' });
+                return middleware(ctx, next);
+            };
+            trackedMiddleware.metadata = middleware.metadata;
+            Object.defineProperty(trackedMiddleware, 'name', { value: middleware.name || 'middleware' });
 
-        (trackedMiddleware as any).order = this.middleware.length;
-        this.middleware.push(trackedMiddleware);
+            trackedMiddleware.order = this.middleware.length;
+            this.middleware.push(trackedMiddleware);
+        } else {
+            // Direct push without wrapper
+            this.middleware.push(middleware);
+        }
+
         return this;
     }
 
@@ -149,16 +155,12 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         }
 
         // Run startup hooks
-        for (const hook of this.startupHooks) {
-            await hook();
-        }
+        await Promise.all(this.startupHooks.map(hook => hook()));
 
         if (this.applicationConfig.enableOpenApiGen) {
             this.openApiSpec = await generateOpenApi(this);
             // Run spec available hooks
-            for (const hook of this.specAvailableHooks) {
-                await hook(this.openApiSpec);
-            }
+            await Promise.all(this.specAvailableHooks.map(hook => hook(this.openApiSpec)));
         }
 
         if (port === 0 && process.platform === "linux") {
@@ -231,7 +233,9 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
         if (options.query) {
             const u = new URL(url);
-            for (const [k, v] of Object.entries(options.query)) {
+            const entries = Object.entries(options.query);
+            for (let i = 0; i < entries.length; i++) {
+                const [k, v] = entries[i];
                 u.searchParams.set(k, v);
             }
             url = u.toString();
@@ -330,9 +334,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
             try {
                 // Request Start Hook
-                if (this.hasHook('onRequestStart')) {
-                    await this.executeHook('onRequestStart', ctx);
-                }
+                await this.executeHook('onRequestStart', ctx);
 
                 // Compose middleware + router dispatch
                 const fn = this.composedMiddleware ??= compose(this.middleware);
@@ -397,14 +399,10 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 }
 
                 // Request End Hook - Processing finished, response ready
-                if (this.hasHook('onRequestEnd')) {
-                    await this.executeHook('onRequestEnd', ctx);
-                }
+                await this.executeHook('onRequestEnd', ctx);
 
                 // Response Start Hook - About to send response
-                if (this.hasHook('onResponseStart')) {
-                    await this.executeHook('onResponseStart', ctx, response);
-                }
+                await this.executeHook('onResponseStart', ctx, response);
 
                 return response;
 
@@ -419,9 +417,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 if (err.errors) body.errors = err.errors;
 
                 // Error Hook
-                if (this.hasHook('onError')) {
-                    await this.executeHook('onError', err, ctx);
-                }
+                await this.executeHook('onError', err, ctx);
 
                 return ctx.json(body, status);
             }
@@ -436,9 +432,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             const timeoutPromise = new Promise<Response>((_, reject) => {
                 timeoutId = setTimeout(async () => {
                     controller.abort(); // Signal cancellation to handlers
-                    if (this.hasHook('onRequestTimeout')) {
-                        await this.executeHook('onRequestTimeout', ctx);
-                    }
+                    await this.executeHook('onRequestTimeout', ctx);
                     reject(new Error("Request Timeout"));
                 }, timeoutMs);
             });
@@ -458,9 +452,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             .then(async (res) => {
                 // Response End Hook - Response returned
                 // Note: We can't guarantee it's fully sent to client here, but it's handed off to Bun
-                if (this.hasHook('onResponseEnd')) {
-                    await this.executeHook('onResponseEnd', ctx, res);
-                }
+                await this.executeHook('onResponseEnd', ctx, res);
                 return res;
             });
     }
@@ -480,9 +472,11 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 'onRequestTimeout', 'onReadTimeout', 'onWriteTimeout'
             ];
 
-            for (const type of hookTypes) {
+            for (let i = 0; i < hookTypes.length; i++) {
+                const type = hookTypes[i];
                 const fns: Function[] = [];
-                for (const h of hookList) {
+                for (let j = 0; j < hookList.length; j++) {
+                    const h = hookList[j];
                     if (h[type]) fns.push(h[type]!);
                 }
                 if (fns.length > 0) {
@@ -502,15 +496,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         const fns = this.hookCache.get(name);
         if (!fns) return;
 
-        for (const fn of fns) {
-            await fn(...args);
-        }
-    }
-
-    public hasHook(name: keyof ShokupanHooks) {
-        if (!this.hooksInitialized) {
-            this.ensureHooksInitialized();
-        }
-        return this.hookCache.has(name);
+        await Promise.all(fns.map(fn => fn(...args)));
     }
 }

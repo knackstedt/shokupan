@@ -143,7 +143,9 @@ export class MemoryStore extends EventEmitter implements Store {
 
     all(cb: (err: any, obj?: { [sid: string]: SessionData; } | null) => void) {
         const result: Record<string, SessionData> = {};
-        for (const sid in this.sessions) {
+        const sessionKeys = Object.keys(this.sessions);
+        for (let i = 0; i < sessionKeys.length; i++) {
+            const sid = sessionKeys[i];
             try {
                 result[sid] = JSON.parse(this.sessions[sid]);
             } catch { }
@@ -291,7 +293,9 @@ export function Session(options: SessionOptions): Middleware {
                     // We actually need to replace the whole ctx.session object, which is tricky inside a method of that object.
                     // Typically middleware attaches a proxy or the consumer does this.
                     // But here we can reset properties.
-                    for (const key in sessObj) {
+                    const keys = Object.keys(sessObj);
+                    for (let i = 0; i < keys.length; i++) {
+                        const key = keys[i];
                         if (key !== 'cookie' && key !== 'id' && typeof sessObj[key] !== 'function') {
                             delete sessObj[key];
                         }
@@ -307,7 +311,9 @@ export function Session(options: SessionOptions): Middleware {
                     if (err) return cb(err);
                     if (!sess) return cb(new Error("Session not found"));
                     // Populate
-                    for (const key in sessObj) {
+                    const keys = Object.keys(sessObj);
+                    for (let i = 0; i < keys.length; i++) {
+                        const key = keys[i];
                         if (key !== 'cookie' && key !== 'id' && typeof sessObj[key] !== 'function') {
                             delete sessObj[key];
                         }

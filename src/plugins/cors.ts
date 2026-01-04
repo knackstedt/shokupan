@@ -94,7 +94,9 @@ export function Cors(options: CorsOptions = {}): Middleware {
         const response = await next();
 
         if (response instanceof Response) {
-            for (const [key, value] of headers.entries()) {
+            const headerEntries = Array.from(headers.entries());
+            for (let i = 0; i < headerEntries.length; i++) {
+                const [key, value] = headerEntries[i];
                 response.headers.set(key, value);
             }
         }

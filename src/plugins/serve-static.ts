@@ -40,7 +40,8 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
 
         // Check Excludes
         if (config.exclude) {
-            for (const pattern of config.exclude) {
+            for (let i = 0; i < config.exclude.length; i++) {
+                const pattern = config.exclude[i];
                 if (pattern instanceof RegExp) {
                     if (pattern.test(relative)) return ctx.json({ error: 'Forbidden' }, 403);
                 } else if (typeof pattern === 'string') {
@@ -64,7 +65,8 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
         } catch (e) {
             // Path not found. Try extensions.
             if (config.extensions) {
-                for (const ext of config.extensions) {
+                for (let i = 0; i < config.extensions.length; i++) {
+                    const ext = config.extensions[i];
                     const p = requestPath + (ext.startsWith('.') ? ext : '.' + ext);
                     try {
                         const s = await stat(p);
@@ -101,7 +103,8 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
             }
 
             let foundIndex = false;
-            for (const idx of indexes) {
+            for (let i = 0; i < indexes.length; i++) {
+                const idx = indexes[i];
                 const idxPath = join(finalPath, idx);
                 try {
                     const idxStats = await stat(idxPath);

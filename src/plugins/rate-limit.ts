@@ -31,7 +31,10 @@ export function RateLimitMiddleware(options: RateLimitOptions = {}): Middleware 
             return 'global';
         }
         // Use IP if available
-        return ctx.headers.get("x-forwarded-for") || ctx.request.headers.get("x-forwarded-for") || (ctx.server as any)?.requestIP?.(ctx.request)?.address || "unknown";
+        return ctx.headers.get("x-forwarded-for")
+            || ctx.request.headers.get("x-forwarded-for")
+            || (ctx.server as any)?.requestIP?.(ctx.request)?.address
+            || "unknown";
     });
     const skip = options.skip || (() => false);
 
@@ -41,7 +44,9 @@ export function RateLimitMiddleware(options: RateLimitOptions = {}): Middleware 
     // Cleanup interval
     const interval = setInterval(() => {
         const now = Date.now();
-        for (const [key, record] of hits.entries()) {
+        const entries = Array.from(hits.entries());
+        for (let i = 0; i < entries.length; i++) {
+            const [key, record] = entries[i];
             if (record.resetTime <= now) {
                 hits.delete(key);
             }

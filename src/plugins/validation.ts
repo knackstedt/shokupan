@@ -188,9 +188,7 @@ export function validate(config: ValidationConfig): Middleware {
         }
 
         // Call beforeValidate Hook
-        if (ctx.app?.hasHook('beforeValidate')) {
-            await ctx.app.executeHook('beforeValidate', ctx, dataToValidate);
-        }
+        await ctx.app.executeHook('beforeValidate', ctx, dataToValidate);
 
         // Validate Params
         if (validators.params) {
@@ -232,14 +230,12 @@ export function validate(config: ValidationConfig): Middleware {
         }
 
         // Call afterValidate Hook
-        if (ctx.app?.hasHook('afterValidate')) {
-            const validatedData: any = { ...dataToValidate };
-            if (config.params) validatedData.params = ctx.params;
-            if (config.query) validatedData.query = validQuery;
-            if (config.body) validatedData.body = validBody;
+        const validatedData: any = { ...dataToValidate };
+        if (config.params) validatedData.params = ctx.params;
+        if (config.query) validatedData.query = validQuery;
+        if (config.body) validatedData.body = validBody;
 
-            await ctx.app?.executeHook('afterValidate', ctx, validatedData);
-        }
+        await ctx.app.executeHook('afterValidate', ctx, validatedData);
 
         return next();
     };

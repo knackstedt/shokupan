@@ -45,7 +45,8 @@ export class RouterTrie<T = any> {
         let node = this.root;
         const segments = this.splitPath(path);
 
-        for (const segment of segments) {
+        for (let i = 0; i < segments.length; i++) {
+            const segment = segments[i];
             if (segment === '**') {
                 if (!node.recursiveChild) {
                     node.recursiveChild = this.createNode();

@@ -84,7 +84,9 @@ export function SecurityHeaders(options: SecurityHeadersOptions = {}): Middlewar
                 // Assuming user passes raw string or we'd need a directive builder.
                 // For now, let's assume they pass directives map.
                 const parts = [];
-                for (const [key, val] of Object.entries(opt)) {
+                const optEntries = Object.entries(opt);
+                for (let i = 0; i < optEntries.length; i++) {
+                    const [key, val] = optEntries[i];
                     // directives, etc.
                     // This is complex to implement fully without a library like 'helmet' itself.
                     // We will support a simple string or custom logic later if requested.
@@ -110,7 +112,9 @@ export function SecurityHeaders(options: SecurityHeadersOptions = {}): Middlewar
         const response = await next();
 
         if (response instanceof Response) {
-            for (const [k, v] of Object.entries(headers)) {
+            const headerEntries = Object.entries(headers);
+            for (let i = 0; i < headerEntries.length; i++) {
+                const [k, v] = headerEntries[i];
                 response.headers.set(k, v);
             }
             return response;

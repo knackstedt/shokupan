@@ -44,7 +44,9 @@ export function openApiValidator(): Middleware {
             matchPath = ctx.path;
         } else {
             // Regex match
-            for (const [path, { regex, paramNames }] of cache.paths) {
+            const pathEntries = Array.from(cache.paths.entries());
+            for (let i = 0; i < pathEntries.length; i++) {
+                const [path, { regex, paramNames }] = pathEntries[i];
                 const match = regex.exec(ctx.path);
                 if (match) {
                     matchPath = path;
@@ -126,7 +128,9 @@ export function compileValidators(spec: any): { paths: Map<string, { regex: RegE
     const validators: ValidatorCache = new Map();
     const paths = new Map<string, { regex: RegExp, paramNames: string[]; }>();
 
-    for (const [path, pathItem] of Object.entries(spec.paths || {})) {
+    const pathEntries = Object.entries(spec.paths || {});
+    for (let i = 0; i < pathEntries.length; i++) {
+        const [path, pathItem] = pathEntries[i];
         // Compile Path Regex
         if (path.includes('{')) {
             const paramNames: string[] = [];
@@ -142,7 +146,9 @@ export function compileValidators(spec: any): { paths: Map<string, { regex: RegE
 
         const pathValidators: any = {};
 
-        for (const [method, operation] of Object.entries(pathItem as any)) {
+        const methodEntries = Object.entries(pathItem as any);
+        for (let k = 0; k < methodEntries.length; k++) {
+            const [method, operation] = methodEntries[k];
             if (method === 'parameters' || method === 'summary' || method === 'description') continue;
 
             const oper = operation as any;
@@ -163,7 +169,8 @@ export function compileValidators(spec: any): { paths: Map<string, { regex: RegE
             const pathRequired: string[] = [];
             const headerRequired: string[] = [];
 
-            for (const param of parameters) {
+            for (let j = 0; j < parameters.length; j++) {
+                const param = parameters[j];
                 if (param.in === 'query') {
                     queryProps[param.name] = param.schema || {};
                     if (param.required) queryRequired.push(param.name);

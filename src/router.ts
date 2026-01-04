@@ -62,7 +62,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         const controllerRoutesMap = new Map<any, any[]>();
         const localRoutes: any[] = [];
 
-        for (const r of this[$routes]) {
+        for (let i = 0; i < this[$routes].length; i++) {
+            const r = this[$routes][i];
             const entry = {
                 type: 'route' as 'route',
                 path: r.path,
@@ -259,7 +260,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             const methodMiddlewareMap = (instance as any)[$middleware] || (proto && (proto as any)[$middleware]);
 
             let routesAttached = 0;
-            for (const name of Array.from(methods)) {
+            for (let i = 0; i < Array.from(methods).length; i++) {
+                const name = Array.from(methods)[i];
                 if (name === "constructor") continue;
                 if (["arguments", "caller", "callee"].includes(name)) continue;
 
@@ -279,7 +281,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                 else {
                     // Simple convention matching
                     // Check if name starts with HTTP verb
-                    for (const m of HTTPMethods) {
+                    for (let j = 0; j < HTTPMethods.length; j++) {
+                        const m = HTTPMethods[j];
                         if (name.toUpperCase().startsWith(m)) {
                             method = m as Method;
                             const rest = name.slice(m.length);
@@ -358,7 +361,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                             const sortedArgs = [...routeArgs].sort((a, b) => a.index - b.index);
 
                             // Fill args array
-                            for (const arg of sortedArgs) {
+                            for (let k = 0; k < sortedArgs.length; k++) {
+                                const arg = sortedArgs[k];
                                 switch (arg.type) {
                                     case RouteParamType.BODY:
                                         try {
@@ -391,7 +395,9 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                                             args[arg.index] = vals.length > 1 ? vals : vals[0];
                                         } else {
                                             const query: Record<string, any> = {};
-                                            for (const key of url.searchParams.keys()) {
+                                            const keys = Object.keys(url.searchParams);
+                                            for (let k = 0; k < keys.length; k++) {
+                                                const key = keys[k];
                                                 const vals = url.searchParams.getAll(key);
                                                 query[key] = vals.length > 1 ? vals : vals[0];
                                             }
@@ -465,9 +471,11 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             handler: r.handler
         }));
 
-        for (const child of this[$childRouters]) {
+        for (let i = 0; i < this[$childRouters].length; i++) {
+            const child = this[$childRouters][i];
             const childRoutes = child.getRoutes();
-            for (const route of childRoutes) {
+            for (let j = 0; j < childRoutes.length; j++) {
+                const route = childRoutes[j];
                 const cleanPrefix = child[$mountPath].endsWith("/") ? child[$mountPath].slice(0, -1) : child[$mountPath];
                 const cleanPath = route.path.startsWith("/") ? route.path : "/" + route.path;
                 const fullPath = (cleanPrefix + cleanPath) || "/";
@@ -533,7 +541,9 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         // Handle query params in options
         if (options.query) {
             const u = new URL(url);
-            for (const [k, v] of Object.entries(options.query)) {
+            const entries = Object.entries(options.query);
+            for (let i = 0; i < entries.length; i++) {
+                const [k, v] = entries[i];
                 u.searchParams.set(k, v);
             }
             url = u.toString();
@@ -688,7 +698,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         }
 
         // 2. Check child routers
-        for (const child of this[$childRouters]) {
+        for (let i = 0; i < this[$childRouters].length; i++) {
+            const child = this[$childRouters][i];
             const prefix = child[$mountPath];
             // console.log(`  -> Checking child prefix ${prefix}`);
 
@@ -762,7 +773,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         // Merge specs from guards
         if (this.currentGuards.length > 0) {
             spec = spec || {};
-            for (const guard of this.currentGuards) {
+            for (let i = 0; i < this.currentGuards.length; i++) {
+                const guard = this.currentGuards[i];
                 if (guard.spec) {
                     // Merge Responses
                     if (guard.spec.responses) {
@@ -801,7 +813,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             const innerHandler = wrappedHandler;
             wrappedHandler = async (ctx: ShokupanContext<T>) => {
                 // Execute guards in order
-                for (const guard of routeGuards) {
+                for (let i = 0; i < routeGuards.length; i++) {
+                    const guard = routeGuards[i];
                     let guardPassed = false;
                     let nextCalled = false;
                     const next = () => {

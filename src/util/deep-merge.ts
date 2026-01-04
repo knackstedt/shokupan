@@ -17,7 +17,9 @@ export function deepMerge<T extends Record<string, any>>(target: T, ...sources: 
     const source = sources.shift();
 
     if (isObject(target) && isObject(source)) {
-        for (const key in source) {
+        const sourceKeys = Object.keys(source);
+        for (let i = 0; i < sourceKeys.length; i++) {
+            const key = sourceKeys[i];
             if (isObject(source[key])) {
                 if (!target[key]) Object.assign(target, { [key]: {} });
                 deepMerge(target[key], source[key]);

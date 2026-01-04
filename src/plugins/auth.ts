@@ -118,7 +118,9 @@ export class AuthPlugin extends ShokupanRouter<any> {
     }
 
     private init() {
-        for (const [providerName, providerConfig] of Object.entries(this.authConfig.providers)) {
+        const providerEntries = Object.entries(this.authConfig.providers);
+        for (let i = 0; i < providerEntries.length; i++) {
+            const [providerName, providerConfig] = providerEntries[i];
             if (!providerConfig) continue;
 
             const provider = this.getProviderInstance(providerName, providerConfig);

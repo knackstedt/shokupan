@@ -34,24 +34,32 @@ function analyzeHandler(handler: ShokupanHandler): { inferredSpec?: any; } {
     const queryParams = new Map<string, { type: string; format?: string; }>();
 
     // Query Integers
-    for (const match of handlerSource.matchAll(REGEX_QUERY_INT)) {
+    const queryIntMatches = Array.from(handlerSource.matchAll(REGEX_QUERY_INT));
+    for (let i = 0; i < queryIntMatches.length; i++) {
+        const match = queryIntMatches[i];
         if (match[1]) queryParams.set(match[1], { type: 'integer', format: 'int32' });
     }
 
     // Query Floats
-    for (const match of handlerSource.matchAll(REGEX_QUERY_FLOAT)) {
+    const queryFloatMatches = Array.from(handlerSource.matchAll(REGEX_QUERY_FLOAT));
+    for (let i = 0; i < queryFloatMatches.length; i++) {
+        const match = queryFloatMatches[i];
         if (match[1]) queryParams.set(match[1], { type: 'number', format: 'float' });
     }
 
     // Query Numbers
-    for (const match of handlerSource.matchAll(REGEX_QUERY_NUMBER)) {
+    const queryNumberMatches = Array.from(handlerSource.matchAll(REGEX_QUERY_NUMBER));
+    for (let i = 0; i < queryNumberMatches.length; i++) {
+        const match = queryNumberMatches[i];
         if (match[1] && !queryParams.has(match[1])) {
             queryParams.set(match[1], { type: 'number' });
         }
     }
 
     // Query Booleans
-    for (const match of handlerSource.matchAll(REGEX_QUERY_BOOL)) {
+    const queryBoolMatches = Array.from(handlerSource.matchAll(REGEX_QUERY_BOOL));
+    for (let i = 0; i < queryBoolMatches.length; i++) {
+        const match = queryBoolMatches[i];
         const name = match[1] || match[2];
         if (name && !queryParams.has(name)) {
             queryParams.set(name, { type: 'boolean' });
@@ -59,7 +67,9 @@ function analyzeHandler(handler: ShokupanHandler): { inferredSpec?: any; } {
     }
 
     // Generic Query Strings
-    for (const match of handlerSource.matchAll(REGEX_QUERY_GENERIC)) {
+    const queryGenericMatches = Array.from(handlerSource.matchAll(REGEX_QUERY_GENERIC));
+    for (let i = 0; i < queryGenericMatches.length; i++) {
+        const match = queryGenericMatches[i];
         const name = match[1];
         if (name && !queryParams.has(name)) {
             queryParams.set(name, { type: 'string' });
@@ -80,12 +90,16 @@ function analyzeHandler(handler: ShokupanHandler): { inferredSpec?: any; } {
     const pathParams = new Map<string, { type: string; format?: string; }>();
 
     // Path Integers
-    for (const match of handlerSource.matchAll(REGEX_PARAM_INT)) {
+    const paramIntMatches = Array.from(handlerSource.matchAll(REGEX_PARAM_INT));
+    for (let i = 0; i < paramIntMatches.length; i++) {
+        const match = paramIntMatches[i];
         if (match[1]) pathParams.set(match[1], { type: 'integer', format: 'int32' });
     }
 
     // Path Floats
-    for (const match of handlerSource.matchAll(REGEX_PARAM_FLOAT)) {
+    const paramFloatMatches = Array.from(handlerSource.matchAll(REGEX_PARAM_FLOAT));
+    for (let i = 0; i < paramFloatMatches.length; i++) {
+        const match = paramFloatMatches[i];
         if (match[1]) pathParams.set(match[1], { type: 'number', format: 'float' });
     }
 
@@ -102,7 +116,9 @@ function analyzeHandler(handler: ShokupanHandler): { inferredSpec?: any; } {
     }
 
     // Detect Headers
-    for (const match of handlerSource.matchAll(REGEX_HEADER_GET)) {
+    const headerMatches = Array.from(handlerSource.matchAll(REGEX_HEADER_GET));
+    for (let i = 0; i < headerMatches.length; i++) {
+        const match = headerMatches[i];
         if (match[1]) {
             if (!inferredSpec.parameters) inferredSpec.parameters = [];
             inferredSpec.parameters.push({
@@ -157,7 +173,9 @@ function analyzeHandler(handler: ShokupanHandler): { inferredSpec?: any; } {
     }
 
     // Detect Error Responses
-    for (const match of handlerSource.matchAll(REGEX_ERROR_STATUS)) {
+    const errorStatusMatches = Array.from(handlerSource.matchAll(REGEX_ERROR_STATUS));
+    for (let i = 0; i < errorStatusMatches.length; i++) {
+        const match = errorStatusMatches[i];
         const statusCode = match[1];
         if (statusCode && statusCode !== '200') {
             responses[statusCode] = { description: `Error response (${statusCode})` };
@@ -212,7 +230,8 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
             const expanded: any[] = [];
 
             // Add app's own routes with accumulated prefix
-            for (const route of app.routes) {
+            for (let i = 0; i < app.routes.length; i++) {
+                const route = app.routes[i];
                 const cleanPrefix = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
                 const cleanPath = route.path.startsWith('/') ? route.path : '/' + route.path;
                 let joined = cleanPrefix + cleanPath;
@@ -228,7 +247,8 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
 
             // Recurse into mounted apps
             if (app.mounted) {
-                for (const mount of app.mounted) {
+                for (let i = 0; i < app.mounted.length; i++) {
+                    const mount = app.mounted[i];
                     const targetApp = appMap.get(mount.target);
                     if (targetApp) {
                         const cleanPrefix = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
@@ -250,7 +270,8 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
         // Prioritize: 1. Has Response Schema, 2. Has Handler Source
         const dedupedRoutes = new Map<string, { route: any, score: number; }>();
 
-        for (const route of astRoutes) {
+        for (let i = 0; i < astRoutes.length; i++) {
+            const route = astRoutes[i];
             const key = `${route.method.toUpperCase()}:${route.path}`;
             let score = 0;
             if (route.responseSchema) score += 10;
@@ -295,7 +316,8 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
         // console.log('[OpenAPI] Router keys:', Reflect.ownKeys(router).map(k => k.toString()));
         // console.log('[OpenAPI] Local $routes symbol:', $routes.toString());
 
-        for (const route of routes) {
+        for (let i = 0; i < routes.length; i++) {
+            const route = routes[i];
             const routeGroup = route.group || group;
             const cleanPrefix = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
             const cleanSubPath = route.path.startsWith("/") ? route.path : "/" + route.path;
@@ -317,12 +339,14 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
 
             // Merge metadata from guards (if any)
             if (route.guards) {
-                for (const guard of route.guards) {
+                for (let j = 0; j < route.guards.length; j++) {
+                    const guard = route.guards[j];
                     if (guard.spec) {
                         // Merge security (deduplicated)
                         if (guard.spec.security) {
                             const existing = operation.security || [];
-                            for (const req of guard.spec.security) {
+                            for (let k = 0; k < guard.spec.security.length; k++) {
+                                const req = guard.spec.security[k];
                                 const reqStr = JSON.stringify(req);
                                 if (!existing.some((e: any) => JSON.stringify(e) === reqStr)) {
                                     existing.push(req);
@@ -434,7 +458,9 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                 // Merge Parameters (Query, Path, Header) from AST
                 const params: any[] = [];
                 if (astMatch.requestTypes?.query) {
-                    for (const [name, _type] of Object.entries(astMatch.requestTypes.query)) {
+                    const queryEntries = Object.entries(astMatch.requestTypes.query);
+                    for (let j = 0; j < queryEntries.length; j++) {
+                        const [name, _type] = queryEntries[j];
                         params.push({ name, in: 'query', schema: { type: 'string' } });
                     }
                 }
@@ -476,7 +502,8 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                     const existingParams = operation.parameters || [];
                     const mergedParams = [...existingParams];
 
-                    for (const p of inferredSpec.parameters) {
+                    for (let j = 0; j < inferredSpec.parameters.length; j++) {
+                        const p = inferredSpec.parameters[j];
                         const idx = mergedParams.findIndex((ep: any) => ep.name === p.name && ep.in === p.in);
                         if (idx >= 0) {
                             mergedParams[idx] = deepMerge(mergedParams[idx], p);
@@ -510,7 +537,8 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
 
             if (operation.tags) {
                 operation.tags = Array.from(new Set(operation.tags));
-                for (const t of operation.tags) {
+                for (let j = 0; j < operation.tags.length; j++) {
+                    const t = operation.tags[j];
                     if (!tagGroups.has(routeGroup)) tagGroups.set(routeGroup, new Set());
                     tagGroups.get(routeGroup)?.add(t);
                 }
@@ -527,12 +555,16 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
             }
         };
 
-        for (const controller of router[$childControllers]) {
+        const controllers = router[$childControllers];
+        for (let i = 0; i < controllers.length; i++) {
+            const controller = controllers[i];
             const controllerName = controller.constructor.name || "UnknownController";
             tagGroups.get(group)?.add(controllerName);
         }
 
-        for (const child of router[$childRouters]) {
+        const childRouters = router[$childRouters];
+        for (let i = 0; i < childRouters.length; i++) {
+            const child = childRouters[i];
             const mountPath = child[$mountPath];
             const cleanPrefix = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
             const cleanMount = mountPath.startsWith("/") ? mountPath : "/" + mountPath;
@@ -544,7 +576,9 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
     collect(rootRouter);
 
     const xTagGroups: { name: string; tags: string[]; }[] = [];
-    for (const [name, tags] of tagGroups) {
+    const tagGroupEntries = Array.from(tagGroups.entries());
+    for (let i = 0; i < tagGroupEntries.length; i++) {
+        const [name, tags] = tagGroupEntries[i];
         xTagGroups.push({ name, tags: Array.from(tags).sort() });
     }
 
