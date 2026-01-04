@@ -1,64 +1,8 @@
 
 import { describe, expect, test } from "bun:test";
-import { Controller, Get, Post, Query } from "../decorators";
+import { Body, Controller, Get, Post, Query } from "../decorators";
 import { Shokupan } from "../shokupan";
-import { type ShokupanContext } from "../types";
 
-describe("Core Fixes Verification", () => {
-
-    test("JSON Parsing: Returns 400 on invalid JSON", async () => {
-        const app = new Shokupan();
-
-        class TestController {
-            @Post("/json")
-            async handle(ctx: ShokupanContext) {
-                // Should trigger implicit body parsing if using decorators usually, 
-                // but here we rely on manual or decorated.
-                // We need to use @Body or manual ctx.req.json()?
-                // Wait, router argument resolution calls json() IF decorated.
-                // Shokupan.ts uses router argument resolution inside wrappedHandler.
-                // let's assume we use decorator logic.
-            }
-        }
-
-        // We'll manually register a route that uses the param resolution logic
-        // Or use the Router.add directly?
-        // Let's use `app.post` which eventually uses `router.add`.
-        // BUT argument resolution logic is inside `mount` -> `wrappedHandler`.
-        // So we MUST use `mount` with a controller or careful function construction.
-
-        // Let's use manual route with param definition to trigger loop
-        const handler = async (ctx: any) => ctx.text("OK");
-        app.add({
-            method: "POST",
-            path: "/json",
-            handler,
-            // Mocking the baked metadata that `mount` normally produces
-        });
-
-        // Actually, the change was in `mount`. Using `app.post` (functional) bypasses `mount`'s `wrappedHandler` logic for decorators.
-        // It uses `router.add`. `router.ts`: `mount` creates `wrappedHandler` that does arg resolution.
-        // Functional API `app.post` creates route with handler directly.
-        // Unless functional API supports args? No.
-
-        // So I MUST use a Controller class to test the fix.
-
-        @Controller("/")
-        class JsonCtrl {
-            @Post("json")
-            handle(@Query('q') q: any, @Body() body: any) {
-                return body;
-            }
-        }
-        // Need to define Body decorator or mock it? 
-        // Decorators are imported.
-        // But `@Body` is not exported in test file preamble.
-        // Shokupan exports it?
-        // Let's assume common exports.
-    });
-});
-
-import { Body } from "../decorators";
 
 describe("Core Fixes Implementation", () => {
 
