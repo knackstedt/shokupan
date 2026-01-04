@@ -341,17 +341,18 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
                 // The "next" at the end of the middleware chain is the router dispatch
                 const result = await fn(ctx, async () => {
+                    // Start body parsing early for applicable HTTP methods to overlap with route lookup
+                    const bodyParsing = (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method))
+                        ? ctx.parseBody()
+                        : Promise.resolve();
+
                     const match = this.find(req.method, ctx.path);
-                    // TODO: Execute router-level hooks from match?
-                    // For now, only app-level hooks are fully supported here.
+
                     if (match) {
                         ctx.params = match.params;
 
-                        // Pre-parse body for methods that typically have bodies
-                        // This improves performance and enables Node.js compatibility
-                        if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-                            await ctx.parseBody();
-                        }
+                        // Ensure body is parsed before handler executes
+                        await bodyParsing;
 
                         return match.handler(ctx);
                     }
