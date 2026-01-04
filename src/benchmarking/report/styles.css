@@ -225,3 +225,26 @@ tr:hover td {
     border-radius: 3px;
     color: var(--primary-color);
 }
+
+.sparkline {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.memory-cell {
+    min-width: 150px;
+}
+
+.memory-stats {
+    font-size: 0.85em;
+    color: #909296;
+    margin-top: 4px;
+}
+
+.memory-stats .avg {
+    color: #63e6be;
+}
+
+.memory-stats .peak {
+    color: #ffa94d;
+}

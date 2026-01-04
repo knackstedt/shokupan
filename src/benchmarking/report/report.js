@@ -177,9 +177,29 @@ function createDataRow(framework, runtime, scenario, endpoint, result) {
         throughput: result.throughput || 0,
         p95: result.percentiles?.p95 || 0,
         p99: result.percentiles?.p99 || 0,
+        memory: result.memory || [],
         status: 'OK',
         statusClass: 'success'
     };
+}
+
+function createSparkline(data, width = 150, height = 25) {
+    if (!data || data.length === 0) return '';
+
+    const values = data.map(s => s.rss);
+    const max = Math.max(...values);
+    const min = Math.min(...values);
+    const range = max - min || 1;
+
+    const points = values.map((val, i) => {
+        const x = (i / Math.max(1, values.length - 1)) * width;
+        const y = height - ((val - min) / range) * height;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+
+    return `<svg width="${width}" height="${height}" class="sparkline" style="stroke: #51cf66; fill: none; stroke-width: 1.5;">
+        <polyline points="${points}"/>
+    </svg>`;
 }
 
 function buildChartGrid(id) {
@@ -259,6 +279,15 @@ function initializeTable(id, tableData, reqsChartId, latencyChartId) {
                 </tr>`;
             } else {
                 const scenarioCol = row.scenario ? `<td>${row.scenario}</td>` : '';
+                const memoryData = row.memory || [];
+                const memoryValues = memoryData.map(s => s.rss);
+                const avgMemory = memoryValues.length ? Math.round(memoryValues.reduce((a, b) => a + b, 0) / memoryValues.length) : 0;
+                const peakMemory = memoryValues.length ? Math.max(...memoryValues) : 0;
+                const memInGb = avgMemory / 1024;
+                const memInGbPeak = peakMemory / 1024;
+                const memoryCell = memoryValues.length > 0
+                    ? `<td class="memory-cell">${createSparkline(memoryData)}<div class="memory-stats"><span class="avg">${memInGb.toFixed(2)}GB avg</span> <span class="peak">${memInGbPeak.toFixed(2)}GB peak</span></div></td>`
+                    : '<td class="memory-cell"><span style="color: #666;">–</span></td>';
                 return `<tr>
                     <td>${row.framework}</td>
                     <td>${row.runtime}</td>
@@ -269,6 +298,7 @@ function initializeTable(id, tableData, reqsChartId, latencyChartId) {
                     <td><span class="metric">${(row.throughput / 1024 / 1024).toFixed(2)}</span></td>
                     <td><span class="metric">${row.p95.toFixed(2)}</span></td>
                     <td><span class="metric">${row.p99.toFixed(2)}</span></td>
+                    ${memoryCell}
                     <td class="${row.statusClass}">✓ ${row.status}</td>
                 </tr>`;
             }

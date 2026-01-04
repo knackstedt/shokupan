@@ -52,6 +52,12 @@ type ScenarioConfig = {
     timeout?: number;
 };
 
+// Memory sample collected during benchmark execution
+type MemorySample = {
+    timestamp: number;      // Milliseconds since benchmark start
+    rss: number;           // Resident Set Size (MB)
+};
+
 const SCENARIOS: Record<string, ScenarioConfig> = {
     // Compression tests - test each algorithm separately
     "compression-gzip": {
@@ -175,6 +181,7 @@ type BenchmarkResult = {
     throughput: number;
     error?: string;
     percentiles?: Record<string, number>;
+    memory?: MemorySample[];  // Memory samples collected during benchmark
 };
 
 type ScenarioResults = Record<string, BenchmarkResult>; // endpoint -> result
@@ -334,6 +341,8 @@ async function runBenchmark(framework: string, runtime: string, scenario: string
     });
 
     const outputLines: string[] = [];
+    const memorySamples: MemorySample[] = [];
+    let memoryInterval: Timer | null = null;
     const pipeStream = async (stream: ReadableStream, dest: any) => {
         if (!stream) return;
         const reader = stream.getReader();
@@ -355,6 +364,42 @@ async function runBenchmark(framework: string, runtime: string, scenario: string
     pipeStream(proc.stderr, process.stderr);
 
     await new Promise(r => setTimeout(r, 2000));
+
+    //Start memory sampling interval
+    const pid = proc.pid;
+    if (pid) {
+        // Take initial sample immediately
+        try {
+            const result = await Bun.$`ps -o rss= -p ${pid}`.quiet();
+            const rss = parseInt(result.stdout.toString().trim());
+            if (!isNaN(rss)) {
+                memorySamples.push({
+                    timestamp: 0, // Initial sample at t=0
+                    rss: Math.round(rss / 1024) // Convert KB to MB
+                });
+            }
+        } catch (e) {
+            // Process might have ended, ignore errors
+        }
+
+        // Then start interval for ongoing sampling
+        memoryInterval = setInterval(async () => {
+            try {
+                // Use ps command to get RSS (in KB)
+                const result = await Bun.$`ps -o rss= -p ${pid}`.quiet();
+                const rss = parseInt(result.stdout.toString().trim());
+                if (!isNaN(rss)) {
+                    memorySamples.push({
+                        timestamp: Date.now() - startTime,
+                        rss: Math.round(rss / 1024) // Convert KB to MB
+                    });
+                }
+            } catch (e) {
+                //Process might have ended, ignore errors
+            }
+        }, 250);
+    }
+
 
     if (proc.killed || proc.exitCode !== null) {
         return { error: "Process died immediately", output: outputLines.join("") };
@@ -423,7 +468,8 @@ async function runBenchmark(framework: string, runtime: string, scenario: string
                     requests: res.requests?.average || 0,
                     latency: res.latency?.average || 0,
                     throughput: res.throughput?.average || 0,
-                    percentiles
+                    percentiles,
+                    memory: memorySamples.length > 0 ? memorySamples : undefined
                 };
             } catch (e) {
                 console.error(`Failed to benchmark ${endpoint}:`, e);
@@ -436,6 +482,9 @@ async function runBenchmark(framework: string, runtime: string, scenario: string
             }
         }
     } finally {
+        if (memoryInterval) {
+            clearInterval(memoryInterval);
+        }
         proc.kill();
         await new Promise(r => setTimeout(r, 500));
     }

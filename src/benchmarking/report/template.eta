@@ -53,6 +53,7 @@
             {key: 'throughput', label: 'Throughput (MB/s)'},
             {key: 'p95', label: 'P95 (ms)'},
             {key: 'p99', label: 'P99 (ms)'},
+            {key: 'memory', label: 'Memory'},
             {key: 'status', label: 'Status'}
         ];
     </script>
