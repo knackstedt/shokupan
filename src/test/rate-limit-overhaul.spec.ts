@@ -26,18 +26,18 @@ describe("Rate Limit Overhaul", () => {
         app.get("/", (ctx) => ctx.text("ok"));
 
         // 1
-        let res = await app.processRequest({ method: "GET", url: "/" });
+        let res = await app.testRequest({ method: "GET", url: "/" });
         expect(res.status).toBe(200);
         expect(res.headers["x-ratelimit-limit"]).toBe("2");
         expect(res.headers["x-ratelimit-remaining"]).toBe("1");
 
         // 2
-        res = await app.processRequest({ method: "GET", url: "/" });
+        res = await app.testRequest({ method: "GET", url: "/" });
         expect(res.status).toBe(200);
         expect(res.headers["x-ratelimit-remaining"]).toBe("0");
 
         // 3 (Blocked)
-        res = await app.processRequest({ method: "GET", url: "/" });
+        res = await app.testRequest({ method: "GET", url: "/" });
         expect(res.status).toBe(429);
         expect(res.headers["retry-after"]).toBeDefined();
     });
@@ -49,15 +49,15 @@ describe("Rate Limit Overhaul", () => {
 
         // 1
 
-        let res = await app.processRequest({ method: "GET", url: "/limit" });
+        let res = await app.testRequest({ method: "GET", url: "/limit" });
         expect(res.status).toBe(200);
 
         // 2
-        res = await app.processRequest({ method: "GET", url: "/limit" });
+        res = await app.testRequest({ method: "GET", url: "/limit" });
         expect(res.status).toBe(200);
 
         // 3 (Blocked)
-        res = await app.processRequest({ method: "GET", url: "/limit" });
+        res = await app.testRequest({ method: "GET", url: "/limit" });
 
 
         expect(res.status).toBe(429);
@@ -98,7 +98,7 @@ describe("Rate Limit Overhaul", () => {
 
         // We need to 'start' the app's monitor.
         // Shokupan.listen() starts the monitor.
-        // Shokupan.processRequest() does NOT call listen(), so monitor is not started.
+        // Shokupan.testRequest() does NOT call listen(), so monitor is not started.
         // WE need to call mock start or similar.
         // But Shokupan initializes monitor in `listen`.
 

@@ -13,7 +13,7 @@ describe("Shokupan Direct Testing", () => {
         });
 
         // Test GET
-        const res1 = await router.processRequest({
+        const res1 = await router.testRequest({
             path: "/direct",
             method: "GET"
         });
@@ -22,7 +22,7 @@ describe("Shokupan Direct Testing", () => {
         expect(res1.data).toEqual({ msg: "direct" });
 
         // Test POST with body
-        const res2 = await router.processRequest({
+        const res2 = await router.testRequest({
             path: "/data",
             method: "POST",
             body: { foo: "bar" }
@@ -49,7 +49,7 @@ describe("Shokupan Direct Testing", () => {
 
         app.get("/mw", () => "original");
 
-        const res = await app.processRequest({ path: "/mw" });
+        const res = await app.testRequest({ path: "/mw" });
 
         expect(res.status).toBe(200);
         // Middleware wrapped the result
@@ -58,7 +58,7 @@ describe("Shokupan Direct Testing", () => {
 
     test("Shokupan.processRequest should handle 404", async () => {
         const app = new Shokupan();
-        const res = await app.processRequest({ path: "/missing" });
+        const res = await app.testRequest({ path: "/missing" });
         expect(res.status).toBe(404);
     });
 });

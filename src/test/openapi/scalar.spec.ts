@@ -16,7 +16,7 @@ describe("Scalar Plugin Rendering with Eta", () => {
 
         app.mount("/docs", plugin);
 
-        const res = await app.processRequest({
+        const res = await app.testRequest({
             method: "GET",
             path: "/docs/"
         });

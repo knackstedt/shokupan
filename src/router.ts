@@ -494,12 +494,12 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     }
 
     /**
-     * Makes a sub request to this router.
-     * This is useful for triggering other methods or route handlers. 
+     * Makes an internal request through this router's full routing pipeline.
+     * This is useful for calling other routes internally and supports streaming responses.
      * @param options The request options.
-     * @returns The response.
+     * @returns The raw Response object.
      */
-    public async subRequest(arg: {
+    public async internalRequest(arg: {
         path: string;
         method?: Method;
         headers?: HeadersInit;
@@ -531,9 +531,10 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     }
 
     /**
-     * Processes a request directly.
+     * Processes a request for testing purposes.
+     * Returns a simplified { status, headers, data } object instead of a Response.
      */
-    public async processRequest(options: RequestOptions): Promise<ProcessResult> {
+    public async testRequest(options: RequestOptions): Promise<ProcessResult> {
         let url = options.url || options.path || "/";
         if (!url.startsWith("http")) {
             const base = `http://${this.rootConfig?.hostname || "localhost"}:${this.rootConfig?.port || 3000}`;

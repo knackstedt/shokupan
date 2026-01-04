@@ -15,7 +15,7 @@ describe("JSON Parser Configuration", () => {
             return ctx.json({ received: body });
         });
 
-        const res = await app.processRequest({
+        const res = await app.testRequest({
             method: "POST",
             path: "/test",
             headers: { "content-type": "application/json" },
@@ -36,7 +36,7 @@ describe("JSON Parser Configuration", () => {
             return ctx.json({ received: body });
         });
 
-        const res = await app.processRequest({
+        const res = await app.testRequest({
             method: "POST",
             path: "/test",
             headers: { "content-type": "application/json" },
@@ -59,7 +59,7 @@ describe("JSON Parser Configuration", () => {
             return ctx.json({ received: body });
         });
 
-        const res = await app.processRequest({
+        const res = await app.testRequest({
             method: "POST",
             path: "/test",
             headers: { "content-type": "application/json" },
@@ -85,7 +85,7 @@ describe("JSON Parser Configuration", () => {
         });
 
         // Create a request with invalid JSON
-        const res = await app.processRequest({
+        const res = await app.testRequest({
             method: "POST",
             path: "/test",
             headers: { "content-type": "application/json" },
@@ -109,7 +109,7 @@ describe("JSON Parser Configuration", () => {
             });
         });
 
-        const res = await app.processRequest({
+        const res = await app.testRequest({
             method: "POST",
             path: "/test",
             headers: { "content-type": "application/json" },

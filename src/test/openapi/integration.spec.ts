@@ -110,9 +110,9 @@ describe("OpenAPI Integration", () => {
 
         app.mount("/docs", plugin);
 
-        // Use subRequest to trigger spec generation inside the plugin
+        // Use internalRequest to trigger spec generation inside the plugin
         // Note: ScalarPlugin serves spec at /docs/openapi.json
-        const response = await app.subRequest("/docs/openapi.json");
+        const response = await app.internalRequest("/docs/openapi.json");
         expect(response.status).toBe(200);
         const spec = await response.json();
 

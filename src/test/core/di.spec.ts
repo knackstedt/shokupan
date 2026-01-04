@@ -104,7 +104,7 @@ describe("Dependency Injection System", () => {
         const app = new Shokupan();
         app.mount("/api", TestController);
 
-        const res = await app.processRequest({ path: "/api/di-test" });
+        const res = await app.testRequest({ path: "/api/di-test" });
         const db = Container.resolve(DatabaseService);
 
         expect(res.data).toEqual({
@@ -130,8 +130,8 @@ describe("Dependency Injection System", () => {
         app.mount("/", ControllerOne);
         app.mount("/", ControllerTwo);
 
-        await app.processRequest({ path: "/c1" });
-        const res = await app.processRequest({ path: "/c2" });
+        await app.testRequest({ path: "/c1" });
+        const res = await app.testRequest({ path: "/c2" });
 
         expect(res.data).toBe("state");
     });

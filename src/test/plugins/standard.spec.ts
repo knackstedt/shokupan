@@ -16,7 +16,7 @@ describe("Plugins", () => {
         app.get("/", (ctx) => ctx.text("ok"));
 
         // Preflight
-        let res = await app.processRequest({
+        let res = await app.testRequest({
             method: "OPTIONS",
             url: "http://localhost/",
             headers: {
@@ -30,7 +30,7 @@ describe("Plugins", () => {
         expect(res.headers["access-control-allow-methods"]).toBe("GET,POST");
 
         // Actual Request
-        res = await app.processRequest({
+        res = await app.testRequest({
             method: "GET",
             url: "http://localhost/",
             headers: { "Origin": "http://example.com" }
@@ -46,7 +46,7 @@ describe("Plugins", () => {
 
         app.get("/", (ctx) => ctx.text("ok"));
 
-        const res = await app.processRequest({ method: "GET", url: "http://localhost/" });
+        const res = await app.testRequest({ method: "GET", url: "http://localhost/" });
 
         expect(res.headers["x-dns-prefetch-control"]).toBe("off");
         expect(res.headers["x-frame-options"]).toBe("SAMEORIGIN");
@@ -67,7 +67,7 @@ describe("Plugins", () => {
         app.get("/", (ctx) => ctx.text("ok"));
 
         // 1st
-        let res = await app.processRequest({
+        let res = await app.testRequest({
             method: "GET",
             url: "http://localhost/",
             headers: { "x-forwarded-for": "1.2.3.4" }
@@ -76,7 +76,7 @@ describe("Plugins", () => {
         expect(res.headers["x-ratelimit-remaining"]).toBe("1");
 
         // 2nd
-        res = await app.processRequest({
+        res = await app.testRequest({
             method: "GET",
             url: "http://localhost/",
             headers: { "x-forwarded-for": "1.2.3.4" }
@@ -85,7 +85,7 @@ describe("Plugins", () => {
         expect(res.headers["x-ratelimit-remaining"]).toBe("0");
 
         // 3rd (Blocked)
-        res = await app.processRequest({
+        res = await app.testRequest({
             method: "GET",
             url: "http://localhost/",
             headers: { "x-forwarded-for": "1.2.3.4" }
@@ -101,7 +101,7 @@ describe("Plugins", () => {
         app.get("/", (ctx) => ctx.text("hello world"));
 
         // Without Accept-Encoding
-        let res = await app.processRequest({ method: "GET", url: "http://localhost/" });
+        let res = await app.testRequest({ method: "GET", url: "http://localhost/" });
         expect(res.headers["content-encoding"]).toBeUndefined();
         expect(res.data).toBe("hello world");
 

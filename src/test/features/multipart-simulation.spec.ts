@@ -31,7 +31,7 @@ describe('Multipart Support (Simulation)', () => {
             `--${boundary}--`
         ].join('\r\n');
 
-        const res = await app.processRequest({
+        const res = await app.testRequest({
             method: 'POST',
             url: '/upload',
             headers: {

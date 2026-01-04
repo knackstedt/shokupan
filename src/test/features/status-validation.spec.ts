@@ -27,10 +27,10 @@ describe('Status Code Validation', () => {
 
         // 305 is in VALID_HTTP_STATUSES but VALID_REDIRECT_STATUSES is specific: 301, 302, 303, 307, 308.
 
-        let res = await app.processRequest({ url: 'http://localhost/valid' });
+        let res = await app.testRequest({ url: 'http://localhost/valid' });
         expect(res.status).toBe(200);
 
-        let invalidRes = await app.processRequest({ url: 'http://localhost/invalid' });
+        let invalidRes = await app.testRequest({ url: 'http://localhost/invalid' });
         expect(invalidRes.status).toBe(500);
         const body = await invalidRes.data;
         expect(body.error).toContain("Invalid HTTP status code: 999");
@@ -52,10 +52,10 @@ describe('Status Code Validation', () => {
 
         app.mount('/api', router);
 
-        let res = await app.processRequest({ url: 'http://localhost/api/router-valid' });
+        let res = await app.testRequest({ url: 'http://localhost/api/router-valid' });
         expect(res.status).toBe(201);
 
-        let invalidRes = await app.processRequest({ url: 'http://localhost/api/router-invalid' });
+        let invalidRes = await app.testRequest({ url: 'http://localhost/api/router-invalid' });
         expect(invalidRes.status).toBe(500);
         const body = await invalidRes.data;
         expect(body.error).toContain("Invalid HTTP status code: 888");
@@ -69,7 +69,7 @@ describe('Status Code Validation', () => {
         });
 
         // Bun/Node Response constructor throws RangeError for 999. Validating that our code doesn't intercept it first.
-        let res = await app.processRequest({ url: 'http://localhost/weird' });
+        let res = await app.testRequest({ url: 'http://localhost/weird' });
         expect(res.status).toBe(500);
         const body = await res.data;
         // The error comes from Bun internals: RangeError
@@ -86,7 +86,7 @@ describe('Status Code Validation', () => {
             return ctx.redirect('/', 200);
         });
 
-        let res = await app.processRequest({ url: 'http://localhost/bad-redirect' });
+        let res = await app.testRequest({ url: 'http://localhost/bad-redirect' });
         expect(res.status).toBe(500);
         const body = await res.data;
         expect(body.error).toContain("Invalid redirect status code: 200");

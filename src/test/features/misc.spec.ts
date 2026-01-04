@@ -70,7 +70,7 @@ describe("Shokupan Advanced Features", () => {
     app.mount("/api", UsersController);
 
     test("Dependency Injection should resolve service", async () => {
-        const res = await app.processRequest({ path: "/api/users" });
+        const res = await app.testRequest({ path: "/api/users" });
         expect(res.status).toBe(200);
         expect(res.data).toEqual({
             data: ["Alice", "Bob"],
@@ -80,7 +80,7 @@ describe("Shokupan Advanced Features", () => {
 
     test("Method Middleware should enforce auth", async () => {
         // Fail case
-        const resFail = await app.processRequest({
+        const resFail = await app.testRequest({
             method: "POST",
             path: "/api/users/create",
             body: { name: "Charlie" }
@@ -88,7 +88,7 @@ describe("Shokupan Advanced Features", () => {
         expect(resFail.data).toEqual({ error: "Unauthorized" });
 
         // Success case
-        const resSuccess = await app.processRequest({
+        const resSuccess = await app.testRequest({
             method: "POST",
             path: "/api/users/create",
             headers: { "authorization": "secret", "user-agent": "BunTest" },
@@ -104,7 +104,7 @@ describe("Shokupan Advanced Features", () => {
     });
 
     test("Param Decorators (Param, Query)", async () => {
-        const res = await app.processRequest({ path: "/api/users/123?detail=full" });
+        const res = await app.testRequest({ path: "/api/users/123?detail=full" });
         expect(res.data).toEqual({
             data: { id: "123", detail: "full" },
             log: "seen"
@@ -112,7 +112,7 @@ describe("Shokupan Advanced Features", () => {
     });
 
     test("Ctx and Req Decorators", async () => {
-        const res = await app.processRequest({ path: "/api/users/ctx/test" });
+        const res = await app.testRequest({ path: "/api/users/ctx/test" });
         expect(res.data.data.hasCtx).toBe(true);
         expect(res.data.data.hasReq).toBe(true);
     });

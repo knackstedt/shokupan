@@ -30,7 +30,7 @@ describe("Static Route Grouping", () => {
         // Actually default behavior is to try index.html, then 403/404 if listDirectory false.
 
         // Let's test a file directly
-        const resFile = await app.processRequest({
+        const resFile = await app.testRequest({
             method: "GET",
             path: "/assets/test.txt"
         });
@@ -38,7 +38,7 @@ describe("Static Route Grouping", () => {
         expect(resFile.data).toBe("Hello World");
 
         // Test 404
-        const res404 = await app.processRequest({
+        const res404 = await app.testRequest({
             method: "GET",
             path: "/assets/notfound.txt"
         });

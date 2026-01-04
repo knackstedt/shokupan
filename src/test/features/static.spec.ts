@@ -24,7 +24,7 @@ describe("Shokupan Static Serving with Eta", () => {
         // Use directory listing option
         app.static("/static", { root: testDir, listDirectory: true });
 
-        const res = await app.processRequest({
+        const res = await app.testRequest({
             method: "GET",
             path: "/static/"
         });

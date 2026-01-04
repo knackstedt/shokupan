@@ -220,7 +220,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     /**
      * Processes a request by wrapping the standard fetch method.
      */
-    public override async processRequest(options: RequestOptions): Promise<ProcessResult> {
+    public override async testRequest(options: RequestOptions): Promise<ProcessResult> {
         let url = options.url || options.path || "/";
         if (!url.startsWith("http")) {
             const base = `http://${this.applicationConfig.hostname || "localhost"}:${this.applicationConfig.port || 3000}`;

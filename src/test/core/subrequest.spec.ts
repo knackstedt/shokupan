@@ -19,7 +19,7 @@ describe("SubRequest (Forking)", () => {
     // Define a forking route
     router.get("/proxy", async (ctx) => {
         // console.log("Proxying request...");
-        const response = await router.subRequest({
+        const response = await router.internalRequest({
             path: "/api/target",
             method: "POST", // Change method
             body: { foo: "bar" } // Add body
@@ -45,7 +45,7 @@ describe("SubRequest (Forking)", () => {
 
     // Define a stream proxy
     router.get("/proxy-stream", async (ctx) => {
-        const response = await router.subRequest({
+        const response = await router.internalRequest({
             path: "/api/stream"
         });
         return response; // Return the response directly to pipe the stream
