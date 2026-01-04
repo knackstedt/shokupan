@@ -77,6 +77,18 @@
         "surrealdb": "^2.0.0-alpha.14",
         "tslib": "^2.8.1"
     },
+    "peerDependencies": {
+        "parse-json": "^8.0.0",
+        "secure-json-parse": "^4.0.0"
+    },
+    "peerDependenciesMeta": {
+        "parse-json": {
+            "optional": true
+        },
+        "secure-json-parse": {
+            "optional": true
+        }
+    },
     "devDependencies": {
         "@sinclair/typebox": "^0.34.45",
         "@tsconfig/bun": "^1.0.8",
@@ -84,7 +96,10 @@
         "@types/bun": "^1.2.23",
         "@types/supertest": "^6.0.3",
         "axios": "^1.13.2",
+        "fast-json-stringify": "^6.1.1",
         "get-port": "^7.1.0",
+        "parse-json": "^8.3.0",
+        "secure-json-parse": "^4.1.0",
         "supertest": "^7.1.4",
         "typescript": "~5.9.3",
         "valibot": "^1.2.0",

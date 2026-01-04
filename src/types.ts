@@ -230,6 +230,23 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
     enableTracing?: boolean;
 
     /**
+     * JSON parser to use for parsing request bodies.
+     * 
+     * Options:
+     * - `'native'`: Use the built-in JSON.parse (fastest, default)
+     * - `'parse-json'`: Use the parse-json library for better error messages with minimal performance overhead (~5% slower than native)
+     * - `'secure-json-parse'`: Use secure-json-parse for protection against prototype pollution (20-30% slower than native)
+     * 
+     * Performance implications based on benchmarks:
+     * - `native`: Fastest option, excellent for production
+     * - `parse-json`: Nearly identical performance to native with better error messages, good for development
+     * - `secure-json-parse`: Provides security at the cost of performance, use only for untrusted input
+     * 
+     * @default 'native'
+     */
+    jsonParser?: 'native' | 'parse-json' | 'secure-json-parse';
+
+    /**
      * Whether to enable automatic backpressure based on system CPU load.
      * @default false
      */

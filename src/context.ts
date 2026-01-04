@@ -321,9 +321,23 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
         const contentType = this.request.headers.get("content-type") || "";
 
         if (contentType.includes("application/json") || contentType.includes("+json")) {
-            this._cachedBody = await this.request.json();
+            // Read directly from stream instead of using req.json()
+            const rawText = await this.readRawBody();
+
+            // Use configured JSON parser (defaults to native if not configured)
+            const parserType = this.app?.applicationConfig?.jsonParser || 'native';
+            if (parserType === 'native') {
+                this._cachedBody = JSON.parse(rawText);
+            } else {
+                // Dynamically import the parser utility
+                const { getJSONParser } = await import('./util/json-parser');
+                const parser = getJSONParser(parserType);
+                this._cachedBody = parser(rawText);
+            }
+
             this._bodyType = 'json';
         } else if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
+            // FormData still needs Request API as it's more complex to parse manually
             this._cachedBody = await this.request.formData();
             this._bodyType = 'formData';
         } else {
@@ -364,8 +378,14 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     /**
      * Read raw body from ReadableStream efficiently.
      * This is much faster than request.text() for large payloads.
+     * Also handles the case where body is already a string (e.g., in tests).
      */
     private async readRawBody(): Promise<string> {
+        // Handle test case where body is already a string
+        if (typeof (this.request as any).body === 'string') {
+            return (this.request as any).body;
+        }
+
         const reader = this.request.body?.getReader();
         if (!reader) {
             return '';
