@@ -7,7 +7,7 @@ import { generateOpenApi } from "./plugins/openapi";
 import { ShokupanRequest } from './request';
 import { ShokupanRouter } from "./router";
 import { $appRoot, $dispatch, $isApplication } from './symbol';
-import type { Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig, ShokupanHooks } from './types';
+import type { Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig } from './types';
 import { asyncContext } from "./util/async-hooks";
 
 
@@ -32,8 +32,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     private composedMiddleware?: Middleware;
     private cpuMonitor?: SystemCpuMonitor;
 
-    private hookCache = new Map<keyof ShokupanHooks, Function[]>();
-    private hooksInitialized = false;
 
     get logger() {
         return this.applicationConfig.logger;
@@ -46,7 +44,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         // Exclude hooks from the router config passed to super() to avoid double execution
         // The application handles app-level hooks in handleRequest()
         const { hooks, ...routerConfig } = config;
-        super(routerConfig);
+        super({ ...routerConfig, hooks });
 
         this[$isApplication] = true;
         this[$appRoot] = this;
@@ -328,13 +326,13 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 const msg = "Too Many Requests (CPU Backpressure)";
                 const res = ctx.text(msg, 429);
                 // Trigger hooks so metrics are recorded
-                await this.executeHook('onResponseEnd', ctx, res);
+                await this.runHooks('onResponseEnd', ctx, res);
                 return res;
             }
 
             try {
                 // Request Start Hook
-                await this.executeHook('onRequestStart', ctx);
+                await this.runHooks('onRequestStart', ctx);
 
                 // Compose middleware + router dispatch
                 const fn = this.composedMiddleware ??= compose(this.middleware);
@@ -399,10 +397,10 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 }
 
                 // Request End Hook - Processing finished, response ready
-                await this.executeHook('onRequestEnd', ctx);
+                await this.runHooks('onRequestEnd', ctx);
 
                 // Response Start Hook - About to send response
-                await this.executeHook('onResponseStart', ctx, response);
+                await this.runHooks('onResponseStart', ctx, response);
 
                 return response;
 
@@ -417,7 +415,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 if (err.errors) body.errors = err.errors;
 
                 // Error Hook
-                await this.executeHook('onError', err, ctx);
+                await this.runHooks('onError', err, ctx);
 
                 return ctx.json(body, status);
             }
@@ -432,7 +430,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             const timeoutPromise = new Promise<Response>((_, reject) => {
                 timeoutId = setTimeout(async () => {
                     controller.abort(); // Signal cancellation to handlers
-                    await this.executeHook('onRequestTimeout', ctx);
+                    await this.runHooks('onRequestTimeout', ctx);
                     reject(new Error("Request Timeout"));
                 }, timeoutMs);
             });
@@ -452,50 +450,8 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             .then(async (res) => {
                 // Response End Hook - Response returned
                 // Note: We can't guarantee it's fully sent to client here, but it's handed off to Bun
-                await this.executeHook('onResponseEnd', ctx, res);
+                await this.runHooks('onResponseEnd', ctx, res);
                 return res;
             });
-    }
-
-    private ensureHooksInitialized() {
-
-        const hooks = this.applicationConfig.hooks;
-        if (hooks) {
-            const hookList = Array.isArray(hooks) ? hooks : [hooks];
-
-            // Pre-compute lookup for each hook type
-            const hookTypes: (keyof ShokupanHooks)[] = [
-                'onRequestStart', 'onRequestEnd',
-                'onResponseStart', 'onResponseEnd',
-                'onError',
-                'beforeValidate', 'afterValidate',
-                'onRequestTimeout', 'onReadTimeout', 'onWriteTimeout'
-            ];
-
-            for (let i = 0; i < hookTypes.length; i++) {
-                const type = hookTypes[i];
-                const fns: Function[] = [];
-                for (let j = 0; j < hookList.length; j++) {
-                    const h = hookList[j];
-                    if (h[type]) fns.push(h[type]!);
-                }
-                if (fns.length > 0) {
-                    this.hookCache.set(type, fns);
-                }
-            }
-        }
-        this.hooksInitialized = true;
-    }
-
-    public async executeHook(name: keyof ShokupanHooks, ...args: any[]) {
-        // Optimization: Use hasHook check before calling this usually
-        // But we ensure initialized here too just in case
-        if (!this.hooksInitialized) {
-            this.ensureHooksInitialized();
-        }
-        const fns = this.hookCache.get(name);
-        if (!fns) return;
-
-        await Promise.all(fns.map(fn => fn(...args)));
     }
 }

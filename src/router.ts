@@ -35,6 +35,9 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     public [$childRouters]: ShokupanRouter<T>[] = [];
     public [$childControllers]: ShokupanController[] = [];
 
+    private hookCache = new Map<keyof ShokupanHooks, Function[]>();
+    private hooksInitialized: boolean = false;
+
     public middleware: Middleware[] = [];
 
     get rootConfig() {
@@ -608,35 +611,22 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         };
     }
 
-    private applyRouterHooks(match: { handler: ShokupanHandler<T>; params: Record<string, string>; }) {
-        if (!this.config?.hooks) return match;
-        const hooks = this.config.hooks;
-        // Re-use static helper or method to avoid code duplication with add()
-        return {
-            ...match,
-            handler: this.wrapWithHooks(match.handler, hooks)
-        };
-    }
+    private wrapWithHooks(handler: ShokupanHandler<T>) {
+        // Ensure hooks are initialized before checking the cache
+        if (!this.hooksInitialized) {
+            this.ensureHooksInitialized();
+        }
 
-    private wrapWithHooks(handler: ShokupanHandler<T>, hooks: ShokupanHooks | ShokupanHooks[]) {
-        const hookList = Array.isArray(hooks) ? hooks : [hooks];
-
-        // Optimize: Check if any relevant hooks are actually defined
-        const hasStart = hookList.some(h => !!h.onRequestStart);
-        const hasEnd = hookList.some(h => !!h.onRequestEnd);
-        const hasError = hookList.some(h => !!h.onError);
+        const hasStart = this.hookCache.get('onRequestStart')?.length > 0;
+        const hasEnd = this.hookCache.get('onRequestEnd')?.length > 0;
+        const hasError = this.hookCache.get('onError')?.length > 0;
 
         if (!hasStart && !hasEnd && !hasError) return handler;
 
         const originalHandler = handler;
 
         const wrapped = async (ctx: ShokupanContext<T>) => {
-            if (hasStart) {
-                for (let i = 0; i < hookList.length; i++) {
-                    const h = hookList[i];
-                    if (typeof h.onRequestStart === 'function') await h.onRequestStart(ctx);
-                }
-            }
+            await this.runHooks("onRequestStart", ctx);
 
             const debug = ctx._debug;
             let debugId: string | undefined;
@@ -655,18 +645,12 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                 const res = await originalHandler(ctx);
                 debug?.trackStep(debugId, 'handler', performance.now() - start, 'success');
 
-                for (let i = 0; i < hookList.length; i++) {
-                    const h = hookList[i];
-                    if (typeof h.onRequestEnd === 'function') await h.onRequestEnd(ctx);
-                }
+                await this.runHooks("onRequestEnd", ctx);
                 return res;
             } catch (err) {
                 debug?.trackStep(debugId, 'handler', performance.now() - start, 'error', err);
 
-                for (let i = 0; i < hookList.length; i++) {
-                    const h = hookList[i];
-                    if (typeof h.onError === 'function') await h.onError(err, ctx);
-                }
+                await this.runHooks("onError", err, ctx);
                 throw err;
             } finally {
                 if (debug && previousNode) debug.setNode(previousNode);
@@ -701,19 +685,20 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         for (let i = 0; i < this[$childRouters].length; i++) {
             const child = this[$childRouters][i];
             const prefix = child[$mountPath];
-            // console.log(`  -> Checking child prefix ${prefix}`);
 
             if (path === prefix || path.startsWith(prefix + "/")) {
                 const subPath = path.slice(prefix.length) || "/";
                 const match = child.find(method, subPath);
-                if (match) return this.applyRouterHooks(match);
+                // Child router handlers are already wrapped with child hooks
+                // Just return them as-is (parent hooks are applied at the app level in handleRequest)
+                if (match) return match;
             }
             // Handle case where prefix ends with /
             if (prefix.endsWith("/")) {
                 if (path.startsWith(prefix)) {
                     const subPath = path.slice(prefix.length) || "/";
                     const match = child.find(method, subPath);
-                    if (match) return this.applyRouterHooks(match);
+                    if (match) return match;
                 }
             }
         }
@@ -931,7 +916,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         // Bake in Hooks if present (Optimization)
         let bakedHandler = wrappedHandler;
         if (this.config?.hooks) {
-            bakedHandler = this.wrapWithHooks(wrappedHandler, this.config.hooks);
+            bakedHandler = this.wrapWithHooks(wrappedHandler);
         }
 
         // Store for OpenAPI (still use list)
@@ -1231,12 +1216,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             return;
         }
 
-        let finalHandler = handlers[handlers.length - 1]; // Last handler is the main handler?
-        // Wait, compose logic: 
-        // If we have [m1, m2, h], we want m1 -> m2 -> h.
-        // compose([m1, m2, h]) does exactly that.
-        // However, middleware returns `Promise<any>`.
-        // If `handlers.length > 1`, we wrap them.
+        let finalHandler = handlers[handlers.length - 1];
 
         if (handlers.length > 1) {
             // Since handlers are [ctx, next?], they fit Strict Middleware signature.
@@ -1245,13 +1225,6 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             const fn = compose(handlers as any);
             finalHandler = (ctx) => fn(ctx);
         }
-
-        // if (spec) {
-        //     console.log(`[Router] attachVerb ${method} ${path} has spec:`, spec);
-        // } 
-        // else {
-        //     console.log(`[Router] attachVerb ${method} ${path} NO SPEC`);
-        // }
 
         this.add({
             method,
@@ -1267,5 +1240,46 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      */
     public generateApiSpec(options: OpenAPIOptions = {}): any {
         return generateOpenApi(this, options);
+    }
+
+    private ensureHooksInitialized() {
+        const hooks = this.config?.hooks;
+        if (hooks) {
+            const hookList = Array.isArray(hooks) ? hooks : [hooks];
+
+            // Pre-compute lookup for each hook type
+            const hookTypes: (keyof ShokupanHooks)[] = [
+                'onRequestStart', 'onRequestEnd',
+                'onResponseStart', 'onResponseEnd',
+                'onError',
+                'beforeValidate', 'afterValidate',
+                'onRequestTimeout', 'onReadTimeout', 'onWriteTimeout'
+            ];
+
+            for (let i = 0; i < hookTypes.length; i++) {
+                const type = hookTypes[i];
+                const fns: Function[] = [];
+                for (let j = 0; j < hookList.length; j++) {
+                    const h = hookList[j];
+                    if (h[type]) fns.push(h[type]!);
+                }
+                if (fns.length > 0) {
+                    this.hookCache.set(type, fns);
+                }
+            }
+        }
+        this.hooksInitialized = true;
+    }
+
+    public async runHooks(name: keyof ShokupanHooks, ...args: any[]) {
+        // Optimization: Use hasHook check before calling this usually
+        // But we ensure initialized here too just in case
+        if (!this.hooksInitialized) {
+            this.ensureHooksInitialized();
+        }
+        const fns = this.hookCache.get(name);
+        if (!fns) return;
+
+        await Promise.all(fns.map(fn => fn(...args)));
     }
 }
