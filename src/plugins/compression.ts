@@ -1,4 +1,4 @@
-import * as zlib from "node:zlib"; // TODO: When bun compression support supercedes node, remove this
+import * as zlib from "node:zlib";
 import type { ShokupanContext } from "../context";
 import type { Middleware, NextFn } from "../types";
 

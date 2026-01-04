@@ -1,5 +1,6 @@
-import { plainToInstance } from "class-transformer";
-import { validateOrReject } from "class-validator";
+// Lazy-loaded dependencies
+let plainToInstance: any;
+let validateOrReject: any;
 import { ShokupanContext } from "../context";
 import type { Middleware } from "../types";
 
@@ -95,6 +96,21 @@ function isClass(schema: any): boolean {
 }
 
 async function validateClassValidator(schema: any, data: any) {
+    // Lazy load dependencies
+    if (!plainToInstance || !validateOrReject) {
+        try {
+            const ct = await import('class-transformer');
+            const cv = await import('class-validator');
+            plainToInstance = ct.plainToInstance;
+            validateOrReject = cv.validateOrReject;
+        } catch (e) {
+            throw new Error(
+                'class-transformer and class-validator are required for class-based validation. ' +
+                'Install them with: bun add class-transformer class-validator reflect-metadata'
+            );
+        }
+    }
+
     // Transform plain object to class instance
     const object = plainToInstance(schema, data);
     try {
