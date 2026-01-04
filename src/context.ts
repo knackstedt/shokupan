@@ -134,7 +134,9 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
         if (this._cachedQuery) return this._cachedQuery;
 
         const q: Record<string, any> = {};
-        for (const [key, value] of this.url.searchParams) {
+        const entries = Object.entries(this.url.searchParams);
+        for (let i = 0; i < entries.length; i++) {
+            const [key, value] = entries[i];
             if (q[key] === undefined) {
                 q[key] = value;
             } else if (Array.isArray(q[key])) {
@@ -386,7 +388,8 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
         // Efficiently combine chunks into single buffer
         const result = new Uint8Array(totalSize);
         let offset = 0;
-        for (const chunk of chunks) {
+        for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i];
             result.set(chunk, offset);
             offset += chunk.length;
         }

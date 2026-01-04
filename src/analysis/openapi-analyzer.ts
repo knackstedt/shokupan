@@ -108,7 +108,8 @@ export class OpenAPIAnalyzer {
         try {
             const entries = fs.readdirSync(dir, { withFileTypes: true });
 
-            for (const entry of entries) {
+            for (let i = 0; i < entries.length; i++) {
+                const entry = entries[i];
                 const fullPath = path.join(dir, entry.name);
 
                 // Skip node_modules for source files (we'll handle deps separately)
@@ -140,7 +141,8 @@ export class OpenAPIAnalyzer {
         const jsFiles = this.files.filter(f => f.type === 'js');
         const mapFiles = this.files.filter(f => f.type === 'map');
 
-        for (const jsFile of jsFiles) {
+        for (let i = 0; i < jsFiles.length; i++) {
+            const jsFile = jsFiles[i];
             const mapFile = mapFiles.find(m => m.path === jsFile.path + '.map');
 
             if (mapFile && !this.files.some(f => f.path === jsFile.path.replace(/\.js$/, '.ts'))) {
@@ -197,7 +199,8 @@ export class OpenAPIAnalyzer {
 
         const typeChecker = this.program.getTypeChecker();
 
-        for (const sourceFile of this.program.getSourceFiles()) {
+        for (let i = 0; i < this.program.getSourceFiles().length; i++) {
+            const sourceFile = this.program.getSourceFiles()[i];
             // Skip node_modules and declaration files/tests
             if (sourceFile.fileName.includes('node_modules')) continue;
             if (sourceFile.isDeclarationFile) continue;
@@ -308,7 +311,8 @@ export class OpenAPIAnalyzer {
     private async extractRoutes(): Promise<void> {
         if (!this.program) return;
 
-        for (const app of this.applications) {
+        for (let i = 0; i < this.applications.length; i++) {
+            const app = this.applications[i];
             const sourceFile = this.program.getSourceFile(app.filePath);
             if (!sourceFile) continue;
 
@@ -322,7 +326,8 @@ export class OpenAPIAnalyzer {
     private extractRoutesFromController(app: ApplicationInstance, classNode: ts.ClassDeclaration, sourceFile: ts.SourceFile): void {
         const methods = classNode.members.filter(m => ts.isMethodDeclaration(m) || m.kind === 175);
 
-        for (const method of methods) {
+        for (let i = 0; i < methods.length; i++) {
+            const method = methods[i];
             const methodNode = method as any; // Cast to any to access decorators in newer/older TS mix
             if (!methodNode.decorators && !methodNode.modifiers) continue;
 
@@ -451,7 +456,8 @@ export class OpenAPIAnalyzer {
             // convertExpressionToSchema is designed for SCHEMAS, not values.
             // We need a simpler value extractor or just parse the props directly for this specific case.
 
-            for (const prop of metaObj.properties) {
+            for (let i = 0; i < metaObj.properties.length; i++) {
+                const prop = metaObj.properties[i];
                 if (ts.isPropertyAssignment(prop) && prop.name) {
                     const name = prop.name.getText(sourceFile);
                     const val = prop.initializer;
@@ -671,7 +677,8 @@ export class OpenAPIAnalyzer {
                 required: []
             };
 
-            for (const prop of node.properties) {
+            for (let i = 0; i < node.properties.length; i++) {
+                const prop = node.properties[i];
                 if (ts.isPropertyAssignment(prop)) {
                     const name = prop.name.getText(sourceFile);
                     const valueSchema = this.convertExpressionToSchema(prop.initializer, sourceFile, scope);
@@ -781,7 +788,8 @@ export class OpenAPIAnalyzer {
                     required: []
                 };
 
-                for (const member of literal.members) {
+                for (let i = 0; i < literal.members.length; i++) {
+                    const member = literal.members[i];
                     if (ts.isPropertySignature(member) && member.type) {
                         const name = member.name.getText(sourceFile);
                         const propSchema = this.convertTypeNodeToSchema(member.type, sourceFile);
@@ -880,7 +888,8 @@ export class OpenAPIAnalyzer {
             }
         });
 
-        for (const imp of imports) {
+        for (let i = 0; i < imports.length; i++) {
+            const imp = imports[i];
             const moduleSpecifier = imp.moduleSpecifier;
             if (ts.isStringLiteral(moduleSpecifier)) {
                 const modulePath = moduleSpecifier.text;
@@ -890,7 +899,8 @@ export class OpenAPIAnalyzer {
                     const namedBindings = imp.importClause?.namedBindings;
 
                     if (namedBindings && ts.isNamedImports(namedBindings)) {
-                        for (const element of namedBindings.elements) {
+                        for (let j = 0; j < namedBindings.elements.length; j++) {
+                            const element = namedBindings.elements[j];
                             if (element.name.text === identifier) {
                                 // Try to read package version
                                 const version = this.getPackageVersion(modulePath);
@@ -935,7 +945,8 @@ export class OpenAPIAnalyzer {
 
         const collectRoutes = (app: ApplicationInstance, prefix: string = '') => {
             // Add direct routes
-            for (const route of app.routes) {
+            for (let i = 0; i < app.routes.length; i++) {
+                const route = app.routes[i];
                 // Ensure prefix handles slashes correctly
                 const cleanPrefix = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
                 const cleanPath = route.path.startsWith('/') ? route.path : '/' + route.path;
@@ -1005,7 +1016,9 @@ export class OpenAPIAnalyzer {
                 const parameters: any[] = [];
 
                 if (route.requestTypes?.query) {
-                    for (const [key] of Object.entries(route.requestTypes.query)) {
+                    const entries = Object.entries(route.requestTypes.query);
+                    for (let i = 0; i < entries.length; i++) {
+                        const [key] = entries[i];
                         parameters.push({
                             name: key,
                             in: 'query',
@@ -1018,7 +1031,9 @@ export class OpenAPIAnalyzer {
                     // Also check for path params implied by the URL {param}
                     // But assume extractRouteFromCall handled explicit ones?
                     // Let's just trust requestTypes for now
-                    for (const [key] of Object.entries(route.requestTypes.params)) {
+                    const entries = Object.entries(route.requestTypes.params);
+                    for (let i = 0; i < entries.length; i++) {
+                        const [key] = entries[i];
                         parameters.push({
                             name: key,
                             in: 'path',
@@ -1053,7 +1068,8 @@ export class OpenAPIAnalyzer {
             }
 
             // Recurse into mounted apps
-            for (const mount of app.mounted) {
+            for (let i = 0; i < app.mounted.length; i++) {
+                const mount = app.mounted[i];
                 // We need to resolve the ApplicationInstance for the target
                 // The 'mounted' array currently only stores { prefix, target, dependency }
                 // We need to find the AppInstance that matches 'target' class name
@@ -1075,7 +1091,8 @@ export class OpenAPIAnalyzer {
             }
         };
 
-        for (const app of this.applications) {
+        for (let i = 0; i < this.applications.length; i++) {
+            const app = this.applications[i];
             // We only want to start collection from "root" apps? 
             // Or just collect everything? 
             // If we collect everything, we might duplicate routes if they are mounted.
