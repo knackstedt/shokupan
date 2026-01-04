@@ -416,7 +416,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 if (err.errors) body.errors = err.errors;
 
                 // Error Hook
-                await this.runHooks('onError', err, ctx);
+                await this.runHooks('onError', ctx, err);
 
                 return ctx.json(body, status);
             }

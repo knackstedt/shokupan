@@ -47,7 +47,7 @@ describe("Event Hooks", () => {
         expect(res.status).toBe(500);
 
         expect(app.applicationConfig.hooks!.onError).toHaveBeenCalled();
-        const [err, ctx] = (app.applicationConfig.hooks!.onError as any).mock.calls[0];
+        const [ctx, err] = (app.applicationConfig.hooks!.onError as any).mock.calls[0];
         expect(err).toBeInstanceOf(Error);
         expect(err.message).toBe("Boom");
     });
