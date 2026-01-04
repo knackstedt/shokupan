@@ -650,7 +650,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             } catch (err) {
                 debug?.trackStep(debugId, 'handler', performance.now() - start, 'error', err);
 
-                await this.runHooks("onError", err, ctx);
+                await this.runHooks("onError", ctx, err);
                 throw err;
             } finally {
                 if (debug && previousNode) debug.setNode(previousNode);
@@ -1280,6 +1280,35 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         const fns = this.hookCache.get(name);
         if (!fns) return;
 
-        await Promise.all(fns.map(fn => fn(...args)));
+        // Check if debug tracking is enabled (ctx is typically the first argument for most hooks)
+        const ctx = args?.[0] instanceof ShokupanContext ? args[0] : undefined;
+        const debug = ctx?._debug;
+
+        if (debug) {
+            // Track each hook individually with debug timing
+            await Promise.all(fns.map(async (fn, index) => {
+                const hookId = `hook_${name}_${fn.name || index}`;
+                const previousNode = debug.getCurrentNode();
+
+                debug.trackEdge(previousNode, hookId);
+                debug.setNode(hookId);
+
+                const start = performance.now();
+                try {
+                    await fn(...args);
+                    const duration = performance.now() - start;
+                    debug.trackStep(hookId, 'hook', duration, 'success');
+                } catch (error) {
+                    const duration = performance.now() - start;
+                    debug.trackStep(hookId, 'hook', duration, 'error', error);
+                    throw error;
+                } finally {
+                    if (previousNode) debug.setNode(previousNode);
+                }
+            }));
+        } else {
+            // Fast path: no debug tracking
+            await Promise.all(fns.map(fn => fn(...args)));
+        }
     }
 }

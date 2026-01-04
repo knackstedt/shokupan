@@ -31,7 +31,7 @@ export interface OpenAPIOptions {
 }
 
 export interface ShokupanHooks<T = any> {
-    onError?: (error: unknown, ctx: ShokupanContext<T>) => void | Promise<void>;
+    onError?: (ctx: ShokupanContext<T>, error: unknown) => void | Promise<void>;
     onRequestStart?: (ctx: ShokupanContext<T>) => void | Promise<void>;
     onRequestEnd?: (ctx: ShokupanContext<T>) => void | Promise<void>;
     onResponseStart?: (ctx: ShokupanContext<T>, response: Response) => void | Promise<void>;
