@@ -81,6 +81,12 @@ class AppController {
         await new Promise(r => setTimeout(r, 100));
         return "done";
     }
+
+    // Property access test
+    @Get('/property/path')
+    getPropertyPath(@Res() res: any) {
+        return res.send(res.req.path);
+    }
 }
 
 @Module({

@@ -165,6 +165,15 @@ const SCENARIOS: Record<string, ScenarioConfig> = {
         duration: 10,
         durationEstimate: 13.5,
         timeout: 30 // Allow enough time for responses
+    },
+
+    // Property access test - simple property read performance
+    "property-access": {
+        name: "Property Access (path)",
+        endpoints: ["/property/path"],
+        connections: 100,
+        duration: 10,
+        durationEstimate: 13
     }
 };
 

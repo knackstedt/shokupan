@@ -115,6 +115,13 @@ export async function startAdvanced(port: number, scenario: string) {
             });
             break;
 
+        // Property access test
+        case "property-access":
+            app.get("/property/path", async (request, reply) => {
+                return request.url;
+            });
+            break;
+
         default:
             throw new Error(`Unknown scenario: ${scenario}`);
     }
