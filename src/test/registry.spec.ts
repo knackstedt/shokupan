@@ -1,7 +1,7 @@
 
 import { describe, expect, test } from "bun:test";
-import { Shokupan } from "../shokupan";
 import { ShokupanRouter } from "../router";
+import { Shokupan } from "../shokupan";
 
 describe("Component Registry", () => {
     test("should collect registry metadata", () => {
@@ -23,7 +23,6 @@ describe("Component Registry", () => {
 
         const registry = app.getComponentRegistry();
 
-        console.log(JSON.stringify(registry, null, 2));
 
         expect(registry).toBeDefined();
 
@@ -31,7 +30,7 @@ describe("Component Registry", () => {
         expect(registry.metadata).toBeDefined();
         // File capture is environment dependent, so allow unknown or string
         if (registry.metadata?.file !== 'unknown') {
-            expect(registry.metadata?.file).toContain("registry.test.ts");
+            expect(registry.metadata?.file).toContain("registry.spec.ts");
         }
 
         // Routes
