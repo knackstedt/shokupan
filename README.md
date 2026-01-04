@@ -1058,8 +1058,8 @@ router.get('/wines/white', async (ctx) => {
 router.get('/wines/all', async (ctx) => {
     // Make parallel sub-requests
     const [redResponse, whiteResponse] = await Promise.all([
-        router.subRequest('/wines/red'),
-        router.subRequest('/wines/white')
+        router.internalRequest('/wines/red'),
+        router.internalRequest('/wines/white')
     ]);
     
     const red = await redResponse.json();
@@ -1560,7 +1560,7 @@ describe('My App', () => {
         app.get('/', () => ({ message: 'Hello' }));
         
         // Process a request without starting the server
-        const res = await app.processRequest({
+        const res = await app.testRequest({
             method: 'GET',
             path: '/'
         });
@@ -1704,8 +1704,8 @@ const app = new Shokupan(config?: ShokupanConfig);
 - `mount(path, controller)` - Mount controller or router
 - `static(path, options)` - Serve static files
 - `listen(port?)` - Start server
-- `processRequest(options)` - Process request (testing)
-- `subRequest(options)` - Make sub-request
+- `testRequest(options)` - Process request (for testing purposes)
+- `internalRequest(options)` - Make sub-request
 - `computeOpenAPISpec(base)` - Generate OpenAPI spec
 
 ### ShokupanRouter Class
@@ -1738,8 +1738,8 @@ const router = new ShokupanRouter(config?: ShokupanRouteConfig);
 - `head(path, spec?, ...handlers)` - Add HEAD route
 - `mount(path, controller)` - Mount controller or router
 - `static(path, options)` - Serve static files
-- `processRequest(options)` - Process request (testing)
-- `subRequest(options)` - Make sub-request
+- `testRequest(options)` - Process request (for testing purposes)
+- `internalRequest(options)` - Make sub-request
 
 
 ### ShokupanContext
