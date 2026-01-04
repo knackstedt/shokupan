@@ -112,14 +112,21 @@ function analyzeHandler(handler: ShokupanHandler): { inferredSpec?: any; } {
 
     if (handlerSource.includes('ctx.html(')) {
         responses['200'] = {
-            description: 'Successful response',
+            description: 'Successful HTML response',
+            content: { 'text/html': { schema: { type: 'string' } } }
+        };
+    }
+
+    if (handlerSource.includes('ctx.jsx(')) {
+        responses['200'] = {
+            description: 'Successful HTML response (Rendered JSX)',
             content: { 'text/html': { schema: { type: 'string' } } }
         };
     }
 
     if (handlerSource.includes('ctx.text(')) {
         responses['200'] = {
-            description: 'Successful response',
+            description: 'Successful text response',
             content: { 'text/plain': { schema: { type: 'string' } } }
         };
     }
