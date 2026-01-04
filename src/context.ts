@@ -26,7 +26,6 @@ export interface DebugCollector {
 }
 
 export class ShokupanContext<State extends Record<string, any> = Record<string, any>> {
-    private _url: URL | undefined;
     public params: Record<string, string> = {}; // Router assigns this, but default to empty object
     public state: State;
     public handlerStack: HandlerStackItem[] = [];
@@ -37,10 +36,18 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     public _rawBody?: string | ArrayBuffer | Uint8Array; // Raw body for compression optimization
 
     // Body caching to avoid double parsing
+    private _url?: URL;
     private _cachedBody?: any;
     private _bodyType?: 'json' | 'text' | 'formData' | 'arrayBuffer' | 'blob';
     private _bodyParsed: boolean = false;
     private _bodyParseError?: Error;
+
+    // Cached URL properties to avoid repeated parsing
+    private _cachedHostname?: string;
+    private _cachedProtocol?: string;
+    private _cachedHost?: string;
+    private _cachedOrigin?: string;
+    private _cachedQuery?: Record<string, any>;
 
     constructor(
         public readonly request: ShokupanRequest<any>,
@@ -124,6 +131,8 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
      * Request query params
      */
     get query() {
+        if (this._cachedQuery) return this._cachedQuery;
+
         const q: Record<string, any> = {};
         for (const [key, value] of this.url.searchParams) {
             if (q[key] === undefined) {
@@ -134,6 +143,7 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
                 q[key] = [q[key], value];
             }
         }
+        this._cachedQuery = q;
         return q;
     }
 
@@ -145,27 +155,35 @@ export class ShokupanContext<State extends Record<string, any> = Record<string, 
     /**
      * Request hostname (e.g. "localhost")
      */
-    get hostname() { return this.url.hostname; }
+    get hostname() {
+        return this._cachedHostname ??= this.url.hostname;
+    }
 
     /**
      * Request host (e.g. "localhost:3000")
      */
-    get host() { return this.url.host; }
+    get host() {
+        return this._cachedHost ??= this.url.host;
+    }
 
     /**
      * Request protocol (e.g. "http:", "https:")
      */
-    get protocol() { return this.url.protocol; }
+    get protocol() {
+        return this._cachedProtocol ??= this.url.protocol;
+    }
 
     /**
      * Whether request is secure (https)
      */
-    get secure() { return this.url.protocol === 'https:'; }
+    get secure() { return this.protocol === 'https:'; }
 
     /**
      * Request origin (e.g. "http://localhost:3000")
      */
-    get origin() { return this.url.origin; }
+    get origin() {
+        return this._cachedOrigin ??= this.url.origin;
+    }
 
     /**
      * Request headers
