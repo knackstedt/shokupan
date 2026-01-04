@@ -25,8 +25,7 @@ bun add ajv ajv-formats
 To set up the "Spec-First" validation flow where validation schemas are prepared before the server starts listening:
 
 ```typescript
-import { Shokupan } from 'shokupan';
-import { enableOpenApiValidation } from 'shokupan/plugins/openapi-validator';
+import { Shokupan, enableOpenApiValidation } from 'shokupan';
 
 const app = new Shokupan({
     // Enable OpenAPI generation (required)

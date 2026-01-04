@@ -75,6 +75,7 @@ That's it! Your server is running at `http://localhost:3000` 🎉
   - [Using Express Middleware](#using-express-middleware)
 - [Testing](#testing)
 - [Deployment](#deployment)
+- [Production Best Practices](https://knackstedt.github.io/shokupan/guides/production/) 📚
 - [CLI Tools](#cli-tools)
 - [API Reference](#api-reference)
 - [Roadmap](#-roadmap)
@@ -929,7 +930,7 @@ This works great when combined with the Debug Dashboard.
 A visual dashboard to inspect your application, view metrics, analyze the middleware graph, and replay failed requests.
 
 ```typescript
-import { DebugDashboard } from 'shokupan/plugins/debugview';
+import { DebugDashboard } from 'shokupan';
 
 // Mount the dashboard
 app.mount('/debug', new DebugDashboard({

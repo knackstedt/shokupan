@@ -1,0 +1,471 @@
+---
+title: Production Best Practices
+description: Comprehensive guide for running Shokupan applications in production
+---
+
+This guide covers best practices, performance optimization, and recommended configurations for running Shokupan in production environments.
+
+## Configuration
+
+### Basic Production Setup
+
+```typescript
+import { Shokupan, Compression, SecurityHeaders, RateLimit } from 'shokupan';
+
+const app = new Shokupan({
+    port: parseInt(process.env.PORT || '3000'),
+    development: false,
+    enableAsyncLocalStorage: false, // Disable unless needed
+    logger: {
+        verbose: false,
+        info: console.info,
+        debug: () => {}, // Disable debug logs in production
+        warning: console.warn,
+        error: console.error,
+        fatal: console.error
+    }
+});
+
+// Apply production middleware
+app.use(SecurityHeaders());
+app.use(RateLimit({ windowMs: 60000, max: 100 }));
+app.use(Compression({ threshold: 1024 }));
+
+await app.listen();
+```
+
+## Logging
+
+### Structured Logging
+
+Use a structured logging library for better observability:
+
+```typescript
+import { Shokupan } from 'shokupan';
+import pino from 'pino';
+
+const logger = pino({
+    level: process.env.LOG_LEVEL || 'info',
+    transport: {
+        target: 'pino-pretty',
+        options: {
+            colorize: false,
+            translateTime: 'SYS:standard',
+            ignore: 'pid,hostname'
+        }
+    }
+});
+
+const app = new Shokupan({
+    logger: {
+        verbose: false,
+        info: (msg) => logger.info(msg),
+        debug: (msg) => logger.debug(msg),
+        warning: (msg) => logger.warn(msg),
+        error: (msg) => logger.error(msg),
+        fatal: (msg) => logger.fatal(msg)
+    }
+});
+```
+
+### Request Logging Middleware
+
+```typescript
+app.use(async (ctx, next) => {
+    const start = Date.now();
+    const result = await next();
+    const duration = Date.now() - start;
+    
+    logger.info({
+        method: ctx.request.method,
+        path: ctx.path,
+        status: ctx.response?.status || 200,
+        duration,
+        ip: ctx.request.headers.get('x-forwarded-for') || 'unknown'
+    });
+    
+    return result;
+});
+```
+
+## Performance Optimization
+
+### Enable Compression
+
+> [!IMPORTANT]
+> Compression can dramatically improve performance for larger payloads by reducing network I/O overhead.
+
+```typescript
+import { Compression } from 'shokupan';
+
+app.use(Compression({ 
+    threshold: 1024  // Only compress responses larger than 1KB
+}));
+```
+
+#### Why zstd Compression Improves Performance
+
+When running on Bun, zstd compression provides **significant performance benefits**:
+
+**Benchmark Results** (Shokupan on Bun):
+- **Without compression**: 3,389 req/s
+- **With zstd compression**: 4,120 req/s (~21% improvement)
+
+**Compression Ratios**:
+- Small payloads (1.2 MB): **99.8% reduction** (540x compression ratio)
+- Large payloads (16 MB): **99.7% reduction** (387x compression ratio)
+
+**Why it's faster**:
+1. **Reduced network I/O**: Transmitting 2-40 KB instead of 1-16 MB
+2. **Less memory operations**: Fewer buffer allocations and memory copies through the network stack
+3. **Fast compression**: Bun's native `zstdCompress` is extremely efficient
+4. **Lower total CPU**: The CPU cost of compression is less than the saved I/O processing overhead
+
+> [!TIP]
+> For APIs serving JSON responses larger than 10 KB, enable compression for measurable performance gains.
+
+### Disable Async Local Storage
+
+Unless you specifically need AsyncLocalStorage (for request tracing, etc.), disable it:
+
+```typescript
+const app = new Shokupan({
+    enableAsyncLocalStorage: false  // ~5-10% performance improvement
+});
+```
+
+### Connection Pooling
+
+For database connections, use connection pooling:
+
+```typescript
+import { Pool } from 'pg';
+
+const pool = new Pool({
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
+});
+
+// Use the pool in your routes
+app.get('/users', async (ctx) => {
+    const { rows } = await pool.query('SELECT * FROM users');
+    return ctx.json(rows);
+});
+```
+
+## Security
+
+### Security Headers
+
+```typescript
+import { SecurityHeaders } from 'shokupan';
+
+app.use(SecurityHeaders({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: ["'self'"],
+            imgSrc: ["'self'", 'data:', 'https:'],
+        }
+    },
+    strictTransportSecurity: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true
+    }
+}));
+```
+
+### CORS Configuration
+
+```typescript
+import { CORS } from 'shokupan';
+
+app.use(CORS({
+    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['https://yourdomain.com'],
+    credentials: true,
+    maxAge: 86400
+}));
+```
+
+### Rate Limiting
+
+```typescript
+import { RateLimit } from 'shokupan';
+
+// Global rate limit
+app.use(RateLimit({
+    windowMs: 60000,      // 1 minute
+    max: 100,             // 100 requests per minute
+    standardHeaders: true,
+    legacyHeaders: false
+}));
+
+// Stricter rate limit for auth endpoints
+app.post('/auth/login', 
+    RateLimit({ windowMs: 60000, max: 5 }),
+    async (ctx) => {
+        // Login logic
+    }
+);
+```
+
+### Authentication
+
+```typescript
+import { Authentication } from 'shokupan';
+
+app.use(Authentication({
+    secret: process.env.JWT_SECRET!,
+    algorithms: ['HS256'],
+    exclude: ['/health', '/auth/login', '/auth/register']
+}));
+```
+
+## Error Handling
+
+### Global Error Handler
+
+```typescript
+app.use(async (ctx, next) => {
+    try {
+        return await next();
+    } catch (error: any) {
+        logger.error({
+            error: error.message,
+            stack: error.stack,
+            path: ctx.path,
+            method: ctx.request.method
+        });
+
+        // Don't expose internal errors in production
+        if (process.env.NODE_ENV === 'production') {
+            return ctx.json({
+                error: 'Internal Server Error',
+                message: 'An unexpected error occurred'
+            }, 500);
+        }
+
+        return ctx.json({
+            error: error.message,
+            stack: error.stack
+        }, 500);
+    }
+});
+```
+
+### Graceful Shutdown
+
+```typescript
+const server = await app.listen(3000);
+
+const shutdown = async () => {
+    logger.info('Shutting down gracefully...');
+    
+    // Close database connections
+    await pool.end();
+    
+    // Stop server
+    server.stop();
+    
+    process.exit(0);
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+```
+
+## Monitoring
+
+### Health Check Endpoint
+
+```typescript
+app.get('/health', (ctx) => {
+    return ctx.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
+});
+
+app.get('/health/ready', async (ctx) => {
+    try {
+        // Check database connection
+        await pool.query('SELECT 1');
+        
+        return ctx.json({ status: 'ready' });
+    } catch (error) {
+        return ctx.json({ status: 'not ready' }, 503);
+    }
+});
+```
+
+### Metrics
+
+```typescript
+let requestCount = 0;
+let errorCount = 0;
+
+app.use(async (ctx, next) => {
+    requestCount++;
+    
+    try {
+        return await next();
+    } catch (error) {
+        errorCount++;
+        throw error;
+    }
+});
+
+app.get('/metrics', (ctx) => {
+    return ctx.json({
+        requests: requestCount,
+        errors: errorCount,
+        errorRate: requestCount > 0 ? errorCount / requestCount : 0,
+        uptime: process.uptime(),
+        memory: process.memoryUsage()
+    });
+});
+```
+
+## Environment Variables
+
+### Required Variables
+
+```bash
+# Server
+PORT=3000
+NODE_ENV=production
+
+# Security
+JWT_SECRET=your-super-secret-jwt-key-change-this
+ALLOWED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
+
+# Database
+DATABASE_URL=postgresql://user:pass@host:5432/dbname
+
+# Logging
+LOG_LEVEL=info
+```
+
+### Loading Environment Variables
+
+```typescript
+// Bun automatically loads .env files
+// For Node.js, use dotenv:
+import 'dotenv/config';
+
+// Validate required variables
+const requiredEnvVars = ['JWT_SECRET', 'DATABASE_URL'];
+for (const envVar of requiredEnvVars) {
+    if (!process.env[envVar]) {
+        throw new Error(`Missing required environment variable: ${envVar}`);
+    }
+}
+```
+
+## Deployment Platforms
+
+### Docker
+
+See the [Deployment Guide](/guides/deployment/) for Docker configuration.
+
+### Bun with systemd
+
+Create `/etc/systemd/system/myapp.service`:
+
+```ini
+[Unit]
+Description=My Shokupan Application
+After=network.target
+
+[Service]
+Type=simple
+User=appuser
+WorkingDirectory=/opt/myapp
+Environment="NODE_ENV=production"
+EnvironmentFile=/opt/myapp/.env
+ExecStart=/usr/local/bin/bun run src/index.ts
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start:
+
+```bash
+sudo systemctl enable myapp
+sudo systemctl start myapp
+sudo systemctl status myapp
+```
+
+## Production Checklist
+
+- [ ] **Logging**: Configure structured logging with appropriate log levels
+- [ ] **Compression**: Enable compression middleware for responses > 1KB
+- [ ] **Security Headers**: Apply security headers plugin
+- [ ] **CORS**: Configure CORS with specific allowed origins
+- [ ] **Rate Limiting**: Implement rate limiting on all endpoints
+- [ ] **Authentication**: Secure private endpoints with JWT or sessions
+- [ ] **Error Handling**: Implement global error handler
+- [ ] **Graceful Shutdown**: Handle SIGTERM/SIGINT signals
+- [ ] **Health Checks**: Add `/health` and `/health/ready` endpoints
+- [ ] **Environment Variables**: Use env vars for all secrets and config
+- [ ] **HTTPS**: Enable HTTPS (via reverse proxy like nginx/Caddy)
+- [ ] **Database**: Use connection pooling
+- [ ] **Monitoring**: Set up metrics and alerting
+- [ ] **AsyncLocalStorage**: Disable if not needed for performance
+- [ ] **Debug Logs**: Disable debug logging in production
+
+## Reverse Proxy (nginx)
+
+Run Shokupan behind nginx for HTTPS and load balancing:
+
+```nginx
+upstream shokupan {
+    server localhost:3000;
+    server localhost:3001;
+    server localhost:3002;
+}
+
+server {
+    listen 80;
+    server_name yourdomain.com;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name yourdomain.com;
+
+    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+
+    location / {
+        proxy_pass http://shokupan;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+## Performance Tips
+
+1. **Use Bun Runtime**: Bun provides the best performance for Shokupan
+2. **Enable zstd Compression**: 20%+ performance improvement for JSON APIs
+3. **Minimize Middleware**: Only use middleware you actually need
+4. **Connection Pooling**: Pool database connections (max 20-50 connections)
+5. **Caching**: Use Redis or in-memory caching for frequently accessed data
+6. **Static Assets**: Serve static files through CDN or nginx
+7. **Database Indexes**: Ensure proper database indexing
+8. **Monitor Memory**: Watch for memory leaks with process.memoryUsage()

@@ -96,6 +96,7 @@ export default defineConfig({
                         { label: 'Advanced Features', link: '/guides/advanced/' },
                         { label: 'CLI Tools', link: '/guides/cli/' },
                         { label: 'Deployment', link: '/guides/deployment/' },
+                        { label: 'Production Best Practices', link: '/guides/production/' },
                         { label: 'Testing', link: '/guides/testing/' },
                     ],
                 },
