@@ -108,6 +108,36 @@
                     }
                 }
             }
+        },
+        {
+            "label": "▶ Test",
+            "type": "shell",
+            "command": "bun",
+            "args": [
+                "run",
+                "test"
+            ],
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "bun",
+                "pattern": [
+                    {
+                        "regexp": "^\\s*at\\s+.*\\((.+):(\\d+):(\\d+)\\)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3
+                    }
+                ],
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": {
+                        "regexp": "bun test v\\d+\\.\\d+\\.\\d+ (\\w+)"
+                    },
+                    "endsPattern": {
+                        "regexp": "Ran \\d+ tests across \\d+ files."
+                    }
+                }
+            }
         }
     ]
 }
