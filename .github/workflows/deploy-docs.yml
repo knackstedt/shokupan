@@ -1,4 +1,4 @@
-name: Deploy Documentation to GitHub Pages
+name: Documentation
 
 on:
   # Runs on pushes to main branch
