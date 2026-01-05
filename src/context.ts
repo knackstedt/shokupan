@@ -34,8 +34,11 @@ export interface DebugCollector {
     getCurrentNode(): string | undefined;
 }
 
-export class ShokupanContext<State extends Record<string, any> = Record<string, any>> {
-    public params: Record<string, string> = {}; // Router assigns this, but default to empty object
+export class ShokupanContext<
+    State extends Record<string, any> = Record<string, any>,
+    Params extends Record<string, string> = Record<string, string>
+> {
+    public params: Params = {} as Params; // Router assigns this, but default to empty object
     public state: State;
     public handlerStack: HandlerStackItem[] = [];
 

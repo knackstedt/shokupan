@@ -8,7 +8,7 @@ import { RouterTrie } from './router/trie';
 import type { Shokupan } from './shokupan';
 import { $appRoot, $childControllers, $childRouters, $controllerPath, $dispatch, $isApplication, $isMounted, $isRouter, $middleware, $mountPath, $parent, $routeArgs, $routeMethods, $routes, $routeSpec } from './symbol';
 
-import { type GuardAPISpec, HTTPMethods, type JSXRenderer, type Method, type MethodAPISpec, type Middleware, type OpenAPIOptions, type ProcessResult, type RequestOptions, type RouteMetadata, RouteParamType, type ShokupanController, type ShokupanHandler, type ShokupanHooks, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions } from './types';
+import { type GuardAPISpec, HTTPMethods, type JSXRenderer, type Method, type MethodAPISpec, type Middleware, type OpenAPIOptions, type ProcessResult, type RequestOptions, type RouteMetadata, type RouteParams, RouteParamType, type ShokupanController, type ShokupanHandler, type ShokupanHooks, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions } from './types';
 import { asyncContext } from './util/async-hooks';
 import { datastore } from './util/datastore';
 import { traceHandler } from './util/instrumentation';
@@ -952,7 +952,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * @param path - URL path    
      * @param handlers - Route handler functions 
      */
-    public get(path: string, ...handlers: ShokupanHandler<T>[]);
+    public get<Path extends string>(path: Path, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
     /**
      * Adds a GET route to the router.
      * 
@@ -960,7 +960,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public get(path: string, spec: MethodAPISpec, ...handlers: ShokupanHandler<T>[]);
+    public get<Path extends string>(path: Path, spec: MethodAPISpec, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
     public get(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
         this.attachVerb("GET", path, ...args);
         return this;
@@ -972,7 +972,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * @param path - URL path    
      * @param handlers - Route handler functions 
      */
-    public post(path: string, ...handlers: ShokupanHandler<T>[]);
+    public post<Path extends string>(path: Path, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
     /**
      * Adds a POST route to the router.
      * 
@@ -980,7 +980,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public post(path: string, spec: MethodAPISpec, ...handlers: ShokupanHandler<T>[]);
+    public post<Path extends string>(path: Path, spec: MethodAPISpec, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
     public post(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
         this.attachVerb("POST", path, ...args);
         return this;
@@ -992,7 +992,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * @param path - URL path    
      * @param handlers - Route handler functions 
      */
-    public put(path: string, ...handlers: ShokupanHandler<T>[]);
+    public put<Path extends string>(path: Path, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
     /**
      * Adds a PUT route to the router.
      * 
@@ -1000,7 +1000,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public put(path: string, spec: MethodAPISpec, ...handlers: ShokupanHandler<T>[]);
+    public put<Path extends string>(path: Path, spec: MethodAPISpec, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
     public put(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
         this.attachVerb("PUT", path, ...args);
         return this;
@@ -1012,7 +1012,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * @param path - URL path    
      * @param handlers - Route handler functions 
      */
-    public delete(path: string, ...handlers: ShokupanHandler<T>[]);
+    public delete<Path extends string>(path: Path, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
     /**
      * Adds a DELETE route to the router.
      * 
@@ -1020,7 +1020,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public delete(path: string, spec: MethodAPISpec, ...handlers: ShokupanHandler<T>[]);
+    public delete<Path extends string>(path: Path, spec: MethodAPISpec, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
     public delete(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
         this.attachVerb("DELETE", path, ...args);
         return this;
@@ -1032,7 +1032,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * @param path - URL path    
      * @param handlers - Route handler functions 
      */
-    public patch(path: string, ...handlers: ShokupanHandler<T>[]);
+    public patch<Path extends string>(path: Path, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
     /**
      * Adds a PATCH route to the router.
      * 
@@ -1040,7 +1040,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public patch(path: string, spec: MethodAPISpec, ...handlers: ShokupanHandler<T>[]);
+    public patch<Path extends string>(path: Path, spec: MethodAPISpec, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
     public patch(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
         this.attachVerb("PATCH", path, ...args);
         return this;
@@ -1052,7 +1052,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * @param path - URL path    
      * @param handlers - Route handler functions 
      */
-    public options(path: string, ...handlers: ShokupanHandler<T>[]);
+    public options<Path extends string>(path: Path, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
     /**
      * Adds a OPTIONS route to the router.
      * 
@@ -1060,7 +1060,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public options(path: string, spec: MethodAPISpec, ...handlers: ShokupanHandler<T>[]);
+    public options<Path extends string>(path: Path, spec: MethodAPISpec, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
     public options(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
         this.attachVerb("OPTIONS", path, ...args);
         return this;
@@ -1072,7 +1072,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * @param path - URL path    
      * @param handlers - Route handler functions 
      */
-    public head(path: string, ...handlers: ShokupanHandler<T>[]);
+    public head<Path extends string>(path: Path, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
     /**
      * Adds a HEAD route to the router.
      * 
@@ -1080,7 +1080,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public head(path: string, spec: MethodAPISpec, ...handlers: ShokupanHandler<T>[]);
+    public head<Path extends string>(path: Path, spec: MethodAPISpec, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
     public head(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
         this.attachVerb("HEAD", path, ...args);
         return this;

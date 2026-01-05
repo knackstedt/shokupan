@@ -8,6 +8,24 @@ export type DeepPartial<T> = T extends Function ? T : T extends object ? {
     [P in keyof T]?: DeepPartial<T[P]>;
 } : T;
 
+// Utility type to extract parameter names from a route path
+// Example: "/users/:id/posts/:postId" => { id: string, postId: string }
+type ParsePathParams<Path extends string> =
+    Path extends `${infer _Start}:${infer Param}/${infer Rest}`
+    ? { [K in Param | keyof ParsePathParams<`/${Rest}`>]: string }
+    : Path extends `${infer _Start}:${infer Param}`
+    ? { [K in Param]: string }
+    : {};
+
+// Helper type for route parameters
+// Falls back to Record<string, string> if no params are detected
+export type RouteParams<Path extends string> =
+    string extends Path
+    ? Record<string, string>
+    : ParsePathParams<Path> extends Record<string, never>
+    ? Record<string, string>
+    : ParsePathParams<Path>;
+
 export interface RouteMetadata {
     file: string;
     line: number;
@@ -55,7 +73,10 @@ export interface CookieOptions {
 }
 
 
-export type ShokupanHandler<T extends Record<string, any> = Record<string, any>> = (ctx: ShokupanContext<T>, next?: NextFn) => Promise<any> | any;
+export type ShokupanHandler<
+    State extends Record<string, any> = Record<string, any>,
+    Params extends Record<string, string> = Record<string, string>
+> = (ctx: ShokupanContext<State, Params>, next?: NextFn) => Promise<any> | any;
 export const HTTPMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "ALL"];
 export type Method = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "OPTIONS" | "HEAD" | "ALL";
 
