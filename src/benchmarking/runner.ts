@@ -416,7 +416,30 @@ function generateReport(history: HistoryEntry[], skipAutoOpen = false) {
             --success-color: #51cf66;
             --accent-color: #cc5de8;
         }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+            background-color: #22355a;
+        }
 
+        ::-webkit-scrollbar-thumb {
+            border-radius: 10px;
+            background-color: #2a406a;
+            box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+        }
+
+        *:hover::-webkit-scrollbar-thumb {
+            background-color: #22468a;
+        }
+
+        ::-webkit-scrollbar-track {
+            border-radius: 10px;
+            background-color: #0b0f17;
+        }
+
+        ::-webkit-scrollbar-corner {
+            box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+        }
         body {
             background-color: var(--bg-color);
             color: var(--text-color);
