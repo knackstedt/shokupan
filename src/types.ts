@@ -8,6 +8,29 @@ export type DeepPartial<T> = T extends Function ? T : T extends object ? {
     [P in keyof T]?: DeepPartial<T[P]>;
 } : T;
 
+/**
+ * Helper type for applications that don't use ctx.state.
+ * Prevents accidental property access on state.
+ * 
+ * @example
+ * ```typescript
+ * const app = new Shokupan<EmptyState>();
+ * ```
+ */
+export type EmptyState = Record<string, never>;
+
+/**
+ * Default state type that allows any properties.
+ * This is the default if no state type is specified.
+ * 
+ * @example
+ * ```typescript
+ * const app = new Shokupan<DefaultState>();
+ * // Equivalent to: new Shokupan();
+ * ```
+ */
+export type DefaultState = Record<string, any>;
+
 // Utility type to extract parameter names from a route path
 // Example: "/users/:id/posts/:postId" => { id: string, postId: string }
 type ParsePathParams<Path extends string> =

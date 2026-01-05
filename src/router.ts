@@ -23,6 +23,65 @@ export const RouterRegistry = new Map<string, ShokupanRouter<any>>();
 
 export const ShokupanApplicationTree = {};
 
+/**
+ * Shokupan Router
+ * 
+ * A router for organizing and grouping routes with shared middleware and configuration.
+ * 
+ * @template State - The shape of `ctx.state` for all routes in this router.
+ * Provides type safety for state management within the router's middleware and handlers.
+ * 
+ * @example Basic Router
+ * ```typescript
+ * const router = new ShokupanRouter();
+ * router.get('/users', (ctx) => ctx.json({ users: [] }));
+ * 
+ * app.mount('/api', router);
+ * // Routes: GET /api/users
+ * ```
+ * 
+ * @example Typed State Router
+ * ```typescript
+ * interface AuthState {
+ *   userId: string;
+ *   isAuthenticated: boolean;
+ * }
+ * 
+ * class AuthRouter extends ShokupanRouter<AuthState> {
+ *   constructor() {
+ *     super();
+ *     
+ *     // Router middleware has typed state
+ *     this.use((ctx, next) => {
+ *       ctx.state.userId = 'user-123';
+ *       ctx.state.isAuthenticated = true;
+ *       return next();
+ *     });
+ *     
+ *     this.get('/me', (ctx) => {
+ *       // State is fully typed
+ *       return ctx.json({ userId: ctx.state.userId });
+ *     });
+ *   }
+ * }
+ * 
+ * app.mount('/auth', new AuthRouter());
+ * ```
+ * 
+ * @example Router with Middleware
+ * ```typescript
+ * const apiRouter = new ShokupanRouter();
+ * 
+ * // Router-level middleware
+ * apiRouter.use(async (ctx, next) => {
+ *   console.log(`API request: ${ctx.method} ${ctx.path}`);
+ *   return next();
+ * });
+ * 
+ * apiRouter.get('/status', (ctx) => ctx.json({ status: 'ok' }));
+ * app.mount('/api', apiRouter);
+ * ```
+ */
 export class ShokupanRouter<T extends Record<string, any> = Record<string, any>> {
     // Internal marker to identify Router vs. Application
     private [$isApplication]: boolean = false;

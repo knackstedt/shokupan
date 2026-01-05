@@ -34,6 +34,67 @@ export interface DebugCollector {
     getCurrentNode(): string | undefined;
 }
 
+/**
+ * Shokupan Request Context
+ * 
+ * The context object passed to all middleware and route handlers.
+ * Provides access to request data, response helpers, and typed state management.
+ * 
+ * @template State - The shape of `ctx.state` for type-safe state access across middleware.
+ * @template Params - The shape of `ctx.params` based on the route path pattern.
+ * 
+ * @example Basic Usage
+ * ```typescript
+ * app.get('/hello', (ctx) => {
+ *   return ctx.json({ message: 'Hello' });
+ * });
+ * ```
+ * 
+ * @example Typed State
+ * ```typescript
+ * interface AppState {
+ *   userId: string;
+ *   requestId: string;
+ * }
+ * 
+ * const app = new Shokupan<AppState>();
+ * 
+ * app.use((ctx, next) => {
+ *   ctx.state.requestId = crypto.randomUUID(); // ✓ Type-safe
+ *   return next();
+ * });
+ * ```
+ * 
+ * @example Typed Path Parameters
+ * ```typescript
+ * app.get('/users/:userId/posts/:postId', (ctx) => {
+ *   // ctx.params is automatically typed as { userId: string; postId: string }
+ *   const { userId, postId } = ctx.params;
+ *   return ctx.json({ userId, postId });
+ * });
+ * ```
+ * 
+ * @example Full Type Safety (State + Params)
+ * ```typescript
+ * interface RequestState {
+ *   userId: string;
+ *   permissions: string[];
+ * }
+ * 
+ * const app = new Shokupan<RequestState>();
+ * 
+ * app.get('/admin/users/:userId', (ctx) => {
+ *   // Both typed!
+ *   const { userId } = ctx.params;        // ✓ From path
+ *   const { permissions } = ctx.state;     // ✓ From state
+ *   
+ *   if (!permissions.includes('admin')) {
+ *     return ctx.json({ error: 'Forbidden' }, 403);
+ *   }
+ *   return ctx.json({ userId });
+ * });
+ * ```
+ */
 export class ShokupanContext<
     State extends Record<string, any> = Record<string, any>,
     Params extends Record<string, string> = Record<string, string>

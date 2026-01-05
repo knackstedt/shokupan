@@ -26,6 +26,70 @@ const defaults: ShokupanConfig = {
 const tracer = trace.getTracer("shokupan.application");
 
 
+/**
+ * Shokupan Application
+ * 
+ * The main application class for creating a Shokupan web server.
+ * 
+ * @template State - The shape of `ctx.state` for all routes in the application.
+ * Use this to provide type safety for state management across middleware and handlers.
+ * 
+ * @example Basic Usage
+ * ```typescript
+ * const app = new Shokupan();
+ * app.get('/hello', (ctx) => ctx.json({ message: 'Hello' }));
+ * await app.listen(3000);
+ * ```
+ * 
+ * @example Typed State
+ * ```typescript
+ * interface AppState {
+ *   userId: string;
+ *   tenant: string;
+ *   requestId: string;
+ * }
+ * 
+ * const app = new Shokupan<AppState>();
+ * 
+ * // Middleware has typed state access
+ * app.use((ctx, next) => {
+ *   ctx.state.userId = 'user-123';    // ✓ Type-safe
+ *   ctx.state.requestId = crypto.randomUUID();
+ *   return next();
+ * });
+ * 
+ * // Handlers have typed state access
+ * app.get('/profile', (ctx) => {
+ *   const { userId, tenant } = ctx.state; // ✓ TypeScript knows these exist
+ *   return ctx.json({ userId, tenant });
+ * });
+ * ```
+ * 
+ * @example Empty State (No State Management)
+ * ```typescript
+ * import { EmptyState } from 'shokupan';
+ * 
+ * const app = new Shokupan<EmptyState>();
+ * // ctx.state will be an empty object with no properties
+ * ```
+ * 
+ * @example Combining Path Params and State
+ * ```typescript
+ * interface RequestState {
+ *   userId: string;
+ *   permissions: string[];
+ * }
+ * 
+ * const app = new Shokupan<RequestState>();
+ * 
+ * app.get('/users/:userId/posts/:postId', (ctx) => {
+ *   // Both params and state are fully typed!
+ *   const { userId, postId } = ctx.params;  // ✓ Path params typed
+ *   const { permissions } = ctx.state;       // ✓ State typed
+ *   return ctx.json({ userId, postId, permissions });
+ * });
+ * ```
+ */
 export class Shokupan<T = any> extends ShokupanRouter<T> {
     readonly applicationConfig: ShokupanConfig = {};
     public openApiSpec?: any;
