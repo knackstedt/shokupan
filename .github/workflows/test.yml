@@ -1,35 +1,29 @@
-name: Release
+name: Test
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - '*'
 
 jobs:
-  publish-npm:
+  test:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
       
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
-          
       - name: Install Dependencies
         run: bun install
       
       - name: Install Peer Dependencies
         run: |
-          bun install ajv@^8.0.0 \
+          bun add ajv@^8.0.0 \
             ajv-formats@^3.0.0 \
-            arctic@^3.0.0 \
+            arctic@^3 \
             class-transformer@^0.5.0 \
             class-validator@^0.14.0 \
             eta@^4.0.0 \
@@ -44,20 +38,5 @@ jobs:
       - name: Build
         run: bun run build
         
-      - name: Publish to NPM
-        run: npm publish --provenance
-
-  create-release:
-    needs: publish-npm
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          draft: false
-          prerelease: false
+      - name: Run Tests
+        run: bun test

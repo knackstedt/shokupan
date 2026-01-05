@@ -30,8 +30,8 @@ jobs:
       - name: Run Basic benchmark
         run: bun run bench --all
 
-    #   - name: Run Advanced benchmark
-    #     run: bun run bench:advanced --all
+      - name: Run Advanced benchmark
+        run: bun run bench:advanced --all
 
       - run: git commit -am "Update benchmark results"
       - run: git push origin ${{ github.ref }}
