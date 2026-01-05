@@ -7,7 +7,6 @@ jobs:
     timeout-minutes: 360
     permissions: 
       contents: write
-      pages: write
     
     steps:
       - uses: actions/checkout@v6

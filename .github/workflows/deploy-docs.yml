@@ -13,8 +13,7 @@ on:
 
 # Sets permissions for GitHub Pages deployment
 permissions:
-  contents: read
-  id-token: write
+  contents: write
 
 jobs:
   build:
