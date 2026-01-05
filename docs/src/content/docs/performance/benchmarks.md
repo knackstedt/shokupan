@@ -1,6 +1,11 @@
 ---
 title: Benchmarks
 description: Performance benchmarks comparing Shokupan to other frameworks
+# template: splash
+tableOfContents: false
+head:
+  - tag: style
+    content: ":root { --sl-content-width: 100% !important; }"
 ---
 
 Shokupan is built with performance as a top priority. This page contains comprehensive benchmark results comparing Shokupan against other popular Node.js web frameworks across both **Bun** and **Node.js** runtimes.
@@ -46,7 +51,7 @@ The basic benchmark suite tests fundamental request handling capabilities across
 
 ### Interactive Results
 
-<iframe src="/report.html" style="width: 100%; height: 600px; border: 1px solid #ddd; border-radius: 4px;"></iframe>
+<iframe src="/report.html" style="width: 100%; height: calc(100vh - 64px); border: 1px solid #ddd; border-radius: 4px;"></iframe>
 
 ## Advanced Benchmark Suite
 
@@ -102,7 +107,7 @@ Measures overhead of production-ready configurations:
 
 #### 7. **Long-Pending Parallelization**
 Tests concurrent connection handling:
-- 1000+ concurrent requests with delays
+- 10000+ concurrent requests with delays
 - Tests connection handling capacity
 - Measures timeout behavior
 - Identifies framework parallelization capabilities
@@ -113,13 +118,13 @@ Not all frameworks support all scenarios. Common limitations include:
 
 - **Compression**: Some frameworks lack native brotli/zstd support
 - **Math Middleware**: NestJS has limited dynamic middleware support
-- **Long-Pending**: Some frameworks may not handle 1000+ connections efficiently
+- **Long-Pending**: Some frameworks may not handle 10000+ connections efficiently
 
 Failed scenarios are marked as "FAILED" in the report with error details.
 
 ### Interactive Results
 
-<iframe src="/advanced-report.html" style="width: 100%; height: 600px; border: 1px solid #ddd; border-radius: 4px;"></iframe>
+<iframe src="/advanced-report.html" style="width: 100%; height: calc(100vh - 64px); border: 1px solid #ddd; border-radius: 4px;"></iframe>
 
 ## Running Benchmarks Yourself
 
@@ -180,4 +185,4 @@ See our [Production Best Practices](/guides/production/) guide for more detailed
 
 ## Contributing Benchmarks
 
-To add new frameworks or scenarios to the benchmark suite, see the [benchmark README](https://github.com/knackstedt/shokupan/tree/main/src/benchmarking) for detailed instructions.
+To add new frameworks or scenarios to the benchmark suite, see the [benchmark README](https://github.com/knackstedt/shokupan/tree/HEAD/src/benchmarking) for detailed instructions.
