@@ -64,6 +64,12 @@ export default defineConfig({
                     ],
                 },
                 {
+                    label: 'Performance',
+                    items: [
+                        { label: 'Benchmarks', link: '/performance/benchmarks/' },
+                    ],
+                },
+                {
                     label: 'Plugins',
                     items: [
                         { label: 'Authentication', link: '/plugins/authentication/' },
