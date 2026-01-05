@@ -7,6 +7,8 @@ Shokupan is designed to make building APIs delightful again. With zero-config de
 
 ### Note: Shokupan is still in alpha and is not guaranteed to be stable. Please use with caution. We will be adding more features and APIs in the future. Please file an issue if you find any bugs or have suggestions for improvement.
 
+📚 **[Full documentation available at https://shokupan.dev](https://shokupan.dev)**
+
 ## ✨ Features
 
 - 🎯 **TypeScript First** - End-to-end type safety with decorators and generics. No manual types needed.
