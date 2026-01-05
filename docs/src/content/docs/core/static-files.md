@@ -239,6 +239,6 @@ if (isDev) {
 
 ## Next Steps
 
-- [Routing](/shokupan/core/routing/) - Learn about dynamic routing
-- [Middleware](/shokupan/core/middleware/) - Add caching and compression
-- [Compression Plugin](/shokupan/plugins/compression/) - Compress static assets
+- [Routing](/core/routing/) - Learn about dynamic routing
+- [Middleware](/core/middleware/) - Add caching and compression
+- [Compression Plugin](/plugins/compression/) - Compress static assets

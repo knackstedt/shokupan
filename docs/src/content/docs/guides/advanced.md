@@ -38,4 +38,4 @@ const app = new Shokupan({
 
 When enabled, the `ctx.handlerStack` property will contain an array of all handlers and middleware that have executed for the current request.
 
-This is also required for the [Debug Dashboard](/shokupan/plugins/debug-dashboard) to visualize the request flow.
+This is also required for the [Debug Dashboard](/plugins/debug-dashboard) to visualize the request flow.

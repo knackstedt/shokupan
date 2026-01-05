@@ -30,4 +30,4 @@ app.use(async (ctx, next) => {
 
 ## Next Steps
 
-- [Core Concepts](/shokupan/core/routing/) - Learn Shokupan patterns
+- [Core Concepts](/core/routing/) - Learn Shokupan patterns

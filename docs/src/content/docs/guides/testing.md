@@ -920,6 +920,6 @@ npx vitest --coverage
 
 ## Next Steps
 
-- [Deployment](/shokupan/guides/deployment/) - Deploy your app
-- [Production Setup](/shokupan/guides/production/) - Production best practices
-- [CLI Tools](/shokupan/guides/cli/) - Code generation
+- [Deployment](/guides/deployment/) - Deploy your app
+- [Production Setup](/guides/production/) - Production best practices
+- [CLI Tools](/guides/cli/) - Code generation

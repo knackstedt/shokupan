@@ -328,11 +328,11 @@ app.use(RateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 app.use(SecurityHeaders());
 ```
 
-See the [Plugins](/shokupan/plugins/cors/) section for more details.
+See the [Plugins](/plugins/cors/) section for more details.
 
 ## Next Steps
 
-- [Context API](/shokupan/core/context/) - Full context reference
-- [CORS Plugin](/shokupan/plugins/cors/) - Configure CORS
-- [Rate Limiting](/shokupan/plugins/rate-limiting/) - Prevent abuse
-- [Authentication](/shokupan/plugins/authentication/) - OAuth2 support
+- [Context API](/core/context/) - Full context reference
+- [CORS Plugin](/plugins/cors/) - Configure CORS
+- [Rate Limiting](/plugins/rate-limiting/) - Prevent abuse
+- [Authentication](/plugins/authentication/) - OAuth2 support

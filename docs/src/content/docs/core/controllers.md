@@ -329,6 +329,6 @@ For controllers to work, enable decorators in `tsconfig.json`:
 
 ## Next Steps
 
-- [Middleware](/shokupan/core/middleware/) - Create custom middleware
-- [Dependency Injection](/shokupan/advanced/dependency-injection/) - Advanced DI patterns
-- [Validation](/shokupan/plugins/validation/) - Validate controller inputs
+- [Middleware](/core/middleware/) - Create custom middleware
+- [Dependency Injection](/advanced/dependency-injection/) - Advanced DI patterns
+- [Validation](/plugins/validation/) - Validate controller inputs

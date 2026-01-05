@@ -8,14 +8,14 @@ import starlightTypeDoc, { typeDocSidebarGroup } from 'starlight-typedoc';
 
 // https://astro.build/config
 export default defineConfig({
-    site: 'https://knackstedt.github.io',
-    base: '/shokupan',
+    site: 'https://shokupan.dev',
+    base: '/',
     integrations: [
         sitemap({
             customPages: [
-                'https://knackstedt.github.io/shokupan/llms.txt',
-                'https://knackstedt.github.io/shokupan/llms-full.txt',
-                'https://knackstedt.github.io/shokupan/llms-small.txt',
+                'https://shokupan.dev/llms.txt',
+                'https://shokupan.dev/llms-full.txt',
+                'https://shokupan.dev/llms-small.txt',
             ],
             changefreq: 'weekly',
             priority: 0.7,

@@ -62,5 +62,5 @@ Higher compression levels provide better compression but use more CPU. Level 6 i
 
 ## Next Steps
 
-- [CORS](/shokupan/plugins/cors/) - Configure CORS
-- [Security Headers](/shokupan/plugins/security-headers/) - Add security headers
+- [CORS](/plugins/cors/) - Configure CORS
+- [Security Headers](/plugins/security-headers/) - Add security headers

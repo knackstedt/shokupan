@@ -46,7 +46,7 @@ The basic benchmark suite tests fundamental request handling capabilities across
 
 ### Interactive Results
 
-<iframe src="/shokupan/report.html" style="width: 100%; height: 600px; border: 1px solid #ddd; border-radius: 4px;"></iframe>
+<iframe src="/report.html" style="width: 100%; height: 600px; border: 1px solid #ddd; border-radius: 4px;"></iframe>
 
 ## Advanced Benchmark Suite
 
@@ -119,7 +119,7 @@ Failed scenarios are marked as "FAILED" in the report with error details.
 
 ### Interactive Results
 
-<iframe src="/shokupan/advanced-report.html" style="width: 100%; height: 600px; border: 1px solid #ddd; border-radius: 4px;"></iframe>
+<iframe src="/advanced-report.html" style="width: 100%; height: 600px; border: 1px solid #ddd; border-radius: 4px;"></iframe>
 
 ## Running Benchmarks Yourself
 
@@ -176,7 +176,7 @@ For optimal Shokupan performance in production:
 4. **Minimize Middleware** - Each middleware adds overhead; use only what you need
 5. **Enable Caching** - Cache responses where appropriate using `ShokupanContext.set()` headers
 
-See our [Production Best Practices](/shokupan/guides/production/) guide for more detailed recommendations.
+See our [Production Best Practices](/guides/production/) guide for more detailed recommendations.
 
 ## Contributing Benchmarks
 

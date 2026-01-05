@@ -144,6 +144,6 @@ app.use(SecurityHeaders({
 
 ## Next Steps
 
-- [CORS](/shokupan/plugins/cors/) - Configure CORS
-- [Rate Limiting](/shokupan/plugins/rate-limiting/) - Prevent abuse
-- [Authentication](/shokupan/plugins/authentication/) - Secure your API
+- [CORS](/plugins/cors/) - Configure CORS
+- [Rate Limiting](/plugins/rate-limiting/) - Prevent abuse
+- [Authentication](/plugins/authentication/) - Secure your API

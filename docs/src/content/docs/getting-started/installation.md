@@ -152,7 +152,7 @@ The important settings for Shokupan are:
 
 Now that you have Shokupan installed, learn about:
 
-- [Quick Start Guide](/shokupan/getting-started/quick-start/) - Build your first real application
-- [Routing](/shokupan/core/routing/) - Learn about routing and path parameters
-- [Controllers](/shokupan/core/controllers/) - Use decorators for structured APIs
-- [Middleware](/shokupan/core/middleware/) - Add cross-cutting concerns
+- [Quick Start Guide](/getting-started/quick-start/) - Build your first real application
+- [Routing](/core/routing/) - Learn about routing and path parameters
+- [Controllers](/core/controllers/) - Use decorators for structured APIs
+- [Middleware](/core/middleware/) - Add cross-cutting concerns

@@ -339,6 +339,6 @@ app.get('/profile', (ctx) => {
 
 ## Next Steps
 
-- [Authentication](/shokupan/plugins/authentication/) - OAuth2 support
-- [Rate Limiting](/shokupan/plugins/rate-limiting/) - Protect login endpoints
-- [Security Headers](/shokupan/plugins/security-headers/) - Add security headers
+- [Authentication](/plugins/authentication/) - OAuth2 support
+- [Rate Limiting](/plugins/rate-limiting/) - Protect login endpoints
+- [Security Headers](/plugins/security-headers/) - Add security headers

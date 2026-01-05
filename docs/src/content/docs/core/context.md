@@ -399,6 +399,6 @@ app.get('/typed', (ctx: ShokupanContext<MyContext>) => {
 
 ## Next Steps
 
-- [Routing](/shokupan/core/routing/) - Learn about routing patterns
-- [Middleware](/shokupan/core/middleware/) - Create custom middleware
+- [Routing](/core/routing/) - Learn about routing patterns
+- [Middleware](/core/middleware/) - Create custom middleware
 - [API Reference](../api/interfaces/SessionContext.md) - Complete Context API reference

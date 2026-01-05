@@ -120,6 +120,6 @@ app.use('/auth/register', RateLimit({
 
 ## Next Steps
 
-- [Security Headers](/shokupan/plugins/security-headers/) - Add security headers
-- [Authentication](/shokupan/plugins/authentication/) - Secure your API
-- [CORS](/shokupan/plugins/cors/) - Configure CORS
+- [Security Headers](/plugins/security-headers/) - Add security headers
+- [Authentication](/plugins/authentication/) - Secure your API
+- [CORS](/plugins/cors/) - Configure CORS

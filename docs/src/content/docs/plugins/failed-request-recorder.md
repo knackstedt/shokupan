@@ -15,7 +15,7 @@ app.use(FailedRequestRecorder());
 
 ## Integration with Debug Dashboard
 
-The captured failures are viewable in the [Debug Dashboard](/shokupan/plugins/debug-dashboard). You can inspect the error, stack trace, headers, and body, and even replay the request from the dashboard.
+The captured failures are viewable in the [Debug Dashboard](/plugins/debug-dashboard). You can inspect the error, stack trace, headers, and body, and even replay the request from the dashboard.
 
 ## Configuration
 

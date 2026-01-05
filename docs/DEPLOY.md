@@ -32,7 +32,7 @@ https://<your-username>.github.io/<repository-name>/
 
 For this project:
 ```
-https://knackstedt.github.io/shokupan/
+https://shokupan.dev/
 ```
 
 ## Updating Documentation

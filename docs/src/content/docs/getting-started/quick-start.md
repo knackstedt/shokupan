@@ -16,7 +16,7 @@ A simple TODO API with the following features:
 
 ## Basic Setup
 
-First, make sure you have [Shokupan installed](/shokupan/getting-started/installation/).
+First, make sure you have [Shokupan installed](/getting-started/installation/).
 
 Create a new file `app.ts`:
 
@@ -293,8 +293,8 @@ curl -X DELETE http://localhost:3000/todos/1
 
 Great! You've built your first Shokupan API. Now explore:
 
-- [Routing](/shokupan/core/routing/) - Advanced routing patterns
-- [Middleware](/shokupan/core/middleware/) - Create custom middleware
-- [Validation](/shokupan/plugins/validation/) - Deep dive into validation
-- [Authentication](/shokupan/plugins/authentication/) - Add OAuth2 authentication
-- [OpenAPI](/shokupan/advanced/openapi/) - Generate API documentation
+- [Routing](/core/routing/) - Advanced routing patterns
+- [Middleware](/core/middleware/) - Create custom middleware
+- [Validation](/plugins/validation/) - Deep dive into validation
+- [Authentication](/plugins/authentication/) - Add OAuth2 authentication
+- [OpenAPI](/advanced/openapi/) - Generate API documentation
