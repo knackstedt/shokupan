@@ -8,10 +8,65 @@ export interface ProxyOptions {
     changeOrigin?: boolean;
     ws?: boolean;
     headers?: Record<string, string>;
+    // Security: Whitelist allowed target hosts
+    allowedHosts?: string[];
+    // Security: Allow private IPs (disabled by default)
+    allowPrivateIPs?: boolean;
+}
+
+
+/**
+ * Security: Validate if an IP address is in a private range
+ */
+function isPrivateIP(ip: string): boolean {
+    // IPv4 private ranges
+    const ipv4Patterns = [
+        /^10\./,                          // 10.0.0.0/8
+        /^172\.(1[6-9]|2[0-9]|3[01])\./,  // 172.16.0.0/12
+        /^192\.168\./,                     // 192.168.0.0/16
+        /^127\./,                          // 127.0.0.0/8 (loopback)
+        /^169\.254\./,                     // 169.254.0.0/16 (link-local)
+        /^0\.0\.0\.0$/,                    // 0.0.0.0
+    ];
+
+    // IPv6 private ranges (simplified)
+    const ipv6Patterns = [
+        /^::1$/,           // loopback
+        /^fe80:/,          // link-local
+        /^fc00:/,          // unique local
+        /^fd00:/,          // unique local
+    ];
+
+    for (const pattern of ipv4Patterns) {
+        if (pattern.test(ip)) return true;
+    }
+
+    for (const pattern of ipv6Patterns) {
+        if (pattern.test(ip.toLowerCase())) return true;
+    }
+
+    return false;
 }
 
 export function Proxy(options: ProxyOptions): Middleware {
     const targetUrl = new URL(options.target);
+
+    // Security: Validate target URL
+    if (!['http:', 'https:'].includes(targetUrl.protocol)) {
+        throw new Error('Invalid proxy target protocol. Only http and https are allowed.');
+    }
+
+    // Security: Validate hostname is in allowlist (if provided)
+    if (options.allowedHosts && options.allowedHosts.length > 0) {
+        if (!options.allowedHosts.includes(targetUrl.hostname)) {
+            throw new Error(`Target hostname ${targetUrl.hostname} is not in the allowed hosts list.`);
+        }
+    }
+
+    // Security: Check if target is private IP (unless explicitly allowed)
+    if (!options.allowPrivateIPs && isPrivateIP(targetUrl.hostname)) {
+        throw new Error('Proxying to private IP addresses is not allowed.');
+    }
 
     return async (ctx: ShokupanContext, next: NextFn) => {
         const req = ctx.request;
@@ -42,6 +97,11 @@ export function Proxy(options: ProxyOptions): Middleware {
         }
 
         const url = new URL(path + ctx.url.search, targetUrl);
+
+        // Security: Validate the final URL doesn't bypass restrictions
+        if (!['http:', 'https:'].includes(url.protocol)) {
+            return ctx.text('Invalid protocol in proxied URL', 400);
+        }
 
         const headers = new Headers(req.headers);
         if (options.changeOrigin) {

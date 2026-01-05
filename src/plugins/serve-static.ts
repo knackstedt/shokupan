@@ -1,6 +1,6 @@
 import { Eta } from 'eta';
 import { readdir, readFile, stat } from 'fs/promises';
-import { basename, join, resolve } from 'path';
+import { basename, join, resolve, sep } from 'path';
 import type { ShokupanContext } from '../context';
 import type { Middleware, StaticServeOptions } from '../types';
 
@@ -18,17 +18,36 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
         if (!relative.startsWith('/') && relative.length > 0) relative = '/' + relative;
         if (relative.length === 0) relative = '/';
 
-        // Decode URI components
-        relative = decodeURIComponent(relative);
-
-        // Security: Prevent directory traversal
-        const requestPath = join(rootPath, relative);
-        if (!requestPath.startsWith(rootPath)) {
+        // Security: Check for null bytes BEFORE decoding
+        if (relative.includes('\0')) {
             return ctx.json({ error: 'Forbidden' }, 403);
         }
 
-        // check if path includes null byte
-        if (requestPath.includes('\0')) {
+        // Decode URI components
+        try {
+            relative = decodeURIComponent(relative);
+        } catch (e) {
+            // Invalid URL encoding
+            return ctx.json({ error: 'Bad Request' }, 400);
+        }
+
+        // Security: Check for null bytes AFTER decoding
+        if (relative.includes('\0')) {
+            return ctx.json({ error: 'Forbidden' }, 403);
+        }
+
+        // Security: Check for directory traversal patterns
+        if (relative.includes('../') || relative.includes('..\\')) {
+            return ctx.json({ error: 'Forbidden' }, 403);
+        }
+
+        // Security: Prevent directory traversal with proper path normalization
+        const requestPath = resolve(join(rootPath, relative));
+        const normalizedRoot = resolve(rootPath);
+
+        // Ensure the resolved path is within the root directory
+        // Use separator to prevent partial matching (e.g., /var/www vs /var/www-evil)
+        if (!requestPath.startsWith(normalizedRoot + sep) && requestPath !== normalizedRoot) {
             return ctx.json({ error: 'Forbidden' }, 403);
         }
 

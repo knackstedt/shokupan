@@ -8,6 +8,26 @@ import type { CookieOptions, JSXRenderer } from './types';
 // Shim for HeadersInit if not available globally in some envs
 type HeadersInit = Headers | Record<string, string> | [string, string][];
 
+/**
+ * Security: Validate if a cookie domain is safe to use
+*/
+function isValidCookieDomain(domain: string, currentHost: string): boolean {
+    // Remove port from current host if present
+    const hostWithoutPort = currentHost.split(':')[0];
+
+    // Domain must be current host or a parent domain
+    if (domain === hostWithoutPort) return true;
+
+    // Check if domain is a parent domain (starts with .)
+    if (domain.startsWith('.')) {
+        const domainWithoutDot = domain.slice(1);
+        // Current host must end with the domain
+        return hostWithoutPort.endsWith(domainWithoutDot);
+    }
+
+    return false;
+}
+
 const VALID_HTTP_STATUSES = new Set<number>([
     100, 101, 102, 103,
     200, 201, 202, 203, 204, 205, 206, 207, 208, 226,
@@ -207,16 +227,28 @@ export class ShokupanContext<
     get query() {
         if (this._cachedQuery) return this._cachedQuery;
 
-        const q: Record<string, any> = {};
+        // Security: Use Object.create(null) to prevent prototype pollution
+        const q: Record<string, any> = Object.create(null);
+
+        // Security: Blocklist dangerous property names
+        const blocklist = ['__proto__', 'constructor', 'prototype'];
+
         const entries = Object.entries(this.url.searchParams);
         for (let i = 0; i < entries.length; i++) {
             const [key, value] = entries[i];
-            if (q[key] === undefined) {
-                q[key] = value;
-            } else if (Array.isArray(q[key])) {
-                q[key].push(value);
+
+            // Security: Skip dangerous keys
+            if (blocklist.includes(key)) continue;
+
+            // Use hasOwnProperty to avoid prototype chain issues
+            if (Object.prototype.hasOwnProperty.call(q, key)) {
+                if (Array.isArray(q[key])) {
+                    q[key].push(value);
+                } else {
+                    q[key] = [q[key], value];
+                }
             } else {
-                q[key] = [q[key], value];
+                q[key] = value;
             }
         }
         this._cachedQuery = q;
@@ -294,6 +326,14 @@ export class ShokupanContext<
      * @param options Cookie options
      */
     public setCookie(name: string, value: string, options: CookieOptions = {}) {
+        // Security: Validate domain attribute to prevent cookie injection
+        if (options.domain) {
+            const currentHost = this.hostname;
+            if (!isValidCookieDomain(options.domain, currentHost)) {
+                throw new Error(`Invalid cookie domain: ${options.domain} for host ${currentHost}`);
+            }
+        }
+
         // Robust Cookie Serialization
         let cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}`;
         if (options.maxAge) cookie += `; Max-Age=${Math.floor(options.maxAge)}`;

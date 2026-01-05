@@ -11,6 +11,8 @@ export interface RateLimitOptions {
     keyGenerator?: (ctx: ShokupanContext) => string;
     skip?: (ctx: ShokupanContext) => boolean;
     mode?: 'user' | 'absolute';
+    // Security: List of trusted proxy IPs
+    trustedProxies?: string[];
 }
 
 interface HitRecord {
@@ -25,16 +27,34 @@ export function RateLimitMiddleware(options: RateLimitOptions = {}): Middleware 
     const statusCode = options.statusCode || 429;
     const headers = options.headers !== false;
     const mode = options.mode || 'user';
+    const trustedProxies = options.trustedProxies || [];
 
     const keyGenerator = options.keyGenerator || ((ctx) => {
         if (mode === 'absolute') {
             return 'global';
         }
-        // Use IP if available
-        return ctx.headers.get("x-forwarded-for")
-            || ctx.request.headers.get("x-forwarded-for")
-            || (ctx.server as any)?.requestIP?.(ctx.request)?.address
-            || "unknown";
+
+        // Security: Use proper IP detection with trusted proxy support
+        const xForwardedFor = ctx.headers.get("x-forwarded-for");
+
+        if (xForwardedFor && trustedProxies.length > 0) {
+            // Parse X-Forwarded-For from right to left (most recent proxy first)
+            const ips = xForwardedFor.split(',').map(ip => ip.trim());
+
+            // Get the rightmost IP that is not in trusted proxies
+            for (let i = ips.length - 1; i >= 0; i--) {
+                const ip = ips[i];
+                if (!trustedProxies.includes(ip)) {
+                    // Validate IP format (basic check)
+                    if (/^[\d.:a-fA-F]+$/.test(ip)) {
+                        return ip;
+                    }
+                }
+            }
+        }
+
+        // Fallback to server IP detection
+        return (ctx.server as any)?.requestIP?.(ctx.request)?.address || "unknown";
     });
     const skip = options.skip || (() => false);
 

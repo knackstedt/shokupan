@@ -27,15 +27,28 @@ export function Cors(options: CorsOptions = {}): Middleware {
         const set = (k: string, v: string) => headers.set(k, v);
         const append = (k: string, v: string) => headers.append(k, v);
 
+        // Security: Reject null origin by default (can be used in attacks)
+        if (origin === 'null' && opts.origin !== 'null') {
+            // Null origin is not allowed unless explicitly set
+            return next();
+        }
+
         // Set Access-Control-Allow-Origin
         if (opts.origin === "*") {
             set("Access-Control-Allow-Origin", "*");
         } else if (typeof opts.origin === "string") {
             set("Access-Control-Allow-Origin", opts.origin);
         } else if (Array.isArray(opts.origin)) {
-            if (origin && opts.origin.includes(origin)) {
-                set("Access-Control-Allow-Origin", origin);
-                append("Vary", "Origin");
+            if (origin) {
+                // Security: Normalize origins for case-insensitive comparison
+                const normalizedOrigin = origin.toLowerCase();
+                const normalizedAllowed = opts.origin.map(o => o.toLowerCase());
+
+                if (normalizedAllowed.includes(normalizedOrigin)) {
+                    // Use the original (non-normalized) origin in the response
+                    set("Access-Control-Allow-Origin", origin);
+                    append("Vary", "Origin");
+                }
             }
         } else if (typeof opts.origin === "function") {
             const allowed = opts.origin(ctx);

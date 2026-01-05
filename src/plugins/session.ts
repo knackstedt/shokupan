@@ -172,13 +172,24 @@ function unsign(input: string, secret: string) {
     if (typeof secret !== 'string') throw new TypeError("Secret string must be provided.");
     const tentValue = input.slice(0, input.lastIndexOf('.'));
     const expectedInput = sign(tentValue, secret);
-    const expectedBuffer = Buffer.from(expectedInput);
-    const inputBuffer = Buffer.from(input);
-    if (expectedBuffer.length !== inputBuffer.length) return false;
-    // timingSafeEqual
-    // crypto.timingSafeEqual is available in node/bun
-    const valid = require('crypto').timingSafeEqual(expectedBuffer, inputBuffer);
-    return valid ? tentValue : false;
+
+    // Security: Use constant-time comparison with padding to prevent timing attacks
+    // Pad both buffers to the same length to avoid length-based timing leaks
+    const maxLength = Math.max(expectedInput.length, input.length);
+    const paddedExpected = Buffer.alloc(maxLength);
+    const paddedInput = Buffer.alloc(maxLength);
+
+    Buffer.from(expectedInput).copy(paddedExpected);
+    Buffer.from(input).copy(paddedInput);
+
+    // Use crypto.timingSafeEqual for constant-time comparison
+    try {
+        const valid = require('crypto').timingSafeEqual(paddedExpected, paddedInput);
+        return valid ? tentValue : false;
+    } catch {
+        // Buffers are different lengths (shouldn't happen with padding, but handle gracefully)
+        return false;
+    }
 }
 
 // --- Middleware ---

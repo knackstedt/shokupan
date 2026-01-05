@@ -153,9 +153,11 @@ export class AuthPlugin extends ShokupanRouter<any> {
                     return ctx.text("Provider config error", 500);
                 }
 
-                ctx.res.headers.set("Set-Cookie", `oauth_state=${state}; Path=/; HttpOnly; Max-Age=600`);
+                // Security: Set secure cookies with SameSite=Lax to prevent CSRF attacks
+                const isSecure = ctx.secure;
+                ctx.res.headers.set("Set-Cookie", `oauth_state=${state}; Path=/; HttpOnly; SameSite=Lax${isSecure ? '; Secure' : ''}; Max-Age=600`);
                 if (codeVerifier) {
-                    ctx.res.headers.append("Set-Cookie", `oauth_verifier=${codeVerifier}; Path=/; HttpOnly; Max-Age=600`);
+                    ctx.res.headers.append("Set-Cookie", `oauth_verifier=${codeVerifier}; Path=/; HttpOnly; SameSite=Lax${isSecure ? '; Secure' : ''}; Max-Age=600`);
                 }
 
                 return ctx.redirect(url.toString());
@@ -207,8 +209,9 @@ export class AuthPlugin extends ShokupanRouter<any> {
                     return ctx.json({ token: jwt, user });
 
                 } catch (e: any) {
+                    // Security: Log detailed errors server-side, return generic message to client
                     console.error("Auth Error", e);
-                    return ctx.text("Authentication failed: " + e.message + "\n" + e.stack, 500);
+                    return ctx.text("Authentication failed. Please try again.", 500);
                 }
             });
         }

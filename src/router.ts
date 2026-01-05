@@ -768,13 +768,22 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
     private parsePath(path: string): { regex: RegExp; keys: string[]; } {
         const keys: string[] = [];
+
+        // Security: Validate path length to prevent ReDoS
+        if (path.length > 2048) {
+            throw new Error('Path too long');
+        }
+
         const pattern = path
             .replace(/:([a-zA-Z0-9_]+)/g, (_, key) => {
                 keys.push(key);
-                return "([^/]+)";
+                // Security: Add length limit to prevent ReDoS
+                return "([^/]{1,255})";
             })
-            .replace(/\*\*/g, ".*")   // Recursive wildcard
-            .replace(/\*/g, "[^/]+"); // Single segment wildcard
+            // Security: Limit recursive wildcard to prevent ReDoS
+            .replace(/\*\*/g, ".{0,1000}")
+            // Security: Limit single segment wildcard to prevent ReDoS  
+            .replace(/\*/g, "[^/]{1,255}");
 
         return {
             regex: new RegExp(`^${pattern}$`),

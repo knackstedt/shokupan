@@ -422,6 +422,10 @@ export interface StaticServeOptions<T extends Record<string, any>> {
     root?: string;
     /**
      * Whether to list directory contents if no index file is found.
+     * 
+     * Security Note: Directory listing is disabled by default to prevent information disclosure.
+     * Enable this only if you specifically need it and understand the security implications.
+     * 
      * @default false
      */
     listDirectory?: boolean;
