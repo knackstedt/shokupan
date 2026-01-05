@@ -1,6 +1,7 @@
-# Plugin Dependencies Guide
-
-Shokupan uses an optional peer dependency model for plugin-specific packages. This keeps the core framework lean while allowing you to install only the features you need.
+---
+title: Plugin Dependencies
+description: Shokupan uses an optional peer dependency model for plugin-specific packages. This keeps the core framework lean while allowing you to install only the features you need.
+---
 
 ## Overview
 

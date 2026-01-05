@@ -1,6 +1,7 @@
-# JSON Parser Configuration
-
-Shokupan allows you to configure which JSON parser to use for parsing request bodies. This gives you the flexibility to choose between performance, better error messages, or security.
+---
+title: JSON Parser Configuration
+description: Configure which JSON parser to use for parsing request bodies.
+---
 
 ## Available Parsers
 

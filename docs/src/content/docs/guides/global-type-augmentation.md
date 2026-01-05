@@ -1,6 +1,7 @@
-# Global Type Augmentation for Shokupan Context
-
-This guide shows how to use TypeScript's **module augmentation** to globally extend `ShokupanContext` types, similar to how `express-session` extends the Express `Request` type.
+---
+title: Global Type Augmentation
+description: This guide shows how to use TypeScript's **module augmentation** to globally extend `ShokupanContext` types, similar to how `express-session` extends the Express `Request` type.
+---
 
 ## Overview
 
