@@ -11,11 +11,7 @@ import { ShokupanRequest } from './util/request';
 import { getCallerInfo } from './util/stack';
 import { $appRoot, $childControllers, $childRouters, $controllerPath, $dispatch, $isApplication, $isMounted, $isRouter, $middleware, $mountPath, $parent, $routeArgs, $routeMethods, $routes, $routeSpec } from './util/symbol';
 import { RouterTrie } from './util/trie';
-import { type GuardAPISpec, HTTPMethods, type JSXRenderer, type Method, type MethodAPISpec, type Middleware, type OpenAPIOptions, type ProcessResult, type RequestOptions, type RouteMetadata, type RouteParams, RouteParamType, type ShokupanController, type ShokupanHandler, type ShokupanHooks, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions } from './util/types';
-
-
-// Shim for HeadersInit if not available globally
-type HeadersInit = Headers | Record<string, string> | [string, string][];
+import { type GuardAPISpec, HeadersInit, HTTPMethods, type JSXRenderer, type Method, type MethodAPISpec, type Middleware, type OpenAPIOptions, type ProcessResult, type RequestOptions, type RouteMetadata, type RouteParams, RouteParamType, type ShokupanController, type ShokupanHandler, type ShokupanHooks, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions } from './util/types';
 
 
 export const RouterRegistry = new Map<string, ShokupanRouter<any>>();
@@ -218,305 +214,11 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         }
 
         if (this.isRouterInstance(controller)) {
-            if (controller[$isMounted]) {
-                throw new Error("Router is already mounted");
-            }
-
-            controller[$mountPath] = prefix;
-
-            // Capture mount location if not already present (create new router usually has it? no)
-            if (!controller.metadata) {
-                const info = getCallerInfo();
-                controller.metadata = {
-                    file: info.file,
-                    line: info.line,
-                    name: 'MountedRouter'
-                };
-            }
-            this[$childRouters].push(controller);
-
-            /**
-             * Descendants are defined first, then mounted backwards up to the application root.
-             * Thus, we have to recurse through the children and assign the root reference.
-             */
-            controller[$parent] = this;
-
-            const setRouterContext = (router: ShokupanRouter<T>) => {
-                router[$appRoot] = this.root;
-                router[$childRouters].forEach((child) => setRouterContext(child));
-            };
-            setRouterContext(controller);
-
-
-            // If the controller is the root router
-            if (this[$appRoot]) {
-                // TODO:
-            }
-            controller[$appRoot] = this.root;
-            controller[$isMounted] = true;
+            this.mountRouter(prefix, controller);
         }
         // Controller is an arbitrary class
         else {
-            let instance = controller;
-            if (typeof controller === 'function') {
-                // DI Resolution
-                instance = Container.resolve(controller as any);
-
-                // Controller Parameter Decorator (@Controller('prefix'))
-                const controllerPath = (controller as any)[$controllerPath];
-                if (controllerPath) {
-                    // Combine mount prefix + controller path
-                    // mount('/api', Ctrl) + @Controller('/users') -> /api/users
-                    const p1 = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
-                    const p2 = controllerPath.startsWith("/") ? controllerPath : "/" + controllerPath;
-                    prefix = (p1 + p2);
-                    // Normalize
-                    if (!prefix) prefix = "/";
-                }
-            }
-            else {
-                // Controller is an instance, read metadata from constructor
-                const ctor = instance.constructor;
-                const controllerPath = (ctor as any)[$controllerPath];
-                if (controllerPath) {
-                    const p1 = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
-                    const p2 = controllerPath.startsWith("/") ? controllerPath : "/" + controllerPath;
-                    prefix = (p1 + p2);
-                    if (!prefix) prefix = "/";
-                }
-            }
-
-            instance[$mountPath] = prefix;
-
-            // Capture metadata for controller instance
-            const info = getCallerInfo();
-            (instance as any).metadata = {
-                file: info.file,
-                line: info.line,
-                name: instance.constructor.name
-            };
-
-            this[$childControllers].push(instance as any);
-
-            // Get Middleware for Controller
-            // It could be on the Constructor (if passed as class) or Instance (if passed as object and manually set?)
-            // Usually decorators set it on Constructor.
-            const controllerMiddleware = (typeof controller === 'function' ? (controller as any)[$middleware] : (instance as any)[$middleware]) || [];
-
-            // Get all method names from the prototype (for classes)
-            const proto = Object.getPrototypeOf(instance);
-            const methods = new Set<string>();
-
-            // Scan prototype chain
-            let current = proto;
-            while (current && current !== Object.prototype) {
-                Object.getOwnPropertyNames(current).forEach(name => methods.add(name));
-                current = Object.getPrototypeOf(current);
-            }
-            // Also scan own properties (for objects or bound methods)
-            Object.getOwnPropertyNames(instance).forEach(name => methods.add(name));
-
-            const decoratedRoutes = (instance as any)[$routeMethods] || (proto && (proto as any)[$routeMethods]);
-            const decoratedArgs = (instance as any)[$routeArgs] || (proto && (proto as any)[$routeArgs]);
-            const methodMiddlewareMap = (instance as any)[$middleware] || (proto && (proto as any)[$middleware]);
-
-            let routesAttached = 0;
-            for (let i = 0; i < Array.from(methods).length; i++) {
-                const name = Array.from(methods)[i];
-                if (name === "constructor") continue;
-                if (["arguments", "caller", "callee"].includes(name)) continue;
-
-                const originalHandler = (instance as any)[name];
-                if (typeof originalHandler !== "function") continue;
-
-                let method: Method | undefined;
-                let subPath = "";
-
-                // 1. Check for Decorator Metadata
-                if (decoratedRoutes && decoratedRoutes.has(name)) {
-                    const config = decoratedRoutes.get(name);
-                    method = config.method;
-                    subPath = config.path;
-                }
-                // 2. Fallback to Convention
-                else {
-                    // Simple convention matching
-                    // Check if name starts with HTTP verb
-                    for (let j = 0; j < HTTPMethods.length; j++) {
-                        const m = HTTPMethods[j];
-                        if (name.toUpperCase().startsWith(m)) {
-                            method = m as Method;
-                            const rest = name.slice(m.length);
-                            if (rest.length === 0) {
-                                subPath = "/";
-                            }
-                            else {
-                                // Existing parsing logic...
-                                subPath = "";
-                                let buffer = "";
-                                const flush = () => {
-                                    if (buffer.length > 0) {
-                                        subPath += "/" + buffer.toLowerCase();
-                                        buffer = "";
-                                    }
-                                };
-                                for (let i = 0; i < rest.length; i++) {
-                                    const char = rest[i];
-                                    if (char === "$") {
-                                        flush();
-                                        subPath += "/:";
-                                        continue;
-                                    }
-                                    // Revised simple loop
-                                }
-                                subPath = rest
-                                    .replace(/\$/g, "/:") // $id -> /:id
-                                    .replace(/([a-z0-9])([A-Z])/g, "$1/$2") // camelCase -> camel/Case
-                                    .toLowerCase();
-
-                                if (!subPath.startsWith("/")) {
-                                    subPath = "/" + subPath;
-                                }
-                            }
-                            break;
-                        }
-                    }
-                }
-
-                if (method) {
-                    routesAttached++;
-                    // Remove trailing slash from prefix if needed, combine with subPath
-                    const cleanPrefix = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
-                    const cleanSubPath = subPath === "/" ? "" : subPath;
-
-                    let joined: string;
-                    if (cleanSubPath.length === 0) {
-                        joined = cleanPrefix;
-                    }
-                    else if (cleanSubPath.startsWith("/")) {
-                        joined = cleanPrefix + cleanSubPath;
-                    }
-                    else {
-                        joined = cleanPrefix + "/" + cleanSubPath;
-                    }
-
-                    const fullPath = joined || "/";
-                    const normalizedPath = fullPath.replace(/\/+/g, "/");
-
-                    // -- Compose Handler with Middleware and Param Resolution --
-
-                    const methodMw = (methodMiddlewareMap instanceof Map) ? (methodMiddlewareMap.get(name) || []) : [];
-                    const allMiddleware = [...controllerMiddleware, ...methodMw];
-
-                    // Check for Args
-                    const routeArgs = decoratedArgs && decoratedArgs.get(name);
-
-                    // Create Wrapper
-                    const wrappedHandler = async (ctx: ShokupanContext<T>) => {
-                        // Resolve Arguments
-                        let args: any[] = [ctx]; // Default to just context if no decorators
-
-                        if (routeArgs?.length > 0) {
-                            args = [];
-                            // Sort by index
-                            const sortedArgs = [...routeArgs].sort((a, b) => a.index - b.index);
-
-                            // Fill args array
-                            for (let k = 0; k < sortedArgs.length; k++) {
-                                const arg = sortedArgs[k];
-                                switch (arg.type) {
-                                    case RouteParamType.BODY:
-                                        try {
-                                            if (ctx.req.headers.get("content-type")?.includes("application/json")) {
-                                                args[arg.index] = await ctx.req.json();
-                                            } else {
-                                                // Fallback or empty if not JSON? 
-                                                // If @Body is used, valid JSON is expected.
-                                                // If empty body, json() throws.
-                                                const text = await ctx.req.text();
-                                                if (!text) {
-                                                    args[arg.index] = {};
-                                                } else {
-                                                    args[arg.index] = JSON.parse(text);
-                                                }
-                                            }
-                                        } catch (e) {
-                                            const err: any = new Error("Invalid JSON body");
-                                            err.status = 400;
-                                            throw err;
-                                        }
-                                        break;
-                                    case RouteParamType.PARAM:
-                                        args[arg.index] = arg.name ? ctx.params[arg.name] : ctx.params;
-                                        break;
-                                    case RouteParamType.QUERY: {
-                                        const url = new URL(ctx.req.url);
-                                        if (arg.name) {
-                                            const vals = url.searchParams.getAll(arg.name);
-                                            args[arg.index] = vals.length > 1 ? vals : vals[0];
-                                        } else {
-                                            const query: Record<string, any> = {};
-                                            const keys = Object.keys(url.searchParams);
-                                            for (let k = 0; k < keys.length; k++) {
-                                                const key = keys[k];
-                                                const vals = url.searchParams.getAll(key);
-                                                query[key] = vals.length > 1 ? vals : vals[0];
-                                            }
-                                            args[arg.index] = query;
-                                        }
-                                        break;
-                                    }
-                                    case RouteParamType.HEADER:
-                                        args[arg.index] = arg.name ? ctx.req.headers.get(arg.name) : ctx.req.headers;
-                                        break;
-                                    case RouteParamType.REQUEST:
-                                        args[arg.index] = ctx.req;
-                                        break;
-                                    case RouteParamType.CONTEXT:
-                                        args[arg.index] = ctx;
-                                        break;
-                                }
-                            }
-                        }
-
-                        const tracedOriginalHandler = ctx.app?.applicationConfig.enableTracing
-                            ? traceHandler(originalHandler, normalizedPath)
-                            : originalHandler;
-                        return tracedOriginalHandler.apply(instance, args);
-                    };
-
-                    // Apply Middleware wrapping
-                    let finalHandler = wrappedHandler;
-                    if (allMiddleware.length > 0) {
-                        const composed = compose(allMiddleware);
-                        finalHandler = async (ctx) => {
-                            return composed(ctx, () => wrappedHandler(ctx));
-                        };
-                    }
-
-                    // Expose original handler for OpenAPI analysis
-                    (finalHandler as any).originalHandler = originalHandler;
-                    if (finalHandler !== wrappedHandler) {
-                        (wrappedHandler as any).originalHandler = originalHandler;
-                    }
-
-                    // Inject Controller Name as Tag
-                    const tagName = instance.constructor.name;
-
-                    // Retrieve @Spec metadata
-                    const decoratedSpecs = (instance as any)[$routeSpec] || (proto && (proto as any)[$routeSpec]);
-                    const userSpec = decoratedSpecs && decoratedSpecs.get(name);
-
-                    // Merge with existing spec from decorator if available
-                    const spec = { tags: [tagName], ...userSpec };
-
-                    this.add({ method, path: normalizedPath, handler: finalHandler, spec, controller: instance });
-                }
-            }
-            if (routesAttached === 0) {
-                console.warn(`No routes attached to controller ${instance.constructor.name}`);
-            }
-            instance[$isMounted] = true;
+            this.scanControllerRoutes(prefix, controller);
         }
 
         return this;
@@ -718,6 +420,305 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         // Preserve original handler reference for analysis if needed
         (wrapped as any).originalHandler = (originalHandler as any).originalHandler ?? originalHandler;
         return wrapped;
+    }
+
+    private mountRouter(prefix: string, router: ShokupanRouter<T>) {
+        if (router[$isMounted]) {
+            throw new Error("Router is already mounted");
+        }
+
+        router[$mountPath] = prefix;
+
+        // Capture mount location if not already present
+        if (!router.metadata) {
+            const info = getCallerInfo();
+            router.metadata = {
+                file: info.file,
+                line: info.line,
+                name: 'MountedRouter'
+            };
+        }
+        this[$childRouters].push(router);
+
+        /**
+         * Descendants are defined first, then mounted backwards up to the application root.
+         * Thus, we have to recurse through the children and assign the root reference.
+         */
+        router[$parent] = this;
+
+        const setRouterContext = (router: ShokupanRouter<T>) => {
+            router[$appRoot] = this.root;
+            router[$childRouters].forEach((child) => setRouterContext(child));
+        };
+        setRouterContext(router);
+
+        router[$appRoot] = this.root;
+        router[$isMounted] = true;
+    }
+
+    private scanControllerRoutes(prefix: string, controller: any) {
+        let instance = controller;
+        if (typeof controller === 'function') {
+            // DI Resolution
+            instance = Container.resolve(controller as any);
+
+            // Controller Parameter Decorator (@Controller('prefix'))
+            const controllerPath = (controller as any)[$controllerPath];
+            if (controllerPath) {
+                // Combine mount prefix + controller path
+                // mount('/api', Ctrl) + @Controller('/users') -> /api/users
+                const p1 = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
+                const p2 = controllerPath.startsWith("/") ? controllerPath : "/" + controllerPath;
+                prefix = (p1 + p2);
+                // Normalize
+                if (!prefix) prefix = "/";
+            }
+        }
+        else {
+            // Controller is an instance, read metadata from constructor
+            const ctor = instance.constructor;
+            const controllerPath = (ctor as any)[$controllerPath];
+            if (controllerPath) {
+                const p1 = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
+                const p2 = controllerPath.startsWith("/") ? controllerPath : "/" + controllerPath;
+                prefix = (p1 + p2);
+                if (!prefix) prefix = "/";
+            }
+        }
+
+        instance[$mountPath] = prefix;
+
+        // Capture metadata for controller instance
+        const info = getCallerInfo();
+        (instance as any).metadata = {
+            file: info.file,
+            line: info.line,
+            name: instance.constructor.name
+        };
+
+        this[$childControllers].push(instance as any);
+
+        // Get Middleware for Controller
+        // It could be on the Constructor (if passed as class) or Instance (if passed as object and manually set?)
+        // Usually decorators set it on Constructor.
+        const controllerMiddleware = (typeof controller === 'function' ? (controller as any)[$middleware] : (instance as any)[$middleware]) || [];
+
+        // Get all method names from the prototype (for classes)
+        const proto = Object.getPrototypeOf(instance);
+        const methods = new Set<string>();
+
+        // Scan prototype chain
+        let current = proto;
+        while (current && current !== Object.prototype) {
+            Object.getOwnPropertyNames(current).forEach(name => methods.add(name));
+            current = Object.getPrototypeOf(current);
+        }
+        // Also scan own properties (for objects or bound methods)
+        Object.getOwnPropertyNames(instance).forEach(name => methods.add(name));
+
+        const decoratedRoutes = (instance as any)[$routeMethods] || (proto && (proto as any)[$routeMethods]);
+        const decoratedArgs = (instance as any)[$routeArgs] || (proto && (proto as any)[$routeArgs]);
+        const methodMiddlewareMap = (instance as any)[$middleware] || (proto && (proto as any)[$middleware]);
+
+        let routesAttached = 0;
+        for (let i = 0; i < Array.from(methods).length; i++) {
+            const name = Array.from(methods)[i];
+            if (name === "constructor") continue;
+            if (["arguments", "caller", "callee"].includes(name)) continue;
+
+            const originalHandler = (instance as any)[name];
+            if (typeof originalHandler !== "function") continue;
+
+            let method: Method | undefined;
+            let subPath = "";
+
+            // 1. Check for Decorator Metadata
+            if (decoratedRoutes && decoratedRoutes.has(name)) {
+                const config = decoratedRoutes.get(name);
+                method = config.method;
+                subPath = config.path;
+            }
+            // 2. Fallback to Convention
+            else {
+                // Simple convention matching
+                // Check if name starts with HTTP verb
+                for (let j = 0; j < HTTPMethods.length; j++) {
+                    const m = HTTPMethods[j];
+                    if (name.toUpperCase().startsWith(m)) {
+                        method = m as Method;
+                        const rest = name.slice(m.length);
+                        if (rest.length === 0) {
+                            subPath = "/";
+                        }
+                        else {
+                            // Existing parsing logic...
+                            subPath = "";
+                            let buffer = "";
+                            const flush = () => {
+                                if (buffer.length > 0) {
+                                    subPath += "/" + buffer.toLowerCase();
+                                    buffer = "";
+                                }
+                            };
+                            for (let i = 0; i < rest.length; i++) {
+                                const char = rest[i];
+                                if (char === "$") {
+                                    flush();
+                                    subPath += "/:";
+                                    continue;
+                                }
+                                buffer += char; // Copied missing logic from previous view
+                            }
+                            if (buffer.length > 0) flush(); // Copied missing logic
+
+                            subPath = rest
+                                .replace(/\$/g, "/:") // $id -> /:id
+                                .replace(/([a-z0-9])([A-Z])/g, "$1/$2") // camelCase -> camel/Case
+                                .toLowerCase();
+
+                            if (!subPath.startsWith("/")) {
+                                subPath = "/" + subPath;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+
+            if (method) {
+                routesAttached++;
+                // Remove trailing slash from prefix if needed, combine with subPath
+                const cleanPrefix = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
+                const cleanSubPath = subPath === "/" ? "" : subPath;
+
+                let joined: string;
+                if (cleanSubPath.length === 0) {
+                    joined = cleanPrefix;
+                }
+                else if (cleanSubPath.startsWith("/")) {
+                    joined = cleanPrefix + cleanSubPath;
+                }
+                else {
+                    joined = cleanPrefix + "/" + cleanSubPath;
+                }
+
+                const fullPath = joined || "/";
+                const normalizedPath = fullPath.replace(/\/+/g, "/");
+
+                // -- Compose Handler with Middleware and Param Resolution --
+
+                const methodMw = (methodMiddlewareMap instanceof Map) ? (methodMiddlewareMap.get(name) || []) : [];
+                const allMiddleware = [...controllerMiddleware, ...methodMw];
+
+                // Check for Args
+                const routeArgs = decoratedArgs && decoratedArgs.get(name);
+
+                // Create Wrapper
+                const wrappedHandler = async (ctx: ShokupanContext<T>) => {
+                    // Resolve Arguments
+                    let args: any[] = [ctx]; // Default to just context if no decorators
+
+                    if (routeArgs?.length > 0) {
+                        args = [];
+                        // Sort by index
+                        const sortedArgs = [...routeArgs].sort((a, b) => a.index - b.index);
+
+                        // Fill args array
+                        for (let k = 0; k < sortedArgs.length; k++) {
+                            const arg = sortedArgs[k];
+                            switch (arg.type) {
+                                case RouteParamType.BODY:
+                                    try {
+                                        if (ctx.req.headers.get("content-type")?.includes("application/json")) {
+                                            args[arg.index] = await ctx.req.json();
+                                        } else {
+                                            // Fallback or empty if not JSON? 
+                                            // If @Body is used, valid JSON is expected.
+                                            // If empty body, json() throws.
+                                            const text = await ctx.req.text();
+                                            if (!text) {
+                                                args[arg.index] = {};
+                                            } else {
+                                                args[arg.index] = JSON.parse(text);
+                                            }
+                                        }
+                                    } catch (e) {
+                                        const err: any = new Error("Invalid JSON body");
+                                        err.status = 400;
+                                        throw err;
+                                    }
+                                    break;
+                                case RouteParamType.PARAM:
+                                    args[arg.index] = arg.name ? ctx.params[arg.name] : ctx.params;
+                                    break;
+                                case RouteParamType.QUERY: {
+                                    const url = new URL(ctx.req.url);
+                                    if (arg.name) {
+                                        const vals = url.searchParams.getAll(arg.name);
+                                        args[arg.index] = vals.length > 1 ? vals : vals[0];
+                                    } else {
+                                        const query: Record<string, any> = {};
+                                        const keys = Object.keys(url.searchParams);
+                                        for (let k = 0; k < keys.length; k++) {
+                                            const key = keys[k];
+                                            const vals = url.searchParams.getAll(key);
+                                            query[key] = vals.length > 1 ? vals : vals[0];
+                                        }
+                                        args[arg.index] = query;
+                                    }
+                                    break;
+                                }
+                                case RouteParamType.HEADER:
+                                    args[arg.index] = arg.name ? ctx.req.headers.get(arg.name) : ctx.req.headers;
+                                    break;
+                                case RouteParamType.REQUEST:
+                                    args[arg.index] = ctx.req;
+                                    break;
+                                case RouteParamType.CONTEXT:
+                                    args[arg.index] = ctx;
+                                    break;
+                            }
+                        }
+                    }
+
+                    const tracedOriginalHandler = ctx.app?.applicationConfig.enableTracing
+                        ? traceHandler(originalHandler, normalizedPath)
+                        : originalHandler;
+                    return tracedOriginalHandler.apply(instance, args);
+                };
+
+                // Apply Middleware wrapping
+                let finalHandler = wrappedHandler;
+                if (allMiddleware.length > 0) {
+                    const composed = compose(allMiddleware);
+                    finalHandler = async (ctx) => {
+                        return composed(ctx, () => wrappedHandler(ctx));
+                    };
+                }
+
+                // Expose original handler for OpenAPI analysis
+                (finalHandler as any).originalHandler = originalHandler;
+                if (finalHandler !== wrappedHandler) {
+                    (wrappedHandler as any).originalHandler = originalHandler;
+                }
+
+                // Inject Controller Name as Tag
+                const tagName = instance.constructor.name;
+
+                // Retrieve @Spec metadata
+                const decoratedSpecs = (instance as any)[$routeSpec] || (proto && (proto as any)[$routeSpec]);
+                const userSpec = decoratedSpecs && decoratedSpecs.get(name);
+
+                // Merge with existing spec from decorator if available
+                const spec = { tags: [tagName], ...userSpec };
+
+                this.add({ method, path: normalizedPath, handler: finalHandler, spec, controller: instance });
+            }
+        }
+        if (routesAttached === 0) {
+            console.warn(`No routes attached to controller ${instance.constructor.name}`);
+        }
+        instance[$isMounted] = true;
     }
 
     /**

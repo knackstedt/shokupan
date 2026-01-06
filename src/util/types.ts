@@ -4,6 +4,8 @@ import type { Server as NodeServer } from 'node:http';
 import type { ShokupanContext } from '../context';
 import { $isRouter } from "./symbol";
 
+export type HeadersInit = Headers | Record<string, string> | [string, string][];
+
 export interface ShokupanPluginOptions {
     path?: string;
 }
