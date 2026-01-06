@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from "bun:test";
-import { MemoryStore, Session as session } from '../../plugins/session';
+import { MemoryStore, Session as session } from '../../plugins/middleware/session';
 import { Shokupan } from '../../shokupan';
 
 describe("Session Middleware", () => {

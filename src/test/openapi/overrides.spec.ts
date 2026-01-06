@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { ShokupanContext } from "../../context";
-import { Body, Controller, Get, Post, Spec } from "../../decorators";
+import { Body, Controller, Get, Post, Spec } from '../../util/decorators';
 import { Shokupan } from "../../shokupan";
 import { PriorityController } from "./fixtures/priority-controller";
 

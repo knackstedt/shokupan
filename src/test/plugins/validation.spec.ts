@@ -5,7 +5,7 @@ import { describe, expect, it } from "bun:test";
 import * as v from "valibot";
 import { z } from "zod";
 
-import { valibot, validate } from "../../plugins/validation";
+import { valibot, validate } from "../../plugins/middleware/validation";
 import { Shokupan } from "../../shokupan";
 
 describe("Validation Plugin", () => {

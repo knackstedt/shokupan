@@ -1,5 +1,5 @@
 import { ShokupanContext } from "../../../context";
-import { Controller, Get, Spec } from "../../../decorators";
+import { Controller, Get, Spec } from '../../../util/decorators';
 
 @Controller("/priority")
 export class PriorityController {

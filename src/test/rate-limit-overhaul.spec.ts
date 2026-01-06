@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { Controller, Get, RateLimit } from "../decorators";
-import { RateLimitMiddleware } from "../plugins/rate-limit";
+import { Controller, Get, RateLimit } from "../util/decorators";
+import { RateLimitMiddleware } from "../plugins/middleware/rate-limit";
 import { Shokupan } from "../shokupan";
 
 // Mock implementation of ShokupanRouter/Controller for Decorator test

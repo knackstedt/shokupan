@@ -1,6 +1,6 @@
 
 import { describe, expect, test } from "bun:test";
-import { Body, Controller, Get, Post, Query } from "../decorators";
+import { Body, Controller, Get, Post, Query } from "../util/decorators";
 import { Shokupan } from "../shokupan";
 
 

@@ -1,6 +1,6 @@
-import { describe, expect, test, beforeAll, afterAll, mock, spyOn } from "bun:test";
+import { beforeAll, describe, expect, spyOn, test } from "bun:test";
+import { FailedRequestRecorder } from "../../plugins/application/debugview/failed-request-recorder";
 import { Shokupan } from "../../shokupan";
-import { FailedRequestRecorder } from "../../plugins/failed-request-recorder";
 import { datastore } from "../../util/datastore";
 
 // Mock datastore methods

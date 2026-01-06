@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import tap from 'supertest';
-import { DebugDashboard } from '../../plugins/debugview/plugin';
+import { DebugDashboard } from '../../plugins/application/debugview/plugin';
 import { Shokupan } from '../../shokupan';
 
 describe('Debug Dashboard Plugin', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import path from 'node:path';
-import { OpenAPIAnalyzer } from '../../analysis/openapi-analyzer';
+import { OpenAPIAnalyzer } from '../../plugins/application/openapi/analyzer';
 
 async function getSpec(directory: string) {
     const analyzer = new OpenAPIAnalyzer(directory);

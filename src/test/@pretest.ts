@@ -1,5 +1,5 @@
 import { beforeAll } from "bun:test";
-import { useExpress } from '../plugins/express';
+import { useExpress } from '../plugins/middleware/express';
 import { Shokupan } from '../shokupan';
 
 beforeAll(async () => {

@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, spyOn, test } from "bun:test";
-import { Idempotency } from "../../plugins/idempotency/plugin";
+import { Idempotency } from "../../plugins/application/idempotency/plugin";
 import { Shokupan } from "../../shokupan";
 import { datastore } from "../../util/datastore";
 

@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { createHmac } from "crypto";
-import { Cors } from "../plugins/cors";
-import { Proxy } from "../plugins/proxy";
-import { RateLimitMiddleware } from "../plugins/rate-limit";
-import { serveStatic } from "../plugins/serve-static";
+import { Cors } from "../plugins/middleware/cors";
+import { Proxy } from "../plugins/middleware/proxy";
+import { RateLimitMiddleware } from "../plugins/middleware/rate-limit";
+import { serveStatic } from "../plugins/middleware/serve-static";
 import { Shokupan } from "../shokupan";
 
 describe("Security Vulnerability Tests", () => {

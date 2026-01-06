@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Proxy } from "../../plugins/proxy";
+import { Proxy } from "../../plugins/middleware/proxy";
 import { Shokupan } from "../../shokupan";
 
 describe("Proxy Plugin", () => {

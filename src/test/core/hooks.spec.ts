@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import { z } from "zod";
-import { validate } from "../../plugins/validation";
+import { validate } from "../../plugins/middleware/validation";
 import { ShokupanRouter } from "../../router";
 import { Shokupan } from "../../shokupan";
 

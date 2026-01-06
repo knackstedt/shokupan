@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import type { ShokupanContext } from "../../context";
-import { ScalarPlugin } from "../../plugins/scalar";
+import { ScalarPlugin } from "../../plugins/application/scalar";
 import { ShokupanRouter } from "../../router";
 import { Shokupan } from "../../shokupan";
-import { $controllerPath, $routeMethods } from "../../symbol";
+import { $controllerPath, $routeMethods } from '../../util/symbol';
 
 
 // Mock Controller Decorator for testing "Bindings"

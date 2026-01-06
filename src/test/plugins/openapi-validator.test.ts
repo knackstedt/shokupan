@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { describe, expect, it } from 'bun:test';
 import getPort from 'get-port';
-import { openApiValidator } from '../../plugins/openapi-validator';
+import { openApiValidator } from '../../plugins/middleware/openapi-validator';
 import { Shokupan } from '../../shokupan';
 
 describe('OpenAPI Validator Plugin', () => {

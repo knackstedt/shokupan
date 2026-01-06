@@ -1,6 +1,6 @@
 import { describe, expect, it, test } from "bun:test";
-import { Controller, Get } from '../../decorators';
 import { ShokupanRouter } from '../../router';
+import { Controller, Get } from '../../util/decorators';
 
 describe("OpenAPI Config & Groups", () => {
     describe("Configurable Defaults", () => {

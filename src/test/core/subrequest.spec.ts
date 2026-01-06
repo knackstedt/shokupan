@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import { ShokupanRouter } from '../../router';
 import { Shokupan } from '../../shokupan';
-import { $dispatch } from '../../symbol';
+import { $dispatch } from '../../util/symbol';
 
 describe("SubRequest (Forking)", () => {
     // Setup app and router once

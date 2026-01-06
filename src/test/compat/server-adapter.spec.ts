@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { createHttpServer } from "../../plugins/server-adapter";
+import { createHttpServer } from "../../plugins/application/http-server";
 import { Shokupan } from "../../shokupan";
 
 describe("Server Adapters", () => {

@@ -1,7 +1,7 @@
 
 import { describe, expect, test } from "bun:test";
-import { Controller, Get } from '../../decorators';
-import { Container, Inject, Injectable } from '../../di';
+import { Controller, Get } from '../../util/decorators';
+import { Container, Inject, Injectable } from '../../util/di';
 import { Shokupan } from '../../shokupan';
 
 // --- Test Fixtures ---

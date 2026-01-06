@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { Compression } from "../../plugins/compression";
-import { Cors } from "../../plugins/cors";
-import { RateLimitMiddleware } from "../../plugins/rate-limit";
-import { SecurityHeaders } from "../../plugins/security-headers";
+import { Compression } from "../../plugins/middleware/compression";
+import { Cors } from "../../plugins/middleware/cors";
+import { RateLimitMiddleware } from "../../plugins/middleware/rate-limit";
+import { SecurityHeaders } from "../../plugins/middleware/security-headers";
 import { Shokupan } from "../../shokupan";
 
 describe("Plugins", () => {

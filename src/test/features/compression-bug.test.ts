@@ -1,6 +1,6 @@
 
 import { describe, expect, test } from "bun:test";
-import { Compression } from "../../plugins/compression";
+import { Compression } from "../../plugins/middleware/compression";
 import { Shokupan } from "../../shokupan";
 
 describe("Compression Plugin Bug", () => {
