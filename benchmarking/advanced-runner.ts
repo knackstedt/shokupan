@@ -717,10 +717,9 @@ async function main() {
     if (!hasAllFlag) {
         const openCmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
         spawn([openCmd, REPORT_PATH]);
-    } else {
-        // In all mode (CI/CD), explicitly exit to prevent hanging
-        process.exit(0);
     }
+
+    process.exit(0);
 }
 
 function generateReport(history: HistoryEntry[], skipAutoOpen = false) {
