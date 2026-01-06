@@ -1,7 +1,7 @@
 import { createHmac, randomUUID } from "crypto";
 import { EventEmitter } from "events";
-import { ShokupanContext } from "../context";
-import type { Middleware } from "../types";
+import { ShokupanContext } from "../../context";
+import type { Middleware } from "../../util/types";
 
 // --- Types ---
 
@@ -208,7 +208,7 @@ export interface SessionContext {
 }
 
 // Merge into ShokupanContext? TODO: Review.
-declare module "../context" {
+declare module "../../context" {
     interface ShokupanContext {
         session: SessionContext['session'];
         sessionID: string;

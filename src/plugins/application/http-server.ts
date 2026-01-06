@@ -1,7 +1,7 @@
 import type { Server } from "bun";
 import * as http from "node:http";
 import * as https from "node:https";
-import type { ServerFactory } from "../types";
+import type { ServerFactory } from "../../util/types";
 
 /**
  * Creates a server factory that uses the standard Node.js `http` module.

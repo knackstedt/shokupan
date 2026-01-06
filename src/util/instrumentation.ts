@@ -1,5 +1,5 @@
 import { SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
-import type { Middleware, ShokupanHandler } from "../types";
+import type { Middleware, ShokupanHandler } from "./types";
 
 const tracer = trace.getTracer("shokupan.middleware");
 

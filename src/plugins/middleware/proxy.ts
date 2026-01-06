@@ -1,6 +1,6 @@
 import type { ServerWebSocket } from "bun";
-import type { ShokupanContext } from "../context";
-import type { Middleware, NextFn } from "../types";
+import type { ShokupanContext } from "../../context";
+import type { Middleware, NextFn } from "../../util/types";
 
 export interface ProxyOptions {
     target: string;

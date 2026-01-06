@@ -1,4 +1,4 @@
-import type { Method, ShokupanHandler } from '../types';
+import type { Method, ShokupanHandler } from './types';
 
 export interface RouteMatch<T = any> {
     handler: ShokupanHandler<T>;

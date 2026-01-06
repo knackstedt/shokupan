@@ -1,6 +1,6 @@
-import type { ShokupanContext } from "../../context";
-import type { Middleware } from "../../types";
-import { datastore } from "../../util/datastore";
+import type { ShokupanContext } from "../../../context";
+import { datastore } from "../../../util/datastore";
+import type { Middleware } from "../../../util/types";
 
 export interface IdempotencyOptions {
     /**

@@ -1,8 +1,8 @@
 // Lazy-loaded dependencies
 let plainToInstance: any;
 let validateOrReject: any;
-import { ShokupanContext } from "../context";
-import type { Middleware } from "../types";
+import { ShokupanContext } from "../../context";
+import type { Middleware } from "../../util/types";
 
 export interface ValidationConfig {
     body?: any;

@@ -1,10 +1,11 @@
 import type { ApiReferenceConfiguration } from '@scalar/api-reference';
 import type { OpenAPI } from '@scalar/openapi-types';
 import { Eta } from 'eta';
-import { OpenAPIAnalyzer } from '../analysis/openapi-analyzer';
-import { ShokupanRouter } from '../router';
-import type { DeepPartial } from '../types';
-import { deepMerge } from '../util/deep-merge';
+import { ShokupanRouter } from '../../router';
+import type { Shokupan } from '../../shokupan';
+import { deepMerge } from '../../util/deep-merge';
+import type { DeepPartial, ShokupanPlugin, ShokupanPluginOptions } from '../../util/types';
+import { OpenAPIAnalyzer } from './openapi/analyzer';
 
 const eta = new Eta();
 
@@ -14,13 +15,24 @@ export type ScalarPluginOptions = {
     enableStaticAnalysis?: boolean;
 };
 
-export class ScalarPlugin extends ShokupanRouter<any> {
+export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
     constructor(
         private readonly pluginOptions: ScalarPluginOptions = {}
     ) {
         pluginOptions.config ??= {};
         super();
         this.init();
+    }
+
+    onInit(app: Shokupan, options?: ShokupanPluginOptions) {
+        if (options?.path) {
+            app.mount(options.path, this);
+        } else {
+            app.mount(options.path ?? '/', this);
+        }
+
+        // Also run onMount logic if needed
+        this.onMount(app);
     }
 
     private init() {

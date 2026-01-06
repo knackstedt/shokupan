@@ -3,7 +3,7 @@ import * as p from '@clack/prompts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { setTimeout } from 'node:timers/promises';
-import { analyzeDirectory } from '../analysis/openapi-analyzer';
+import { analyzeDirectory } from '../plugins/application/openapi/analyzer';
 
 const templates = {
     controller: (name: string) => `import { Controller, Get, Ctx } from 'shokupan';

@@ -1,8 +1,16 @@
 import type { OpenAPI } from '@scalar/openapi-types';
 import type { Server } from 'bun';
 import type { Server as NodeServer } from 'node:http';
-import type { ShokupanContext } from './context';
+import type { ShokupanContext } from '../context';
 import { $isRouter } from "./symbol";
+
+export interface ShokupanPluginOptions {
+    path?: string;
+}
+
+export interface ShokupanPlugin {
+    onInit: (app: any, options?: ShokupanPluginOptions) => void | Promise<void>;
+}
 
 export type DeepPartial<T> = T extends Function ? T : T extends object ? {
     [P in keyof T]?: DeepPartial<T[P]>;

@@ -1,10 +1,10 @@
 import { Eta } from "eta";
 import { readFile } from 'node:fs/promises';
-import type { DebugCollector } from "../../context";
-import { ShokupanRouter } from "../../router";
-import { $appRoot } from "../../symbol";
-import type { ShokupanHooks } from "../../types";
-import { datastore } from "../../util/datastore";
+import type { DebugCollector } from "../../../context";
+import { ShokupanRouter } from "../../../router";
+import { datastore } from "../../../util/datastore";
+import { $appRoot } from "../../../util/symbol";
+import type { ShokupanHooks } from "../../../util/types";
 
 interface RequestMetrics {
     totalRequests: number;

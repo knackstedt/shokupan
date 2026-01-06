@@ -1,6 +1,6 @@
 import Ajv from "ajv";
 import addFormats from "ajv-formats";
-import type { Middleware } from "../types";
+import type { Middleware } from "../../util/types";
 import { ValidationError } from "./validation";
 
 const ajv = new Ajv({ coerceTypes: true, allErrors: true });
@@ -231,7 +231,7 @@ export function precompileValidators(app: any, spec: any) {
  * 
  * @param app The Shokupan application instance
  */
-export function enableOpenApiValidation(app: import("../shokupan").Shokupan) {
+export function enableOpenApiValidation(app: import("../../shokupan").Shokupan) {
     app.use(openApiValidator());
     app.onSpecAvailable((spec) => {
         precompileValidators(app, spec);

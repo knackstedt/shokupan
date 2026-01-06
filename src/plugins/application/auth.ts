@@ -8,8 +8,8 @@ import {
     generateState
 } from "arctic";
 import * as jose from "jose";
-import { ShokupanContext } from "../context";
-import { ShokupanRouter } from "../router";
+import { ShokupanContext } from "../../context";
+import { ShokupanRouter } from "../../router";
 
 export interface AuthUser {
     id: string;
@@ -57,7 +57,10 @@ export interface AuthConfig {
     };
 }
 
-export class AuthPlugin extends ShokupanRouter<any> {
+import type { Shokupan } from "../../shokupan";
+import type { ShokupanPlugin, ShokupanPluginOptions } from "../../util/types";
+
+export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
     private secret: Uint8Array;
 
     constructor(private authConfig: AuthConfig) {
@@ -67,6 +70,15 @@ export class AuthPlugin extends ShokupanRouter<any> {
             : authConfig.jwtSecret;
 
         this.init();
+    }
+
+    onInit(app: Shokupan, options?: ShokupanPluginOptions) {
+        // If registered via app.register(), mount it to root or specified path
+        if (options?.path) {
+            app.mount(options.path, this);
+        } else {
+            app.mount(options.path ?? '/', this);
+        }
     }
 
     private getProviderInstance(name: string, p: ProviderConfig) {

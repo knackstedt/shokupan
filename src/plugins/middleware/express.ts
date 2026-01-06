@@ -1,4 +1,4 @@
-import type { Middleware } from '../types';
+import type { Middleware } from '../../util/types';
 
 /**
  * Adapter to use legacy Express middleware.

@@ -1,4 +1,4 @@
-import { RateLimitMiddleware, type RateLimitOptions } from "./plugins/rate-limit";
+import { RateLimitMiddleware, type RateLimitOptions } from "../plugins/middleware/rate-limit";
 import { $controllerPath, $middleware, $routeArgs, $routeMethods, $routeSpec } from "./symbol";
 import type { GuardAPISpec, MethodAPISpec } from "./types";
 import { type Method, type Middleware, RouteParamType } from "./types";

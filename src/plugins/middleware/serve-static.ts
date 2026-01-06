@@ -1,8 +1,8 @@
 import { Eta } from 'eta';
 import { readdir, readFile, stat } from 'fs/promises';
 import { basename, join, resolve, sep } from 'path';
-import type { ShokupanContext } from '../context';
-import type { Middleware, StaticServeOptions } from '../types';
+import type { ShokupanContext } from '../../context';
+import type { Middleware, StaticServeOptions } from '../../util/types';
 
 const eta = new Eta();
 

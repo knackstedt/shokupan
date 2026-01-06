@@ -1,6 +1,6 @@
 import * as zlib from "node:zlib";
-import type { ShokupanContext } from "../context";
-import type { Middleware, NextFn } from "../types";
+import type { ShokupanContext } from "../../context";
+import type { Middleware, NextFn } from "../../util/types";
 
 export interface CompressionOptions {
     threshold?: number; // Minimum byte size to compress

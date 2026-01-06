@@ -1,8 +1,8 @@
 import { trace } from '@opentelemetry/api';
 import { createHash } from 'node:crypto';
-import type { ShokupanContext } from '../context';
-import type { Middleware } from '../types';
-import { datastore } from '../util/datastore';
+import type { ShokupanContext } from '../../../context';
+import { datastore } from '../../../util/datastore';
+import type { Middleware } from '../../../util/types';
 
 export interface FailedRequestRecorderOptions {
     /**

@@ -1,7 +1,7 @@
-import type { ShokupanRouter } from '../router';
-import { $childControllers, $childRouters, $mountPath, $routes } from '../symbol';
-import type { OpenAPIOptions, ShokupanHandler } from '../types';
-import { deepMerge } from '../util/deep-merge';
+import type { ShokupanRouter } from '../../../router';
+import { deepMerge } from '../../../util/deep-merge';
+import { $childControllers, $childRouters, $mountPath, $routes } from '../../../util/symbol';
+import type { OpenAPIOptions, ShokupanHandler } from '../../../util/types';
 
 /**
  * Regex patterns for analyzing handler source code to infer types.
@@ -257,7 +257,7 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
     // Attempt to run AST Analysis
     let astRoutes: any[] = [];
     try {
-        const { OpenAPIAnalyzer } = await import('../analysis/openapi-analyzer');
+        const { OpenAPIAnalyzer } = await import('./analyzer');
         const analyzer = new OpenAPIAnalyzer(process.cwd());
         const { applications } = await analyzer.analyze();
         astRoutes = await getAstRoutes(applications);

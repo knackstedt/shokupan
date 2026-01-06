@@ -1,9 +1,9 @@
 import type { BodyInit, Server } from 'bun';
 import { readFile } from 'node:fs/promises';
-import type { ShokupanRequest } from './request';
-import { ShokupanResponse } from './response';
 import type { Shokupan } from './shokupan';
-import type { CookieOptions, JSXRenderer } from './types';
+import type { ShokupanRequest } from './util/request';
+import { ShokupanResponse } from './util/response';
+import type { CookieOptions, JSXRenderer } from './util/types';
 
 // Shim for HeadersInit if not available globally in some envs
 type HeadersInit = Headers | Record<string, string> | [string, string][];

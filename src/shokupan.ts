@@ -3,16 +3,16 @@ import "./util/instrumentation";
 import { context, trace } from '@opentelemetry/api';
 import { ShokupanContext } from "./context";
 import { compose } from "./middleware";
-import { generateOpenApi } from "./plugins/openapi";
-import { ShokupanRequest } from './request';
-import { ShokupanRouter } from "./router";
-import { $appRoot, $dispatch, $isApplication } from './symbol';
-import type { Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig } from './types';
+import { generateOpenApi } from "./plugins/application/openapi/openapi";
 import { asyncContext } from "./util/async-hooks";
+import { $appRoot, $dispatch, $isApplication } from './util/symbol';
+import type { Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig, ShokupanPlugin } from './util/types';
 
 
 import type { Server } from 'bun';
+import { ShokupanRouter } from './router';
 import { SystemCpuMonitor } from "./util/cpu-monitor";
+import { ShokupanRequest } from './util/request';
 import { getCallerInfo } from './util/stack';
 
 
@@ -182,6 +182,14 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         return this;
     }
 
+    /**
+     * Registers a plugin.
+     */
+    public register(plugin: ShokupanPlugin, options?: { path?: string; }) {
+        plugin.onInit(this, options);
+        return this;
+    }
+
     private startupHooks: (() => Promise<void> | void)[] = [];
 
     /**
@@ -265,7 +273,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         // Detect if we are not running on Bun
         // @ts-ignore
         if (!factory && typeof Bun === "undefined") {
-            const { createHttpServer } = await import("./plugins/server-adapter");
+            const { createHttpServer } = await import("./plugins/application/http-server");
             factory = createHttpServer();
         }
 
