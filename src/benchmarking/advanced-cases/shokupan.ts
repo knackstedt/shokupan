@@ -1,6 +1,6 @@
-import { Compression } from "../../plugins/compression";
+import { Compression } from "../../plugins/middleware/compression";
 import { Shokupan } from "../../shokupan";
-import type { Middleware, NextFn } from "../../types";
+import type { Middleware, NextFn } from '../../util/types';
 import { COMPRESSIBLE_JSON, LARGE_JSON, md5, serializeRequest } from "../advanced-data";
 
 export async function startAdvanced(port: number, scenario: string) {
