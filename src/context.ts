@@ -415,15 +415,24 @@ export class ShokupanContext<
         const contentType = this.request.headers.get("content-type") || "";
 
         if (contentType.includes("application/json") || contentType.includes("+json")) {
-            // Read directly from stream instead of using req.json()
-            const rawText = await this.readRawBody();
-
-            // Use configured JSON parser (defaults to native if not configured)
+            // Use native JSON parser which is significantly faster (C++)
             const parserType = this.app?.applicationConfig?.jsonParser || 'native';
+
             if (parserType === 'native') {
-                this._cachedBody = JSON.parse(rawText);
+                // Determine if we can use the native request.json() method
+                // We can't use it if we've already read the body or if it's a clone
+                try {
+                    this._cachedBody = await this.request.json();
+                } catch (e) {
+                    // Fallback for empty body or invalid JSON
+                    // If body is empty, return empty object/null based on preference, or let it fail
+                    // But standard behavior for empty JSON request is usually error or empty object
+                    // Re-throwing to match previous behavior
+                    throw e;
+                }
             } else {
-                // Dynamically import the parser utility
+                // For custom parsers, we still need the text
+                const rawText = await this.request.text();
                 const { getJSONParser } = await import('./util/json-parser');
                 const parser = getJSONParser(parserType);
                 this._cachedBody = parser(rawText);
@@ -435,9 +444,8 @@ export class ShokupanContext<
             this._cachedBody = await this.request.formData();
             this._bodyType = 'formData';
         } else {
-            // For large payloads, reading from stream is much faster than request.text()
-            // This bypasses the slow Request API and reads chunks directly
-            this._cachedBody = await this.readRawBody();
+            // Use native text() method
+            this._cachedBody = await this.request.text();
             this._bodyType = 'text';
         }
 

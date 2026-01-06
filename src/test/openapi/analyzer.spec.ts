@@ -10,7 +10,7 @@ async function getSpec(directory: string) {
 
 describe('OpenAPI Analyzer', () => {
     test('should analyze example directory and generate OpenAPI spec', async () => {
-        const exampleDir = path.join(__dirname, '../../example');
+        const exampleDir = path.join(__dirname, '../../../examples');
 
         const spec = await getSpec(exampleDir);
 
@@ -29,7 +29,7 @@ describe('OpenAPI Analyzer', () => {
     });
 
     test('should extract route methods correctly', async () => {
-        const exampleDir = path.join(__dirname, '../../example');
+        const exampleDir = path.join(__dirname, '../../../examples');
 
         const spec = await getSpec(exampleDir);
 
@@ -50,7 +50,7 @@ describe('OpenAPI Analyzer', () => {
     });
 
     test('generated spec should be valid JSON', async () => {
-        const exampleDir = path.join(__dirname, '../../example');
+        const exampleDir = path.join(__dirname, '../../../examples');
 
         const spec = await getSpec(exampleDir);
 

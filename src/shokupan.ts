@@ -4,7 +4,7 @@ import { context, trace } from '@opentelemetry/api';
 import { ShokupanContext } from "./context";
 import { compose } from "./middleware";
 import { generateOpenApi } from "./plugins/application/openapi/openapi";
-import { asyncContext } from "./util/async-hooks";
+import { asyncContext, RequestContextStore } from "./util/async-hooks";
 import { $appRoot, $dispatch, $isApplication } from './util/symbol';
 import type { Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig, ShokupanPlugin } from './util/types';
 
@@ -363,19 +363,19 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             const parent = store?.get("span");
             const ctx = parent ? trace.setSpan(context.active(), parent) : undefined;
             return tracer.startActiveSpan(`${req.method} ${new URL(req.url).pathname}`, attrs, ctx, span => {
-                const ctxMap = new Map();
-                ctxMap.set("span", span);
-                ctxMap.set("request", req);
+                const ctxStore = new RequestContextStore();
+                ctxStore.span = span;
+                ctxStore.request = req;
 
-                return asyncContext.run(ctxMap, () => this.handleRequest(req, server).finally(() => span.end()));
+                return asyncContext.run(ctxStore, () => this.handleRequest(req, server).finally(() => span.end()));
             });
         }
 
         // If ALS is enabled but tracing is not
         if (this.applicationConfig.enableAsyncLocalStorage) {
-            const ctxMap = new Map();
-            ctxMap.set("request", req);
-            return asyncContext.run(ctxMap, () => this.handleRequest(req, server));
+            const ctxStore = new RequestContextStore();
+            ctxStore.request = req;
+            return asyncContext.run(ctxStore, () => this.handleRequest(req, server));
         }
 
         return this.handleRequest(req, server);
@@ -479,7 +479,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             }
             catch (err: any) {
                 console.error(err);
-                const span = asyncContext.getStore()?.get("span");
+                const span = asyncContext.getStore()?.span;
                 if (span) span.setStatus({ code: 2 }); // Error
 
                 const status = err.status || err.statusCode || 500;

@@ -268,7 +268,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         const options = typeof arg === "string" ? { path: arg } : arg;
 
         const store = asyncContext.getStore();
-        const originalReq = store?.get("req") as ShokupanRequest<T>;
+        const originalReq = store?.request as ShokupanRequest<T>;
 
         let url = options.path;
         // If path is relative, make it absolute (required by Request constructor)

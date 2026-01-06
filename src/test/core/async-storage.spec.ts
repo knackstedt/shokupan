@@ -1,7 +1,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { Shokupan } from "../../shokupan";
-import { asyncContext } from "../../util/async-hooks";
+import { asyncContext, RequestContextStore } from "../../util/async-hooks";
 
 describe("AsyncLocalStorage Configuration", () => {
     test("should be disabled by default", async () => {
@@ -30,7 +30,7 @@ describe("AsyncLocalStorage Configuration", () => {
         const res = await app.fetch(new Request("http://localhost/") as any);
         expect(await res.text()).toBe("OK");
         expect(store).toBeDefined();
-        expect(store).toBeInstanceOf(Map);
+        expect(store).toBeInstanceOf(RequestContextStore);
     });
 
     test("should remain disabled if explicitly set to false", async () => {
@@ -52,7 +52,7 @@ describe("AsyncLocalStorage Configuration", () => {
 
         app.use(async (ctx, next) => {
             const store = asyncContext.getStore();
-            store?.set("requestId", "req-123");
+            if (store) store.requestId = "req-123";
             await new Promise(r => setTimeout(r, 10)); // Force async
             return next();
         });
@@ -60,7 +60,7 @@ describe("AsyncLocalStorage Configuration", () => {
         app.get("/", async () => {
             const store = asyncContext.getStore();
             await new Promise(r => setTimeout(r, 10)); // Force async
-            return store?.get("requestId");
+            return store?.requestId;
         });
 
         const res = await app.fetch(new Request("http://localhost/") as any);
@@ -73,14 +73,14 @@ describe("AsyncLocalStorage Configuration", () => {
         app.use(async (ctx, next) => {
             const store = asyncContext.getStore();
             const id = new URL(ctx.request.url).searchParams.get("id");
-            store?.set("id", id);
+            if (store) store.id = id;
             await new Promise(r => setTimeout(r, Math.random() * 20));
             return next();
         });
 
         app.get("/", async () => {
             const store = asyncContext.getStore();
-            return store?.get("id");
+            return store?.id;
         });
 
         const req1 = app.fetch(new Request("http://localhost/?id=1") as any);
