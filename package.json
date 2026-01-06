@@ -26,8 +26,8 @@
         "debug:otel": "sh scripts/debug-otel.sh",
         "docs": "cd docs && bun run dev",
         "build": "vite build",
-        "bench": "cd src/benchmarking && bun runner.ts",
-        "bench:advanced": "cd src/benchmarking && bun advanced-runner.ts",
+        "bench": "cd benchmarking && bun runner.ts",
+        "bench:advanced": "cd benchmarking && bun advanced-runner.ts",
         "retag": "git push origin :refs/tags/v$(node -p \"require('./package.json').version\") 2>/dev/null || true && git tag -d v$(node -p \"require('./package.json').version\") 2>/dev/null || true && git tag v$(node -p \"require('./package.json').version\") && git push origin v$(node -p \"require('./package.json').version\") --force"
     },
     "bin": {

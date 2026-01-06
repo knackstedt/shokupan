@@ -33,13 +33,15 @@
         ]
     },
     "include": [
-        "src"
+        "src",
+        "example",
+        "benchmarking"
     ],
     "exclude": [
         "node_modules",
         "dist",
-        "src/benchmarking",
+        "benchmarking",
         "src/test",
-        "src/example"
+        "example"
     ]
 }
