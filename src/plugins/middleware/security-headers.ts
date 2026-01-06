@@ -2,23 +2,73 @@ import type { ShokupanContext } from "../../context";
 import type { Middleware, NextFn } from "../../util/types";
 
 export interface SecurityHeadersOptions {
+    /**
+     * Content Security Policy
+     */
     contentSecurityPolicy?: boolean | Record<string, any>;
+    /**
+     * Cross-Origin Embedder Policy
+     */
     crossOriginEmbedderPolicy?: boolean;
+    /**
+     * Cross-Origin Opener Policy
+     */
     crossOriginOpenerPolicy?: boolean;
+    /**
+     * Cross-Origin Resource Policy
+     */
     crossOriginResourcePolicy?: boolean;
+    /**
+     * DNS Prefetch Control
+     */
     dnsPrefetchControl?: boolean | { allow: boolean; };
+    /**
+     * Expect CT
+     */
     expectCt?: boolean | { maxAge?: number, enforce?: boolean, reportUri?: string; };
+    /**
+     * Frameguard
+     */
     frameguard?: boolean | { action: 'deny' | 'sameorigin' | 'allow-from', domain?: string; };
+    /**
+     * Hide Powered By
+     */
     hidePoweredBy?: boolean;
+    /**
+     * HTTP Strict Transport Security
+     */
     hsts?: boolean | { maxAge?: number, includeSubDomains?: boolean, preload?: boolean; };
+    /**
+     * IE No Open
+     */
     ieNoOpen?: boolean;
+    /**
+     * No Sniff
+     */
     noSniff?: boolean;
+    /**
+     * Origin Agent Cluster
+     */
     originAgentCluster?: boolean;
+    /**
+     * Permitted Cross Domain Policies
+     */
     permittedCrossDomainPolicies?: boolean | { permittedPolicies: 'none' | 'master-only' | 'by-content-type' | 'all'; };
+    /**
+     * Referrer Policy
+     */
     referrerPolicy?: boolean | { policy: string | string[]; };
+    /**
+     * X-XSS-Protection
+     */
     xssFilter?: boolean;
 }
 
+/**
+ * Security headers middleware.
+ * @param options Security headers options
+ * @returns Middleware function
+ */
 export function SecurityHeaders(options: SecurityHeadersOptions = {}): Middleware {
     const securityHeadersMiddleware: Middleware = async function SecurityHeadersMiddleware(ctx: ShokupanContext, next: NextFn) {
         const headers: Record<string, string> = {};

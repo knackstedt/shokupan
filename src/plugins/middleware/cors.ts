@@ -2,14 +2,37 @@ import type { ShokupanContext } from "../../context";
 import type { Middleware, NextFn } from "../../util/types";
 
 export interface CorsOptions {
+    /**
+     * Origin to allow. Can be a string, array of strings, or function that returns a string.
+     */
     origin?: string | string[] | ((ctx: ShokupanContext) => string | undefined | null | boolean);
+    /**
+     * HTTP methods to allow.
+     */
     methods?: string | string[];
+    /**
+     * HTTP headers to allow.
+     */
     allowedHeaders?: string | string[];
+    /**
+     * HTTP headers to expose.
+     */
     exposedHeaders?: string | string[];
+    /**
+     * Whether to allow credentials.
+     */
     credentials?: boolean;
+    /**
+     * Maximum age of preflight request.
+     */
     maxAge?: number;
 }
 
+/**
+ * CORS middleware.
+ * @param options CORS options
+ * @returns Middleware function
+ */
 export function Cors(options: CorsOptions = {}): Middleware {
     const defaults: CorsOptions = {
         origin: "*",

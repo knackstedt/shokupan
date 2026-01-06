@@ -22,6 +22,12 @@ interface StoredResponse {
     timestamp: number;
 }
 
+/**
+ * Idempotency middleware. This middleware will cache responses based on the idempotency key
+ * to prevent duplicate server processing of requests.
+ * @param options Idempotency options
+ * @returns Middleware
+ */
 export function Idempotency(options: IdempotencyOptions = {}): Middleware {
     const headerName = options.header || "Idempotency-Key";
     const ttl = options.ttl || 24 * 60 * 60 * 1000;

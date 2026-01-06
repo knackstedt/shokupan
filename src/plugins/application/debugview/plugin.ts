@@ -1,6 +1,6 @@
 import { Eta } from "eta";
 import { readFile } from 'node:fs/promises';
-import type { DebugCollector } from "../../../context";
+import type { DebugCollector, ShokupanContext } from "../../../context";
 import { ShokupanRouter } from "../../../router";
 import { datastore } from "../../../util/datastore";
 import { $appRoot } from "../../../util/symbol";
@@ -40,7 +40,13 @@ export interface RequestLog {
 }
 
 export interface DebugDashboardConfig {
-    getRequestHeaders?: () => Record<string, string>;
+    /**
+     * Function to get request headers to include in the debug dashboard
+     */
+    getHeaders?: (ctx: ShokupanContext) => Record<string, string>;
+    /**
+     * Retention time in milliseconds
+     */
     retentionMs?: number;
 }
 
@@ -171,7 +177,7 @@ export class DebugDashboard extends ShokupanRouter {
                 uptime,
                 rootPath: process.cwd(),
                 linkPattern,
-                getRequestHeaders: this.dashboardConfig.getRequestHeaders?.toString()
+                headers: this.dashboardConfig.getHeaders?.(ctx)
             }));
         });
     }

@@ -3,14 +3,33 @@ import type { ShokupanContext } from "../../context";
 import type { Middleware, NextFn } from "../../util/types";
 
 export interface ProxyOptions {
+    /**
+     * Target URL to proxy requests to.
+     */
     target: string;
+    /**
+     * Function to rewrite the path of the request.
+     */
     pathRewrite?: (path: string) => string;
+    /**
+     * Whether to change the origin of the request.
+     */
     changeOrigin?: boolean;
+    /**
+     * Whether to proxy WebSocket connections.
+     */
     ws?: boolean;
+    /**
+     * Additional headers to send with the request.
+     */
     headers?: Record<string, string>;
-    // Security: Whitelist allowed target hosts
+    /**
+     * Whitelist of allowed target hosts.
+     */
     allowedHosts?: string[];
-    // Security: Allow private IPs (disabled by default)
+    /**
+     * Whether to allow private IPs (disabled by default).
+     */
     allowPrivateIPs?: boolean;
 }
 
@@ -48,6 +67,11 @@ function isPrivateIP(ip: string): boolean {
     return false;
 }
 
+/**
+ * Proxy middleware. This will proxy requests that match the path to the target URL.
+ * @param options Proxy options
+ * @returns Middleware function
+ */
 export function Proxy(options: ProxyOptions): Middleware {
     const targetUrl = new URL(options.target);
 

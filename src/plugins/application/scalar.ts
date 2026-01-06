@@ -10,11 +10,30 @@ import { OpenAPIAnalyzer } from './openapi/analyzer';
 const eta = new Eta();
 
 export type ScalarPluginOptions = {
+    /**
+     * Base document to use for API reference.
+     */
     baseDocument?: DeepPartial<OpenAPI.Document>;
+    /**
+     * Configuration for API reference.
+     */
     config?: Partial<ApiReferenceConfiguration>;
+    /**
+     * Whether to enable static analysis.
+     * When this is enabled, the plugin will run static analysis on the entrypoint
+     * and generate an OpenAPI document. This is useful for when you want to generate
+     * an OpenAPI document without having to manually define it.
+     * 
+     * Only works with TypeScript entrypoints.
+     */
     enableStaticAnalysis?: boolean;
 };
 
+/**
+ * Scalar plugin. This plugin provides an API reference interface for your API.
+ * @param options Scalar plugin options
+ * @returns Scalar plugin instance
+ */
 export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
     constructor(
         private readonly pluginOptions: ScalarPluginOptions = {}

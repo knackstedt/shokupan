@@ -57,6 +57,11 @@ interface HitRecord {
     resetTime: number;
 }
 
+/**
+ * Rate limit middleware.
+ * @param options Rate limit options
+ * @returns Middleware function
+ */
 export function RateLimitMiddleware(options: RateLimitOptions = {}): Middleware {
     const windowMs = options.windowMs || 60 * 1000; // 1 minute
     const max = options.limit || options.max || 5; // 5 requests per window

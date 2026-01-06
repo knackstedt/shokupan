@@ -10,6 +10,8 @@ import {
 import * as jose from "jose";
 import { ShokupanContext } from "../../context";
 import { ShokupanRouter } from "../../router";
+import type { Shokupan } from "../../shokupan";
+import type { ShokupanPlugin, ShokupanPluginOptions } from "../../util/types";
 
 export interface AuthUser {
     id: string;
@@ -21,30 +23,93 @@ export interface AuthUser {
 }
 
 export interface ProviderConfig {
+    /**
+     * Client ID
+     */
     clientId: string;
+    /**
+     * Client secret
+     */
     clientSecret: string;
+    /**
+     * Redirect URI
+     */
     redirectUri: string; // Must be absolute
+    /**
+     * Scopes
+     */
     scopes?: string[];
-    tenantId?: string; // For MS
-    domain?: string; // For Auth0, Okta
-    teamId?: string; // For Apple
-    keyId?: string; // For Apple
-    authUrl?: string; // For generic OAuth2
-    tokenUrl?: string; // For generic OAuth2
-    userInfoUrl?: string; // For generic OAuth2
+    /**
+     * Tenant ID (MSFT AD)
+     */
+    tenantId?: string;
+    /**
+     * Domain (Auth0, Okta)
+     */
+    domain?: string;
+    /**
+     * Team ID (Apple)
+     */
+    teamId?: string;
+    /**
+     * Key ID (Apple)
+     */
+    keyId?: string;
+    /**
+     * Auth URL (Generic OAuth2)
+     */
+    authUrl?: string;
+    /**
+     * Token URL (Generic OAuth2)
+     */
+    tokenUrl?: string;
+    /**
+     * User info URL (Generic OAuth2)
+     */
+    userInfoUrl?: string;
 }
 
 export interface AuthConfig {
+    /**
+     * JWT secret
+     */
     jwtSecret: string | Uint8Array;
+    /**
+     * JWT expiration
+     */
     jwtExpiration?: string; // e.g. "2h"
+    /**
+     * Cookie options
+     */
     cookieOptions?: {
+        /**
+         * HTTP only
+         */
         httpOnly?: boolean;
+        /**
+         * Secure
+         */
         secure?: boolean;
+        /**
+         * Same site
+         */
         sameSite?: "Strict" | "Lax" | "None";
+        /**
+         * Path
+         */
         path?: string;
+        /**
+         * Max age
+         */
         maxAge?: number;
     };
+    /**
+     * Success callback
+     */
     onSuccess?: (user: AuthUser, ctx: ShokupanContext) => Promise<any> | any;
+    /**
+     * Providers
+     */
     providers: {
         github?: ProviderConfig;
         google?: ProviderConfig;
@@ -57,9 +122,9 @@ export interface AuthConfig {
     };
 }
 
-import type { Shokupan } from "../../shokupan";
-import type { ShokupanPlugin, ShokupanPluginOptions } from "../../util/types";
-
+/**
+ * Authentication plugin
+ */
 export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
     private secret: Uint8Array;
 

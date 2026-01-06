@@ -3,11 +3,24 @@ import type { ShokupanContext } from "../../context";
 import type { Middleware, NextFn } from "../../util/types";
 
 export interface CompressionOptions {
-    threshold?: number; // Minimum byte size to compress
+    /**
+     * Minimum byte size to compress
+     */
+    threshold?: number;
+    /**
+     * Allowed algorithms
+     */
+    allowedAlgorithms?: string[];
 }
 
+/**
+ * Compression middleware.
+ * @param options Compression options
+ * @returns Middleware function
+ */
 export function Compression(options: CompressionOptions = {}): Middleware {
     const threshold = options.threshold ?? 512; // 512 bytes default
+    const allowedAlgorithms = new Set(options.allowedAlgorithms ?? ['br', 'gzip', 'zstd', 'deflate']);
 
     const compressionMiddleware: Middleware = async function CompressionMiddleware(ctx: ShokupanContext, next: NextFn) {
         const acceptEncoding = ctx.headers.get("accept-encoding") || "";
@@ -26,6 +39,10 @@ export function Compression(options: CompressionOptions = {}): Middleware {
         else if (acceptEncoding.includes("deflate")) method = "deflate";
 
         if (!method) return next();
+
+        if (!allowedAlgorithms.has(method)) {
+            return next();
+        }
 
         let response = await next();
 
@@ -115,6 +132,7 @@ export function Compression(options: CompressionOptions = {}): Middleware {
 
         return response;
     };
+
     compressionMiddleware.isBuiltin = true;
     compressionMiddleware.pluginName = 'Compression';
     return compressionMiddleware;

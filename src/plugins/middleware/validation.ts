@@ -171,6 +171,11 @@ function getValidator(schema: any): (data: any) => Promise<any> | any {
     throw new Error("Unknown validator type provided. Please use a supported library (Zod, Ajv, TypeBox) or a custom function.");
 }
 
+/**
+ * Validation middleware.
+ * @param config Validation configuration
+ * @returns Middleware function
+ */
 export function validate(config: ValidationConfig): Middleware {
     // Pre-compilation: Resolve validators for each part
     const validators: {

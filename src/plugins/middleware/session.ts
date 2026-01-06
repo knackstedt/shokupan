@@ -11,38 +11,119 @@ export interface SessionData {
 }
 
 export interface SessionCookieOptions {
+    /**
+     * Maximum age of the session cookie in milliseconds.
+     */
     maxAge?: number;
+    /**
+     * Whether the session cookie should be signed.
+     */
     signed?: boolean;
+    /**
+     * Expiration date of the session cookie.
+     */
     expires?: Date;
+    /**
+     * Whether the session cookie should be HTTP-only.
+     */
     httpOnly?: boolean;
+    /**
+     * Path of the session cookie.
+     */
     path?: string;
+    /**
+     * Domain of the session cookie.
+     */
     domain?: string;
+    /**
+     * Whether the session cookie should be secure.
+     */
     secure?: boolean | 'auto';
+    /**
+     * SameSite attribute of the session cookie.
+     */
     sameSite?: boolean | 'lax' | 'strict' | 'none';
+    /**
+     * Priority of the session cookie.
+     */
     priority?: 'low' | 'medium' | 'high';
 }
 
 export interface SessionOptions {
+    /**
+     * Secret used to sign the session cookie.
+     */
     secret: string | string[];
+    /**
+     * Name of the session cookie.
+     */
     name?: string;
+    /**
+     * Store to use for session data.
+     */
     store?: Store;
+    /**
+     * Options for the session cookie.
+     */
     cookie?: SessionCookieOptions;
+    /**
+     * Function to generate a session ID.
+     */
     genid?: (ctx: ShokupanContext) => string;
+    /**
+     * Whether to force a session identifier cookie to be set on every response.
+     */
     resave?: boolean;
+    /**
+     * Whether to save the session on every request.
+     */
     saveUninitialized?: boolean;
+    /**
+     * Whether to update the session cookie on every request.
+     */
     rolling?: boolean;
+    /**
+     * Whether to destroy or keep the session on logout.
+     */
     unset?: 'destroy' | 'keep';
 }
 
 export interface Store extends EventEmitter {
+    /**
+     * Retrieves a session by ID.
+     */
     get(sid: string, callback: (err: any, session?: SessionData | null) => void): void;
+    /**
+     * Stores a session.
+     */
     set(sid: string, session: SessionData, callback?: (err?: any) => void): void;
+    /**
+     * Destroys a session.
+     */
     destroy(sid: string, callback?: (err?: any) => void): void;
+    /**
+     * Touches a session.
+     */
     touch?(sid: string, session: SessionData, callback?: (err?: any) => void): void;
+    /**
+     * Retrieves all sessions.
+     */
     all?(callback: (err: any, obj?: { [sid: string]: SessionData; } | null) => void): void;
+    /**
+     * Retrieves the number of sessions.
+     */
     length?(callback: (err: any, length?: number) => void): void;
+    /**
+     * Clears all sessions.
+     */
     clear?(callback?: (err?: any) => void): void;
+    /**
+     * Loads a session.
+     */
     load?(sid: string, fn: (err: any, session?: SessionData | null) => void): void;
+    /**
+     * Creates a session.
+     */
     createSession?(req: any, session: SessionData): SessionData;
 }
 
@@ -123,12 +204,12 @@ export class MemoryStore extends EventEmitter implements Store {
 
     set(sid: string, sess: SessionData, cb?: (err?: any) => void) {
         this.sessions[sid] = JSON.stringify(sess);
-        cb && cb();
+        cb?.();
     }
 
     destroy(sid: string, cb?: (err?: any) => void) {
         delete this.sessions[sid];
-        cb && cb();
+        cb?.();
     }
 
     touch(sid: string, sess: SessionData, cb?: (err?: any) => void) {
@@ -138,7 +219,7 @@ export class MemoryStore extends EventEmitter implements Store {
             // But for MemoryStore, just set is fine
             this.sessions[sid] = JSON.stringify(sess);
         }
-        cb && cb();
+        cb?.();
     }
 
     all(cb: (err: any, obj?: { [sid: string]: SessionData; } | null) => void) {
@@ -155,7 +236,7 @@ export class MemoryStore extends EventEmitter implements Store {
 
     clear(cb?: (err?: any) => void) {
         this.sessions = {};
-        cb && cb();
+        cb?.();
     }
 }
 
@@ -216,6 +297,11 @@ declare module "../../context" {
     }
 }
 
+/**
+ * Session middleware.
+ * @param options Session options
+ * @returns Middleware function
+ */
 export function Session(options: SessionOptions): Middleware {
     const store = options.store || new MemoryStore();
     const name = options.name || 'connect.sid';
