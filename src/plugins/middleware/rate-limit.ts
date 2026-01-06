@@ -2,16 +2,53 @@ import type { ShokupanContext } from "../../context";
 import type { Middleware, NextFn } from "../../util/types";
 
 export interface RateLimitOptions {
+    /**
+     * Window in milliseconds
+     */
     windowMs?: number;
+    /**
+     * Maximum number of requests allowed in the window
+     */
     max?: number;
-    limit?: number; // Alias for max
-    message?: string | object;
+    /**
+     * Alias for max
+     */
+    limit?: number;
+    /**
+     * Message to send when rate limited
+     */
+    message?: string | object | ((ctx: ShokupanContext, key: string) => string | object);
+    /**
+     * Status code to send when rate limited
+     */
     statusCode?: number;
+    /**
+     * Whether to include X-RateLimit headers in the response
+     */
     headers?: boolean;
+    /**
+     * Function to generate a unique key for each request
+     * This is used to identify the user or source of the request
+     * Defaults to the request's ip address.
+     */
     keyGenerator?: (ctx: ShokupanContext) => string;
+    /**
+     * Function to execute when a request is rate limited
+     */
+    onRateLimited?: (ctx: ShokupanContext, key: string) => void | Response | Promise<void | Response>;
+    /**
+     * Function to determine whether to skip rate limiting
+     */
     skip?: (ctx: ShokupanContext) => boolean;
+    /**
+     * Mode to use for rate limiting
+     * - user: Rate limit per user (generated key, defaults to ip address)
+     * - absolute: Rate limit for all users
+     */
     mode?: 'user' | 'absolute';
-    // Security: List of trusted proxy IPs
+    /**
+     * List of trusted proxy IPs
+     */
     trustedProxies?: string[];
 }
 
@@ -110,9 +147,17 @@ export function RateLimitMiddleware(options: RateLimitOptions = {}): Middleware 
 
         if (record.hits > max) {
 
+            if (options.onRateLimited) {
+                const result = await options.onRateLimited(ctx, key);
+                if (result instanceof Response) {
+                    return result;
+                }
+            }
+
             // Dispatch 429
-            const body = typeof message === 'object' ? JSON.stringify(message) : String(message);
-            const res = typeof message === 'object' ? ctx.json(message, statusCode) : ctx.text(String(message), statusCode);
+            const msg = typeof message === 'function' ? message(ctx, key) : message;
+            const body = typeof msg === 'object' ? JSON.stringify(msg) : String(msg);
+            const res = typeof msg === 'object' ? ctx.json(msg, statusCode) : ctx.text(String(msg), statusCode);
 
             if (headers) {
                 setHeaders(res);
