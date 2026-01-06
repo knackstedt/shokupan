@@ -11,7 +11,7 @@ import { ShokupanRequest } from './util/request';
 import { getCallerInfo } from './util/stack';
 import { $appRoot, $childControllers, $childRouters, $controllerPath, $dispatch, $isApplication, $isMounted, $isRouter, $middleware, $mountPath, $parent, $routeArgs, $routeMethods, $routes, $routeSpec } from './util/symbol';
 import { RouterTrie } from './util/trie';
-import { type GuardAPISpec, HeadersInit, HTTPMethods, type JSXRenderer, type Method, type MethodAPISpec, type Middleware, type OpenAPIOptions, type ProcessResult, type RequestOptions, type RouteMetadata, type RouteParams, RouteParamType, type ShokupanController, type ShokupanHandler, type ShokupanHooks, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions } from './util/types';
+import { type GuardAPISpec, type HeadersInit, HTTPMethods, type JSXRenderer, type Method, type MethodAPISpec, type Middleware, type OpenAPIOptions, type ProcessResult, type RequestOptions, type RouteMetadata, type RouteParams, RouteParamType, type ShokupanController, type ShokupanHandler, type ShokupanHooks, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions } from './util/types';
 
 
 export const RouterRegistry = new Map<string, ShokupanRouter<any>>();
@@ -902,7 +902,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         if (effectiveRenderer) {
             const innerHandler = wrappedHandler;
             wrappedHandler = async (ctx: ShokupanContext<T>) => {
-                ctx.renderer = effectiveRenderer;
+                ctx.setRenderer(effectiveRenderer);
                 return innerHandler(ctx);
             };
         }

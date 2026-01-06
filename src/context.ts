@@ -133,6 +133,14 @@ export class ShokupanContext<
     private _cachedOrigin?: string;
     private _cachedQuery?: Record<string, any>;
 
+    /**
+     * JSX Rendering Function
+     */
+    private renderer?: JSXRenderer;
+    setRenderer(renderer: JSXRenderer) {
+        this.renderer = renderer;
+    }
+
     constructor(
         public readonly request: ShokupanRequest<any>,
         public readonly server?: Server,
@@ -667,11 +675,6 @@ export class ShokupanContext<
             return this._finalResponse;
         }
     }
-
-    /**
-     * JSX Rendering Function
-     */
-    public renderer?: JSXRenderer;
 
     /**
      * Render a JSX element
