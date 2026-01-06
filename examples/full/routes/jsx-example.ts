@@ -1,5 +1,5 @@
-import { ShokupanRouter } from '../../router';
-import type { JSXRenderer } from '../../types';
+import { ShokupanRouter } from '../../../src/router';
+import type { JSXRenderer } from '../../../src/util/types';
 
 /**
  * JSX Rendering Examples

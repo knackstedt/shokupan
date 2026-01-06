@@ -1,8 +1,8 @@
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsEmail, IsEnum, IsInt, IsNumber, IsOptional, IsPositive, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import 'reflect-metadata';
-import { validate } from '../../../plugins/validation';
-import { ShokupanRouter } from '../../../router';
+import { validate } from '../../../../src/plugins/middleware/validation';
+import { ShokupanRouter } from '../../../../src/router';
 
 /**
  * class-validator Examples

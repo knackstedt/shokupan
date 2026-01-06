@@ -1,5 +1,5 @@
 
-import { ShokupanRouter } from '../../router';
+import { ShokupanRouter } from '../../../src/router';
 
 export class TrackingDemoRouter extends ShokupanRouter {
     constructor() {

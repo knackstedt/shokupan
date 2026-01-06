@@ -1,4 +1,4 @@
-import { Body, Get, Param, Post, Query } from "../../decorators";
+import { Body, Get, Param, Post, Query } from '../../../src/util/decorators';
 
 export class UserController {
 

@@ -1,12 +1,12 @@
 import axios from 'axios';
-import { ShokupanRouter } from '../../router';
+import { ShokupanRouter } from '../../../src/router';
 
 const router = new ShokupanRouter();
 
 router.get("/service_fetch", async (ctx) => {
     const [data, data2] = await Promise.all([
-        router.subRequest("/wines/red"),
-        router.subRequest("/wines/white")
+        router.internalRequest("/wines/red"),
+        router.internalRequest("/wines/white")
     ]);
     return { data, data2 };
 });

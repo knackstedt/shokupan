@@ -1,7 +1,7 @@
 
-import { Shokupan } from '../shokupan';
+import { ShokupanContext } from '../../src/context';
+import { Shokupan } from '../../src/shokupan';
 import { Get, Post } from '../decorators';
-import { ShokupanContext } from '../context';
 import { enableOpenApiValidation } from '../plugins/openapi-validator';
 
 // 1. Define a Controller with Decorators

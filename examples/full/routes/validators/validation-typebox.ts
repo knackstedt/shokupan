@@ -1,7 +1,7 @@
 import { Type } from '@sinclair/typebox';
 import { TypeCompiler } from '@sinclair/typebox/compiler';
-import { validate } from '../../../plugins/validation';
-import { ShokupanRouter } from '../../../router';
+import { validate } from '../../../../src/plugins/middleware/validation';
+import { ShokupanRouter } from '../../../../src/router';
 
 // Helper to compile schemas for Shokupan validation
 const C = (schema: any) => TypeCompiler.Compile(schema);

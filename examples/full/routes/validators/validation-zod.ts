@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { validate } from '../../../plugins/validation';
-import { ShokupanRouter } from '../../../router';
+import { validate } from '../../../../src/plugins/middleware/validation';
+import { ShokupanRouter } from '../../../../src/router';
 
 /**
  * Zod Validation Examples

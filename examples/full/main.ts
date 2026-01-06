@@ -1,13 +1,17 @@
 import "./otel";
 
-import { Compression } from '../plugins/compression';
-import { Cors } from '../plugins/cors';
-import { DebugDashboard } from '../plugins/debugview/plugin';
-import { RateLimitMiddleware } from '../plugins/rate-limit';
-import { ScalarPlugin } from '../plugins/scalar';
-import { SecurityHeaders } from '../plugins/security-headers';
-import { Session } from '../plugins/session';
-import { Shokupan } from '../shokupan';
+// Default to memory DB for example/dev server to avoid file locks (rocksdb)
+// when running multiple instances or tests concurrently.
+process.env['SHOKUPAN_DB_ENGINE'] = process.env['SHOKUPAN_DB_ENGINE'] || 'memory';
+
+import { DebugDashboard } from '../../src/plugins/application/debugview/plugin';
+import { ScalarPlugin } from '../../src/plugins/application/scalar';
+import { Compression } from '../../src/plugins/middleware/compression';
+import { Cors } from '../../src/plugins/middleware/cors';
+import { RateLimitMiddleware } from '../../src/plugins/middleware/rate-limit';
+import { SecurityHeaders } from '../../src/plugins/middleware/security-headers';
+import { Session } from '../../src/plugins/middleware/session';
+import { Shokupan } from '../../src/shokupan';
 import { DecoratorTestController } from './controllers/decorator-controller';
 import { UserController } from './controllers/implicit-controller';
 import { appLevelHooks, HooksExampleRouter, PerRouteHooksRouter } from './routes/hooks-example';
@@ -20,10 +24,18 @@ import { TypeBoxValidationRouter } from './routes/validators/validation-typebox'
 import { ValibotValidationRouter } from './routes/validators/validation-valibot';
 import { ZodValidationRouter } from './routes/validators/validation-zod';
 
-type session = {
-    profile: any,
-    lastAccess: Date;
-};
+/**
+ * Application State Interface
+ * 
+ * Defines the shape of ctx.state for all routes in this application.
+ * This provides type safety when accessing state in middleware and handlers.
+ */
+interface AppState {
+    session: {
+        profile: any;
+        lastAccess: Date;
+    };
+}
 
 /**
  * Comprehensive Shokupan Example Application
@@ -41,14 +53,13 @@ type session = {
  */
 
 const dashboard = new DebugDashboard({
-    getRequestHeaders: () => ({
+    getHeaders: () => ({
         "Authorization": "Bearer my-secret-token"
     })
 });
 
-const app = new Shokupan<{
-    session: session;
-}>({
+// Create app with typed state for session management
+const app = new Shokupan<AppState>({
     port: 3000,
     development: true,
     enableOpenApiGen: true,
@@ -222,6 +233,9 @@ app.use(RateLimitMiddleware({
     headers: true
 }));
 
+app.get("/path/:param", ctx => {
+    ctx.text(ctx.params.param);
+});
 
 // ============================================================================
 // MOUNT FEATURE EXAMPLES
@@ -308,9 +322,9 @@ Explore the different sections to see examples of each feature.
 
 console.log(`
 ╔═══════════════════════════════════════════════════════════════╗
-║                                                                 ║
-║         🍞 Shokupan Comprehensive Example Server 🍞             ║
-║                                                                 ║
+║                                                               ║
+║         🍞 Shokupan Comprehensive Example Server 🍞           ║
+║                                                               ║
 ╚═══════════════════════════════════════════════════════════════╝
 
 🚀 Server starting with ALL features enabled:

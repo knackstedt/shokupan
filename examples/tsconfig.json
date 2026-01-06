@@ -1,9 +1,15 @@
 {
     "compilerOptions": {
         "noPropertyAccessFromIndexSignature": false,
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
+        "esModuleInterop": true
     },
     "include": [
         "./**/*"
+    ],
+    "exclude": [
+        "node_modules"
     ],
     "extends": "../../tsconfig.json"
 }

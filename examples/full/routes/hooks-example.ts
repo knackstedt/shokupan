@@ -1,5 +1,5 @@
-import { ShokupanRouter } from '../../router';
-import type { ShokupanHooks } from '../../types';
+import { ShokupanRouter } from '../../../src/router';
+import type { ShokupanHooks } from '../../../src/util/types';
 
 /**
  * Event Hooks Examples

@@ -1,4 +1,4 @@
-import { ShokupanRouter } from '../../router';
+import { ShokupanRouter } from '../../../src/router';
 
 /**
  * Dependency Injection Examples

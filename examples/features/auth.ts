@@ -1,6 +1,6 @@
 
+import { Shokupan } from '../../src/shokupan';
 import { AuthPlugin } from '../plugins/auth';
-import { Shokupan } from '../shokupan';
 
 const app = new Shokupan({
     port: 3002

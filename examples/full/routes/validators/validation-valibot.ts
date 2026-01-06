@@ -1,6 +1,6 @@
 import * as v from 'valibot';
-import { valibot, validate } from '../../../plugins/validation';
-import { ShokupanRouter } from '../../../router';
+import { valibot, validate } from '../../../../src/plugins/middleware/validation';
+import { ShokupanRouter } from '../../../../src/router';
 
 /**
  * Valibot Validation Examples

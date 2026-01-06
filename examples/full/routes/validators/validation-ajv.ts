@@ -1,7 +1,7 @@
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
-import { validate } from '../../../plugins/validation';
-import { ShokupanRouter } from '../../../router';
+import { validate } from '../../../../src/plugins/middleware/validation';
+import { ShokupanRouter } from '../../../../src/router';
 
 /**
  * Ajv Validation Examples
