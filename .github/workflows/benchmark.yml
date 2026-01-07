@@ -26,7 +26,7 @@ jobs:
       - name: Install Main Dependencies
         run: bun install
       - name: Install Bench Dependencies
-        working-directory: src/benchmarking
+        working-directory: benchmarking
         run: bun install
     
       - name: Run Basic benchmark
