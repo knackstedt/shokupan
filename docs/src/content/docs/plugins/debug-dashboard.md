@@ -3,7 +3,7 @@ title: Debug Dashboard
 description: Visual dashboard for inspecting your Shokupan application.
 ---
 
-The `DebugDashboard` provides a visual interface to inspect your running application. It allows you to:
+The `Dashboard` provides a visual interface to inspect your running application. It allows you to:
 
 - View real-time metrics (requests/sec, errors, latency).
 - Visualize the middleware graph and request flow.
@@ -16,10 +16,10 @@ The `DebugDashboard` provides a visual interface to inspect your running applica
 ## Installation
 
 ```typescript
-import { DebugDashboard } from 'shokupan';
+import { Dashboard } from 'shokupan';
 
 // Mount the dashboard at a path of your choice
-app.mount('/debug', new DebugDashboard({
+app.mount('/debug', new Dashboard({
     retentionMs: 7200000 // Keep logs for 2 hours
 }));
 ```

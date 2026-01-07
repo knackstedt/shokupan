@@ -932,10 +932,10 @@ This works great when combined with the Debug Dashboard.
 A visual dashboard to inspect your application, view metrics, analyze the middleware graph, and replay failed requests.
 
 ```typescript
-import { DebugDashboard } from 'shokupan';
+import { Dashboard } from 'shokupan';
 
 // Mount the dashboard
-app.mount('/debug', new DebugDashboard({
+app.mount('/debug', new Dashboard({
     retentionMs: 2 * 60 * 60 * 1000, // Keep 2 hours of logs
     getRequestHeaders: () => ({
         'Authorization': 'Bearer ...' // Headers to using when replaying requests and accessing data APIs

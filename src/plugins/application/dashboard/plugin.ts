@@ -39,7 +39,7 @@ export interface RequestLog {
     handlerStack?: any[];
 }
 
-export interface DebugDashboardConfig {
+export interface DashboardConfig {
     /**
      * Function to get request headers to include in the debug dashboard
      */
@@ -53,7 +53,7 @@ export interface DebugDashboardConfig {
 class Collector implements DebugCollector {
     private currentNode: string | undefined;
 
-    constructor(private dashboard: DebugDashboard) { }
+    constructor(private dashboard: Dashboard) { }
 
     trackStep(id: string | undefined, type: string, duration: number, status: 'success' | 'error', error?: any) {
         if (!id) return;
@@ -74,7 +74,7 @@ class Collector implements DebugCollector {
     }
 }
 
-export class DebugDashboard extends ShokupanRouter {
+export class Dashboard extends ShokupanRouter {
     private metrics: RequestMetrics = {
         totalRequests: 0,
         successfulRequests: 0,
@@ -95,7 +95,7 @@ export class DebugDashboard extends ShokupanRouter {
     private startTime = Date.now();
     private instrumented = false;
 
-    constructor(private readonly dashboardConfig: DebugDashboardConfig = {}) {
+    constructor(private readonly dashboardConfig: DashboardConfig = {}) {
         super();
 
         this.get("/metrics", (ctx) => {

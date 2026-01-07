@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 import tap from 'supertest';
-import { DebugDashboard } from '../../plugins/application/debugview/plugin';
+import { Dashboard } from '../../plugins/application/debugview/plugin';
 import { Shokupan } from '../../shokupan';
 
 describe('Debug Dashboard Plugin', () => {
     it('should collect metrics and render the dashboard', async () => {
-        const dashboard = new DebugDashboard();
+        const dashboard = new Dashboard();
         const app = new Shokupan({
             port: 0,
             hooks: dashboard.getHooks()

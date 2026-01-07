@@ -4,7 +4,7 @@ import "./otel";
 // when running multiple instances or tests concurrently.
 process.env['SHOKUPAN_DB_ENGINE'] = process.env['SHOKUPAN_DB_ENGINE'] || 'memory';
 
-import { DebugDashboard } from '../../src/plugins/application/debugview/plugin';
+import { Dashboard } from '../../src/plugins/application/debugview/plugin';
 import { ScalarPlugin } from '../../src/plugins/application/scalar';
 import { Compression } from '../../src/plugins/middleware/compression';
 import { Cors } from '../../src/plugins/middleware/cors';
@@ -52,7 +52,7 @@ interface AppState {
  * - Timeouts: Request, read, and write timeouts
  */
 
-const dashboard = new DebugDashboard({
+const dashboard = new Dashboard({
     getHeaders: () => ({
         "Authorization": "Bearer my-secret-token"
     })
