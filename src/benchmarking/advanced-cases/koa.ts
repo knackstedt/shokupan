@@ -1,7 +1,7 @@
 import Router from "@koa/router";
 import Koa from "koa";
 import bodyParser from "koa-bodyparser";
-import { COMPRESSIBLE_JSON, LARGE_JSON, md5, serializeRequest } from "../advanced-data";
+import { COMPRESSIBLE_JSON, LARGE_JSON, SMALL_JSON, md5, serializeRequest } from "../advanced-data";
 
 export async function startAdvanced(port: number, scenario: string) {
     const app = new Koa();
@@ -127,6 +127,22 @@ export async function startAdvanced(port: number, scenario: string) {
             router.get("/property/path", (ctx) => {
                 ctx.body = ctx.path;
             });
+            break;
+
+        // Multi-process tests
+        case "multi-process":
+            app.use(router.get("/small-get", (ctx) => {
+                ctx.body = SMALL_JSON;
+            }).routes());
+
+            app.use(router.get("/large-get", (ctx) => {
+                ctx.body = LARGE_JSON;
+            }).routes());
+
+            app.use(router.post("/large-post", (ctx) => {
+                const bodyLength = typeof ctx.request.body === 'string' ? ctx.request.body.length : 0;
+                ctx.body = { ъreceived: bodyLength };
+            }).routes());
             break;
 
         default:

@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { COMPRESSIBLE_JSON, LARGE_JSON, md5, serializeRequest } from "../advanced-data";
+import { COMPRESSIBLE_JSON, LARGE_JSON, SMALL_JSON, md5, serializeRequest } from "../advanced-data";
 
 export async function startAdvanced(port: number, scenario: string) {
     // Elysia is Bun-only - it doesn't work on Node.js
@@ -99,6 +99,18 @@ export async function startAdvanced(port: number, scenario: string) {
         // Property access test
         case "property-access":
             app.get("/property/path", ({ path }) => path);
+            break;
+
+        // Multi-process tests
+        case "multi-process":
+            app.get("/small-get", () => SMALL_JSON);
+
+            app.get("/large-get", () => LARGE_JSON);
+
+            app.post("/large-post", ({ body }) => {
+                const bodyLength = typeof body === 'string' ? body.length : 0;
+                return { received: bodyLength };
+            });
             break;
 
         default:

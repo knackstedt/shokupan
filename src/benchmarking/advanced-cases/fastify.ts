@@ -1,5 +1,5 @@
 import fastify from "fastify";
-import { COMPRESSIBLE_JSON, LARGE_JSON, md5, serializeRequest } from "../advanced-data";
+import { COMPRESSIBLE_JSON, LARGE_JSON, SMALL_JSON, md5, serializeRequest } from "../advanced-data";
 
 export async function startAdvanced(port: number, scenario: string) {
     const app = fastify({ logger: false });
@@ -119,6 +119,22 @@ export async function startAdvanced(port: number, scenario: string) {
         case "property-access":
             app.get("/property/path", async (request, reply) => {
                 return request.url;
+            });
+            break;
+
+        // Multi-process tests
+        case "multi-process":
+            app.get("/small-get", async (request, reply) => {
+                return SMALL_JSON;
+            });
+
+            app.get("/large-get", async (request, reply) => {
+                return LARGE_JSON;
+            });
+
+            app.post("/large-post", async (request, reply) => {
+                const bodyLength = typeof request.body === 'string' ? request.body.length : 0;
+                return { received: bodyLength };
             });
             break;
 

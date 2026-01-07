@@ -1,10 +1,20 @@
 import { createHash } from "node:crypto";
 
+// Small JSON response (~100 bytes) for multi-process testing
+export const SMALL_JSON = {
+    status: "ok",
+    message: "Hello World",
+    timestamp: new Date().toISOString()
+};
+
 // Large JSON response (~5MB) for compression and large payload testing
 export const LARGE_JSON = generateLargeJSON();
 
 // Large request body (~10MB)
 export const LARGE_REQUEST_BODY = generateLargeText(10 * 1024 * 1024);
+
+// Large POST body (~1MB) for multi-process testing
+export const LARGE_POST_BODY = generateLargeText(1 * 1024 * 1024);
 
 // Large headers (100 headers) for header stress testing
 export const LARGE_HEADERS = generateLargeHeaders();

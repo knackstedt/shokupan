@@ -2,7 +2,7 @@ import type { NestMiddleware } from "@nestjs/common";
 import { Body, Controller, Get, Injectable, Module, Param, Post, Res } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import "reflect-metadata";
-import { COMPRESSIBLE_JSON, LARGE_JSON, md5, serializeRequest } from "../advanced-data";
+import { COMPRESSIBLE_JSON, LARGE_JSON, SMALL_JSON, md5, serializeRequest } from "../advanced-data";
 
 let currentScenario: string = "";
 
@@ -80,6 +80,23 @@ class AppController {
     async getDelayed() {
         await new Promise(r => setTimeout(r, 100));
         return "done";
+    }
+
+    // Multi-process tests
+    @Get('/small-get')
+    getSmallGet() {
+        return SMALL_JSON;
+    }
+
+    @Get('/large-get')
+    getLargeGet() {
+        return LARGE_JSON;
+    }
+
+    @Post('/large-post')
+    postLargePost(@Body() body: any) {
+        const bodyLength = typeof body === 'string' ? body.length : 0;
+        return { received: bodyLength };
     }
 
     // Property access test
