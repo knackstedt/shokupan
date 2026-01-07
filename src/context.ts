@@ -125,6 +125,8 @@ export class ShokupanContext<
     private _bodyParsed: boolean = false;
     public _bodyParseError?: Error;
 
+    public _routeMatched: boolean = false;
+
 
     // Cached URL properties to avoid repeated parsing
     private _cachedHostname?: string;

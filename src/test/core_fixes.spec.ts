@@ -1,7 +1,7 @@
 
 import { describe, expect, test } from "bun:test";
-import { Body, Controller, Get, Post, Query } from "../util/decorators";
 import { Shokupan } from "../shokupan";
+import { Body, Controller, Get, Post, Query } from "../util/decorators";
 
 
 describe("Core Fixes Implementation", () => {
@@ -95,14 +95,14 @@ describe("Core Fixes Implementation", () => {
         expect(res.status).toBe(408); // Request Timeout
     });
 
-    test("Fix 6: Return Logic (Void -> 404 vs 201)", async () => {
+    test("Fix 6: Return Logic (Void -> 200 vs 201)", async () => {
         const app = new Shokupan();
 
         app.get("/void", (ctx) => { });
         app.get("/explicit", (ctx) => { ctx.status(201); });
 
         const res1 = await app.fetch(new Request("http://localhost/void"));
-        expect(res1.status).toBe(404);
+        expect(res1.status).toBe(200);
 
         const res2 = await app.fetch(new Request("http://localhost/explicit"));
         expect(res2.status).toBe(201);

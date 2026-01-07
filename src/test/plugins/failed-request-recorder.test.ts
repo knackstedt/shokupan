@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, spyOn, test } from "bun:test";
-import { FailedRequestRecorder } from "../../plugins/application/debugview/failed-request-recorder";
+import { FailedRequestRecorder } from "../../plugins/application/dashboard/failed-request-recorder";
 import { Shokupan } from "../../shokupan";
 import { datastore } from "../../util/datastore";
 

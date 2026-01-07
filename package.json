@@ -22,7 +22,7 @@
     ],
     "type": "module",
     "scripts": {
-        "dev": "bun --watch --inspect src/example/main.ts",
+        "dev": "bun --watch --inspect examples/full/main.ts",
         "debug:otel": "sh scripts/debug-otel.sh",
         "docs": "cd docs && bun run dev",
         "build": "vite build",

@@ -419,7 +419,9 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
                     const match = this.find(req.method, ctx.path);
 
+
                     if (match) {
+                        ctx._routeMatched = true;
                         ctx.params = match.params;
 
                         // Ensure body is parsed before handler executes
@@ -446,19 +448,27 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                     if (ctx._finalResponse instanceof Response) {
                         response = ctx._finalResponse;
                     }
-                    // 2. Check if user manipulated ctx.response state manually (status/headers)
-                    // If status is NOT 200 (default), or headers are set, maybe we should construct a response?
-                    // But usually returning nothing implies 404 in this framework unless explicit.
-                    // However, if one sets `ctx.response.status = 201`, they expect 201?
-                    // Currently `ShokupanResponse` doesn't automatically generate a body.
-                    // So we'd send empty body with that status.
-                    else if (ctx.response.status !== 200 || ctx.response.hasPopulatedHeaders) {
-                        // Construct response from context state
+                    // 2. Logic Split: Route Matched vs Not Found
+                    else if (ctx._routeMatched) {
+                        // A route WAS matched but returned nothing.
+                        // Default to 200 OK (unless user set status manually)
+                        // If user set status manually (e.g. ctx.status(201)), use that.
+                        // If user set headers manually, we keep those.
+
+                        // If no status is set in ctx.response, it defaults to 200.
+                        // We need to send a response. Since result is void, body is empty.
                         response = ctx.send(null, { status: ctx.response.status, headers: ctx.response.headers });
                     }
-                    // 3. Fallback: Not Found
                     else {
-                        response = ctx.text("Not Found", 404);
+                        // No route matched.
+                        // Check if user (likely middleware) manually changed status from default 200?
+                        // If status is NOT 200, we respect it (e.g. auth middleware set 401).
+                        if (ctx.response.status !== 200) {
+                            response = ctx.send(null, { status: ctx.response.status, headers: ctx.response.headers });
+                        } else {
+                            // Default 404
+                            response = ctx.text("Not Found", 404);
+                        }
                     }
                 }
                 else if (typeof result === "object") {
