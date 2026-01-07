@@ -360,7 +360,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 }
             };
 
-            const parent = store?.get("span");
+            const parent = store?.span;
             const ctx = parent ? trace.setSpan(context.active(), parent) : undefined;
             return tracer.startActiveSpan(`${req.method} ${new URL(req.url).pathname}`, attrs, ctx, span => {
                 const ctxStore = new RequestContextStore();

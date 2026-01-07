@@ -3,7 +3,6 @@ import { compose } from './middleware';
 import { generateOpenApi } from './plugins/application/openapi/openapi';
 import { serveStatic } from './plugins/middleware/serve-static';
 import type { Shokupan } from './shokupan';
-import { asyncContext } from './util/async-hooks';
 import { datastore } from './util/datastore';
 import { Container } from './util/di';
 import { traceHandler } from './util/instrumentation';
@@ -266,9 +265,6 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         body?: any;
     } | string): Promise<Response> {
         const options = typeof arg === "string" ? { path: arg } : arg;
-
-        const store = asyncContext.getStore();
-        const originalReq = store?.request as ShokupanRequest<T>;
 
         let url = options.path;
         // If path is relative, make it absolute (required by Request constructor)
