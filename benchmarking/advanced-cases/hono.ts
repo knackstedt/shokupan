@@ -130,6 +130,7 @@ export async function startAdvanced(port: number, scenario: string) {
         // Use Bun.serve for Bun runtime
         const server = Bun.serve({
             port,
+            reusePort: !!process.env.REUSE_PORT,
             fetch: app.fetch
         });
 

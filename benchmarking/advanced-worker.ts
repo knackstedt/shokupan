@@ -5,6 +5,40 @@ async function main() {
     const port = parseInt(process.env['PORT'] || "3000", 10);
     const scenario = process.env['SCENARIO'];
 
+    // Cluster support
+    // Check if CLUSTER_WORKERS is set to determine if we should act as a cluster primary
+    const workersStr = process.env['CLUSTER_WORKERS'];
+
+    if (workersStr && parseInt(workersStr) > 0) {
+        try {
+            // @ts-ignore - dynamic import
+            // In Bun, "cluster" is available as "node:cluster" or "cluster". In Node, "cluster".
+            // We use standard import which works in both environments (Bun maps "cluster" to "node:cluster" internal)
+            const cluster = await import("cluster");
+
+            if (cluster.default.isPrimary) {
+                const numWorkers = parseInt(workersStr);
+                console.log(`Primary ${process.pid} is running. Forking ${numWorkers} workers...`);
+
+                for (let i = 0; i < numWorkers; i++) {
+                    cluster.default.fork();
+                }
+
+                cluster.default.on('exit', (worker, code, signal) => {
+                    if (code !== 0 && !worker.exitedAfterDisconnect) {
+                        console.log(`Worker ${worker.process.pid} died. Restarting...`);
+                        cluster.default.fork();
+                    }
+                });
+
+                // Keep primary alive
+                return;
+            }
+        } catch (e) {
+            console.error("Cluster module error:", e);
+        }
+    }
+
     if (!caseFile) {
         console.error("No CASE_FILE provided");
         process.exit(1);

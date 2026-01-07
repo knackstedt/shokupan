@@ -117,7 +117,10 @@ export async function startAdvanced(port: number, scenario: string) {
             throw new Error(`Unknown scenario: ${scenario}`);
     }
 
-    app.listen(port);
+    app.listen({
+        port,
+        reusePort: !!process.env.REUSE_PORT
+    });
 
     return async () => {
         app.stop();

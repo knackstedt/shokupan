@@ -14,7 +14,8 @@ export async function startAdvanced(port: number, scenario: string) {
             error: () => { },
             fatal: () => { }
         } as any,
-        enableAsyncLocalStorage: scenario === "fully-loaded"
+        enableAsyncLocalStorage: scenario === "fully-loaded",
+        reusePort: !!process.env.REUSE_PORT
     });
 
     switch (scenario) {
