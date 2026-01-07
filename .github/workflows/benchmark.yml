@@ -1,9 +1,7 @@
 name: Benchmark
 on: 
-  workflow_dispatch: # Allows you to start it manually
-  push:
-    tags:
-      - 'v*'
+  [workflow_dispatch]
+
 jobs:
   benchmark:
     runs-on: ubuntu-latest
