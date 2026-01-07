@@ -38,6 +38,9 @@ jobs:
         working-directory: ./docs
         run: bun run build
 
+      - run: cp benchmarking/report.html docs/dist/report.html
+      - run: cp benchmarking/advanced-report.html docs/dist/advanced-report.html
+
       - name: Upload to Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
