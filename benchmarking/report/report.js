@@ -2,13 +2,19 @@
 if (benchmarkData.length === 0) {
     document.getElementById('content').innerHTML = '<p>No benchmark data available yet. Run the benchmarks first!</p>';
 } else {
-    const latest = benchmarkData[0].results;
-    initializeReport(latest);
+    const latest = benchmarkData[0];
+    initializeReport(latest.results, latest.system);
 }
 
-function initializeReport(latest) {
+function initializeReport(latest, systemInfo) {
     const tabsContainer = document.getElementById('tabs');
     const contentContainer = document.getElementById('content');
+
+    // Render system info if available
+    if (systemInfo) {
+        renderSystemInfo(contentContainer, systemInfo);
+    }
+
     let tabIndex = 0;
 
     // Add composite view tabs first
@@ -63,6 +69,47 @@ function showScenario(scenario, event) {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     event.target.classList.add('active');
     document.getElementById(`scenario-${scenario}`).classList.add('active');
+}
+
+function renderSystemInfo(container, system) {
+    const sysDiv = document.createElement('div');
+    sysDiv.className = 'system-info-card';
+    sysDiv.style.marginBottom = '20px';
+    sysDiv.style.padding = '15px';
+    sysDiv.style.borderRadius = '8px';
+    sysDiv.style.backgroundColor = '#25262b';
+    sysDiv.style.border = '1px solid #373a40';
+    sysDiv.style.color = '#c1c2c5';
+    sysDiv.style.fontSize = '0.9rem';
+    sysDiv.style.display = 'grid';
+    sysDiv.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
+    sysDiv.style.gap = '15px';
+
+    const memoryGB = (system.memory.total / 1024 / 1024 / 1024).toFixed(2);
+    const cpuSpeed = (system.cpu.speed / 1000).toFixed(2); // usually in MHz
+
+    // Format fields
+    const fields = [
+        { label: 'OS', value: system.os },
+        { label: 'Kernel', value: system.kernel },
+        { label: 'CPU', value: `${system.cpu.model} (${system.cpu.cores} cores @ ${cpuSpeed}GHz)` },
+        { label: 'Memory', value: `${memoryGB} GB Total` },
+        { label: 'Runtime', value: `Bun v${system.bun} / Node ${system.node}` }
+    ];
+
+    sysDiv.innerHTML = fields.map(f => `
+        <div class="sys-field">
+            <div style="color: #909296; font-size: 0.8em; text-transform: uppercase; margin-bottom: 4px;">${f.label}</div>
+            <div style="font-weight: 600; color: #e4e5e7;">${f.value}</div>
+        </div>
+    `).join('');
+
+    // Insert at top of content container (or better, before content container in main body?)
+    // The current layout is: tabs -> content. We likely want this above tabs.
+    // Let's prepend to the main container, actually.
+    const mainContainer = document.querySelector('.container');
+    const tabs = document.getElementById('tabs');
+    mainContainer.insertBefore(sysDiv, tabs);
 }
 
 function renderCompositeView(viewId, viewConfig, availableScenarios, latest) {

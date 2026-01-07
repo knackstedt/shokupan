@@ -5,6 +5,7 @@ import { Eta } from 'eta';
 import fs from "fs";
 import getPort, { portNumbers } from "get-port";
 import ora from "ora";
+import os from "os";
 import path from "path";
 
 const FRAMEWORKS = ["shokupan", "fastify", "express", "koa", "hapi", "nest", "hono", "elysia"];
@@ -213,8 +214,24 @@ type RuntimeResults = Record<string, ScenarioResults>; // scenario -> endpoints 
 type FrameworkResults = Record<string, RuntimeResults>; // runtime -> scenario -> endpoints -> result
 type AllResults = Record<string, FrameworkResults>; // framework -> runtime -> scenario -> endpoints -> result
 
+type SystemInfo = {
+    os: string;
+    kernel: string;
+    node: string;
+    bun: string;
+    cpu: {
+        model: string;
+        speed: number;
+        cores: number;
+    };
+    memory: {
+        total: number;
+    };
+};
+
 type HistoryEntry = {
     timestamp: number;
+    system?: SystemInfo;
     results: AllResults;
 };
 
@@ -817,8 +834,24 @@ async function main() {
         }
     }
 
+    const systemInfo = {
+        os: `${os.type()} ${os.release()}`,
+        kernel: os.version(),
+        node: process.version,
+        bun: Bun.version,
+        cpu: {
+            model: os.cpus()[0].model,
+            speed: os.cpus()[0].speed,
+            cores: os.cpus().length
+        },
+        memory: {
+            total: os.totalmem()
+        }
+    };
+
     const newEntry: HistoryEntry = {
         timestamp: Date.now(),
+        system: systemInfo,
         results: fullResults
     };
 
