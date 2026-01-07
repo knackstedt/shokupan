@@ -1,7 +1,7 @@
 import { Compression } from "../../src/plugins/middleware/compression";
 import { Shokupan } from "../../src/shokupan";
-import type { Middleware, NextFn } from '../../src/util/types';
-import { COMPRESSIBLE_JSON, LARGE_JSON, md5, serializeRequest } from "../advanced-data";
+import type { Middleware, NextFn } from "../../src/util/types";
+import { COMPRESSIBLE_JSON, LARGE_JSON, SMALL_JSON, md5, serializeRequest } from "../advanced-data";
 
 export async function startAdvanced(port: number, scenario: string) {
     const app = new Shokupan({
@@ -128,6 +128,25 @@ export async function startAdvanced(port: number, scenario: string) {
             app.get("/property/path", (ctx) => {
                 const value = ctx.path;
                 return ctx.text(value);
+            });
+            break;
+
+        // Multi-process tests
+        case "multi-process":
+            // Small GET endpoint with small response
+            app.get("/small-get", (ctx) => {
+                return ctx.json(SMALL_JSON);
+            });
+
+            // Large GET endpoint with large response
+            app.get("/large-get", (ctx) => {
+                return ctx.json(LARGE_JSON);
+            });
+
+            // POST endpoint with large payload
+            app.post("/large-post", async (ctx) => {
+                const body = await ctx.body<string>();
+                return ctx.json({ received: body?.length || 0 });
             });
             break;
 

@@ -50,6 +50,8 @@ type ScenarioConfig = {
     body?: string;
     headers?: Record<string, string>;
     timeout?: number;
+    processCount?: number; // Single process count (legacy, for non-scaling scenarios)
+    processCounts?: number[]; // Array of process counts to test for scaling comparison
 };
 
 // Memory sample collected during benchmark execution
@@ -174,6 +176,16 @@ const SCENARIOS: Record<string, ScenarioConfig> = {
         connections: 100,
         duration: 10,
         durationEstimate: 13
+    },
+
+    // Multi-process scaling test - compares 1, 2, and 4 worker performance
+    "multi-process": {
+        name: "Multi-Process Scaling",
+        endpoints: ["/small-get", "/large-get", "/large-post"],
+        connections: 100,
+        duration: 10,
+        durationEstimate: 224, // 3 endpoints × 3 process counts × ~13s
+        processCounts: [1, 2, 4] // Test with 1, 2, and 4 workers for comparison
     }
 };
 
@@ -294,207 +306,393 @@ async function runBenchmark(framework: string, runtime: string, scenario: string
         } as any;
     }
 
-    // Get port with retries and wider range for high-concurrency scenarios
-    let port: number | undefined;
-    let portAttempts = 0;
-    const maxPortAttempts = 10;
+    // If this scenario has processCounts array, run benchmarks for each process count
+    // and return combined results with process count as part of endpoint key
+    if (scenarioConfig.processCounts && scenarioConfig.processCounts.length > 0) {
+        const allResults: ScenarioResults = {};
+        let totalDuration = 0;
 
-    while (!port && portAttempts < maxPortAttempts) {
-        try {
-            port = await getPort({ port: portNumbers(30000, 60000) });
-            break;
-        } catch (e) {
-            portAttempts++;
-            if (portAttempts >= maxPortAttempts) {
-                throw new Error(`No available ports found after ${maxPortAttempts} attempts`);
-            }
-            // Wait a bit before retrying to let ports get released
-            await new Promise(r => setTimeout(r, 100));
-        }
-    }
+        for (const processCount of scenarioConfig.processCounts) {
+            console.log(`\n${'='.repeat(60)}`);
+            console.log(`Testing with ${processCount} worker${processCount > 1 ? 's' : ''}`);
+            console.log('='.repeat(60));
 
-    if (!port) {
-        throw new Error("No available ports found");
-    }
+            // Run benchmark with this specific process count
+            const result = await runBenchmarkWithProcessCount(
+                framework,
+                runtime,
+                scenario,
+                scenarioConfig,
+                processCount,
+                startTime
+            );
 
-    console.log(`Benchmark starting: \x1b[36m${scenarioConfig.name}\x1b[0m (port \x1b[36m${port}\x1b[0m)`);
-
-    let cmd: string[];
-    let caseFile: string;
-    let env = {
-        ...process.env,
-        PORT: String(port),
-        SCENARIO: scenario,
-        BUN_QUIET: "1" // Suppress Bun diagnostic output
-    };
-
-    if (runtime === "bun") {
-        cmd = ["bun", "run", WORKER_TS];
-        caseFile = path.join(CASES_DIR, `${framework}.ts`);
-    } else {
-        cmd = ["node", WORKER_JS];
-        caseFile = path.join(DIST_DIR, `${framework}.cjs`);
-    }
-    env['CASE_FILE'] = caseFile;
-
-    const proc = spawn(cmd, {
-        env,
-        stdout: "pipe",
-        stderr: "pipe",
-        onExit(proc, exitCode, signalCode, error) {
-            const isExpectedSignal = signalCode === 15 || signalCode === 2;
-            if (exitCode !== 0 && !isExpectedSignal) {
-                console.error(`Process exited unexpectedly with code ${exitCode}, signal ${signalCode}`);
-            }
-        },
-    });
-
-    const outputLines: string[] = [];
-    const memorySamples: MemorySample[] = [];
-    let memoryInterval: Timer | null = null;
-    const pipeStream = async (stream: ReadableStream, dest: any) => {
-        if (!stream) return;
-        const reader = stream.getReader();
-        const decoder = new TextDecoder();
-        try {
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                const text = decoder.decode(value);
-                dest.write(text);
-                if (outputLines.length < 100) {
-                    outputLines.push(text);
+            // Add process count to endpoint keys for comparison
+            for (const [endpoint, data] of Object.entries(result)) {
+                if (endpoint !== 'duration') {
+                    allResults[`${endpoint} [${processCount}w]`] = data;
                 }
             }
-        } catch (e) { }
-    };
 
-    // pipeStream(proc.stdout, process.stdout);
-    pipeStream(proc.stderr, process.stderr);
-
-    await new Promise(r => setTimeout(r, 2000));
-
-    //Start memory sampling interval
-    const pid = proc.pid;
-    if (pid) {
-        // Take initial sample immediately
-        try {
-            const result = await Bun.$`ps -o rss= -p ${pid}`.quiet();
-            const rss = parseInt(result.stdout.toString().trim());
-            if (!isNaN(rss)) {
-                memorySamples.push({
-                    timestamp: 0, // Initial sample at t=0
-                    rss: Math.round(rss / 1024) // Convert KB to MB
-                });
-            }
-        } catch (e) {
-            // Process might have ended, ignore errors
+            totalDuration += (result as any).duration || 0;
         }
 
-        // Then start interval for ongoing sampling
-        memoryInterval = setInterval(async () => {
+        return {
+            ...allResults,
+            duration: totalDuration
+        };
+    }
+
+    // Single process count scenario
+    const processCount = scenarioConfig.processCount || 1;
+    return await runBenchmarkWithProcessCount(
+        framework,
+        runtime,
+        scenario,
+        scenarioConfig,
+        processCount,
+        startTime
+    );
+}
+
+async function runBenchmarkWithProcessCount(
+    framework: string,
+    runtime: string,
+    scenario: string,
+    scenarioConfig: ScenarioConfig,
+    processCount: number,
+    benchmarkStartTime: number
+) {
+    const startTime = Date.now();
+    const isMultiProcess = processCount > 1;
+
+    // Allocate ports for all workers
+    const ports: number[] = [];
+    for (let i = 0; i < processCount; i++) {
+        let port: number | undefined;
+        let portAttempts = 0;
+        const maxPortAttempts = 10;
+
+        while (!port && portAttempts < maxPortAttempts) {
             try {
-                // Use ps command to get RSS (in KB)
+                port = await getPort({ port: portNumbers(30000, 60000) });
+                break;
+            } catch (e) {
+                portAttempts++;
+                if (portAttempts >= maxPortAttempts) {
+                    throw new Error(`No available ports found after ${maxPortAttempts} attempts`);
+                }
+                await new Promise(r => setTimeout(r, 100));
+            }
+        }
+
+        if (!port) {
+            throw new Error("No available ports found");
+        }
+        ports.push(port);
+    }
+
+    if (isMultiProcess) {
+        console.log(`Benchmark starting: \x1b[36m${scenarioConfig.name}\x1b[0m (${processCount} workers on ports \x1b[36m${ports.join(', ')}\x1b[0m)`);
+    } else {
+        console.log(`Benchmark starting: \x1b[36m${scenarioConfig.name}\x1b[0m (port \x1b[36m${ports[0]}\x1b[0m)`);
+    }
+
+    // Spawn worker processes
+    const procs: any[] = [];
+    const allOutputLines: string[][] = [];
+    const allMemorySamples: MemorySample[][] = [];
+
+    for (let i = 0; i < processCount; i++) {
+        const port = ports[i];
+        let cmd: string[];
+        let caseFile: string;
+        let env = {
+            ...process.env,
+            PORT: String(port),
+            SCENARIO: scenario,
+            BUN_QUIET: "1"
+        };
+
+        if (runtime === "bun") {
+            cmd = ["bun", "run", WORKER_TS];
+            caseFile = path.join(CASES_DIR, `${framework}.ts`);
+        } else {
+            cmd = ["node", WORKER_JS];
+            caseFile = path.join(DIST_DIR, `${framework}.cjs`);
+        }
+        env['CASE_FILE'] = caseFile;
+
+        const proc = spawn(cmd, {
+            env,
+            stdout: "pipe",
+            stderr: "pipe",
+            onExit(proc, exitCode, signalCode, error) {
+                const isExpectedSignal = signalCode === 15 || signalCode === 2;
+                if (exitCode !== 0 && !isExpectedSignal) {
+                    console.error(`Worker ${i + 1} exited unexpectedly with code ${exitCode}, signal ${signalCode}`);
+                }
+            },
+        });
+
+        const outputLines: string[] = [];
+        const pipeStream = async (stream: ReadableStream, dest: any) => {
+            if (!stream) return;
+            const reader = stream.getReader();
+            const decoder = new TextDecoder();
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const text = decoder.decode(value);
+                    dest.write(text);
+                    if (outputLines.length < 100) {
+                        outputLines.push(text);
+                    }
+                }
+            } catch (e) { }
+        };
+
+        pipeStream(proc.stderr, process.stderr);
+        procs.push(proc);
+        allOutputLines.push(outputLines);
+        allMemorySamples.push([]);
+    }
+
+    // Wait for all workers to start
+    await new Promise(r => setTimeout(r, 2000));
+
+    // Start memory sampling for all workers
+    const memoryIntervals: (Timer | null)[] = [];
+    for (let i = 0; i < processCount; i++) {
+        const proc = procs[i];
+        const memorySamples = allMemorySamples[i];
+        const pid = proc.pid;
+
+        if (pid) {
+            // Take initial sample
+            try {
                 const result = await Bun.$`ps -o rss= -p ${pid}`.quiet();
                 const rss = parseInt(result.stdout.toString().trim());
                 if (!isNaN(rss)) {
                     memorySamples.push({
-                        timestamp: Date.now() - startTime,
-                        rss: Math.round(rss / 1024) // Convert KB to MB
+                        timestamp: 0,
+                        rss: Math.round(rss / 1024)
                     });
                 }
-            } catch (e) {
-                //Process might have ended, ignore errors
-            }
-        }, 250);
+            } catch (e) { }
+
+            // Start interval sampling
+            const interval = setInterval(async () => {
+                try {
+                    const result = await Bun.$`ps -o rss= -p ${pid}`.quiet();
+                    const rss = parseInt(result.stdout.toString().trim());
+                    if (!isNaN(rss)) {
+                        memorySamples.push({
+                            timestamp: Date.now() - benchmarkStartTime,
+                            rss: Math.round(rss / 1024)
+                        });
+                    }
+                } catch (e) { }
+            }, 250);
+            memoryIntervals[i] = interval;
+        } else {
+            memoryIntervals[i] = null;
+        }
     }
 
-
-    if (proc.killed || proc.exitCode !== null) {
-        return { error: "Process died immediately", output: outputLines.join("") };
-    }
-
-    // Health check
-    let serverReady = false;
-    let lastError: any = null;
-    for (let i = 0; i < 20; i++) {
-        await new Promise(r => setTimeout(r, 500));
-
+    // Check if any process died immediately
+    for (let i = 0; i < processCount; i++) {
+        const proc = procs[i];
         if (proc.killed || proc.exitCode !== null) {
-            return { error: "Process died during startup", output: outputLines.join("") };
-        }
-
-        try {
-            const testEndpoint = scenarioConfig.endpoints[0];
-            const healthCheck = await fetch(`http://localhost:${port}${testEndpoint}`, {
-                signal: AbortSignal.timeout(1000),
-                method: (scenarioConfig.method as any) || "GET"
-            });
-            if (healthCheck.ok || healthCheck.status < 500) {
-                serverReady = true;
-                spinner.text = `Server is ready on port ${port}`;
-                break;
+            // Cleanup
+            for (const interval of memoryIntervals) {
+                if (interval) clearInterval(interval);
             }
-            lastError = `HTTP ${healthCheck.status}`;
-        } catch (e: any) {
-            lastError = e.message || String(e);
+            for (const p of procs) {
+                p.kill();
+            }
+            return { error: `Worker ${i + 1} died immediately`, output: allOutputLines[i].join("") };
         }
     }
 
-    if (!serverReady) {
-        proc.kill();
-        await new Promise(r => setTimeout(r, 1000));
-        return { error: `Server failed to start: ${lastError}`, output: outputLines.join("") };
+    // Health check all workers
+    let allReady = true;
+    for (let i = 0; i < processCount; i++) {
+        const port = ports[i];
+        const proc = procs[i];
+        let serverReady = false;
+        let lastError: any = null;
+
+        for (let attempt = 0; attempt < 20; attempt++) {
+            await new Promise(r => setTimeout(r, 500));
+
+            if (proc.killed || proc.exitCode !== null) {
+                // Cleanup
+                for (const interval of memoryIntervals) {
+                    if (interval) clearInterval(interval);
+                }
+                for (const p of procs) {
+                    p.kill();
+                }
+                return { error: `Worker ${i + 1} died during startup`, output: allOutputLines[i].join("") };
+            }
+
+            try {
+                const testEndpoint = scenarioConfig.endpoints[0];
+                const healthCheck = await fetch(`http://localhost:${port}${testEndpoint}`, {
+                    signal: AbortSignal.timeout(1000),
+                    method: (scenarioConfig.method as any) || "GET"
+                });
+                if (healthCheck.ok || healthCheck.status < 500) {
+                    serverReady = true;
+                    spinner.text = `Worker ${i + 1}/${processCount} ready on port ${port}`;
+                    break;
+                }
+                lastError = `HTTP ${healthCheck.status}`;
+            } catch (e: any) {
+                lastError = e.message || String(e);
+            }
+        }
+
+        if (!serverReady) {
+            allReady = false;
+            // Cleanup
+            for (const interval of memoryIntervals) {
+                if (interval) clearInterval(interval);
+            }
+            for (const p of procs) {
+                p.kill();
+            }
+            await new Promise(r => setTimeout(r, 1000));
+            return { error: `Worker ${i + 1} failed to start: ${lastError}`, output: allOutputLines[i].join("") };
+        }
+    }
+
+    if (isMultiProcess) {
+        spinner.text = `All ${processCount} workers ready`;
     }
 
     const results: ScenarioResults = {};
 
     try {
         for (const endpoint of scenarioConfig.endpoints) {
-            spinner.text = `Testing ${endpoint}...`;
-            const url = `http://localhost:${port}${endpoint}`;
-            try {
-                const res = await runAutocannon(url, {
-                    connections: scenarioConfig.connections,
-                    duration: scenarioConfig.duration,
-                    method: scenarioConfig.method,
-                    body: scenarioConfig.body,
-                    headers: scenarioConfig.headers,
-                    timeout: scenarioConfig.timeout
-                });
+            spinner.text = `Testing ${endpoint}${isMultiProcess ? ` (across ${processCount} workers)` : ''}...`;
 
-                const latencies = (res.latencies || []).sort((a: number, b: number) => a - b);
-                const percentiles = {
-                    p1: calculatePercentile(latencies, 1),
-                    p5: calculatePercentile(latencies, 5),
-                    p25: calculatePercentile(latencies, 25),
-                    p75: calculatePercentile(latencies, 75),
-                    p95: calculatePercentile(latencies, 95),
-                    p99: calculatePercentile(latencies, 99)
-                };
+            // For multi-process, we need to manually implement load balancing
+            // We'll make autocannon hit each port in round-robin fashion by
+            // running separate benchmarks and aggregating results
+            if (isMultiProcess) {
+                // Run autocannon against each worker and aggregate results
+                let workerResults: any[] = [];
+                let allLatencies: number[] = [];
 
-                results[endpoint] = {
-                    requests: res.requests?.average || 0,
-                    latency: res.latency?.average || 0,
-                    throughput: res.throughput?.average || 0,
-                    percentiles,
-                    memory: memorySamples.length > 0 ? memorySamples : undefined
-                };
-            } catch (e) {
-                console.error(`Failed to benchmark ${endpoint}:`, e);
-                results[endpoint] = {
-                    requests: 0,
-                    latency: 0,
-                    throughput: 0,
-                    error: String(e)
-                };
+                for (let i = 0; i < processCount; i++) {
+                    const url = `http://localhost:${ports[i]}${endpoint}`;
+                    try {
+                        // Split connections across workers
+                        const connectionsPerWorker = Math.ceil(scenarioConfig.connections / processCount);
+                        const res = await runAutocannon(url, {
+                            connections: connectionsPerWorker,
+                            duration: scenarioConfig.duration,
+                            method: scenarioConfig.method,
+                            body: scenarioConfig.body,
+                            headers: scenarioConfig.headers,
+                            timeout: scenarioConfig.timeout
+                        });
+                        workerResults.push(res);
+                        // Use concat instead of spread to avoid stack overflow with large arrays
+                        allLatencies = allLatencies.concat(res.latencies || []);
+                    } catch (e) {
+                        console.error(`Failed to benchmark worker ${i + 1} ${endpoint}:`, e);
+                        workerResults.push(null);
+                    }
+                }
+
+                // Aggregate results from all workers
+                const validResults = workerResults.filter(r => r !== null);
+                if (validResults.length === 0) {
+                    results[endpoint] = {
+                        requests: 0,
+                        latency: 0,
+                        throughput: 0,
+                        error: "All workers failed"
+                    };
+                } else {
+                    const totalRequests = validResults.reduce((sum, r) => sum + (r.requests?.average || 0), 0);
+                    const avgLatency = validResults.reduce((sum, r) => sum + (r.latency?.average || 0), 0) / validResults.length;
+                    const totalThroughput = validResults.reduce((sum, r) => sum + (r.throughput?.average || 0), 0);
+
+                    const sortedLatencies = allLatencies.sort((a, b) => a - b);
+                    const percentiles = {
+                        p1: calculatePercentile(sortedLatencies, 1),
+                        p5: calculatePercentile(sortedLatencies, 5),
+                        p25: calculatePercentile(sortedLatencies, 25),
+                        p75: calculatePercentile(sortedLatencies, 75),
+                        p95: calculatePercentile(sortedLatencies, 95),
+                        p99: calculatePercentile(sortedLatencies, 99)
+                    };
+
+                    // Aggregate memory samples from all workers
+                    const combinedMemory = allMemorySamples.flat().filter(s => s).sort((a, b) => a.timestamp - b.timestamp);
+
+                    results[endpoint] = {
+                        requests: totalRequests,
+                        latency: avgLatency,
+                        throughput: totalThroughput,
+                        percentiles,
+                        memory: combinedMemory.length > 0 ? combinedMemory : undefined
+                    };
+                }
+            } else {
+                // Single process - use original logic
+                const url = `http://localhost:${ports[0]}${endpoint}`;
+                try {
+                    const res = await runAutocannon(url, {
+                        connections: scenarioConfig.connections,
+                        duration: scenarioConfig.duration,
+                        method: scenarioConfig.method,
+                        body: scenarioConfig.body,
+                        headers: scenarioConfig.headers,
+                        timeout: scenarioConfig.timeout
+                    });
+
+                    const latencies = (res.latencies || []).sort((a: number, b: number) => a - b);
+                    const percentiles = {
+                        p1: calculatePercentile(latencies, 1),
+                        p5: calculatePercentile(latencies, 5),
+                        p25: calculatePercentile(latencies, 25),
+                        p75: calculatePercentile(latencies, 75),
+                        p95: calculatePercentile(latencies, 95),
+                        p99: calculatePercentile(latencies, 99)
+                    };
+
+                    results[endpoint] = {
+                        requests: res.requests?.average || 0,
+                        latency: res.latency?.average || 0,
+                        throughput: res.throughput?.average || 0,
+                        percentiles,
+                        memory: allMemorySamples[0].length > 0 ? allMemorySamples[0] : undefined
+                    };
+                } catch (e) {
+                    console.error(`Failed to benchmark ${endpoint}:`, e);
+                    results[endpoint] = {
+                        requests: 0,
+                        latency: 0,
+                        throughput: 0,
+                        error: String(e)
+                    };
+                }
             }
         }
     } finally {
-        if (memoryInterval) {
-            clearInterval(memoryInterval);
+        // Cleanup all workers and intervals
+        for (const interval of memoryIntervals) {
+            if (interval) clearInterval(interval);
         }
-        proc.kill();
+        for (const proc of procs) {
+            proc.kill();
+        }
         await new Promise(r => setTimeout(r, 500));
     }
 

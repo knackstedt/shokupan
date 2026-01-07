@@ -112,7 +112,30 @@ h1 {
 
 h2 {
     color: var(--primary-color);
-    margin-bottom: 15px;
+    margin-bottom: 5px;
+}
+
+/* Multi-process charts */
+.multi-process-charts {
+    margin-bottom: 2rem;
+}
+
+.scaling-hint {
+    background: linear-gradient(135deg, #373a40 0%, #2c2e33 100%);
+    border-left: 4px solid #51cf66;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    border-radius: 6px;
+    font-size: 1rem;
+    color: #e4e5e7;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.endpoint-charts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
 }
 
 .table-container {

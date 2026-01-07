@@ -1,5 +1,5 @@
 import Hapi from "@hapi/hapi";
-import { COMPRESSIBLE_JSON, LARGE_JSON, md5, serializeRequest } from "../advanced-data";
+import { COMPRESSIBLE_JSON, LARGE_JSON, SMALL_JSON, md5, serializeRequest } from "../advanced-data";
 
 export async function startAdvanced(port: number, scenario: string) {
     const server = Hapi.server({
@@ -169,6 +169,30 @@ export async function startAdvanced(port: number, scenario: string) {
                 path: '/property/path',
                 handler: (request) => {
                     return request.path;
+                }
+            });
+            break;
+
+        // Multi-process tests
+        case "multi-process":
+            server.route({
+                method: 'GET',
+                path: '/small-get',
+                handler: () => SMALL_JSON
+            });
+
+            server.route({
+                method: 'GET',
+                path: '/large-get',
+                handler: () => LARGE_JSON
+            });
+
+            server.route({
+                method: 'POST',
+                path: '/large-post',
+                handler: (request) => {
+                    const bodyLength = typeof request.payload === 'string' ? request.payload.length : 0;
+                    return { received: bodyLength };
                 }
             });
             break;

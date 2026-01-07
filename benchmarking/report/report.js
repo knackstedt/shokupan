@@ -83,7 +83,16 @@ function renderScenarioView(scenario, scenarioIndex, latest) {
     const tableData = buildScenarioTableData(scenario, latest);
 
     let html = `<h2>${scenarioNames[scenario] || scenario}</h2>`;
-    html += buildChartGrid(scenarioIndex);
+
+    // Check if this is a multi-process scenario
+    const isMultiProcess = scenario === 'multi-process' || scenario.startsWith('multi-process-');
+
+    if (isMultiProcess) {
+        // Add dedicated multi-process scaling charts
+        html += buildMultiProcessCharts(scenarioIndex);
+    } else {
+        html += buildChartGrid(scenarioIndex);
+    }
 
     // Remove scenario column for individual views
     const columns = TABLE_COLUMNS.filter(c => c.key !== 'scenario');
@@ -91,7 +100,11 @@ function renderScenarioView(scenario, scenarioIndex, latest) {
 
     container.innerHTML = html;
 
-    initializeTable(scenarioIndex, tableData, `chart-${scenarioIndex}-reqs`, `chart-${scenarioIndex}-latency`);
+    if (isMultiProcess) {
+        initializeMultiProcessView(scenarioIndex, tableData);
+    } else {
+        initializeTable(scenarioIndex, tableData, `chart-${scenarioIndex}-reqs`, `chart-${scenarioIndex}-latency`);
+    }
 }
 
 function buildCompositeTableData(scenarios, latest) {
@@ -207,6 +220,18 @@ function buildChartGrid(id) {
         <div class="chart-grid">
             <div class="chart-container"><canvas id="chart-${id}-reqs"></canvas></div>
             <div class="chart-container"><canvas id="chart-${id}-latency"></canvas></div>
+        </div>
+    `;
+}
+
+function buildMultiProcessCharts(id) {
+    // We'll generate chart containers dynamically based on available frameworks
+    return `
+        <div class="multi-process-charts">
+            <div class="scaling-hint">📊 Framework comparison by endpoint: Bun vs Node.js performance across 1, 2, and 4 workers</div>
+            <div class="endpoint-charts" id="framework-charts-${id}">
+                <!-- Endpoint charts will be dynamically generated -->
+            </div>
         </div>
     `;
 }
@@ -406,5 +431,246 @@ function createCharts(tableData, reqsChartId, latencyChartId) {
                 x: { ticks: { color: '#909296' }, grid: { color: '#373a40' } }
             }
         }
+    });
+}
+
+function initializeMultiProcessView(id, tableData) {
+    const table = document.getElementById(`table-${id}`);
+    const tbody = document.getElementById(`tbody-${id}`);
+    let currentSort = { column: 'requests', direction: 'desc' };
+    let filters = {};
+
+    function renderTable() {
+        let filteredData = [...tableData];
+
+        // Apply filters
+        Object.entries(filters).forEach(([column, value]) => {
+            if (value) {
+                filteredData = filteredData.filter(row => {
+                    const cellValue = String(row[column] || '').toLowerCase();
+                    return cellValue.includes(value.toLowerCase());
+                });
+            }
+        });
+
+        // Apply sort
+        filteredData.sort((a, b) => {
+            let aVal = a[currentSort.column];
+            let bVal = b[currentSort.column];
+
+            if (typeof aVal === 'number') {
+                return currentSort.direction === 'asc' ? aVal - bVal : bVal - aVal;
+            } else {
+                aVal = String(aVal).toLowerCase();
+                bVal = String(bVal).toLowerCase();
+                if (currentSort.direction === 'asc') {
+                    return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+                } else {
+                    return bVal < aVal ? -1 : bVal > aVal ? 1 : 0;
+                }
+            }
+        });
+
+        // Render rows with note about total requests/sec
+        tbody.innerHTML = filteredData.map(row => {
+            if (row.error) {
+                const cols = row.scenario ?
+                    `<td>${row.framework}</td><td>${row.runtime}</td><td>${row.scenario}</td>` :
+                    `<td>${row.framework}</td><td>${row.runtime}</td>`;
+                const colspan = row.scenario ? 6 : 7;
+                return `<tr>
+                    ${cols}
+                    <td colspan="${colspan}"><span class="${row.statusClass}">${row.error}</span></td>
+                    <td class="${row.statusClass}">${row.status}</td>
+                </tr>`;
+            } else {
+                const scenarioCol = row.scenario ? `<td>${row.scenario}</td>` : '';
+                const memoryData = row.memory || [];
+                const memoryValues = memoryData.map(s => s.rss);
+                const avgMemory = memoryValues.length ? Math.round(memoryValues.reduce((a, b) => a + b, 0) / memoryValues.length) : 0;
+                const peakMemory = memoryValues.length ? Math.max(...memoryValues) : 0;
+                const memInGb = avgMemory / 1024;
+                const memInGbPeak = peakMemory / 1024;
+                const memoryCell = memoryValues.length > 0
+                    ? `<td class="memory-cell">${createSparkline(memoryData)}<div class="memory-stats"><span class="avg">${memInGb.toFixed(2)}GB avg</span> <span class="peak">${memInGbPeak.toFixed(2)}GB peak</span></div></td>`
+                    : '<td class="memory-cell"><span style="color: #666;">–</span></td>';
+
+                // For multi-process, show note that requests/sec is total across all workers
+                const reqsCell = `<td><span class="metric">${row.requests.toFixed(0)}</span><span style="font-size: 0.8em; color: #666; display: block;">total</span></td>`;
+
+                return `<tr>
+                    <td>${row.framework}</td>
+                    <td>${row.runtime}</td>
+                    ${scenarioCol}
+                    <td>${row.endpoint}</td>
+                    ${reqsCell}
+                    <td><span class="metric">${row.latency.toFixed(2)}</span></td>
+                    <td><span class="metric">${(row.throughput / 1024 / 1024).toFixed(2)}</span></td>
+                    <td><span class="metric">${row.p95.toFixed(2)}</span></td>
+                    <td><span class="metric">${row.p99.toFixed(2)}</span></td>
+                    ${memoryCell}
+                    <td class="${row.statusClass}">✓ ${row.status}</td>
+                </tr>`;
+            }
+        }).join('');
+    }
+
+    // Add sort handlers
+    table.querySelectorAll('thead tr:first-child th').forEach(th => {
+        th.addEventListener('click', () => {
+            const column = th.dataset.column;
+            if (currentSort.column === column) {
+                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort.column = column;
+                currentSort.direction = 'desc';
+            }
+
+            table.querySelectorAll('thead tr:first-child th').forEach(h => {
+                h.classList.remove('sorted-asc', 'sorted-desc');
+            });
+            th.classList.add('sorted-' + currentSort.direction);
+
+            renderTable();
+        });
+    });
+
+    // Add filter handlers
+    table.querySelectorAll('.filter-input').forEach(input => {
+        input.addEventListener('input', (e) => {
+            filters[e.target.dataset.column] = e.target.value;
+            renderTable();
+        });
+    });
+
+    // Initial render
+    table.querySelector(`th[data-column="${currentSort.column}"]`).classList.add('sorted-desc');
+    renderTable();
+
+    // Create multi-process scaling charts for each endpoint
+    setTimeout(() => {
+        createMultiProcessCharts(tableData, id);
+    }, 100);
+}
+
+function createMultiProcessCharts(tableData, id) {
+    const container = document.getElementById(`framework-charts-${id}`);
+    if (!container) return;
+
+    container.innerHTML = '';
+    container.style.display = 'grid';
+    container.style.gridTemplateColumns = 'repeat(auto-fit, minmax(500px, 1fr))';
+    container.style.gap = '20px';
+    container.style.padding = '20px';
+
+    const validData = tableData.filter(d => !d.error && d.requests > 0);
+    const frameworks = [...new Set(validData.map(d => d.framework))].sort();
+    const endpoints = [
+        { path: '/small-get', title: 'Small GET Response' },
+        { path: '/large-get', title: 'Large GET Response' },
+        { path: '/large-post', title: 'Large POST Request' }
+    ];
+    const runtimes = ['bun', 'node'];
+    const workerCounts = [1, 2, 4];
+
+    // Create one chart per endpoint
+    endpoints.forEach(endpoint => {
+        const chartSection = document.createElement('div');
+        chartSection.style.backgroundColor = '#25262b';
+        chartSection.style.padding = '20px';
+        chartSection.style.borderRadius = '8px';
+        chartSection.style.height = '500px';
+
+        const title = document.createElement('h3');
+        title.textContent = endpoint.title;
+        title.style.color = '#e4e5e7';
+        title.style.marginTop = '0';
+        title.style.marginBottom = '15px';
+        chartSection.appendChild(title);
+
+        const chartContainer = document.createElement('div');
+        chartContainer.style.height = 'calc(100% - 50px)';
+        const canvas = document.createElement('canvas');
+        const chartId = `chart-${endpoint.path.replace('/', '')}-${id}`;
+        canvas.id = chartId;
+        chartContainer.appendChild(canvas);
+        chartSection.appendChild(chartContainer);
+        container.appendChild(chartSection);
+
+        // Build labels: framework + worker count
+        const labels = [];
+        frameworks.forEach(fw => {
+            workerCounts.forEach(wc => {
+                labels.push(`${fw}\n${wc}w`);
+            });
+        });
+
+        // Build datasets for Bun and Node
+        const datasets = [
+            {
+                label: 'Bun',
+                backgroundColor: '#51cf66',
+                data: []
+            },
+            {
+                label: 'Node.js',
+                backgroundColor: '#339af0',
+                data: []
+            }
+        ];
+
+        // Fill data for each framework and worker count
+        frameworks.forEach(fw => {
+            workerCounts.forEach(wc => {
+                runtimes.forEach((rt, rtIdx) => {
+                    const row = validData.find(d =>
+                        d.framework === fw &&
+                        d.runtime === rt &&
+                        d.endpoint === `${endpoint.path} [${wc}w]`
+                    );
+                    datasets[rtIdx].data.push(row ? row.requests : 0);
+                });
+            });
+        });
+
+        new Chart(canvas, {
+            type: 'bar',
+            data: { labels, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { color: '#e4e5e7' }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            title: function (context) {
+                                const label = context[0].label.split('\n');
+                                return `${label[0]} - ${label[1]}`;
+                            },
+                            label: function (context) {
+                                return `${context.dataset.label}: ${context.parsed.y.toFixed(0)} req/s`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Total Requests/sec', color: '#e4e5e7' },
+                        ticks: { color: '#909296' },
+                        grid: { color: '#373a40' }
+                    },
+                    x: {
+                        ticks: { color: '#909296', font: { size: 10 }, maxRotation: 45, minRotation: 0 },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
     });
 }

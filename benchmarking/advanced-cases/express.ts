@@ -1,5 +1,5 @@
 import express from "express";
-import { COMPRESSIBLE_JSON, LARGE_JSON, md5, serializeRequest } from "../advanced-data";
+import { COMPRESSIBLE_JSON, LARGE_JSON, SMALL_JSON, md5, serializeRequest } from "../advanced-data";
 
 export async function startAdvanced(port: number, scenario: string) {
     const app = express();
@@ -119,6 +119,22 @@ export async function startAdvanced(port: number, scenario: string) {
         case "property-access":
             app.get("/property/path", (req, res) => {
                 res.send(req.path);
+            });
+            break;
+
+        // Multi-process tests
+        case "multi-process":
+            app.get("/small-get", (req, res) => {
+                res.json(SMALL_JSON);
+            });
+
+            app.get("/large-get", (req, res) => {
+                res.json(LARGE_JSON);
+            });
+
+            app.post("/large-post", (req, res) => {
+                const bodyLength = typeof req.body === 'string' ? req.body.length : 0;
+                res.json({ received: bodyLength });
             });
             break;
 

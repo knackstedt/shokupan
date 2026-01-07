@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { compress } from 'hono/compress';
-import { COMPRESSIBLE_JSON, LARGE_JSON, md5, serializeRequest } from "../advanced-data";
+import { COMPRESSIBLE_JSON, LARGE_JSON, SMALL_JSON, md5, serializeRequest } from "../advanced-data";
 
 export async function startAdvanced(port: number, scenario: string) {
     const app = new Hono();
@@ -106,6 +106,18 @@ export async function startAdvanced(port: number, scenario: string) {
         case "property-access":
             app.get("/property/path", (c) => {
                 return c.text(c.req.path);
+            });
+            break;
+
+        // Multi-process tests
+        case "multi-process":
+            app.get("/small-get", (c) => c.json(SMALL_JSON));
+
+            app.get("/large-get", (c) => c.json(LARGE_JSON));
+
+            app.post("/large-post", async (c) => {
+                const body = await c.req.text();
+                return c.json({ received: body.length });
             });
             break;
 
