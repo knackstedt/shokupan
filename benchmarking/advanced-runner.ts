@@ -1,647 +1,24 @@
+
 import * as clack from "@clack/prompts";
-import autocannon from "autocannon";
 import { spawn } from "bun";
-import { Eta } from 'eta';
 import fs from "fs";
-import getPort, { portNumbers } from "get-port";
 import ora from "ora";
 import os from "os";
 import path from "path";
+import {
+    AllResults,
+    BUN_ONLY_FRAMEWORKS,
+    FRAMEWORKS,
+    HistoryEntry,
+    RUNTIMES,
+    SCENARIOS,
+    SystemInfo
+} from "./config";
+import { compileForNode, runBenchmark } from "./lib/engine";
+import { generateReport } from "./lib/report";
 
-const FRAMEWORKS = ["shokupan", "fastify", "express", "koa", "hapi", "nest", "hono", "elysia"];
-const RUNTIMES = ["bun", "node"];
-const BUN_ONLY_FRAMEWORKS = ["elysia"]; // Frameworks that only work on Bun
-const BUN_REUSE_PORT_FRAMEWORKS = ["shokupan", "elysia", "hono"]; // Frameworks supporting Bun's reusePort (Bun.serve)
-
-
-// Framework/scenario exclusions - scenarios that frameworks don't support
-const FRAMEWORK_EXCLUSIONS: Record<string, string[]> = {
-    "express": ["compression-brotli", "compression-zstd"],
-    "koa": ["compression-brotli", "compression-zstd"],
-    "hapi": ["compression-brotli", "compression-zstd"],
-    "nest": ["compression-gzip", "compression-brotli", "compression-deflate", "compression-zstd", "math-middleware"],
-    "fastify": ["compression-zstd"],
-    "hono": ["compression-brotli", "compression-zstd"],
-    "elysia": ["compression-gzip", "compression-brotli", "compression-deflate", "compression-zstd"],
-};
-
-// Runtime-specific exclusions - scenarios that don't work on specific runtimes
-const RUNTIME_EXCLUSIONS: Record<string, Record<string, string[]>> = {
-    "node": {
-        // Shokupan on Node.js has issues with POST requests due to undici Request duplex requirement
-        "shokupan": ["fully-loaded", "compression-zstd"]
-    },
-    "bun": {
-        // Express body-parser has issues with large payloads on Bun
-        "express": ["large-payload-request"],
-        // Koa compression middleware has stream issues on Bun
-        "koa": ["compression-gzip", "compression-deflate"]
-    }
-};
-
-const spinner = ora({ spinner: "dots" });
-
-
-// Advanced scenarios
-type ScenarioConfig = {
-    name: string;
-    endpoints: string[];
-    connections: number;
-    duration: number;
-    durationEstimate?: number;
-    method?: string;
-    body?: string;
-    headers?: Record<string, string>;
-    timeout?: number;
-    processCount?: number; // Single process count (legacy, for non-scaling scenarios)
-    processCounts?: number[]; // Array of process counts to test for scaling comparison
-};
-
-// Memory sample collected during benchmark execution
-type MemorySample = {
-    timestamp: number;      // Milliseconds since benchmark start
-    rss: number;           // Resident Set Size (MB)
-};
-
-const SCENARIOS: Record<string, ScenarioConfig> = {
-    // Compression tests - test each algorithm separately
-    "compression-gzip": {
-        name: "Compression (gzip)",
-        endpoints: ["/compressed", "/compressed-large"],
-        connections: 100,
-        duration: 10,
-        durationEstimate: 23,
-        headers: { "Accept-Encoding": "gzip" }
-    },
-    "compression-brotli": {
-        name: "Compression (brotli)",
-        endpoints: ["/compressed", "/compressed-large"],
-        connections: 100,
-        duration: 10,
-        durationEstimate: 23,
-        headers: { "Accept-Encoding": "br" }
-    },
-    "compression-deflate": {
-        name: "Compression (deflate)",
-        endpoints: ["/compressed", "/compressed-large"],
-        connections: 100,
-        duration: 10,
-        durationEstimate: 23,
-        headers: { "Accept-Encoding": "deflate" }
-    },
-    "compression-zstd": {
-        name: "Compression (zstd)",
-        endpoints: ["/compressed", "/compressed-large"],
-        connections: 100,
-        duration: 10,
-        durationEstimate: 23,
-        headers: { "Accept-Encoding": "zstd" }
-    },
-    "compression-store": {
-        name: "No Compression (baseline)",
-        endpoints: ["/compressed", "/compressed-large"],
-        connections: 100,
-        duration: 10,
-        durationEstimate: 23,
-        headers: {}
-    },
-
-    // Large payload tests
-    "large-payload-request": {
-        name: "Large Request Payload (10MB POST)",
-        endpoints: ["/large-request"],
-        connections: 50,
-        duration: 10,
-        durationEstimate: 13,
-        method: "POST",
-        body: "x".repeat(10 * 1024 * 1024), // 10MB plain text
-        headers: { "Content-Type": "text/plain" }
-    },
-    "large-payload-response": {
-        name: "Large Response Payload (5MB JSON)",
-        endpoints: ["/large-response"],
-        connections: 50,
-        duration: 10,
-        durationEstimate: 13
-    },
-    "large-payload-headers": {
-        name: "Large Headers (100 headers)",
-        endpoints: ["/large-headers"],
-        connections: 100,
-        duration: 10,
-        durationEstimate: 13
-    },
-
-    // Math middleware test
-    "math-middleware": {
-        name: "10 MD5 Middleware Chain",
-        endpoints: ["/compute"],
-        connections: 100,
-        duration: 10,
-        durationEstimate: 13
-    },
-
-    // Scaling test
-    "scaling": {
-        name: "1000 Route Handlers (Scaling)",
-        endpoints: Array.from({ length: 10 }, (_, i) => `/route-${Math.floor(Math.random() * 1000)}`),
-        connections: 100,
-        duration: 10,
-        durationEstimate: 110
-    },
-
-    // Fully loaded test
-    "fully-loaded": {
-        name: "Fully Loaded (Validators + ALS)",
-        endpoints: ["/validate"],
-        connections: 100,
-        duration: 10,
-        durationEstimate: 13,
-        method: "POST",
-        body: JSON.stringify({ data: "test" }),
-        headers: { "Content-Type": "application/json" }
-    },
-
-    // Long pending test - tests high concurrency with small delays
-    "long-pending": {
-        name: "High Concurrency (10000 concurrent, 100ms delay)",
-        endpoints: ["/delayed"],
-        connections: 10000,
-        duration: 10,
-        durationEstimate: 13.5,
-        timeout: 30 // Allow enough time for responses
-    },
-
-    // Property access test - simple property read performance
-    "property-access": {
-        name: "Property Access (path)",
-        endpoints: ["/property/path"],
-        connections: 100,
-        duration: 10,
-        durationEstimate: 13
-    },
-
-    // Multi-process scaling test - compares 1, 2, and 4 worker performance
-    "multi-process": {
-        name: "Multi-Process Scaling",
-        endpoints: ["/small-get", "/large-get", "/large-post"],
-        connections: 500,
-        duration: 60, // Increase duration to allow for initial CPU blocking (serialization of large payloads)
-        durationEstimate: 224, // 3 endpoints × 3 process counts × ~13s
-        processCounts: [1, 2, 4], // Test with 1, 2, and 4 workers for comparison
-        timeout: 60 // Increase timeout for high concurrency/large payload
-    }
-};
-
-const CASES_DIR = path.join(import.meta.dir, "advanced-cases");
-const DIST_DIR = path.join(import.meta.dir, "dist");
-const WORKER_TS = path.join(import.meta.dir, "advanced-worker.ts");
-const WORKER_JS = path.join(DIST_DIR, "advanced-worker.cjs");
-const REPORT_PATH = path.join(import.meta.dir, "advanced-report.html");
 const HISTORY_PATH = path.join(import.meta.dir, "advanced-results.json");
-
-type BenchmarkResult = {
-    requests: number;
-    latency: number;
-    throughput: number;
-    error?: string;
-    percentiles?: Record<string, number>;
-    memory?: MemorySample[];  // Memory samples collected during benchmark
-};
-
-type ScenarioResults = Record<string, BenchmarkResult>; // endpoint -> result
-type RuntimeResults = Record<string, ScenarioResults>; // scenario -> endpoints -> result
-type FrameworkResults = Record<string, RuntimeResults>; // runtime -> scenario -> endpoints -> result
-type AllResults = Record<string, FrameworkResults>; // framework -> runtime -> scenario -> endpoints -> result
-
-type SystemInfo = {
-    os: string;
-    kernel: string;
-    node: string;
-    bun: string;
-    cpu: {
-        model: string;
-        speed: number;
-        cores: number;
-    };
-    memory: {
-        total: number;
-    };
-};
-
-type HistoryEntry = {
-    timestamp: number;
-    system?: SystemInfo;
-    results: AllResults;
-};
-
-
-async function compileForNode(targetFrameworks: string[]) {
-    console.log("Compiling advanced cases for Node.js...");
-    if (!fs.existsSync(DIST_DIR)) {
-        fs.mkdirSync(DIST_DIR);
-    }
-
-    // Compile worker
-    const workerProc = spawn(["bun", "build",
-        WORKER_TS,
-        "--outfile", path.join(DIST_DIR, "advanced-worker.cjs"),
-        "--target", "node",
-        "--format", "cjs"
-    ], { stdout: "inherit", stderr: "inherit" });
-    await workerProc.exited;
-
-    const pkg = JSON.parse(fs.readFileSync(path.join(import.meta.dir, "./package.json"), "utf8"));
-    const externals = Object.keys(pkg.dependencies || {}).concat(Object.keys(pkg.devDependencies || {}));
-    const externalFlags = externals.flatMap(e => ["--external", e]);
-
-    // Compile each case individually to ensure proper output
-    for (const framework of targetFrameworks) {
-        const entrypoint = path.join(CASES_DIR, `${framework}.ts`);
-        const outfile = path.join(DIST_DIR, `${framework}.cjs`);
-
-        const proc = spawn(["bun", "build",
-            entrypoint,
-            "--outfile", outfile,
-            "--target", "node",
-            "--format", "cjs",
-            ...externalFlags
-        ], { stdout: "inherit", stderr: "inherit" });
-        await proc.exited;
-
-        if (proc.exitCode !== 0) {
-            console.warn(`Warning: Failed to compile ${framework}.ts for Node.js`);
-        }
-    }
-}
-
-function runAutocannon(url: string, options: any = {}) {
-    return new Promise<any>((resolve, reject) => {
-        const latencies: number[] = [];
-        const config: any = {
-            url,
-            connections: options.connections || 100,
-            duration: options.duration || 10,
-            timeout: options.timeout || 10,
-        };
-
-        if (options.method) config.method = options.method;
-        if (options.body) config.body = options.body;
-        if (options.headers) config.headers = options.headers;
-
-        const instance = autocannon(config, (err, result) => {
-            if (err) {
-                console.error("Autocannon error:", err);
-                return reject(err);
-            }
-            (result as any).latencies = latencies;
-            resolve(result);
-        });
-
-        instance.on('response', (client, statusCode, resBytes, responseTime) => {
-            latencies.push(responseTime);
-        });
-    });
-}
-
-function calculatePercentile(latencies: number[], percentile: number): number {
-    if (latencies.length === 0) return 0;
-    const index = Math.ceil(percentile / 100 * latencies.length) - 1;
-    return latencies[Math.max(0, Math.min(latencies.length - 1, index))];
-}
-
-async function runBenchmark(framework: string, runtime: string, scenario: string) {
-    const startTime = Date.now();
-    const scenarioConfig = SCENARIOS[scenario as keyof typeof SCENARIOS];
-
-    // Check if this framework/scenario combination is excluded
-    const frameworkExclusions = FRAMEWORK_EXCLUSIONS[framework] || [];
-    const runtimeExclusions = RUNTIME_EXCLUSIONS[runtime]?.[framework] || [];
-    const allExclusions = [...frameworkExclusions, ...runtimeExclusions];
-
-    if (allExclusions.includes(scenario)) {
-        const reason = frameworkExclusions.includes(scenario)
-            ? `${framework} doesn't support ${scenarioConfig.name}`
-            : `${framework} on ${runtime} doesn't support ${scenarioConfig.name}`;
-        return {
-            error: `Skipped - ${reason}`,
-            duration: Date.now() - startTime
-        } as any;
-    }
-
-    // If this scenario has processCounts array, run benchmarks for each process count
-    // and return combined results with process count as part of endpoint key
-    if (scenarioConfig.processCounts && scenarioConfig.processCounts.length > 0) {
-        const allResults: ScenarioResults = {};
-        let totalDuration = 0;
-
-        for (const processCount of scenarioConfig.processCounts) {
-            console.log(`\n${'='.repeat(60)}`);
-            console.log(`Testing with ${processCount} worker${processCount > 1 ? 's' : ''}`);
-            console.log('='.repeat(60));
-
-            // Run benchmark with this specific process count
-            const result = await runBenchmarkWithProcessCount(
-                framework,
-                runtime,
-                scenario,
-                scenarioConfig,
-                processCount,
-                startTime
-            );
-
-            // Add process count to endpoint keys for comparison
-            for (const [endpoint, data] of Object.entries(result)) {
-                if (endpoint !== 'duration') {
-                    allResults[`${endpoint} [${processCount}w]`] = data;
-                }
-            }
-
-            totalDuration += (result as any).duration || 0;
-        }
-
-        return {
-            ...allResults,
-            duration: totalDuration
-        };
-    }
-
-    // Single process count scenario
-    const processCount = scenarioConfig.processCount || 1;
-    return await runBenchmarkWithProcessCount(
-        framework,
-        runtime,
-        scenario,
-        scenarioConfig,
-        processCount,
-        startTime
-    );
-}
-
-async function runBenchmarkWithProcessCount(
-    framework: string,
-    runtime: string,
-    scenario: string,
-    scenarioConfig: ScenarioConfig,
-    processCount: number,
-    benchmarkStartTime: number
-) {
-    const startTime = Date.now();
-    const isMultiProcess = processCount > 1;
-
-    // Allocate single port for the benchmark
-    const port = await getPort({ port: portNumbers(30000, 60000) });
-    const ports = [port]; // Keep array for log compatibility if needed, but we only use one
-
-    if (isMultiProcess) {
-        if (runtime === "bun") {
-            const workers = processCount;
-            console.log(`Benchmark starting: \x1b[36m${scenarioConfig.name}\x1b[0m (${workers} workers sharing port \x1b[36m${port}\x1b[0m)`);
-        } else {
-            // Node cluster mode
-            console.log(`Benchmark starting: \x1b[36m${scenarioConfig.name}\x1b[0m (Cluster Primary + ${processCount} workers on port \x1b[36m${port}\x1b[0m)`);
-        }
-    } else {
-        console.log(`Benchmark starting: \x1b[36m${scenarioConfig.name}\x1b[0m (port \x1b[36m${port}\x1b[0m)`);
-    }
-
-    // Spawn worker processes
-    const procs: any[] = [];
-    const allOutputLines: string[][] = [];
-
-    // For Bun with supported frameworks, we spawn N processes (OS load balancing via reusePort)
-    // For Node (and incompatible Bun frameworks), we spawn 1 Primary process which forks N workers (Cluster module)
-    /* 
-     * Frameworks using node:http (Express, Fastify, etc.) don't support reusePort in Bun easily.
-     * So for them, we use Cluster mode even in Bun.
-     */
-    const canUseReusePort = runtime === "bun" && BUN_REUSE_PORT_FRAMEWORKS.includes(framework);
-    const procCountToSpawn = (canUseReusePort) ? processCount : 1;
-
-    // For Node, we only have one direct child PID (the primary). We need to track it to find its children.
-    let nodePrimaryPid: number | undefined;
-
-    for (let i = 0; i < procCountToSpawn; i++) {
-        let cmd: string[];
-        let caseFile: string;
-        let env = {
-            ...process.env,
-            PORT: String(port),
-            SCENARIO: scenario,
-            BUN_QUIET: "1",
-            REUSE_PORT: (canUseReusePort && isMultiProcess) ? "1" : undefined,
-            CLUSTER_WORKERS: (!canUseReusePort && isMultiProcess) ? String(processCount) : undefined
-        };
-
-        if (runtime === "bun") {
-            cmd = ["bun", "run", WORKER_TS];
-            caseFile = path.join(CASES_DIR, `${framework}.ts`);
-        } else {
-            // Increase memory limit for Node.js workers to 8GB to handle large payloads/high concurrency
-            cmd = ["node", "--max-old-space-size=8192", WORKER_JS];
-            caseFile = path.join(DIST_DIR, `${framework}.cjs`);
-        }
-        env['CASE_FILE'] = caseFile;
-
-        const proc = spawn(cmd, {
-            env,
-            stdout: "pipe",
-            stderr: "pipe",
-            onExit(proc, exitCode, signalCode, error) {
-                const isExpectedSignal = signalCode === 15 || signalCode === 2;
-                if (exitCode !== 0 && !isExpectedSignal) {
-                    console.error(`Worker process ${i + 1} exited unexpectedly with code ${exitCode}, signal ${signalCode}`);
-                }
-            },
-        });
-
-        if (runtime === "node" || !canUseReusePort) {
-            nodePrimaryPid = proc.pid;
-        }
-
-        const outputLines: string[] = [];
-        const pipeStream = async (stream: ReadableStream, dest: any) => {
-            if (!stream) return;
-            const reader = stream.getReader();
-            const decoder = new TextDecoder();
-            try {
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    const text = decoder.decode(value);
-                    dest.write(text);
-                    if (outputLines.length < 100) {
-                        outputLines.push(text);
-                    }
-                }
-            } catch (e) { }
-        };
-
-        pipeStream(proc.stderr, process.stderr);
-        procs.push(proc);
-        allOutputLines.push(outputLines);
-    }
-
-    // Wait for startup
-    await new Promise(r => setTimeout(r, 2000));
-
-    // Memory sampling logic
-    const allMemorySamples: MemorySample[] = [];
-
-    // Start interval sampling
-    const samplingInterval = setInterval(async () => {
-        try {
-            let totalRss = 0;
-
-            if (canUseReusePort) {
-                // Sum all spawned processes (Bun reusePort mode)
-                for (const proc of procs) {
-                    if (proc.pid) {
-                        const result = await Bun.$`ps -o rss= -p ${proc.pid}`.quiet();
-                        const rss = parseInt(result.stdout.toString().trim());
-                        if (!isNaN(rss)) totalRss += rss;
-                    }
-                }
-            } else {
-                // Cluster mode (Node or Bun): Find all processes (Primary + Children)
-                if (nodePrimaryPid) {
-                    // Get primary RSS
-                    const primaryRes = await Bun.$`ps -o rss= -p ${nodePrimaryPid}`.quiet();
-                    const pRss = parseInt(primaryRes.stdout.toString().trim());
-                    if (!isNaN(pRss)) totalRss += pRss;
-
-                    // Get children RSS (pgrep -P parent_pid to get child pids, then ps)
-                    // Or just use pgrep to sum? pgrep doesn't output rss directly usually.
-                    // Use ps --ppid
-                    try {
-                        const childrenRes = await Bun.$`ps -o rss= --ppid ${nodePrimaryPid}`.quiet();
-                        const lines = childrenRes.stdout.toString().trim().split('\n');
-                        for (const line of lines) {
-                            const val = parseInt(line.trim());
-                            if (!isNaN(val)) totalRss += val;
-                        }
-                    } catch (e) {
-                        // No children or error
-                    }
-                }
-            }
-
-            if (totalRss > 0) {
-                allMemorySamples.push({
-                    timestamp: Date.now() - benchmarkStartTime,
-                    rss: Math.round(totalRss / 1024)
-                });
-            }
-
-        } catch (e) { }
-    }, 250);
-
-
-    // Check if any process died immediately
-    for (let i = 0; i < procs.length; i++) {
-        const proc = procs[i];
-        if (proc.killed || proc.exitCode !== null) {
-            clearInterval(samplingInterval);
-            for (const p of procs) p.kill();
-            return { error: `Process ${i + 1} died immediately`, output: allOutputLines[i].join("") };
-        }
-    }
-
-    // Health check (only check the single port)
-    let serverReady = false;
-    let lastError: any = null;
-
-    for (let attempt = 0; attempt < 20; attempt++) {
-        await new Promise(r => setTimeout(r, 500));
-
-        if (procs[0].killed || procs[0].exitCode !== null) {
-            clearInterval(samplingInterval);
-            for (const p of procs) p.kill();
-            return { error: `Process died during startup`, output: allOutputLines[0].join("") };
-        }
-
-        try {
-            const testEndpoint = scenarioConfig.endpoints[0];
-            const healthCheck = await fetch(`http://localhost:${port}${testEndpoint}`, {
-                signal: AbortSignal.timeout(1000),
-                method: (scenarioConfig.method as any) || "GET"
-            });
-            if (healthCheck.ok || healthCheck.status < 500) {
-                serverReady = true;
-                break;
-            }
-            lastError = `HTTP ${healthCheck.status}`;
-        } catch (e: any) {
-            lastError = e.message || String(e);
-        }
-    }
-
-    if (!serverReady) {
-        clearInterval(samplingInterval);
-        for (const p of procs) p.kill();
-        await new Promise(r => setTimeout(r, 1000));
-        return { error: `Server failed to start on port ${port}: ${lastError}`, output: allOutputLines[0].join("") };
-    }
-
-    spinner.text = `Server ready on port ${port}`;
-
-    const results: ScenarioResults = {};
-
-    try {
-        for (const endpoint of scenarioConfig.endpoints) {
-            spinner.text = `Testing ${endpoint}${isMultiProcess ? ` (multi-process)` : ''}...`;
-
-            const url = `http://localhost:${port}${endpoint}`;
-            try {
-                const res = await runAutocannon(url, {
-                    connections: scenarioConfig.connections,
-                    duration: scenarioConfig.duration,
-                    method: scenarioConfig.method,
-                    body: scenarioConfig.body,
-                    headers: scenarioConfig.headers,
-                    timeout: scenarioConfig.timeout
-                });
-
-                const latencies = (res.latencies || []).sort((a: number, b: number) => a - b);
-                const percentiles = {
-                    p1: calculatePercentile(latencies, 1),
-                    p5: calculatePercentile(latencies, 5),
-                    p25: calculatePercentile(latencies, 25),
-                    p75: calculatePercentile(latencies, 75),
-                    p95: calculatePercentile(latencies, 95),
-                    p99: calculatePercentile(latencies, 99)
-                };
-
-                results[endpoint] = {
-                    requests: res.requests?.average || 0,
-                    latency: res.latency?.average || 0,
-                    throughput: res.throughput?.average || 0,
-                    percentiles,
-                    memory: allMemorySamples.length > 0 ? allMemorySamples : undefined
-                };
-            } catch (e) {
-                console.error(`Failed to benchmark ${endpoint}:`, e);
-                results[endpoint] = {
-                    requests: 0,
-                    latency: 0,
-                    throughput: 0,
-                    error: String(e)
-                };
-            }
-        }
-    } finally {
-        clearInterval(samplingInterval);
-        for (const proc of procs) {
-            proc.kill();
-        }
-        await new Promise(r => setTimeout(r, 500));
-    }
-
-    return {
-        ...results,
-        duration: Date.now() - startTime
-    };
-}
+const spinner = ora({ spinner: "dots" });
 
 async function main() {
     clack.intro("🚀 Advanced Benchmark Suite for Web Frameworks");
@@ -653,6 +30,25 @@ async function main() {
     const scenarioIndex = args.indexOf("--scenario");
     const hasScenarioArg = scenarioIndex !== -1;
     const hasAllFlag = args.includes("--all");
+    const isReportOnly = args.includes("--report-only");
+
+    if (isReportOnly) {
+        console.log("Generating report from existing history...");
+        let history: HistoryEntry[] = [];
+        if (fs.existsSync(HISTORY_PATH)) {
+            try {
+                history = JSON.parse(fs.readFileSync(HISTORY_PATH, "utf8"));
+            } catch (e) {
+                console.error("Failed to parse history.");
+            }
+        }
+        const reportPath = generateReport(history);
+        console.log(`Report generated: ${reportPath}`);
+
+        const openCmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
+        spawn([openCmd, reportPath]);
+        return;
+    }
 
     let targetFrameworks: string[];
     let targetScenarios: string[];
@@ -708,7 +104,7 @@ async function main() {
             options: Object.entries(SCENARIOS).map(([key, config]) => ({
                 value: key,
                 label: config.name,
-                hint: `${config.connections} conns, ${config.durationEstimate * targetFrameworks.length * 2}s`
+                hint: `${config.connections} conns, ${config.durationEstimate! * targetFrameworks.length * 2}s`
             })),
             initialValues: Object.keys(SCENARIOS).slice(0, 3),
             required: true
@@ -724,7 +120,7 @@ async function main() {
 
     const testCount = targetFrameworks.length * RUNTIMES.length * targetScenarios.length;;
     const durationEstimate = (targetFrameworks.length * 2 - BUN_ONLY_FRAMEWORKS.length) * targetScenarios.map(s => {
-        return SCENARIOS[s].durationEstimate;
+        return SCENARIOS[s].durationEstimate || 10;
     }).reduce((acc, val) => acc + val, 0);
 
     // Estimate based on actual configuration:
@@ -803,7 +199,7 @@ async function main() {
                     fullResults[framework][runtime][scenario] = res as any;
 
                     // Log test completion time
-                    if (res.error) {
+                    if (res && res.error) {
                         console.log(`\x1b[90m  ${res.error.startsWith('Skipped') ? 'Skipped' : 'Failed'} (${testDuration.toFixed(2)}s)\x1b[0m`);
                     } else {
                         console.log(`\x1b[32m  ✓ Completed in ${testDuration.toFixed(2)}s\x1b[0m`);
@@ -834,7 +230,7 @@ async function main() {
         }
     }
 
-    const systemInfo = {
+    const systemInfo: SystemInfo = {
         os: `${os.type()} ${os.release()}`,
         kernel: os.version(),
         node: process.version,
@@ -863,50 +259,18 @@ async function main() {
     fs.writeFileSync(HISTORY_PATH, JSON.stringify(history, null, 2));
 
     spinner.start("Generating HTML report...");
-    generateReport(history, hasAllFlag);
-    spinner.succeed(` Report generated: ${REPORT_PATH}`);
+    const reportPath = generateReport(history);
+    spinner.succeed(` Report generated: ${reportPath}`);
 
     clack.outro("✨ All done!");
 
     // Only auto-open in interactive mode (not in CI/CD)
     if (!hasAllFlag) {
         const openCmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
-        spawn([openCmd, REPORT_PATH]);
+        spawn([openCmd, reportPath]);
     }
 
     process.exit(0);
-}
-
-function generateReport(history: HistoryEntry[], skipAutoOpen = false) {
-    const sortedHistory = [...history].reverse();
-    const latest = sortedHistory[0];
-
-    // Extract actual scenarios that were run
-    const runScenarios = new Set<string>();
-    Object.values(latest.results).forEach(frameworkRes => {
-        Object.values(frameworkRes).forEach(runtimeRes => {
-            Object.keys(runtimeRes).forEach(scenario => {
-                runScenarios.add(scenario);
-            });
-        });
-    });
-    const actualScenarios = Array.from(runScenarios);
-
-    // Read template files
-    const templatePath = path.join(__dirname, 'report', 'template.eta');
-    const template = fs.readFileSync(templatePath, 'utf-8');
-
-    // Render template with data
-    const eta = new Eta({
-        views: path.join(__dirname, 'report')
-    });
-    const html = eta.renderString(template, {
-        dataJson: JSON.stringify(sortedHistory),
-        scenarioNamesJson: JSON.stringify(Object.fromEntries(Object.entries(SCENARIOS).map(([k, v]) => [k, v.name]))),
-        actualScenariosJson: JSON.stringify(actualScenarios)
-    });
-
-    fs.writeFileSync(REPORT_PATH, html);
 }
 
 main().catch(err => {
