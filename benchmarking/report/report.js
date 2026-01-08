@@ -275,7 +275,7 @@ function buildMultiProcessCharts(id) {
     // We'll generate chart containers dynamically based on available frameworks
     return `
         <div class="multi-process-charts">
-            <div class="scaling-hint">📊 Framework comparison by endpoint: Bun vs Node.js performance across 1, 2, and 4 workers</div>
+            <div class="scaling-hint">📊 Experimental framework comparison by endpoint: Bun vs Node.js performance across 1, 2, and 4 workers</div>
             <div class="endpoint-charts" id="framework-charts-${id}">
                 <!-- Endpoint charts will be dynamically generated -->
             </div>
