@@ -100,8 +100,9 @@ function printDuration(deltaMs/** number in ms */) {
 async function updateDashboard() {
     try {
         const headers = getRequestHeaders ? getRequestHeaders() : {};
+        const interval = document.getElementById('time-range-selector')?.value || '1m';
         // Handle relative path issue when accessing /admin without trailing slash
-        const metricsUrl = window.location.pathname.endsWith('/') ? 'metrics' : window.location.pathname + '/metrics';
+        const metricsUrl = (window.location.pathname.endsWith('/') ? 'metrics' : window.location.pathname + '/metrics') + `?interval=${interval}`;
         const res = await fetch(metricsUrl, { headers });
         if (!res.ok) return;
 

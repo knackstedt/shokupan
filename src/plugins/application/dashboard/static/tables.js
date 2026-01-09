@@ -57,24 +57,25 @@ async function fetchTopStats() {
     // Determine base path for API requests  
     const basePath = window.location.pathname.endsWith('/') ? window.location.pathname.slice(0, -1) : window.location.pathname;
     const url = basePath + '/';
+    const interval = document.getElementById('time-range-selector')?.value || '1m';
     try {
         // Top Requests
-        fetch(url + 'requests/top', { headers }).then(r => r.json()).then(d => {
+        fetch(url + 'requests/top?interval=' + interval, { headers }).then(r => r.json()).then(d => {
             if (d.top) topRequestsTable.setData(d.top);
         });
 
         // Top Errors
-        fetch(url + 'errors/top', { headers }).then(r => r.json()).then(d => {
+        fetch(url + 'errors/top?interval=' + interval, { headers }).then(r => r.json()).then(d => {
             if (d.top) topErrorsTable.setData(d.top);
         });
 
         // Failing Requests
-        fetch(url + 'requests/failing', { headers }).then(r => r.json()).then(d => {
+        fetch(url + 'requests/failing?interval=' + interval, { headers }).then(r => r.json()).then(d => {
             if (d.top) failingRequestsTable.setData(d.top);
         });
 
         // Slowest Requests
-        fetch(url + 'requests/slowest', { headers }).then(r => r.json()).then(d => {
+        fetch(url + 'requests/slowest?interval=' + interval, { headers }).then(r => r.json()).then(d => {
             if (d.slowest) slowestRequestsTable.setData(d.slowest);
         });
 

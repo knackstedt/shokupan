@@ -93,7 +93,7 @@
 
         <div id="chart-container" style="display: flex; flex-direction: column; gap: 1rem;">
             <div style="display: flex; justify-content: flex-end;">
-                <select id="time-range-selector" onchange="updateCharts()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px; border-radius: 4px;">
+                <select id="time-range-selector" onchange="updateCharts(); updateDashboard(); fetchTopStats();" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px; border-radius: 4px;">
                     <option value="1m">1 Minute</option>
                     <option value="5m">5 Minutes</option>
                     <option value="30m">30 Minutes</option>

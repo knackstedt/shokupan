@@ -85,19 +85,23 @@ export class MetricsCollector {
     }
 
     private async collect() {
-        const now = Date.now();
-        console.log('[MetricsCollector] collect() called at', new Date(now).toISOString());
+        try {
+            const now = Date.now();
+            console.log('[MetricsCollector] collect() called at', new Date(now).toISOString());
 
-        for (const int of INTERVALS) {
-            const start = this.currentIntervalStart[int.label];
-            // If we passed the interval boundary
-            if (now >= start + int.ms) {
-                console.log(`[MetricsCollector] Flushing ${int.label} interval (boundary crossed)`);
-                await this.flushInterval(int.label, start, int.ms);
-                // Advance to next interval (could simply be aligning now, but be careful of gaps if app was down)
-                // For simplicity, just align now.
-                this.currentIntervalStart[int.label] = this.alignTimestamp(now, int.ms);
+            for (const int of INTERVALS) {
+                const start = this.currentIntervalStart[int.label];
+                // If we passed the interval boundary
+                if (now >= start + int.ms) {
+                    console.log(`[MetricsCollector] Flushing ${int.label} interval (boundary crossed)`);
+                    await this.flushInterval(int.label, start, int.ms);
+                    // Advance to next interval (could simply be aligning now, but be careful of gaps if app was down)
+                    // For simplicity, just align now.
+                    this.currentIntervalStart[int.label] = this.alignTimestamp(now, int.ms);
+                }
             }
+        } catch (error) {
+            console.error('[MetricsCollector] Error in collect():', error);
         }
     }
 

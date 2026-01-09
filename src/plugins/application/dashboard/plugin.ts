@@ -137,7 +137,9 @@ export class Dashboard implements ShokupanPlugin {
             const duration = Date.now() - startTime;
 
             if (hooks.onResponseEnd) {
-                await hooks.onResponseEnd(ctx, ctx.response || {});
+                // Use _finalResponse if available to get the actual status code sent to the client
+                const effectiveResponse = (ctx as any)._finalResponse || ctx.response || {};
+                await hooks.onResponseEnd(ctx, effectiveResponse);
             }
         };
 
@@ -151,9 +153,59 @@ export class Dashboard implements ShokupanPlugin {
     }
 
     private setupRoutes() {
-        this.router.get("/metrics", (ctx) => {
+        this.router.get("/metrics", async (ctx) => {
             const uptimeSeconds = Math.floor((Date.now() - this.startTime) / 1000);
             const uptime = `${Math.floor(uptimeSeconds / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m ${uptimeSeconds % 60}s`;
+
+            const interval = ctx.query['interval'];
+            if (interval) {
+                const intervalMap: Record<string, number> = {
+                    '10s': 10 * 1000,
+                    '1m': 60 * 1000,
+                    '5m': 5 * 60 * 1000,
+                    '30m': 30 * 60 * 1000,
+                    '1h': 60 * 60 * 1000,
+                    '2h': 2 * 60 * 60 * 1000,
+                    '6h': 6 * 60 * 60 * 1000,
+                    '12h': 12 * 60 * 60 * 1000,
+                    '1d': 24 * 60 * 60 * 1000,
+                    '3d': 3 * 24 * 60 * 60 * 1000,
+                    '7d': 7 * 24 * 60 * 60 * 1000,
+                    '30d': 30 * 24 * 60 * 60 * 1000,
+                };
+                const ms = intervalMap[interval] || 60 * 1000;
+                const startTime = Date.now() - ms;
+
+                // For accuracy, query the requests table for the specific window
+                const stats = await datastore.query(`
+                    SELECT 
+                        count() as total,
+                        math::sum(IF status < 400 THEN 1 ELSE 0 END) as success,
+                        math::sum(IF status >= 400 THEN 1 ELSE 0 END) as failed,
+                        math::mean((SELECT VALUE duration FROM requests WHERE timestamp >= $start)) as avg_latency
+                    FROM requests 
+                    WHERE timestamp >= $start
+                `, { start: startTime });
+
+                const s = stats[0] || { total: 0, success: 0, failed: 0, avg_latency: 0 };
+                // console.log("INTERVAL STATS:", interval, s);
+
+                return ctx.json({
+                    metrics: {
+                        totalRequests: s.total || 0,
+                        successfulRequests: s.success || 0,
+                        failedRequests: s.failed || 0,
+                        activeRequests: this.metrics.activeRequests,
+                        averageTotalTime_ms: s.avg_latency || 0,
+                        recentTimings: this.metrics.recentTimings,
+                        logs: [],
+                        rateLimitedCounts: this.metrics.rateLimitedCounts,
+                        nodeMetrics: this.metrics.nodeMetrics,
+                        edgeMetrics: this.metrics.edgeMetrics
+                    },
+                    uptime
+                });
+            }
 
             return ctx.json({
                 metrics: this.metrics,
@@ -194,34 +246,62 @@ export class Dashboard implements ShokupanPlugin {
             });
         });
 
+        const getIntervalStartTime = (interval?: string) => {
+            if (!interval) return 0;
+            const intervalMap: Record<string, number> = {
+                '10s': 10 * 1000,
+                '1m': 60 * 1000,
+                '5m': 5 * 60 * 1000,
+                '30m': 30 * 60 * 1000,
+                '1h': 60 * 60 * 1000,
+                '2h': 2 * 60 * 60 * 1000,
+                '6h': 6 * 60 * 60 * 1000,
+                '12h': 12 * 60 * 60 * 1000,
+                '1d': 24 * 60 * 60 * 1000,
+                '3d': 3 * 24 * 60 * 60 * 1000,
+                '7d': 7 * 24 * 60 * 60 * 1000,
+                '30d': 30 * 24 * 60 * 60 * 1000,
+            };
+            const ms = intervalMap[interval] || 0;
+            return ms ? Date.now() - ms : 0;
+        };
+
         // Top Requests Endpoint
         this.router.get("/requests/top", async (ctx) => {
+            const startTime = getIntervalStartTime(ctx.query['interval']);
             const result = await datastore.query(
-                "SELECT method, url, count() as count FROM requests GROUP BY method, url ORDER BY count DESC LIMIT 10"
+                "SELECT method, url, count() as count FROM requests WHERE timestamp >= $start GROUP BY method, url ORDER BY count DESC LIMIT 10",
+                { start: startTime }
             );
             return ctx.json({ top: result[0] || [] });
         });
 
         // Top Errors Endpoint
         this.router.get("/errors/top", async (ctx) => {
+            const startTime = getIntervalStartTime(ctx.query['interval']);
             const result = await datastore.query(
-                "SELECT status, count() as count FROM failed_requests GROUP BY status ORDER BY count DESC LIMIT 10"
+                "SELECT status, count() as count FROM failed_requests WHERE timestamp >= $start GROUP BY status ORDER BY count DESC LIMIT 10",
+                { start: startTime }
             );
             return ctx.json({ top: result[0] || [] });
         });
 
         // Failing Requests Endpoint
         this.router.get("/requests/failing", async (ctx) => {
+            const startTime = getIntervalStartTime(ctx.query['interval']);
             const result = await datastore.query(
-                "SELECT method, url, count() as count FROM failed_requests GROUP BY method, url ORDER BY count DESC LIMIT 10"
+                "SELECT method, url, count() as count FROM failed_requests WHERE timestamp >= $start GROUP BY method, url ORDER BY count DESC LIMIT 10",
+                { start: startTime }
             );
             return ctx.json({ top: result[0] || [] });
         });
 
         // Slowest Requests Endpoint
         this.router.get("/requests/slowest", async (ctx) => {
+            const startTime = getIntervalStartTime(ctx.query['interval']);
             const result = await datastore.query(
-                "SELECT method, url, duration, status, timestamp FROM requests ORDER BY duration DESC LIMIT 10"
+                "SELECT method, url, duration, status, timestamp FROM requests WHERE timestamp >= $start ORDER BY duration DESC LIMIT 10",
+                { start: startTime }
             );
             return ctx.json({ slowest: result[0] || [] });
         });
@@ -484,4 +564,8 @@ export class Dashboard implements ShokupanPlugin {
 }
 function unknownError(ctx: any): any {
     return ctx.json({ error: "Unknown Error" }, 500);
+}
+
+export default function DebugDashboard(config?: DashboardConfig) {
+    return new Dashboard(config);
 }

@@ -58,7 +58,7 @@ async function ensureDb() {
 export const datastore = {
     async get<T extends Record<string, any>>(recordId: RecordId | Table | Range<any, any>) {
         await ensureDb();
-        return G.__shokupan_db.select<T>(recordId as any);
+        return G.__shokupan_db.select(recordId as any) as Promise<T>;
     },
     async set(recordId: RecordId, value: Record<string, any>) {
         await ensureDb();
@@ -67,7 +67,7 @@ export const datastore = {
     async query<T extends Record<string, any>>(query: string, vars?: Record<string, unknown>) {
         await ensureDb();
         try {
-            return G.__shokupan_db.query(query, vars).collect() as Promise<T[]>;
+            return G.__shokupan_db.query(query, vars).collect() as Promise<T>;
         } catch (e) {
             console.error("DS ERROR:", e);
             throw e;
