@@ -1,6 +1,7 @@
 import { RecordId } from 'surrealdb';
 import type { ShokupanContext } from "../../../context";
 import { datastore } from "../../../util/datastore";
+import { $finalResponse } from '../../../util/symbol';
 import type { Middleware } from "../../../util/types";
 
 export interface IdempotencyOptions {
@@ -74,8 +75,8 @@ export function Idempotency(options: IdempotencyOptions = {}): Middleware {
         // Normalization logic mimicking Shokupan.handleRequest
         if (result instanceof Response) {
             response = result;
-        } else if ((result === null || result === undefined) && ctx._finalResponse instanceof Response) {
-            response = ctx._finalResponse;
+        } else if ((result === null || result === undefined) && ctx[$finalResponse] instanceof Response) {
+            response = ctx[$finalResponse];
         } else if (result !== null && result !== undefined) {
             if (typeof result === 'object') {
                 response = ctx.json(result);

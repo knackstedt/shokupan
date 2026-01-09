@@ -1,7 +1,7 @@
 import Router from "@koa/router";
 import type { Server } from "http";
 import Koa from "koa";
-import { MEDIUM_JSON } from "../data";
+import { MEDIUM_JSON } from "../data.ts";
 
 export async function start(port: number) {
     const app = new Koa();

@@ -5,7 +5,9 @@ import { ShokupanContext } from "./context";
 import { compose } from "./middleware";
 import { generateOpenApi } from "./plugins/application/openapi/openapi";
 import { asyncContext, RequestContextStore } from "./util/async-hooks";
-import { $appRoot, $dispatch, $isApplication } from './util/symbol';
+import { getErrorStatus } from "./util/http-error";
+import { HTTP_STATUS } from "./util/http-status";
+import { $appRoot, $dispatch, $finalResponse, $isApplication, $routeMatched } from './util/symbol';
 import type { Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig, ShokupanPlugin } from './util/types';
 
 
@@ -95,6 +97,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     public openApiSpec?: any;
     private composedMiddleware?: Middleware;
     private cpuMonitor?: SystemCpuMonitor;
+    private server?: Server;
 
 
     get logger() {
@@ -243,7 +246,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         }
 
         const serveOptions = {
-
             port: finalPort,
             hostname: this.applicationConfig.hostname,
             development: this.applicationConfig.development,
@@ -266,8 +268,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             }
         };
 
-
-
         let factory = this.applicationConfig.serverFactory;
 
         // Detect if we are not running on Bun
@@ -277,12 +277,44 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             factory = createHttpServer();
         }
 
-        const server = factory
-            ? await factory(serveOptions)
+        this.server = factory
+            ? await factory(serveOptions) as Server
             : Bun.serve(serveOptions);
 
         console.log(`Shokupan server listening on http://${serveOptions.hostname}:${serveOptions.port}`);
-        return server;
+        return this.server;
+    }
+
+    /**
+     * Stops the application server.
+     * 
+     * This method gracefully shuts down the server and stops any running monitors.
+     * Works transparently in both Bun and Node.js runtimes.
+     * 
+     * @returns A promise that resolves when the server has been stopped.
+     * 
+     * @example
+     * ```typescript
+     * const app = new Shokupan();
+     * const server = await app.listen(3000);
+     * 
+     * // Later, when you want to stop the server
+     * await app.stop();
+     * ```
+     * @param closeActiveConnections — Immediately terminate in-flight requests, websockets, and stop accepting new connections.
+     */
+    public async stop(closeActiveConnections?: boolean): Promise<void> {
+        // Stop CPU monitor if running
+        if (this.cpuMonitor) {
+            this.cpuMonitor.stop();
+            this.cpuMonitor = undefined;
+        }
+
+        // Stop the server if it exists
+        if (this.server) {
+            await this.server.stop(closeActiveConnections);
+            this.server = undefined;
+        }
     }
 
     public [$dispatch](req: ShokupanRequest<T>) {
@@ -421,7 +453,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
 
                     if (match) {
-                        ctx._routeMatched = true;
+                        ctx[$routeMatched] = true;
                         ctx.params = match.params;
 
                         // Ensure body is parsed before handler executes
@@ -437,37 +469,32 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                     response = result;
                 }
                 // Check explicit void return but response set in context
-                else if ((result === null || result === undefined) && ctx._finalResponse instanceof Response) {
-                    response = ctx._finalResponse;
+                else if ((result === null || result === undefined) && ctx[$finalResponse] instanceof Response) {
+                    response = ctx[$finalResponse];
                 }
                 // (Logic moved to main block below)
                 else if (result === null || result === undefined) {
                     // Handler returned nothing (void/null/undefined)
 
                     // 1. Check if response was explicitly set via helper (e.g. ctx.text())
-                    if (ctx._finalResponse instanceof Response) {
-                        response = ctx._finalResponse;
+                    if (ctx[$finalResponse] instanceof Response) {
+                        response = ctx[$finalResponse];
                     }
                     // 2. Logic Split: Route Matched vs Not Found
-                    else if (ctx._routeMatched) {
+                    else if (ctx[$routeMatched]) {
                         // A route WAS matched but returned nothing.
-                        // Default to 200 OK (unless user set status manually)
-                        // If user set status manually (e.g. ctx.status(201)), use that.
-                        // If user set headers manually, we keep those.
-
-                        // If no status is set in ctx.response, it defaults to 200.
-                        // We need to send a response. Since result is void, body is empty.
+                        // Default to 200 OK (unless user set status manually via ctx.response.status)
+                        // We send an empty response with the context's status (defaults to 200)
                         response = ctx.send(null, { status: ctx.response.status, headers: ctx.response.headers });
                     }
                     else {
-                        // No route matched.
-                        // Check if user (likely middleware) manually changed status from default 200?
-                        // If status is NOT 200, we respect it (e.g. auth middleware set 401).
-                        if (ctx.response.status !== 200) {
+                        // No route matched - return 404 Not Found
+                        // Exception: If middleware manually changed the status from default 200,
+                        // respect that (e.g., auth middleware set 401)
+                        if (ctx.response.status !== HTTP_STATUS.OK) {
                             response = ctx.send(null, { status: ctx.response.status, headers: ctx.response.headers });
                         } else {
-                            // Default 404
-                            response = ctx.text("Not Found", 404);
+                            response = ctx.text("Not Found", HTTP_STATUS.NOT_FOUND);
                         }
                     }
                 }
@@ -492,7 +519,8 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 const span = asyncContext.getStore()?.span;
                 if (span) span.setStatus({ code: 2 }); // Error
 
-                const status = err.status || err.statusCode || 500;
+                // Extract status from error object (supports both .status and .statusCode)
+                const status = getErrorStatus(err);
                 const body: any = { error: err.message || "Internal Server Error" };
                 if (err.errors) body.errors = err.errors;
 
@@ -524,10 +552,10 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         return executionPromise
             .catch((err) => {
                 if (err.message === "Request Timeout") {
-                    return ctx.text("Request Timeout", 408);
+                    return ctx.text("Request Timeout", HTTP_STATUS.REQUEST_TIMEOUT);
                 }
                 console.error("Unexpected error in request execution:", err);
-                return ctx.text("Internal Server Error", 500);
+                return ctx.text("Internal Server Error", HTTP_STATUS.INTERNAL_SERVER_ERROR);
             })
             .then(async (res) => {
                 // Response End Hook - Response returned

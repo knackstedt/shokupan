@@ -1,5 +1,5 @@
 import Hapi from "@hapi/hapi";
-import { MEDIUM_JSON } from "../data";
+import { MEDIUM_JSON } from "../data.ts";
 
 export async function start(port: number) {
     const server = Hapi.server({

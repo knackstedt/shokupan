@@ -1,0 +1,11 @@
+{
+    "compilerOptions": {
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
+        "strict": false
+    },
+    "unstable": [
+        "sloppy-imports"
+    ],
+    "nodeModulesDir": "auto"
+}

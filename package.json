@@ -1,6 +1,6 @@
 {
     "name": "shokupan",
-    "version": "0.7.0",
+    "version": "0.8.0",
     "description": "Shokupan is a low-lift modern web framework for Bun.",
     "author": "Andrew G. Knackstedt",
     "publishConfig": {
@@ -65,8 +65,8 @@
         "@opentelemetry/sdk-trace-node": "^2.2.0",
         "@opentelemetry/semantic-conventions": "^1.38.0",
         "@scalar/openapi-types": "^0.5.3",
-        "tslib": "^2.8.1",
-        "ulidx": "^2.4.1"
+        "nanoid": "^5.1.6",
+        "tslib": "^2.8.1"
     },
     "peerDependencies": {
         "@scalar/api-reference": "^1.0.0",

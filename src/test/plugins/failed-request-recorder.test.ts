@@ -25,8 +25,10 @@ describe("FailedRequestRecorder Plugin", () => {
             return [{ result: [] }];
         });
 
-        setSpy = spyOn(datastore, 'set').mockImplementation(async () => {
-            return {};
+        setSpy = spyOn(datastore, 'set').mockImplementation(async (recordId, value) => {
+            // RecordId toString gives us \"table:id\" format or might be complex object
+            // For failed_requests, the ID might be a composite object, just return success
+            return {} as any;
         });
 
         // Mock ready property? usage in tests only.
@@ -49,10 +51,10 @@ describe("FailedRequestRecorder Plugin", () => {
 
         expect(setSpy).toHaveBeenCalled();
         const callArgs = setSpy.mock.calls[0];
-        // set(store, key, value)
-        expect(callArgs[0]).toBe('failed_requests');
-        // callArgs[1] is ID
-        const data = callArgs[2];
+        // callArgs[0] is RecordId, callArgs[1] is the data
+        const recordId = callArgs[0];
+        expect(recordId.toString()).toContain('failed_requests');
+        const data = callArgs[1];
         expect(data.path).toBe("/fail");
         expect(data.error).toBe("Test Failure");
     });

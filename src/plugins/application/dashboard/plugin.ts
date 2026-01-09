@@ -7,7 +7,7 @@ import { RecordId } from 'surrealdb';
 import type { DebugCollector } from "../../../context";
 import { ShokupanRouter } from "../../../router";
 import { datastore } from "../../../util/datastore";
-import { $appRoot } from "../../../util/symbol";
+import { $appRoot, $debug } from "../../../util/symbol";
 import type { ShokupanHooks, ShokupanPlugin } from "../../../util/types";
 import { MetricsCollector } from './metrics-collector';
 
@@ -177,15 +177,28 @@ export class Dashboard implements ShokupanPlugin {
                 const startTime = Date.now() - ms;
 
                 // For accuracy, query the requests table for the specific window
-                const stats = await datastore.query(`
-                    SELECT 
-                        count() as total,
-                        math::sum(IF status < 400 THEN 1 ELSE 0 END) as success,
-                        math::sum(IF status >= 400 THEN 1 ELSE 0 END) as failed,
-                        math::mean((SELECT VALUE duration FROM requests WHERE timestamp >= $start)) as avg_latency
-                    FROM requests 
-                    WHERE timestamp >= $start
-                `, { start: startTime });
+                let stats;
+                try {
+                    stats = await datastore.query(`
+                        SELECT 
+                            count() as total,
+                            count(IF status < 400 THEN 1 END) as success,
+                            count(IF status >= 400 THEN 1 END) as failed,
+                            math::mean(duration) as avg_latency
+                        FROM requests 
+                        WHERE timestamp >= $start
+                        GROUP ALL
+                    `, { start: startTime });
+                } catch (error) {
+                    console.error('[Dashboard] Query failed at plugin.ts:180-191', {
+                        error,
+                        interval,
+                        startTime,
+                        query: 'metrics interval stats',
+                        stack: new Error().stack
+                    });
+                    throw error;
+                }
 
                 const s = stats[0] || { total: 0, success: 0, failed: 0, avg_latency: 0 };
                 // console.log("INTERVAL STATS:", interval, s);
@@ -473,7 +486,7 @@ export class Dashboard implements ShokupanPlugin {
                 (ctx as any)._debugStartTime = performance.now();
 
                 // Attach Collector
-                ctx._debug = new Collector(this);
+                ctx[$debug] = new Collector(this);
             },
 
             onResponseEnd: async (ctx, response) => {
