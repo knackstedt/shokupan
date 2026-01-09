@@ -147,7 +147,7 @@ export class ShokupanContext<
 
     private [$requestId]: string;
     get requestId() {
-        return this[$requestId] ??= nanoid();
+        return this[$requestId] ??= (this.app?.applicationConfig?.idGenerator?.() ?? nanoid());
     }
 
     constructor(

@@ -327,6 +327,11 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      */
     middlewareTrackingMaxCapacity?: number;
     /**
+     * Unique ID generator function for requests.
+     * @default nanoid
+     */
+    idGenerator?: () => string;
+    /**
      * Time-to-live for middleware tracking entries in milliseconds.
      * Entries older than this will be cleaned up.
      * Only applies when enableMiddlewareTracking is true.
