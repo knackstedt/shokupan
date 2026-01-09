@@ -122,4 +122,14 @@ export default defineConfig({
             ],
         }),
     ],
+    vite: {
+        resolve: {
+            preserveSymlinks: true,
+        },
+        server: {
+            fs: {
+                allow: ['..'],
+            }
+        }
+    }
 });

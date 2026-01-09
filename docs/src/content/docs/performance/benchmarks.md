@@ -51,10 +51,18 @@ The basic benchmark suite tests fundamental request handling capabilities across
 
 ### Interactive Results
 
-:::caution
-These results are generated automatically on each release. The results may be skewed by the load on the GitHub Actions runner. You can find the latest results [here](https://github.com/knackstedt/shokupan/blob/gh-pages/report.html). For the most accurate results, run the benchmarks yourself.
-:::
-<iframe src="/report.html" style="width: 100%; height: calc(100vh - 64px); border: 1px solid #ddd; border-radius: 4px;"></iframe>
+<iframe id="basic-report" src="/report.html" style="width: 100%; height: 100vh; border: 0; border-radius: 4px;"></iframe>
+
+<script>
+const iframe = document.getElementById('basic-report');
+iframe.onload = function() {
+   iframe.style.height = iframe.contentWindow.document.body.scrollHeight + 'px';
+   new ResizeObserver(() => {
+      iframe.style.height = iframe.contentWindow.document.body.scrollHeight + 'px';
+   }).observe(iframe.contentDocument.body);
+};
+</script>
+
 
 ## Advanced Benchmark Suite
 
@@ -127,11 +135,16 @@ Failed scenarios are marked as "FAILED" in the report with error details.
 
 ### Interactive Results
 
-:::caution
-These results are generated automatically on each release. The results may be skewed by the load on the GitHub Actions runner. You can find the latest results [here](https://github.com/knackstedt/shokupan/blob/gh-pages/report.html). For the most accurate results, run the benchmarks yourself.
-:::
+<iframe id="advanced-report" src="/advanced-report.html" style="width: 100%; height: 100vh; border: 0; border-radius: 4px;"></iframe>
 
-<iframe src="/advanced-report.html" style="width: 100%; height: calc(100vh - 64px); border: 1px solid #ddd; border-radius: 4px;"></iframe>
+<script>
+const iframe2 = document.getElementById('advanced-report');
+iframe2.onload = function() {
+   new ResizeObserver(() => {
+      iframe2.style.height = iframe2.contentWindow.document.body.scrollHeight + 'px';
+   }).observe(iframe2.contentDocument.body);
+};
+</script>
 
 ## Running Benchmarks Yourself
 
