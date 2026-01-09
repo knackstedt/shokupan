@@ -4,7 +4,8 @@ on:
   push:
     branches:
       - '*'
-
+    paths:
+      - src
 jobs:
   test:
     runs-on: ubuntu-latest
