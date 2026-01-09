@@ -1,3 +1,4 @@
+import { RecordId } from 'surrealdb';
 import type { ShokupanContext } from "../../../context";
 import { datastore } from "../../../util/datastore";
 import type { Middleware } from "../../../util/types";
@@ -41,7 +42,7 @@ export function Idempotency(options: IdempotencyOptions = {}): Middleware {
 
         // Check if key exists
         try {
-            const stored = await datastore.get<StoredResponse>('idempotency_keys', key);
+            const stored = await datastore.get<StoredResponse>(new RecordId('idempotency', key));
             if (stored) {
                 // Check TTL (though database cleaning might happen elsewhere, good to check here too if needed, 
                 // but usually we rely on DB or just return if found. 
@@ -108,7 +109,7 @@ export function Idempotency(options: IdempotencyOptions = {}): Middleware {
             // Fire and forget storage? Or await?
             // Await to ensure persistence before returning to client (safer for "guarantee")
             try {
-                await datastore.set('idempotency_keys', key, toStore);
+                await datastore.set(new RecordId('idempotency', key), toStore);
             } catch (e) {
                 console.error("Idempotency write error:", e);
             }

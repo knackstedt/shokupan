@@ -12,6 +12,7 @@ export * from "./util/types";
 // Application Plugins
 export * from "./plugins/application/auth";
 export * from "./plugins/application/cluster";
+export * from "./plugins/application/dashboard/plugin";
 export * from "./plugins/application/scalar";
 
 // Middleware Plugins

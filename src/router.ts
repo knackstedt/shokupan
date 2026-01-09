@@ -1,3 +1,4 @@
+import { RecordId } from 'surrealdb';
 import { ShokupanContext } from './context';
 import { compose } from './middleware';
 import { generateOpenApi } from './plugins/application/openapi/openapi';
@@ -938,9 +939,10 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                     Promise.resolve().then(async () => {
                         try {
                             const timestamp = Date.now();
-                            const key = `${timestamp}-${handler.name || 'anonymous'}-${Math.random().toString(36).substring(7)}`;
-
-                            await datastore.set('middleware_tracking', key, {
+                            await datastore.set(new RecordId('middleware_tracking', {
+                                timestamp,
+                                name: handler.name || 'anonymous'
+                            }), {
                                 name: handler.name || 'anonymous',
                                 path: ctx.path,
                                 timestamp,
@@ -963,8 +965,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                             await datastore.query(`DELETE middleware_tracking WHERE timestamp < ${cutoff}`);
 
                             // Enforce capacity limit
-                            const results = await datastore.query('SELECT count() FROM middleware_tracking GROUP ALL');
-                            if (results && results[0] && results[0].count > maxCapacity) {
+                            const results = await datastore.query<[{ count: number; }]>('SELECT count() FROM middleware_tracking GROUP ALL');
+                            if (results?.[0]?.count > maxCapacity) {
                                 const toDelete = results[0].count - maxCapacity;
                                 await datastore.query(`DELETE middleware_tracking ORDER BY timestamp ASC LIMIT ${toDelete}`);
                             }

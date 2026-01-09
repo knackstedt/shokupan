@@ -1,18 +1,19 @@
+import { RecordId, Surreal, type Range, type Table } from 'surrealdb';
 
-let db: any;
-let dbPromise: Promise<any> | null = null;
-let RecordId: any;
+
+const G = globalThis as any;
+G.__shokupan_db = G.__shokupan_db || null;
+G.__shokupan_db_promise = G.__shokupan_db_promise || null;
+
 
 async function ensureDb() {
-    if (db) return db;
-    if (dbPromise) return dbPromise;
+    if (G.__shokupan_db) return G.__shokupan_db;
+    if (G.__shokupan_db_promise) return G.__shokupan_db_promise;
 
-    dbPromise = (async () => {
+    G.__shokupan_db_promise = (async () => {
         try {
             const { createNodeEngines } = await import('@surrealdb/node');
             const surreal = await import('surrealdb');
-            const Surreal = surreal.Surreal;
-            RecordId = surreal.RecordId;
 
             const engine = process.env['SHOKUPAN_DB_ENGINE'] === 'memory' ? 'mem://' : 'rocksdb://database';
 
@@ -31,12 +32,13 @@ async function ensureDb() {
             DEFINE TABLE OVERWRITE idempotency_keys SCHEMALESS COMMENT "Created by Shokupan";
             DEFINE TABLE OVERWRITE middleware_tracking SCHEMALESS COMMENT "Created by Shokupan";
             DEFINE TABLE OVERWRITE requests SCHEMALESS COMMENT "Created by Shokupan";
+            DEFINE TABLE OVERWRITE metrics SCHEMALESS COMMENT "Created by Shokupan";
         `);
 
-            db = _db;
-            return db;
+            G.__shokupan_db = _db;
+            return _db;
         } catch (e: any) {
-            dbPromise = null; // Reset promise on failure to allow retries
+            G.__shokupan_db_promise = null; // Reset promise on failure to allow retries
             if (e.code === 'ERR_MODULE_NOT_FOUND' || e.message.includes('Cannot find module')) {
                 throw new Error("SurrealDB dependencies not found. To use the datastore, please install 'surrealdb' and '@surrealdb/node'.");
             }
@@ -44,7 +46,7 @@ async function ensureDb() {
         }
     })();
 
-    return dbPromise;
+    return G.__shokupan_db_promise;
 }
 
 // Lazy ready promise that triggers on access if we want, or just a promise that resolves when DB is ready.
@@ -54,22 +56,18 @@ async function ensureDb() {
 // We'll make `ready` valid but only checking connection if referenced.
 
 export const datastore = {
-    async get<T extends Record<string, any>>(store: string, key: string) {
+    async get<T extends Record<string, any>>(recordId: RecordId | Table | Range<any, any>) {
         await ensureDb();
-        return db.select(new RecordId(store, key)) as Promise<T>;
+        return G.__shokupan_db.select<T>(recordId as any);
     },
-    async set(store: string, key: string, value: any) {
+    async set(recordId: RecordId, value: Record<string, any>) {
         await ensureDb();
-        return db.create(new RecordId(store, key)).content(value);
+        return G.__shokupan_db.upsert(recordId).content(value);
     },
-    async query(query: string, vars?: Record<string, unknown>) {
+    async query<T extends Record<string, any>>(query: string, vars?: Record<string, unknown>) {
         await ensureDb();
         try {
-            // console.error("DS QUERY:", query);
-            const r = await db.query(query, vars);
-            // Result handling might differ if using types, but `any` is safe for now
-            // console.error("DS RESULT:", JSON.stringify(r));
-            return Array.isArray(r) ? r : r?.collect ? await (r as any).collect() : r;
+            return G.__shokupan_db.query(query, vars).collect() as Promise<T[]>;
         } catch (e) {
             console.error("DS ERROR:", e);
             throw e;
@@ -81,6 +79,6 @@ export const datastore = {
 };
 
 process.on("exit", async () => {
-    if (db) await db.close();
+    if (G.__shokupan_db) await G.__shokupan_db.close();
 });
 
