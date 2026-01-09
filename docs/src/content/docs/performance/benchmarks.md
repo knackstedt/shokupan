@@ -54,7 +54,18 @@ The basic benchmark suite tests fundamental request handling capabilities across
 :::caution
 These results are generated automatically on each release. The results may be skewed by the load on the GitHub Actions runner. You can find the latest results [here](https://github.com/knackstedt/shokupan/blob/gh-pages/report.html). For the most accurate results, run the benchmarks yourself.
 :::
-<iframe src="/report.html" style="width: 100%; height: calc(100vh - 64px); border: 1px solid #ddd; border-radius: 4px;"></iframe>
+
+<iframe id="basic-report" src="/report.html" style="width: 100%; height: 100vh; border: 0; border-radius: 4px;"></iframe>
+
+<script>
+const iframe = document.getElementById('basic-report');
+
+iframe.onload = function() {
+   // Adjust height based on the content inside
+   iframe.style.height = iframe.contentWindow.document.body.scrollHeight + 'px';
+};
+</script>
+
 
 ## Advanced Benchmark Suite
 
@@ -131,7 +142,17 @@ Failed scenarios are marked as "FAILED" in the report with error details.
 These results are generated automatically on each release. The results may be skewed by the load on the GitHub Actions runner. You can find the latest results [here](https://github.com/knackstedt/shokupan/blob/gh-pages/report.html). For the most accurate results, run the benchmarks yourself.
 :::
 
-<iframe src="/advanced-report.html" style="width: 100%; height: calc(100vh - 64px); border: 1px solid #ddd; border-radius: 4px;"></iframe>
+
+<iframe id="advanced-report" src="/advanced-report.html" style="width: 100%; height: 100vh; border: 0; border-radius: 4px;"></iframe>
+
+<script>
+const iframe2 = document.getElementById('advanced-report');
+
+iframe2.onload = function() {
+   // Adjust height based on the content inside
+   iframe2.style.height = iframe2.contentWindow.document.body.scrollHeight + 'px';
+};
+</script>
 
 ## Running Benchmarks Yourself
 
