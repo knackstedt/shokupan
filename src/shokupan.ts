@@ -97,6 +97,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     public openApiSpec?: any;
     private composedMiddleware?: Middleware;
     private cpuMonitor?: SystemCpuMonitor;
+    private server?: Server;
 
 
     get logger() {
@@ -245,7 +246,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         }
 
         const serveOptions = {
-
             port: finalPort,
             hostname: this.applicationConfig.hostname,
             development: this.applicationConfig.development,
@@ -268,8 +268,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             }
         };
 
-
-
         let factory = this.applicationConfig.serverFactory;
 
         // Detect if we are not running on Bun
@@ -279,12 +277,44 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             factory = createHttpServer();
         }
 
-        const server = factory
-            ? await factory(serveOptions)
+        this.server = factory
+            ? await factory(serveOptions) as Server
             : Bun.serve(serveOptions);
 
         console.log(`Shokupan server listening on http://${serveOptions.hostname}:${serveOptions.port}`);
-        return server;
+        return this.server;
+    }
+
+    /**
+     * Stops the application server.
+     * 
+     * This method gracefully shuts down the server and stops any running monitors.
+     * Works transparently in both Bun and Node.js runtimes.
+     * 
+     * @returns A promise that resolves when the server has been stopped.
+     * 
+     * @example
+     * ```typescript
+     * const app = new Shokupan();
+     * const server = await app.listen(3000);
+     * 
+     * // Later, when you want to stop the server
+     * await app.stop();
+     * ```
+     * @param closeActiveConnections — Immediately terminate in-flight requests, websockets, and stop accepting new connections.
+     */
+    public async stop(closeActiveConnections?: boolean): Promise<void> {
+        // Stop CPU monitor if running
+        if (this.cpuMonitor) {
+            this.cpuMonitor.stop();
+            this.cpuMonitor = undefined;
+        }
+
+        // Stop the server if it exists
+        if (this.server) {
+            await this.server.stop(closeActiveConnections);
+            this.server = undefined;
+        }
     }
 
     public [$dispatch](req: ShokupanRequest<T>) {
