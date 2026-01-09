@@ -5,6 +5,8 @@ import { ShokupanContext } from "./context";
 import { compose } from "./middleware";
 import { generateOpenApi } from "./plugins/application/openapi/openapi";
 import { asyncContext, RequestContextStore } from "./util/async-hooks";
+import { getErrorStatus } from "./util/http-error";
+import { HTTP_STATUS } from "./util/http-status";
 import { $appRoot, $dispatch, $finalResponse, $isApplication, $routeMatched } from './util/symbol';
 import type { Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig, ShokupanPlugin } from './util/types';
 
@@ -451,23 +453,18 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                     // 2. Logic Split: Route Matched vs Not Found
                     else if (ctx[$routeMatched]) {
                         // A route WAS matched but returned nothing.
-                        // Default to 200 OK (unless user set status manually)
-                        // If user set status manually (e.g. ctx.status(201)), use that.
-                        // If user set headers manually, we keep those.
-
-                        // If no status is set in ctx.response, it defaults to 200.
-                        // We need to send a response. Since result is void, body is empty.
+                        // Default to 200 OK (unless user set status manually via ctx.response.status)
+                        // We send an empty response with the context's status (defaults to 200)
                         response = ctx.send(null, { status: ctx.response.status, headers: ctx.response.headers });
                     }
                     else {
-                        // No route matched.
-                        // Check if user (likely middleware) manually changed status from default 200?
-                        // If status is NOT 200, we respect it (e.g. auth middleware set 401).
-                        if (ctx.response.status !== 200) {
+                        // No route matched - return 404 Not Found
+                        // Exception: If middleware manually changed the status from default 200,
+                        // respect that (e.g., auth middleware set 401)
+                        if (ctx.response.status !== HTTP_STATUS.OK) {
                             response = ctx.send(null, { status: ctx.response.status, headers: ctx.response.headers });
                         } else {
-                            // Default 404
-                            response = ctx.text("Not Found", 404);
+                            response = ctx.text("Not Found", HTTP_STATUS.NOT_FOUND);
                         }
                     }
                 }
@@ -492,7 +489,8 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 const span = asyncContext.getStore()?.span;
                 if (span) span.setStatus({ code: 2 }); // Error
 
-                const status = err.status || err.statusCode || 500;
+                // Extract status from error object (supports both .status and .statusCode)
+                const status = getErrorStatus(err);
                 const body: any = { error: err.message || "Internal Server Error" };
                 if (err.errors) body.errors = err.errors;
 
@@ -524,10 +522,10 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         return executionPromise
             .catch((err) => {
                 if (err.message === "Request Timeout") {
-                    return ctx.text("Request Timeout", 408);
+                    return ctx.text("Request Timeout", HTTP_STATUS.REQUEST_TIMEOUT);
                 }
                 console.error("Unexpected error in request execution:", err);
-                return ctx.text("Internal Server Error", 500);
+                return ctx.text("Internal Server Error", HTTP_STATUS.INTERNAL_SERVER_ERROR);
             })
             .then(async (res) => {
                 // Response End Hook - Response returned

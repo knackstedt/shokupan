@@ -6,6 +6,8 @@ import { serveStatic } from './plugins/middleware/serve-static';
 import type { Shokupan } from './shokupan';
 import { datastore } from './util/datastore';
 import { Container } from './util/di';
+import { getErrorStatus } from './util/http-error';
+import { HTTP_STATUS } from './util/http-status';
 import { traceHandler } from './util/instrumentation';
 import { ShokupanRequest } from './util/request';
 import { getCallerInfo } from './util/stack';
@@ -325,7 +327,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         const ctx = new ShokupanContext<T>(req);
 
         let result: any = null;
-        let status = 200;
+        let status: number = HTTP_STATUS.OK;
         const headers: Record<string, string> = {};
 
         const match = this.find(req.method, ctx.path);
@@ -335,13 +337,13 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                 result = await match.handler(ctx);
             } catch (err: any) {
                 console.error(err);
-                status = err.status || err.statusCode || 500;
+                status = getErrorStatus(err);
                 result = { error: err.message || "Internal Server Error" };
                 if (err.errors) result.errors = err.errors;
             }
         }
         else {
-            status = 404;
+            status = HTTP_STATUS.NOT_FOUND;
             result = "Not Found";
         }
 
