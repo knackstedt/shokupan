@@ -5,9 +5,9 @@
             "name": "Debug Example",
             "type": "bun",
             "request": "launch",
-            "program": "src/example/main.ts",
+            "program": "examples/full/main.ts",
             "cwd": "${workspaceRoot}/",
-            "watchMode": false,
+            "watchMode": true,
             "stopOnEntry": false
         }
     ]
