@@ -2,15 +2,18 @@
     "compilerOptions": {
         "noPropertyAccessFromIndexSignature": false,
         "experimentalDecorators": true,
+        "noEmit": true,
+        "esModuleInterop": true,
+        "allowImportingTsExtensions": true,
         "module": "es2022"
     },
     "files": [
-        "**/*.ts"
+        "./**/*.ts"
     ],
     "exclude": [
         "./node_modules",
         "./database",
         "./dist"
     ],
-    "extends": "../../tsconfig.json"
+    "extends": "../tsconfig.json"
 }

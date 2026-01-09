@@ -1,6 +1,6 @@
 import express from "express";
 import type { Server } from "http";
-import { MEDIUM_JSON } from "../data";
+import { MEDIUM_JSON } from "../data.ts";
 
 export async function start(port: number) {
     const app = express();

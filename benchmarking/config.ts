@@ -1,7 +1,7 @@
 
 // Constants
-export const FRAMEWORKS = ["shokupan", "fastify", "express", "koa", "hapi", "nest", "hono", "elysia"];
-export const RUNTIMES = ["bun", "node"];
+export const FRAMEWORKS = ["shokupan", "shokupan-npm", "fastify", "express", "koa", "hapi", "nest", "hono", "elysia"];
+export const RUNTIMES = ["bun", "node", "deno"];
 export const BUN_ONLY_FRAMEWORKS = ["elysia"]; // Frameworks that only work on Bun
 export const BUN_REUSE_PORT_FRAMEWORKS = ["shokupan", "elysia", "hono"]; // Frameworks supporting Bun's reusePort (Bun.serve)
 
@@ -205,13 +205,13 @@ export const SCENARIOS: Record<string, ScenarioConfig> = {
     },
 
     // Multi-process scaling test - compares 1, 2, and 4 worker performance
-    "multi-process": {
-        name: "Multi-Process Scaling",
-        endpoints: ["/small-get", "/large-get", "/large-post"],
-        connections: 500,
-        duration: 60, // Increase duration to allow for initial CPU blocking (serialization of large payloads)
-        durationEstimate: 560,
-        processCounts: [1, 2, 4], // Test with 1, 2, and 4 workers for comparison
-        timeout: 60 // Increase timeout for high concurrency/large payload
-    }
+    // "multi-process": {
+    //     name: "Multi-Process Scaling",
+    //     endpoints: ["/small-get", "/large-get", "/large-post"],
+    //     connections: 500,
+    //     duration: 60, // Increase duration to allow for initial CPU blocking (serialization of large payloads)
+    //     durationEstimate: 560,
+    //     processCounts: [1, 2, 4], // Test with 1, 2, and 4 workers for comparison
+    //     timeout: 60 // Increase timeout for high concurrency/large payload
+    // }
 };

@@ -3,12 +3,12 @@ import autocannon from "autocannon";
 import { spawn } from "bun";
 import fs from "fs";
 import path from "path";
+import { BUN_ONLY_FRAMEWORKS, FRAMEWORKS, RUNTIMES } from "./config.ts";
+
 // We will use a system command to open the browser.
 
-const FRAMEWORKS = ["shokupan", "fastify", "express", "koa", "hapi", "nest", "hono", "elysia"];
-const RUNTIMES = ["bun", "node"];
+
 const ENDPOINTS = ["static", "json", "dynamic/123"];
-const BUN_ONLY_FRAMEWORKS = ["elysia"]; // Frameworks that only work on Bun
 
 
 const CASES_DIR = path.join(import.meta.dir, "cases");
@@ -109,6 +109,9 @@ async function runBenchmark(framework: string, runtime: string) {
 
     if (runtime === "bun") {
         cmd = ["bun", "run", WORKER_TS];
+        caseFile = path.join(CASES_DIR, `${framework}.ts`);
+    } else if (runtime === "deno") {
+        cmd = ["deno", "run", "--allow-all", "--unstable-sloppy-imports", "--node-modules-dir", WORKER_TS];
         caseFile = path.join(CASES_DIR, `${framework}.ts`);
     } else {
         cmd = ["node", WORKER_JS];
@@ -392,6 +395,7 @@ async function main() {
     s.stop(`Report generated: ${REPORT_PATH}`);
 
     clack.outro("✨ All done!");
+    process.exit(0);
 }
 
 function generateReport(history: HistoryEntry[], skipAutoOpen = false) {
@@ -567,9 +571,10 @@ function generateReport(history: HistoryEntry[], skipAutoOpen = false) {
             <div class="control-group">
                 <label>Compare Runtime</label>
                 <select id="runtimeFilter">
-                    <option value="all">All (Bun vs Node)</option>
+                    <option value="all">All (Bun vs Node vs Deno)</option>
                     <option value="bun">Bun Only</option>
                     <option value="node">Node Only</option>
+                    <option value="deno">Deno Only</option>
                 </select>
             </div>
         </div>
@@ -648,6 +653,8 @@ function generateReport(history: HistoryEntry[], skipAutoOpen = false) {
             const base = frameworkColors[framework] || frameworkColors['default'];
             if (runtime === 'bun') {
                  return options.opacity ? addAlpha(base, options.opacity) : base;
+            } else if (runtime === 'deno') {
+                 return addAlpha(base, 0.7);
             } else {
                  return addAlpha(base, 0.4); 
             }
@@ -731,7 +738,8 @@ function generateReport(history: HistoryEntry[], skipAutoOpen = false) {
            const data = [];
            
            Object.entries(latest.results).forEach(([fwName, fwRes]) => {
-               const runtimes = currentRuntimeFilter === 'all' ? ['bun', 'node'] : [currentRuntimeFilter];
+
+               const runtimes = currentRuntimeFilter === 'all' ? ['bun', 'node', 'deno'] : [currentRuntimeFilter];
                
                runtimes.forEach(rt => {
                    const runtimeRes = fwRes[rt];
@@ -882,7 +890,9 @@ function generateReport(history: HistoryEntry[], skipAutoOpen = false) {
             
             const datasets = data.map(d => {
                 const pData = percentiles.map(p => d.percentiles[p] || 0);
-                const borderDash = d.runtime === 'node' ? [5, 5] : [];
+                let borderDash = [];
+                if (d.runtime === 'node') borderDash = [5, 5];
+                if (d.runtime === 'deno') borderDash = [2, 2];
                 return {
                     label: \`\${d.framework} (\${d.runtime})\`,
                     data: pData,
@@ -947,6 +957,7 @@ function generateReport(history: HistoryEntry[], skipAutoOpen = false) {
             
             const bunData = [];
             const nodeData = [];
+            const denoData = [];
             
             const getVal = (fw, rt) => {
                  const res = latest.results[fw]?.[rt];
@@ -967,6 +978,7 @@ function generateReport(history: HistoryEntry[], skipAutoOpen = false) {
             frameworks.forEach(fw => {
                 bunData.push(getVal(fw, 'bun'));
                 nodeData.push(getVal(fw, 'node'));
+                denoData.push(getVal(fw, 'deno'));
             });
             
             const bunColors = frameworks.map(fw => getColor(fw, 'bun'));
@@ -974,6 +986,9 @@ function generateReport(history: HistoryEntry[], skipAutoOpen = false) {
             
             const nodeColors = frameworks.map(fw => getColor(fw, 'node'));
             const nodeBorders = frameworks.map(fw => getBorderColor(fw, 'node'));
+
+            const denoColors = frameworks.map(fw => getColor(fw, 'deno'));
+            const denoBorders = frameworks.map(fw => getBorderColor(fw, 'deno'));
 
             createOrUpdateChart('runtimeCompChart', 'bar', {
                 data: {
@@ -992,6 +1007,13 @@ function generateReport(history: HistoryEntry[], skipAutoOpen = false) {
                             backgroundColor: nodeColors,
                             borderColor: nodeBorders,
                             borderWidth: 2,
+                        },
+                        { 
+                            label: 'Deno', 
+                            data: denoData, 
+                            backgroundColor: denoColors,
+                            borderColor: denoBorders,
+                            borderWidth: 2,
                         }
                     ]
                 }
@@ -1006,7 +1028,7 @@ function generateReport(history: HistoryEntry[], skipAutoOpen = false) {
             const combinations = [];
             const latest = historyData[0];
             Object.keys(latest.results).forEach(fw => {
-                 ['bun', 'node'].forEach(rt => {
+                 ['bun', 'node', 'deno'].forEach(rt => {
                      if (currentRuntimeFilter !== 'all' && currentRuntimeFilter !== rt) return;
                      combinations.push({ fw, rt });
                  });
@@ -1030,7 +1052,9 @@ function generateReport(history: HistoryEntry[], skipAutoOpen = false) {
                     return res[currentEndpoint]?.requests || null;
                 });
                 
-                const borderDash = combo.rt === 'node' ? [5, 5] : [];
+                let borderDash = [];
+                if (combo.rt === 'node') borderDash = [5, 5];
+                if (combo.rt === 'deno') borderDash = [2, 2];
                 
                 datasets.push({
                     label: \`\${combo.fw} (\${combo.rt})\`,

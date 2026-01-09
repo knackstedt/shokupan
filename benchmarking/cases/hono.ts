@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { MEDIUM_JSON } from "../data";
+import { MEDIUM_JSON } from "../data.ts";
 
 export async function start(port: number) {
     const app = new Hono();
@@ -17,7 +17,7 @@ export async function start(port: number) {
         return c.text(`Dynamic content for ${id}`);
     });
 
-    // Check if running on Bun or Node
+    // Check if running on Bun
     if (typeof Bun !== "undefined") {
         // Use Bun.serve for Bun runtime
         const server = Bun.serve({
@@ -27,6 +27,17 @@ export async function start(port: number) {
 
         return async () => {
             server.stop();
+        };
+    } else if (typeof Deno !== "undefined") {
+        // Use Deno.serve for Deno runtime
+        // @ts-ignore
+        const server = Deno.serve({
+            port,
+            onListen: () => { }, // Suppress default listener log if desired
+        }, app.fetch);
+
+        return async () => {
+            await server.shutdown();
         };
     } else {
         // Use Node.js adapter for Node runtime

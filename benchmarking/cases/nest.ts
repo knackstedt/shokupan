@@ -1,6 +1,6 @@
 import { Controller, Get, Module, Param } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
-import { MEDIUM_JSON } from "../data";
+import { MEDIUM_JSON } from "../data.ts";
 
 @Controller()
 class AppController {

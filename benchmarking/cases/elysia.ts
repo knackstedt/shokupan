@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { MEDIUM_JSON } from "../data";
+import { MEDIUM_JSON } from "../data.ts";
 
 export async function start(port: number) {
     // Elysia is Bun-only - it doesn't work on Node.js
