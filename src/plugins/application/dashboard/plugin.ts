@@ -1,10 +1,15 @@
+import type { HeadersInit } from 'bun';
 import { Eta } from "eta";
 import { readFile } from 'node:fs/promises';
-import type { DebugCollector, ShokupanContext } from "../../../context";
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { RecordId } from 'surrealdb';
+import type { DebugCollector } from "../../../context";
 import { ShokupanRouter } from "../../../router";
 import { datastore } from "../../../util/datastore";
 import { $appRoot } from "../../../util/symbol";
-import type { ShokupanHooks } from "../../../util/types";
+import type { ShokupanHooks, ShokupanPlugin } from "../../../util/types";
+import { MetricsCollector } from './metrics-collector';
 
 interface RequestMetrics {
     totalRequests: number;
@@ -40,10 +45,8 @@ export interface RequestLog {
 }
 
 export interface DashboardConfig {
-    /**
-     * Function to get request headers to include in the debug dashboard
-     */
-    getHeaders?: (ctx: ShokupanContext) => Record<string, string>;
+    getRequestHeaders?: () => HeadersInit;
+    path?: string;
     /**
      * Retention time in milliseconds
      */
@@ -74,7 +77,21 @@ class Collector implements DebugCollector {
     }
 }
 
-export class Dashboard extends ShokupanRouter {
+export class Dashboard implements ShokupanPlugin {
+    private static __dirname = dirname(fileURLToPath(import.meta.url));
+
+    // Get base path for dashboard files - works in both dev (src/) and production (dist/)
+    private static getBasePath() {
+        const dir = dirname(fileURLToPath(import.meta.url));
+        // In production (dist/), files are in dist/plugins/application/dashboard/
+        if (dir.endsWith('dist')) {
+            return dir + '/plugins/application/dashboard';
+        }
+        // In dev mode (src/plugins/application/dashboard/), files are in same directory
+        return dir;
+    }
+
+    private router = new ShokupanRouter();
     private metrics: RequestMetrics = {
         totalRequests: 0,
         successfulRequests: 0,
@@ -89,16 +106,52 @@ export class Dashboard extends ShokupanRouter {
     };
 
     private eta = new Eta({
-        views: __dirname + "/static",
+        views: Dashboard.getBasePath() + "/static",
         cache: false
     });
     private startTime = Date.now();
     private instrumented = false;
+    private metricsCollector = new MetricsCollector();
 
-    constructor(private readonly dashboardConfig: DashboardConfig = {}) {
-        super();
+    constructor(private readonly dashboardConfig: DashboardConfig = {}) { }
 
-        this.get("/metrics", (ctx) => {
+    // ShokupanPlugin interface implementation
+    public onInit(app: any, options?: { path?: string; }) {
+        this[$appRoot] = app;
+        const mountPath = options?.path || this.dashboardConfig.path || '/dashboard';
+
+        // Register hooks on the app to track all requests
+        const hooks = this.getHooks();
+        if (!app.middleware) {
+            app.middleware = [];
+        }
+
+        // Create middleware that wraps the hooks
+        const hooksMiddleware = async (ctx: any, next: any) => {
+            if (hooks.onRequestStart) {
+                await hooks.onRequestStart(ctx);
+            }
+
+            const startTime = Date.now();
+            await next();
+            const duration = Date.now() - startTime;
+
+            if (hooks.onResponseEnd) {
+                await hooks.onResponseEnd(ctx, ctx.response || {});
+            }
+        };
+
+        app.use(hooksMiddleware);
+
+        // Mount the dashboard router
+        app.mount(mountPath, this.router);
+
+        // Set up all routes on the internal router
+        this.setupRoutes();
+    }
+
+    private setupRoutes() {
+        this.router.get("/metrics", (ctx) => {
             const uptimeSeconds = Math.floor((Date.now() - this.startTime) / 1000);
             const uptime = `${Math.floor(uptimeSeconds / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m ${uptimeSeconds % 60}s`;
 
@@ -107,9 +160,74 @@ export class Dashboard extends ShokupanRouter {
                 uptime
             });
         });
+        this.router.get("/metrics/history", async (ctx) => {
+            const interval = ctx.query['interval'] || '1m';
 
-        this.get("/registry", (ctx) => {
-            const app = (this)[$appRoot];
+            // Map interval to milliseconds
+            const intervalMap: Record<string, number> = {
+                '10s': 10 * 1000,
+                '1m': 60 * 1000,
+                '5m': 5 * 60 * 1000,
+                '30m': 30 * 60 * 1000,
+                '1h': 60 * 60 * 1000,
+                '2h': 2 * 60 * 60 * 1000,
+                '6h': 6 * 60 * 60 * 1000,
+                '12h': 12 * 60 * 60 * 1000,
+                '1d': 24 * 60 * 60 * 1000,
+                '3d': 3 * 24 * 60 * 60 * 1000,
+                '7d': 7 * 24 * 60 * 60 * 1000,
+                '30d': 30 * 24 * 60 * 60 * 1000,
+            };
+
+            const periodMs = intervalMap[interval] || 60 * 1000;
+            // Expand window to 3x the requested period to ensure we catch the aligned start points.
+            const startTime = Date.now() - (periodMs * 3);
+            const endTime = Date.now();
+
+            const result = await datastore.query(
+                "SELECT * FROM metrics WHERE timestamp >= $start AND timestamp <= $end AND interval = $interval ORDER BY timestamp ASC",
+                { start: startTime, end: endTime, interval }
+            );
+
+            return ctx.json({
+                metrics: result[0] || [],
+            });
+        });
+
+        // Top Requests Endpoint
+        this.router.get("/requests/top", async (ctx) => {
+            const result = await datastore.query(
+                "SELECT method, url, count() as count FROM requests GROUP BY method, url ORDER BY count DESC LIMIT 10"
+            );
+            return ctx.json({ top: result[0] || [] });
+        });
+
+        // Top Errors Endpoint
+        this.router.get("/errors/top", async (ctx) => {
+            const result = await datastore.query(
+                "SELECT status, count() as count FROM failed_requests GROUP BY status ORDER BY count DESC LIMIT 10"
+            );
+            return ctx.json({ top: result[0] || [] });
+        });
+
+        // Failing Requests Endpoint
+        this.router.get("/requests/failing", async (ctx) => {
+            const result = await datastore.query(
+                "SELECT method, url, count() as count FROM failed_requests GROUP BY method, url ORDER BY count DESC LIMIT 10"
+            );
+            return ctx.json({ top: result[0] || [] });
+        });
+
+        // Slowest Requests Endpoint
+        this.router.get("/requests/slowest", async (ctx) => {
+            const result = await datastore.query(
+                "SELECT method, url, duration, status, timestamp FROM requests ORDER BY duration DESC LIMIT 10"
+            );
+            return ctx.json({ slowest: result[0] || [] });
+        });
+
+        this.router.get("/registry", (ctx) => {
+            const app = this[$appRoot];
             if (!this.instrumented && app) {
                 this.instrumentApp(app);
             }
@@ -117,28 +235,28 @@ export class Dashboard extends ShokupanRouter {
             if (registry) {
                 this.assignIdsToRegistry(registry, 'root');
             }
-            return ctx.json({ registry });
+            return ctx.json({ registry: registry || {} });
         });
 
         // Requests Listing Endpoint
-        this.get("/requests", async (ctx) => {
+        this.router.get("/requests", async (ctx) => {
             const result = await datastore.query("SELECT * FROM requests ORDER BY timestamp DESC LIMIT 100");
             return ctx.json({ requests: result[0] || [] });
         });
 
         // Request Details Endpoint
-        this.get("/requests/:id", async (ctx) => {
+        this.router.get("/requests/:id", async (ctx) => {
             const result = await datastore.query("SELECT * FROM requests WHERE id = $id", { id: ctx.params['id'] });
             return ctx.json({ request: result[0]?.[0] });
         });
 
         // Replay/Failed Requests Endpoints
-        this.get("/failures", async (ctx) => {
+        this.router.get("/failures", async (ctx) => {
             const result = await datastore.query("SELECT * FROM failed_requests ORDER BY timestamp DESC LIMIT 50");
             return ctx.json({ failures: result[0] });
         });
 
-        this.post("/replay", async (ctx) => {
+        this.router.post("/replay", async (ctx) => {
             const body = await ctx.body();
             // Logic to replay request:
             // We can't easily replay against the running server instance from inside without a loopback fetch.
@@ -165,19 +283,19 @@ export class Dashboard extends ShokupanRouter {
             }
         });
 
-        this.get("/", async (ctx) => {
+        this.router.get("/", async (ctx) => {
             const uptimeSeconds = Math.floor((Date.now() - this.startTime) / 1000);
             const uptime = `${Math.floor(uptimeSeconds / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m ${uptimeSeconds % 60}s`;
 
             const linkPattern = this.getLinkPattern();
-            const template = await readFile(__dirname + "/template.eta", 'utf8');
+            const template = await readFile(Dashboard.getBasePath() + "/template.eta", 'utf8');
 
             return ctx.html(this.eta.renderString(template, {
                 metrics: this.metrics,
                 uptime,
                 rootPath: process.cwd(),
                 linkPattern,
-                headers: this.dashboardConfig.getHeaders?.(ctx)
+                headers: this.dashboardConfig.getRequestHeaders?.()
             }));
         });
     }
@@ -202,7 +320,6 @@ export class Dashboard extends ShokupanRouter {
             const id = makeId('mw', parentId, idx, mw.name);
             mw.id = id; // Assign to registry object for frontend
             if (mw._fn) (mw._fn as any)._debugId = id; // Assign to function for runtime tracking
-            delete mw._fn; // Clean up
         });
 
         // Controllers
@@ -221,7 +338,6 @@ export class Dashboard extends ShokupanRouter {
             const id = makeId('route', parentId, idx, r.handlerName || 'handler');
             r.id = id;
             if (r._fn) (r._fn as any)._debugId = id;
-            delete r._fn;
         });
 
         // Child Routers
@@ -289,6 +405,10 @@ export class Dashboard extends ShokupanRouter {
                     this.updateTiming(duration);
                 }
 
+                // Record in MetricsCollector
+                const isError = response.status >= 400;
+                this.metricsCollector.recordRequest(duration, isError);
+
                 if (response.status >= 400) {
                     this.metrics.failedRequests++;
                     if (response.status === 429) {
@@ -305,9 +425,9 @@ export class Dashboard extends ShokupanRouter {
                             });
                         }
 
-                        await datastore.set('failed_requests', Date.now().toString(), {
-                            method: ctx.request.method,
-                            url: ctx.path || ctx.request.url,
+                        await datastore.set(new RecordId('failed_requests', ctx.requestId), {
+                            method: ctx.method,
+                            url: ctx.url.toString(),
                             headers: headers,
                             status: response.status,
                             timestamp: Date.now(),
@@ -323,8 +443,8 @@ export class Dashboard extends ShokupanRouter {
                 }
 
                 const logEntry: RequestLog = {
-                    method: ctx.request.method,
-                    url: ctx.path,
+                    method: ctx.method,
+                    url: ctx.url.toString(),
                     status: response.status,
                     duration,
                     timestamp: Date.now(),
@@ -335,7 +455,7 @@ export class Dashboard extends ShokupanRouter {
 
                 // Persist to datastore for detailed view
                 try {
-                    await datastore.set('requests', Date.now().toString(), logEntry);
+                    await datastore.set(new RecordId('requests', ctx.requestId), logEntry);
                 } catch (e) {
                     console.error("Failed to record request log", e);
                 }

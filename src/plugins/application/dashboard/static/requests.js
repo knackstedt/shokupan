@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return `<span style="color: ${color}; font-weight: bold;">${status}</span>`;
                 }
             },
-            { title: "Duration (ms)", field: "duration", width: 150 },
+            { title: "Duration (ms)", field: "duration", width: 150, formatter: (cell) => printDuration(cell.getValue()) },
             {
                 title: "Time",
                 field: "timestamp",
@@ -48,12 +48,13 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function fetchRequests() {
+    const headers = typeof getRequestHeaders !== 'undefined' ? getRequestHeaders() : {};
 
-    const headers = getRequestHeaders ? getRequestHeaders() : {};
-    const basePath = window.location.pathname.endsWith('/') ? '' : window.location.pathname;
-    const url = basePath + (basePath.endsWith('/') ? 'requests' : '/requests');
+    // Determine base path for API requests  
+    const basePath = window.location.pathname.endsWith('/') ? window.location.pathname.slice(0, -1) : window.location.pathname;
+    const url = basePath + '/';
 
-    fetch(url, { headers })
+    fetch(url + 'requests', { headers })
         .then(res => res.json())
         .then(data => {
             if (requestsTable) {
@@ -76,7 +77,7 @@ function showRequestDetails(request) {
             <div><strong>Method:</strong> ${request.method}</div>
             <div><strong>URL:</strong> ${request.url}</div>
             <div><strong>Status:</strong> ${request.status}</div>
-            <div><strong>Duration:</strong> ${request.duration?.toFixed(2)} ms</div>
+            <div><strong>Duration:</strong> ${printDuration(request.duration)} ms</div>
             <div><strong>Timestamp:</strong> ${new Date(request.timestamp).toLocaleString()}</div>
         </div>
     `;
@@ -96,7 +97,7 @@ function showRequestDetails(request) {
                 <div style="padding: 8px; border-radius: 4px; background: var(--bg-secondary);">
                     <div style="display: flex; justify-content: space-between;">
                         <span style="font-weight: bold;">${item.name}</span>
-                        <span>${duration.toFixed(2)} ms</span>
+                        <span>${printDuration(duration)}</span>
                     </div>
                     <div style="font-size: 0.8rem; color: var(--text-secondary);">
                         ${item.file}:${item.line}

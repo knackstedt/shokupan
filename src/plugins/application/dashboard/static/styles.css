@@ -16,17 +16,19 @@
     padding: 0;
 }
 
+html {
+    height: 100%;
+    width: 100%;
+}
+
 body {
+    display: flex;
+    flex-direction: column;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     background-color: var(--bg-primary);
     color: var(--text-primary);
     min-height: 100vh;
     padding: 2rem;
-}
-
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
 }
 
 header {
@@ -45,6 +47,19 @@ h1 {
     color: transparent;
 }
 
+select {
+    outline: none;
+}
+
+.container {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    max-width: 1200px;
+    margin: 0 auto;
+    overflow: auto
+}
+
 .metrics-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -53,10 +68,24 @@ h1 {
 }
 
 .card {
+    display: flex;
+    flex-direction: column;
     background-color: var(--bg-secondary);
     border: 1px solid var(--card-border);
     border-radius: 1rem;
-    padding: 1.5rem;
+    overflow: hidden;
+}
+
+.card canvas {
+    padding: 0 .5rem .5rem .5rem;
+}
+
+.card-chart {
+    flex: 1;
+}
+
+.card-value {
+    padding: 1rem;
 }
 
 .card-title {
@@ -65,6 +94,10 @@ h1 {
     margin-bottom: 0.5rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    height: 48px;
+    line-height: 48px;
+    padding-left: 16px;
+    font-weight: 600;
 }
 
 .card-value {
@@ -87,6 +120,7 @@ h1 {
     border-radius: 1rem;
     padding: 1.5rem;
     margin-bottom: 2rem;
+    overflow: hidden;
 }
 
 /* Tabs */
@@ -132,4 +166,10 @@ h1 {
     background-color: var(--bg-secondary);
     border-radius: 1rem;
     border: 1px solid var(--card-border);
+}
+
+.card-container {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 1fr;
 }

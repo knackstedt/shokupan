@@ -1,4 +1,102 @@
 
+function printDuration(deltaMs/** number in ms */) {
+
+    // More than 1 week
+    if (deltaMs > (7 * 24 * 60 * 60 * 1000)) {
+        const weeks = (deltaMs / (7 * 24 * 60 * 60 * 1000));
+        const weeksR = (deltaMs % (7 * 24 * 60 * 60 * 1000));
+
+        if (weeks >= 10) {
+            return weeks.toFixed(0) + " weeks";
+        }
+        else {
+            const days = (weeksR / (24 * 60 * 60 * 1000));
+
+            if (days >= 1) {
+                return weeks.toFixed(0) + " weeks " + days.toFixed(0) + " days";
+            }
+
+            return weeks.toFixed(0) + " weeks";
+        }
+    }
+    // More than 1 day
+    else if (deltaMs > (24 * 60 * 60 * 1000)) {
+        const days = (deltaMs / (24 * 60 * 60 * 1000));
+        const daysR = (deltaMs % (24 * 60 * 60 * 1000));
+
+        if (days >= 10) {
+            return days.toFixed(0) + " days";
+        }
+        else {
+            const hours = (daysR / (60 * 60 * 1000));
+
+            if (hours >= 1) {
+                return days.toFixed(0) + " days " + hours.toFixed(0) + " hours";
+            }
+
+            return days.toFixed(0) + " days";
+        }
+    }
+    // More than 1 hour
+    else if (deltaMs > (60 * 60 * 1000)) {
+        const hours = (deltaMs / (60 * 60 * 1000));
+        const hoursR = (deltaMs % (60 * 60 * 1000));
+
+        if (hours >= 10) {
+            return hours.toFixed(0) + " hours";
+        }
+        else {
+            const minutes = (hoursR / (60 * 1000));
+
+            if (minutes >= 1) {
+                return hours.toFixed(0) + " hours " + minutes.toFixed(0) + " minutes";
+            }
+
+            return hours.toFixed(0) + " hours";
+        }
+    }
+    // less than an hour, print minutes
+    else if (deltaMs > 60 * 1000) {
+        const minutes = (deltaMs / (60 * 1000));
+        const minutesR = (deltaMs % (60 * 1000));
+
+        if (minutes >= 10) {
+            return minutes.toFixed(0) + " minutes";
+        }
+        else {
+            const seconds = (minutesR / (1000));
+
+            if (seconds >= 1) {
+                return minutes.toFixed(0) + " minutes " + seconds.toFixed(0) + " seconds";
+            }
+
+            return minutes.toFixed(0) + " minutes";
+        }
+    }
+    // Seconds (whoa)
+    else if (deltaMs > 1000) {
+        const seconds = (deltaMs / (60 * 1000));
+
+        if (seconds >= 10) {
+            return seconds.toFixed(0) + " seconds";
+        }
+        else {
+            return seconds.toFixed(2) + " seconds";
+        }
+    }
+    // Milliseconds
+    else if (deltaMs > 1) {
+        const ms = deltaMs;
+        return ms.toFixed(0) + " ms";
+    }
+    // Microseconds
+    else if (deltaMs > 0.0001) {
+        const us = deltaMs;
+        return us.toFixed(0) + " us";
+    }
+    else return "N/A";
+}
+
 async function updateDashboard() {
     try {
         const headers = getRequestHeaders ? getRequestHeaders() : {};
@@ -16,7 +114,7 @@ async function updateDashboard() {
             const registryContainer = document.getElementById('registry-tree');
             // Simple clear and re-render (optimization: could just update tooltips)
             registryContainer.innerHTML = '';
-            renderRegistry(registryData, registryContainer);
+            window.renderRegistry(window.registryData, registryContainer);
         }
 
         document.getElementById('uptime').innerText = data.uptime;
@@ -34,20 +132,6 @@ async function updateDashboard() {
         document.getElementById('success-rate').innerText = successRate + '%';
         document.getElementById('fail-rate').innerText = failRate + '%';
 
-        // --- Update Chart ---
-        // We'll limit to last 50 points
-        const recentLogs = metrics.logs.slice(-50);
-        const labels = recentLogs.map(log => new Date(log.timestamp).toLocaleTimeString());
-        const points = recentLogs.map(log => log.duration);
-
-        latencyChart.data.labels = labels;
-        latencyChart.data.datasets[0].data = points;
-        latencyChart.update();
-
-        // --- Update Table ---
-        // Tabulator replaceData method efficiently updates the table
-        table.replaceData(metrics.logs);
-
     } catch (err) {
         console.error("Failed to update dashboard", err);
     }
@@ -58,20 +142,4 @@ setInterval(updateDashboard, 2000);
 // Initial load
 updateDashboard();
 
-// --- Tabs Logic ---
-function switchTab(tabId) {
-    // Update buttons
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    // Find the button that was clicked
-    const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick') === `switchTab('${tabId}')`);
-    if (btn) btn.classList.add('active');
-
-    // Update content
-    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    document.getElementById('tab-' + tabId).classList.add('active');
-
-    if (tabId === 'graph') {
-        initGraph();
-    }
-}
 

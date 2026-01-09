@@ -1,13 +1,8 @@
-// Registry Data
-// const registryData = <% ~JSON.stringify(it.registry) %>;
-const rootPath = "<%~ it.rootPath %>";
-const linkPattern = "<%~ it.linkPattern %>";
 
-const headers = getRequestHeaders ? getRequestHeaders() : {};
-const basePath = window.location.pathname.endsWith('/') ? '' : window.location.pathname;
-const url = basePath + (basePath.endsWith('/') ? 'registry' : '/registry');
+window.renderRegistry = function renderRegistry(node, container) {
+    const rootPath = "<%~ it.rootPath %>";
+    const linkPattern = "<%~ it.linkPattern %>";
 
-function renderRegistry(node, container) {
     if (!node) {
         container.innerHTML = '<div style="color: var(--text-secondary)">No registry data available</div>';
         return;
@@ -95,9 +90,9 @@ function renderRegistry(node, container) {
         }
     });
 
-    // Helper for Tooltips
     function getTooltipHtml(id) {
         // Return default 0 metrics if not found, rather than empty string, so tooltip always appears if intended
+        const metrics = window.metrics || {};
         const m = (metrics.nodeMetrics && metrics.nodeMetrics[id]) ? metrics.nodeMetrics[id] : { requests: 0, failures: 0 };
         const totalReqs = metrics.totalRequests || 1; // avoid div/0
         const percent = ((m.requests / totalReqs) * 100).toFixed(1);
@@ -249,13 +244,26 @@ function renderRegistry(node, container) {
             wrapper.appendChild(div);
         }
     });
+    container.innerHTML = '';
     container.appendChild(wrapper);
-}
+};
 
-const registryContainer = document.getElementById('registry-tree');
+window.fetchRegistry = async function fetchRegistry() {
+    const registryContainer = document.getElementById('registry-tree');
+    if (!registryContainer) return;
 
-fetch(url, { headers })
-    .then(res => res.json())
-    .then(({ registry }) => {
+    const headers = typeof getRequestHeaders !== 'undefined' ? getRequestHeaders() : {};
+    const basePath = window.location.pathname.endsWith('/') ? window.location.pathname.slice(0, -1) : window.location.pathname;
+    const url = basePath + '/registry';
+
+    try {
+        const res = await fetch(url, { headers });
+        const { registry } = await res.json();
         renderRegistry(window.registryData = registry, registryContainer);
-    });
+    } catch (e) {
+        console.error("Failed to fetch registry", e);
+    }
+};
+
+document.addEventListener('DOMContentLoaded', fetchRegistry);
+

@@ -1,5 +1,5 @@
 import { trace } from '@opentelemetry/api';
-import { createHash } from 'node:crypto';
+import { RecordId } from 'surrealdb';
 import type { ShokupanContext } from '../../../context';
 import { datastore } from '../../../util/datastore';
 import type { Middleware } from '../../../util/types';
@@ -78,12 +78,14 @@ async function recordFailedRequest(ctx: ShokupanContext, error: any, maxCapacity
             }
         }
 
-        const hashInput = `${requestPath}|${method}|${JSON.stringify(body)}|${errorMsg}|${timestamp}`;
-        const id = createHash('sha256').update(hashInput).digest('hex');
-
         // Store
         try {
-            await datastore.set('failed_requests', id, data);
+            await datastore.set(new RecordId('failed_requests', {
+                method,
+                path: requestPath,
+                error: errorMsg,
+                timestamp
+            }), data);
         } catch (err: any) {
             // If it already exists, we can ignore it (duplicate failure)
             if (err.message && err.message.includes("already exists")) {
@@ -107,7 +109,7 @@ async function cleanup(maxCapacity: number, ttl: number) {
     await datastore.query(`DELETE failed_requests WHERE timestamp < ${cutoff}`);
 
     // Check capacity
-    const results = await datastore.query('SELECT count() FROM failed_requests GROUP ALL');
+    const results = await datastore.query<[{ count: number; }]>('SELECT count() FROM failed_requests GROUP ALL');
 
     // Results is [{ result: [{ count: N }], status: 'OK', ... }]
     if (!results?.[0]?.result) return;
