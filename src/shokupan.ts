@@ -5,7 +5,7 @@ import { ShokupanContext } from "./context";
 import { compose } from "./middleware";
 import { generateOpenApi } from "./plugins/application/openapi/openapi";
 import { asyncContext, RequestContextStore } from "./util/async-hooks";
-import { $appRoot, $dispatch, $isApplication } from './util/symbol';
+import { $appRoot, $dispatch, $finalResponse, $isApplication, $routeMatched } from './util/symbol';
 import type { Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig, ShokupanPlugin } from './util/types';
 
 
@@ -421,7 +421,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
 
                     if (match) {
-                        ctx._routeMatched = true;
+                        ctx[$routeMatched] = true;
                         ctx.params = match.params;
 
                         // Ensure body is parsed before handler executes
@@ -437,19 +437,19 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                     response = result;
                 }
                 // Check explicit void return but response set in context
-                else if ((result === null || result === undefined) && ctx._finalResponse instanceof Response) {
-                    response = ctx._finalResponse;
+                else if ((result === null || result === undefined) && ctx[$finalResponse] instanceof Response) {
+                    response = ctx[$finalResponse];
                 }
                 // (Logic moved to main block below)
                 else if (result === null || result === undefined) {
                     // Handler returned nothing (void/null/undefined)
 
                     // 1. Check if response was explicitly set via helper (e.g. ctx.text())
-                    if (ctx._finalResponse instanceof Response) {
-                        response = ctx._finalResponse;
+                    if (ctx[$finalResponse] instanceof Response) {
+                        response = ctx[$finalResponse];
                     }
                     // 2. Logic Split: Route Matched vs Not Found
-                    else if (ctx._routeMatched) {
+                    else if (ctx[$routeMatched]) {
                         // A route WAS matched but returned nothing.
                         // Default to 200 OK (unless user set status manually)
                         // If user set status manually (e.g. ctx.status(201)), use that.

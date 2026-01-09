@@ -9,7 +9,7 @@ import { Container } from './util/di';
 import { traceHandler } from './util/instrumentation';
 import { ShokupanRequest } from './util/request';
 import { getCallerInfo } from './util/stack';
-import { $appRoot, $childControllers, $childRouters, $controllerPath, $dispatch, $isApplication, $isMounted, $isRouter, $middleware, $mountPath, $parent, $routeArgs, $routeMethods, $routes, $routeSpec } from './util/symbol';
+import { $appRoot, $childControllers, $childRouters, $controllerPath, $debug, $dispatch, $isApplication, $isMounted, $isRouter, $middleware, $mountPath, $parent, $routeArgs, $routeMethods, $routes, $routeSpec } from './util/symbol';
 import { RouterTrie } from './util/trie';
 import { type GuardAPISpec, type HeadersInit, HTTPMethods, type JSXRenderer, type Method, type MethodAPISpec, type Middleware, type OpenAPIOptions, type ProcessResult, type RequestOptions, type RouteMetadata, type RouteParams, RouteParamType, type ShokupanController, type ShokupanHandler, type ShokupanHooks, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions } from './util/types';
 
@@ -386,7 +386,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         const wrapped = async (ctx: ShokupanContext<T>) => {
             await this.runHooks("onRequestStart", ctx);
 
-            const debug = ctx._debug;
+            const debug = ctx[$debug];
             let debugId: string | undefined;
             let previousNode: string | undefined;
 
@@ -1349,7 +1349,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
         // Check if debug tracking is enabled (ctx is typically the first argument for most hooks)
         const ctx = args?.[0] instanceof ShokupanContext ? args[0] : undefined;
-        const debug = ctx?._debug;
+        const debug = ctx?.[$debug];
 
         if (debug) {
             // Track each hook individually with debug timing

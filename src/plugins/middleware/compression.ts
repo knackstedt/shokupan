@@ -1,5 +1,6 @@
 import * as zlib from "node:zlib";
 import type { ShokupanContext } from "../../context";
+import { $finalResponse, $rawBody } from '../../util/symbol';
 import type { Middleware, NextFn } from "../../util/types";
 
 export interface CompressionOptions {
@@ -47,8 +48,8 @@ export function Compression(options: CompressionOptions = {}): Middleware {
         let response = await next();
 
         // Check for implicit return stored in context
-        if (!(response instanceof Response) && ctx._finalResponse instanceof Response) {
-            response = ctx._finalResponse;
+        if (!(response instanceof Response) && ctx[$finalResponse] instanceof Response) {
+            response = ctx[$finalResponse];
         }
 
         if (response instanceof Response) {
@@ -60,17 +61,17 @@ export function Compression(options: CompressionOptions = {}): Middleware {
             let body: ArrayBuffer | Uint8Array;
             let bodySize: number;
 
-            if (ctx._rawBody !== undefined) {
+            if (ctx[$rawBody] !== undefined) {
                 // Fast path: we have the raw body from ctx.json() or ctx.text()
-                if (typeof ctx._rawBody === "string") {
-                    const encoded = new TextEncoder().encode(ctx._rawBody);
+                if (typeof ctx[$rawBody] === "string") {
+                    const encoded = new TextEncoder().encode(ctx[$rawBody]);
                     body = encoded;
                     bodySize = encoded.byteLength;
-                } else if (ctx._rawBody instanceof Uint8Array) {
-                    body = ctx._rawBody;
-                    bodySize = ctx._rawBody.byteLength;
+                } else if (ctx[$rawBody] instanceof Uint8Array) {
+                    body = ctx[$rawBody];
+                    bodySize = ctx[$rawBody].byteLength;
                 } else {
-                    body = ctx._rawBody as ArrayBuffer;
+                    body = ctx[$rawBody] as ArrayBuffer;
                     bodySize = body.byteLength;
                 }
             } else {

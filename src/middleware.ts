@@ -1,4 +1,5 @@
 import type { ShokupanContext } from "./context";
+import { $debug } from './util/symbol';
 import type { Middleware, NextFn } from './util/types';
 
 /**
@@ -28,12 +29,12 @@ export const compose = (middleware: Middleware[]) => {
             const fn = middleware[i];
 
             // Fast path: No debug tracking
-            if (!context._debug) {
+            if (!context[$debug]) {
                 return fn(context, () => runner(i + 1));
             }
 
             // Slow path: Debug tracking
-            const debug = context._debug;
+            const debug = context[$debug];
             const debugId = (fn as any)._debugId || fn.name || 'anonymous';
             const previousNode = debug.getCurrentNode();
 

@@ -1,9 +1,11 @@
 import type { BodyInit, Server } from 'bun';
+import { nanoid } from 'nanoid';
 import { readFile } from 'node:fs/promises';
 import type { Shokupan } from './shokupan';
 import { VALID_HTTP_STATUSES, VALID_REDIRECT_STATUSES } from './util/http-status';
 import type { ShokupanRequest } from './util/request';
 import { ShokupanResponse } from './util/response';
+import { $bodyParsed, $bodyParseError, $bodyType, $cachedBody, $cachedHost, $cachedHostname, $cachedOrigin, $cachedProtocol, $cachedQuery, $debug, $finalResponse, $rawBody, $requestId, $routeMatched, $url } from './util/symbol';
 import type { CookieOptions, HeadersInit, JSXRenderer } from './util/types';
 
 /**
@@ -114,26 +116,26 @@ export class ShokupanContext<
     public handlerStack: HandlerStackItem[] = [];
 
     public readonly response: ShokupanResponse;
-    public _debug?: DebugCollector;
-    public _finalResponse?: Response;
-    public _rawBody?: string | ArrayBuffer | Uint8Array; // Raw body for compression optimization
+    public [$debug]?: DebugCollector;
+    public [$finalResponse]?: Response;
+    public [$rawBody]?: string | ArrayBuffer | Uint8Array; // Raw body for compression optimization
 
     // Body caching to avoid double parsing
-    private _url?: URL;
-    private _cachedBody?: any;
-    private _bodyType?: 'json' | 'text' | 'formData' | 'arrayBuffer' | 'blob';
-    private _bodyParsed: boolean = false;
-    public _bodyParseError?: Error;
+    private [$url]?: URL;
+    private [$cachedBody]?: any;
+    private [$bodyType]?: 'json' | 'text' | 'formData' | 'arrayBuffer' | 'blob';
+    private [$bodyParsed]: boolean = false;
+    private [$bodyParseError]?: Error;
 
-    public _routeMatched: boolean = false;
+    public [$routeMatched]: boolean = false;
 
 
     // Cached URL properties to avoid repeated parsing
-    private _cachedHostname?: string;
-    private _cachedProtocol?: string;
-    private _cachedHost?: string;
-    private _cachedOrigin?: string;
-    private _cachedQuery?: Record<string, any>;
+    private [$cachedHostname]?: string;
+    private [$cachedProtocol]?: string;
+    private [$cachedHost]?: string;
+    private [$cachedOrigin]?: string;
+    private [$cachedQuery]?: Record<string, any>;
 
     /**
      * JSX Rendering Function
@@ -141,6 +143,11 @@ export class ShokupanContext<
     private renderer?: JSXRenderer;
     setRenderer(renderer: JSXRenderer) {
         this.renderer = renderer;
+    }
+
+    private [$requestId]: string;
+    get requestId() {
+        return this[$requestId] ??= nanoid();
     }
 
     constructor(
@@ -170,12 +177,12 @@ export class ShokupanContext<
     }
 
     get url(): URL {
-        if (!this._url) {
+        if (!this[$url]) {
             // WebSocket contexts may have empty request URLs
             const urlString = this.request.url || 'http://localhost/';
-            this._url = new URL(urlString);
+            this[$url] = new URL(urlString);
         }
-        return this._url;
+        return this[$url];
     }
 
     /**
@@ -191,7 +198,7 @@ export class ShokupanContext<
      */
     get path() {
         // Optimization: return cached path if url already parsed
-        if (this._url) return this._url.pathname;
+        if (this[$url]) return this[$url].pathname;
 
         // Fast path extraction without URL parsing
         const url = this.request.url;
@@ -225,7 +232,7 @@ export class ShokupanContext<
      * Request query params
      */
     get query() {
-        if (this._cachedQuery) return this._cachedQuery;
+        if (this[$cachedQuery]) return this[$cachedQuery];
 
         // Security: Use Object.create(null) to prevent prototype pollution
         const q: Record<string, any> = Object.create(null);
@@ -251,7 +258,7 @@ export class ShokupanContext<
                 q[key] = value;
             }
         }
-        this._cachedQuery = q;
+        this[$cachedQuery] = q;
         return q;
     }
 
@@ -264,21 +271,21 @@ export class ShokupanContext<
      * Request hostname (e.g. "localhost")
      */
     get hostname() {
-        return this._cachedHostname ??= this.url.hostname;
+        return this[$cachedHostname] ??= this.url.hostname;
     }
 
     /**
      * Request host (e.g. "localhost:3000")
      */
     get host() {
-        return this._cachedHost ??= this.url.host;
+        return this[$cachedHost] ??= this.url.host;
     }
 
     /**
      * Request protocol (e.g. "http:", "https:")
      */
     get protocol() {
-        return this._cachedProtocol ??= this.url.protocol;
+        return this[$cachedProtocol] ??= this.url.protocol;
     }
 
     /**
@@ -290,7 +297,7 @@ export class ShokupanContext<
      * Request origin (e.g. "http://localhost:3000")
      */
     get origin() {
-        return this._cachedOrigin ??= this.url.origin;
+        return this[$cachedOrigin] ??= this.url.origin;
     }
 
     /**
@@ -405,13 +412,13 @@ export class ShokupanContext<
      */
     async body<T = any>(): Promise<T> {
         // If there was an error during pre-parsing, throw it now
-        if (this._bodyParseError) {
-            throw this._bodyParseError;
+        if (this[$bodyParseError]) {
+            throw this[$bodyParseError];
         }
 
         // Return cached body if already parsed
-        if (this._bodyParsed) {
-            return this._cachedBody as T;
+        if (this[$bodyParsed]) {
+            return this[$cachedBody] as T;
         }
 
         const contentType = this.request.headers.get("content-type") || "";
@@ -424,7 +431,7 @@ export class ShokupanContext<
                 // Determine if we can use the native request.json() method
                 // We can't use it if we've already read the body or if it's a clone
                 try {
-                    this._cachedBody = await this.request.json();
+                    this[$cachedBody] = await this.request.json();
                 } catch (e) {
                     // Fallback for empty body or invalid JSON
                     // If body is empty, return empty object/null based on preference, or let it fail
@@ -437,22 +444,22 @@ export class ShokupanContext<
                 const rawText = await this.request.text();
                 const { getJSONParser } = await import('./util/json-parser');
                 const parser = getJSONParser(parserType);
-                this._cachedBody = parser(rawText);
+                this[$cachedBody] = parser(rawText);
             }
 
-            this._bodyType = 'json';
+            this[$bodyType] = 'json';
         } else if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
             // FormData still needs Request API as it's more complex to parse manually
-            this._cachedBody = await this.request.formData();
-            this._bodyType = 'formData';
+            this[$cachedBody] = await this.request.formData();
+            this[$bodyType] = 'formData';
         } else {
             // Use native text() method
-            this._cachedBody = await this.request.text();
-            this._bodyType = 'text';
+            this[$cachedBody] = await this.request.text();
+            this[$bodyType] = 'text';
         }
 
-        this._bodyParsed = true;
-        return this._cachedBody as T;
+        this[$bodyParsed] = true;
+        return this[$cachedBody] as T;
     }
 
     /**
@@ -462,7 +469,7 @@ export class ShokupanContext<
      */
     async parseBody(): Promise<void> {
         // Skip if already parsed
-        if (this._bodyParsed) {
+        if (this[$bodyParsed]) {
             return;
         }
 
@@ -475,7 +482,7 @@ export class ShokupanContext<
             await this.body(); // Trigger body parsing and caching
         } catch (error) {
             // Store error for later throwing when body is accessed
-            this._bodyParseError = error as Error;
+            this[$bodyParseError] = error as Error;
         }
     }
 
@@ -538,11 +545,10 @@ export class ShokupanContext<
 
         // Store raw body for compression middleware
         if (typeof body === "string" || body instanceof ArrayBuffer || body instanceof Uint8Array) {
-            this._rawBody = body;
+            this[$rawBody] = body;
         }
 
-        this._finalResponse = new Response(body, { status, headers });
-        return this._finalResponse;
+        return this[$finalResponse] ??= new Response(body, { status, headers });
     }
 
     /**
@@ -558,22 +564,22 @@ export class ShokupanContext<
         const jsonString = JSON.stringify(data);
 
         // Store raw body for compression middleware
-        this._rawBody = jsonString;
+        this[$rawBody] = jsonString;
 
         // Fast path: no custom headers and no response headers set
         if (!headers && !this.response.hasPopulatedHeaders) {
-            this._finalResponse = new Response(jsonString, {
+            this[$finalResponse] = new Response(jsonString, {
                 status: finalStatus,
                 headers: { "content-type": "application/json" }
             });
-            return this._finalResponse;
+            return this[$finalResponse];
         }
 
         // Slow path: merge headers
         const finalHeaders = this.mergeHeaders(headers);
         finalHeaders.set("content-type", "application/json");
-        this._finalResponse = new Response(jsonString, { status: finalStatus, headers: finalHeaders });
-        return this._finalResponse;
+        this[$finalResponse] = new Response(jsonString, { status: finalStatus, headers: finalHeaders });
+        return this[$finalResponse];
     }
 
     /**
@@ -588,22 +594,22 @@ export class ShokupanContext<
         }
 
         // Store raw body for compression middleware
-        this._rawBody = data;
+        this[$rawBody] = data;
 
         // Fast path: no custom headers and no response headers set
         if (!headers && !this.response.hasPopulatedHeaders) {
-            this._finalResponse = new Response(data, {
+            this[$finalResponse] = new Response(data, {
                 status: finalStatus,
                 headers: { "content-type": "text/plain; charset=utf-8" }
             });
-            return this._finalResponse;
+            return this[$finalResponse];
         }
 
         // Slow path: merge headers
         const finalHeaders = this.mergeHeaders(headers);
         finalHeaders.set("content-type", "text/plain; charset=utf-8");
-        this._finalResponse = new Response(data, { status: finalStatus, headers: finalHeaders });
-        return this._finalResponse;
+        this[$finalResponse] = new Response(data, { status: finalStatus, headers: finalHeaders });
+        return this[$finalResponse];
     }
 
     /**
@@ -621,10 +627,10 @@ export class ShokupanContext<
         finalHeaders.set("content-type", "text/html; charset=utf-8");
 
         // Store raw body for compression middleware
-        this._rawBody = html;
+        this[$rawBody] = html;
 
-        this._finalResponse = new Response(html, { status: finalStatus, headers: finalHeaders });
-        return this._finalResponse;
+        this[$finalResponse] = new Response(html, { status: finalStatus, headers: finalHeaders });
+        return this[$finalResponse];
     }
 
     /**
@@ -638,8 +644,8 @@ export class ShokupanContext<
 
         const headers = this.mergeHeaders();
         headers.set('Location', url);
-        this._finalResponse = new Response(null, { status, headers });
-        return this._finalResponse;
+        this[$finalResponse] = new Response(null, { status, headers });
+        return this[$finalResponse];
     }
 
     /**
@@ -653,8 +659,8 @@ export class ShokupanContext<
         }
 
         const headers = this.mergeHeaders();
-        this._finalResponse = new Response(null, { status, headers });
-        return this._finalResponse;
+        this[$finalResponse] = new Response(null, { status, headers });
+        return this[$finalResponse];
     }
 
     /**
@@ -670,8 +676,8 @@ export class ShokupanContext<
         }
 
         if (typeof Bun !== "undefined") {
-            this._finalResponse = new Response(Bun.file(path, fileOptions), { status, headers });
-            return this._finalResponse;
+            this[$finalResponse] = new Response(Bun.file(path, fileOptions), { status, headers });
+            return this[$finalResponse];
         } else {
             // Node.js fallback using fs
             const fileBuffer = await readFile(path);
@@ -681,8 +687,8 @@ export class ShokupanContext<
                 headers.set('content-type', fileOptions.type);
             }
 
-            this._finalResponse = new Response(fileBuffer, { status, headers });
-            return this._finalResponse;
+            this[$finalResponse] = new Response(fileBuffer, { status, headers });
+            return this[$finalResponse];
         }
     }
 
