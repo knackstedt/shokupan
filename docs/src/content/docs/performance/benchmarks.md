@@ -59,10 +59,11 @@ These results are generated automatically on each release. The results may be sk
 
 <script>
 const iframe = document.getElementById('basic-report');
-
 iframe.onload = function() {
-   // Adjust height based on the content inside
    iframe.style.height = iframe.contentWindow.document.body.scrollHeight + 'px';
+   new ResizeObserver(() => {
+      iframe.style.height = iframe.contentWindow.document.body.scrollHeight + 'px';
+   }).observe(iframe.contentDocument.body);
 };
 </script>
 
@@ -147,10 +148,10 @@ These results are generated automatically on each release. The results may be sk
 
 <script>
 const iframe2 = document.getElementById('advanced-report');
-
 iframe2.onload = function() {
-   // Adjust height based on the content inside
-   iframe2.style.height = iframe2.contentWindow.document.body.scrollHeight + 'px';
+   new ResizeObserver(() => {
+      iframe2.style.height = iframe2.contentWindow.document.body.scrollHeight + 'px';
+   }).observe(iframe2.contentDocument.body);
 };
 </script>
 
