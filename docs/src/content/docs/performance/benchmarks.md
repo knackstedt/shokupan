@@ -51,10 +51,6 @@ The basic benchmark suite tests fundamental request handling capabilities across
 
 ### Interactive Results
 
-:::caution
-These results are generated automatically on each release. The results may be skewed by the load on the GitHub Actions runner. You can find the latest results [here](https://github.com/knackstedt/shokupan/blob/gh-pages/report.html). For the most accurate results, run the benchmarks yourself.
-:::
-
 <iframe id="basic-report" src="/report.html" style="width: 100%; height: 100vh; border: 0; border-radius: 4px;"></iframe>
 
 <script>
@@ -138,11 +134,6 @@ Not all frameworks support all scenarios. Common limitations include:
 Failed scenarios are marked as "FAILED" in the report with error details.
 
 ### Interactive Results
-
-:::caution
-These results are generated automatically on each release. The results may be skewed by the load on the GitHub Actions runner. You can find the latest results [here](https://github.com/knackstedt/shokupan/blob/gh-pages/report.html). For the most accurate results, run the benchmarks yourself.
-:::
-
 
 <iframe id="advanced-report" src="/advanced-report.html" style="width: 100%; height: 100vh; border: 0; border-radius: 4px;"></iframe>
 
