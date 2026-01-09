@@ -24,38 +24,6 @@ export const appLevelHooks: ShokupanHooks = {
         // Log to monitoring service, etc.
     },
 
-    onRequestStart: async (ctx) => {
-        console.log(`[APP HOOK] onRequestStart: ${ctx.method} ${ctx.path}`);
-        // Start request timing, set request ID, etc.
-        ctx.state.requestStartTime = Date.now();
-    },
-
-    onRequestEnd: async (ctx) => {
-        const duration = Date.now() - (ctx.state.requestStartTime || 0);
-        console.log(`[APP HOOK] onRequestEnd: ${ctx.method} ${ctx.path} (${duration}ms)`);
-        // Log request metrics
-    },
-
-    onResponseStart: async (ctx, response) => {
-        console.log(`[APP HOOK] onResponseStart: ${response.status}`);
-        // Add response headers, start response timing, etc.
-    },
-
-    onResponseEnd: async (ctx, response) => {
-        console.log(`[APP HOOK] onResponseEnd: ${response.status}`);
-        // Final cleanup, send metrics, etc.
-    },
-
-    beforeValidate: async (ctx, data) => {
-        console.log('[APP HOOK] beforeValidate:', Object.keys(data || {}));
-        // Pre-process validation data, sanitize input, etc.
-    },
-
-    afterValidate: async (ctx, data) => {
-        console.log('[APP HOOK] afterValidate: Validation passed');
-        // Post-process validated data, audit log, etc.
-    },
-
     onRequestTimeout: async (ctx) => {
         console.log('[APP HOOK] onRequestTimeout: Request took too long');
         // Log timeout, alert monitoring, etc.

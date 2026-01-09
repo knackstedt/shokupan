@@ -3,8 +3,9 @@ import "./otel";
 // Default to memory DB for example/dev server to avoid file locks (rocksdb)
 // when running multiple instances or tests concurrently.
 process.env['SHOKUPAN_DB_ENGINE'] = process.env['SHOKUPAN_DB_ENGINE'] || 'memory';
+Error.stackTraceLimit = 50;
 
-import { Dashboard } from '../../src/plugins/application/debugview/plugin';
+import { Dashboard } from '../../src/plugins/application/dashboard/plugin';
 import { ScalarPlugin } from '../../src/plugins/application/scalar';
 import { Compression } from '../../src/plugins/middleware/compression';
 import { Cors } from '../../src/plugins/middleware/cors';
@@ -52,11 +53,6 @@ interface AppState {
  * - Timeouts: Request, read, and write timeouts
  */
 
-const dashboard = new Dashboard({
-    getHeaders: () => ({
-        "Authorization": "Bearer my-secret-token"
-    })
-});
 
 // Create app with typed state for session management
 const app = new Shokupan<AppState>({
@@ -76,8 +72,7 @@ const app = new Shokupan<AppState>({
 
     // Event Hooks (app-level)
     hooks: [
-        appLevelHooks,
-        dashboard.getHooks()
+        appLevelHooks
     ],
 
 });
@@ -264,7 +259,9 @@ app.mount('/jsx', new JSXExampleRouter());
 app.mount("/api/user", UserController);
 app.mount("/api/service_fetch", ServiceFetchRouter);
 app.mount("/api/tracking", new TrackingDemoRouter());
-app.mount("/admin", dashboard);
+app.register(new Dashboard({
+    path: "/admin"
+}));
 
 // ============================================================================
 // OPENAPI DOCUMENTATION

@@ -6,6 +6,7 @@
         "dev": "bun run full/main.ts"
     },
     "dependencies": {
-        "axios": "^1.13.2"
+        "axios": "^1.13.2",
+        "ulidx": "^2.4.1"
     }
 }
