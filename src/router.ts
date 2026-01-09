@@ -1185,7 +1185,9 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                 !l.includes('bun:main')
             );
             if (callerLine) {
-                const match = callerLine.match(/\((.*):(\d+):(\d+)\)/) || callerLine.match(/at (.*):(\d+):(\d+)/);
+                // Regex should prevent regex DoS attacks
+                const match = callerLine.match(/\((.{0,1000}):(\d{1,10}):(?:\d{1,10})\)/) ||
+                    callerLine.match(/at (.{0,1000}):(\d{1,10}):(?:\d{1,10})/);
                 if (match) {
                     file = match[1];
                     line = parseInt(match[2], 10);
@@ -1203,8 +1205,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             }
             return guardHandler(ctx, next);
         };
-        (trackedGuard as any).originalHandler = (guardHandler as any).originalHandler || guardHandler;
-        // ---------------------------------
+        trackedGuard.originalHandler = guardHandler.originalHandler ?? guardHandler;
 
         this.currentGuards.push({ handler: trackedGuard, spec });
 
