@@ -5,6 +5,7 @@ import "./otel";
 process.env['SHOKUPAN_DB_ENGINE'] = process.env['SHOKUPAN_DB_ENGINE'] || 'memory';
 Error.stackTraceLimit = 50;
 
+import { AsyncApiPlugin } from '../../src/plugins/application/asyncapi/plugin';
 import { Dashboard } from '../../src/plugins/application/dashboard/plugin';
 import { ScalarPlugin } from '../../src/plugins/application/scalar';
 import { Compression } from '../../src/plugins/middleware/compression';
@@ -49,14 +50,16 @@ interface AppState {
  * - Event Hooks: All lifecycle hooks (onError, onRequestStart, etc.)
  * - JSX Rendering: Component-based HTML rendering
  * - OpenAPI: Automatic API documentation with Scalar
+ * - AsyncAPI: Automatic API documentation with AsyncAPI
  * - Static Files: Multiple mount points with directory listings
  * - Timeouts: Request, read, and write timeouts
  */
 
 
 // Create app with typed state for session management
+const port = parseInt(process.env['PORT'] || '3000');
 const app = new Shokupan<AppState>({
-    port: 3000,
+    port,
     development: true,
     enableOpenApiGen: true,
 
@@ -66,6 +69,10 @@ const app = new Shokupan<AppState>({
 
     // Enable AsyncLocalStorage for better request context tracking
     enableAsyncLocalStorage: true,
+
+    enableAsyncApiGen: true,
+
+    enableHttpBridge: true,
 
     // Enable Middleware Tracking for Demo
     enableMiddlewareTracking: true,
@@ -77,10 +84,21 @@ const app = new Shokupan<AppState>({
 
 });
 
+
 // Simple websocket echo server
 app.event("ping", (ctx) => {
     ctx.emit("pong", { message: Date.now() });
 });
+app.event("ping.1", (ctx) => {
+    ctx.emit("pong", { message: Date.now() });
+});
+app.event("ping.4", (ctx) => {
+    ctx.emit("pong", { message: Date.now() });
+});
+app.event("ding", (ctx) => {
+    ctx.emit("dong", { message: Date.now() });
+});
+
 
 // ============================================================================
 // MIDDLEWARE PLUGINS
@@ -272,7 +290,7 @@ app.register(new Dashboard({
 // OPENAPI DOCUMENTATION
 // ============================================================================
 
-app.mount('/scalar', new ScalarPlugin({
+app.mount('/openapi', new ScalarPlugin({
     enableStaticAnalysis: true,
     baseDocument: {
         info: {
@@ -299,7 +317,7 @@ Explore the different sections to see examples of each feature.
             `.trim()
         },
         servers: [{
-            url: 'http://localhost:3000',
+            url: `http://localhost:${port}`,
             description: 'Local Development Server'
         }],
         tags: [
@@ -317,6 +335,9 @@ Explore the different sections to see examples of each feature.
     },
     config: {}
 }));
+
+app.register(new AsyncApiPlugin({ path: "/asyncapi" }));
+
 
 // ============================================================================
 // START SERVER
@@ -364,8 +385,10 @@ console.log(`
 
 app.listen().then(() => {
     console.log(`
-    🍞 Shokupan Comprehensive Example Server 🍞
-    
-    Access the debug dashboard at http://localhost:3000/admin
+Shokupan Example Server is listening on http://localhost:${port}
+
+Access the debug dashboard at http://localhost:${port}/admin
+Access the OpenAPI docs at http://localhost:${port}/openapi
+Access the Websocket playground at http://localhost:${port}/asyncapi
     `);
 });

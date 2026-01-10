@@ -3,6 +3,13 @@ import { ShokupanRouter } from '../../../src/router';
 
 const router = new ShokupanRouter();
 
+router.event("jeff", (ctx) => {
+    ctx.emit("pong", { message: Date.now() });
+});
+router.event("fred", (ctx) => {
+    ctx.emit("pong", { message: Date.now() });
+});
+
 router.get("/service_fetch", async (ctx) => {
     const [data, data2] = await Promise.all([
         router.internalRequest("/wines/red"),

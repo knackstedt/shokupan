@@ -1,5 +1,5 @@
 import { ShokupanContext } from '../../../src/context';
-import { Body, Ctx, Delete, Get, Param, Patch, Post, Put, Query } from '../../../src/util/decorators';
+import { Body, Ctx, Delete, Event, Get, Param, Patch, Post, Put, Query } from '../../../src/util/decorators';
 
 /**
  * Decorator-Based Controller Example
@@ -10,6 +10,16 @@ import { Body, Ctx, Delete, Get, Param, Patch, Post, Put, Query } from '../../..
  * - OpenAPI metadata via decorators
  */
 export class DecoratorTestController {
+
+    @Event("lime")
+    limeEvent(@Ctx() ctx) {
+        ctx.emit("dime", { message: Date.now() });
+    }
+
+    // @Event("crime")
+    // crimeEvent(@Ctx() ctx) {
+    //     ctx.emit("time", { message: Date.now() });
+    // }
 
     // Example 1: Basic GET route
     @Get('/')
