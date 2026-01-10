@@ -80,3 +80,10 @@ export class InternalServerError extends HttpError {
         this.name = 'InternalServerError';
     }
 }
+
+export class EventError extends HttpError {
+    constructor(message: string = 'Event Error') {
+        super(message, 500);
+        this.name = 'EventError';
+    }
+}

@@ -77,6 +77,11 @@ const app = new Shokupan<AppState>({
 
 });
 
+// Simple websocket echo server
+app.event("ping", (ctx) => {
+    ctx.emit("pong", { message: Date.now() });
+});
+
 // ============================================================================
 // MIDDLEWARE PLUGINS
 // ============================================================================

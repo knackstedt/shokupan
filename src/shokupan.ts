@@ -7,11 +7,11 @@ import { generateOpenApi } from "./plugins/application/openapi/openapi";
 import { asyncContext, RequestContextStore } from "./util/async-hooks";
 import { getErrorStatus } from "./util/http-error";
 import { HTTP_STATUS } from "./util/http-status";
-import { $appRoot, $dispatch, $finalResponse, $isApplication, $routeMatched } from './util/symbol';
+import { $appRoot, $dispatch, $finalResponse, $isApplication, $routeMatched, $ws } from './util/symbol';
 import type { Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig, ShokupanPlugin } from './util/types';
 
 
-import type { Server } from 'bun';
+import type { Server, ServerWebSocket } from 'bun';
 import { ShokupanRouter } from './router';
 import { SystemCpuMonitor } from "./util/cpu-monitor";
 import { ShokupanRequest } from './util/request';
@@ -23,6 +23,7 @@ const defaults: ShokupanConfig = {
     hostname: "localhost",
     development: process.env.NODE_ENV !== "production",
     enableAsyncLocalStorage: false,
+    enableHttpBridge: false,
     reusePort: false,
 };
 const tracer = trace.getTracer("shokupan.application");
@@ -245,6 +246,8 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             this.cpuMonitor.start();
         }
 
+        const self = this;
+
         const serveOptions = {
             port: finalPort,
             hostname: this.applicationConfig.hostname,
@@ -253,16 +256,87 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             reusePort: this.applicationConfig.reusePort,
             idleTimeout: this.applicationConfig.readTimeout ? this.applicationConfig.readTimeout / 1000 : undefined,
             websocket: {
-                open(ws) {
+                open(ws: ServerWebSocket<{ handler; }>) {
                     ws.data?.handler?.open?.(ws);
                 },
-                message(ws, message) {
-                    ws.data?.handler?.message?.(ws, message);
+                async message(ws: ServerWebSocket<{ handler; }>, message: string) {
+                    if (ws.data?.handler?.message) {
+                        return ws.data.handler.message(ws, message);
+                    }
+                    if (typeof message !== "string") return;
+
+                    try {
+                        const payload = JSON.parse(message);
+
+                        // HTTP Bridge
+                        if (self.applicationConfig['enableHttpBridge'] && payload.type === 'HTTP') {
+                            const { id, method, path, headers, body } = payload;
+                            const url = new URL(path, `http://${self.applicationConfig.hostname || 'localhost'}:${finalPort}`);
+
+                            const req = new Request(url.toString(), {
+                                method,
+                                headers,
+                                body: typeof body === 'object' ? JSON.stringify(body) : body
+                            });
+
+                            const res = await self.fetch(req);
+
+                            const resBody: any = await res.json()
+                                .catch(err => res.text());
+
+                            const resHeaders: Record<string, string> = {};
+                            res.headers.forEach((v, k) => resHeaders[k] = v);
+
+                            ws.send(JSON.stringify({
+                                type: 'RESPONSE',
+                                id,
+                                status: res.status,
+                                headers: resHeaders,
+                                body: resBody
+                            }));
+                            return;
+                        }
+
+                        // Event Handling
+                        const eventName = payload.event || (payload.type === 'EVENT' ? payload.name : undefined);
+                        if (eventName) {
+                            const handlers = self.findEvent(eventName);
+                            const handler = handlers?.length == 1 ? handlers[0] : compose(handlers);
+                            if (handler) {
+                                const data = payload.data || payload.payload;
+
+                                // Construct a Context that mocks a Request
+                                const req = new ShokupanRequest({
+                                    url: `http://${self.applicationConfig.hostname || 'localhost'}/event/${eventName}`,
+                                    method: 'POST',
+                                    headers: new Headers({ 'content-type': 'application/json' }),
+                                    body: JSON.stringify(data)
+                                });
+
+                                const ctx = new ShokupanContext(req as unknown as ShokupanRequest<T>, self.server);
+                                // Expose socket on context for reply
+                                (ctx as any)[$ws] = ws;
+
+                                try {
+                                    await handler(ctx as any);
+                                } catch (err) {
+                                    if (self.applicationConfig['websocketErrorHandler']) {
+                                        await self.applicationConfig['websocketErrorHandler'](err, ctx as any);
+                                    } else {
+                                        console.error(`Error in event ${eventName}:`, err);
+                                    }
+                                }
+                            }
+                        }
+
+                    } catch (e) {
+                        // ignore malformed
+                    }
                 },
-                drain(ws) {
+                drain(ws: ServerWebSocket<{ handler; }>) {
                     ws.data?.handler?.drain?.(ws);
                 },
-                close(ws, code, reason) {
+                close(ws: ServerWebSocket<{ handler; }>, code: number, reason: string) {
                     ws.data?.handler?.close?.(ws, code, reason);
                 },
             }
@@ -381,6 +455,8 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
      * @returns The response to send.
      */
     public async fetch(req: Request, server?: Server): Promise<Response> {
+
+
         if (this.applicationConfig.enableTracing) {
             const tracer = trace.getTracer("shokupan.application");
             const store = asyncContext.getStore();
@@ -461,6 +537,13 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
                         return match.handler(ctx);
                     }
+
+                    // Fallback: If no route matched, check if it's a WebSocket upgrade request that can be handled by default handlers
+                    // This supports Shokupan's Native WebSocket Events if no specific middleware/route handled it
+                    if (ctx.upgrade()) {
+                        return undefined;
+                    }
+
                     return null;
                 });
 
@@ -476,9 +559,12 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 else if (result === null || result === undefined) {
                     // Handler returned nothing (void/null/undefined)
 
-                    // 1. Check if response was explicitly set via helper (e.g. ctx.text())
                     if (ctx[$finalResponse] instanceof Response) {
                         response = ctx[$finalResponse];
+                    }
+                    else if (ctx.isUpgraded) {
+                        // Request was successfully upgraded to WebSocket
+                        return undefined as unknown as Response;
                     }
                     // 2. Logic Split: Route Matched vs Not Found
                     else if (ctx[$routeMatched]) {
@@ -515,7 +601,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
             }
             catch (err: any) {
-                console.error(err);
                 const span = asyncContext.getStore()?.span;
                 if (span) span.setStatus({ code: 2 }); // Error
 

@@ -11,7 +11,8 @@ describe("Timeouts", () => {
         });
 
         const mockServer = {
-            timeout: mock((req, seconds) => { })
+            timeout: mock((req, seconds) => { }),
+            upgrade: () => false
         } as any;
 
         app.get("/", (ctx) => "ok");
@@ -37,7 +38,8 @@ describe("Timeouts", () => {
         app.mount("/api", router);
 
         const mockServer = {
-            timeout: mock((req, seconds) => { })
+            timeout: mock((req, seconds) => { }),
+            upgrade: () => false
         } as any;
 
         const req = new Request("http://localhost/api/sub");
@@ -58,7 +60,8 @@ describe("Timeouts", () => {
         app.mount("/sub", router);
 
         const mockServer = {
-            timeout: mock((req, seconds) => { })
+            timeout: mock((req, seconds) => { }),
+            upgrade: () => false
         } as any;
 
         const req = new Request("http://localhost/sub/");
@@ -81,7 +84,8 @@ describe("Timeouts", () => {
         app.mount("/sub", router);
 
         const mockServer = {
-            timeout: mock((req, seconds) => { })
+            timeout: mock((req, seconds) => { }),
+            upgrade: () => false
         } as any;
 
         const req = new Request("http://localhost/sub/");

@@ -97,7 +97,7 @@ export function Proxy(options: ProxyOptions): Middleware {
 
         // WebSocket Upgrade Handling
         if (options.ws && req.headers.get("upgrade")?.toLowerCase() === "websocket") {
-            const success = ctx.server?.upgrade(req as unknown as Request, {
+            const success = ctx.upgrade({
                 data: {
                     handler: {
                         open: (ws: ServerWebSocket) => handleWSOpen(ws, ctx, options, targetUrl),

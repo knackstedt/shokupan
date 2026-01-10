@@ -112,7 +112,7 @@ async function cleanup(maxCapacity: number, ttl: number) {
     const results = await datastore.query<[{ count: number; }]>('SELECT count() FROM failed_requests GROUP ALL');
 
     // Results is [{ result: [{ count: N }], status: 'OK', ... }]
-    const countRecords = results?.[0]?.count;
+    const countRecords = results?.[0];
 
     if (!countRecords || !Array.isArray(countRecords) || countRecords.length === 0) return;
 

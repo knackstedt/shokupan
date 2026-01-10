@@ -2,6 +2,7 @@ export const $isApplication = Symbol.for("Shokupan.app");
 export const $appRoot = Symbol.for("Shokupan.app-root");
 export const $isMounted = Symbol("Shokupan.isMounted");
 export const $routeMethods = Symbol("Shokupan.routeMethods");
+export const $eventMethods = Symbol("Shokupan.eventMethods");
 export const $routeArgs = Symbol("Shokupan.routeArgs");
 export const $controllerPath = Symbol("Shokupan.controllerPath");
 export const $middleware = Symbol("Shokupan.middleware");
@@ -35,3 +36,7 @@ export const $cachedProtocol = Symbol.for("Shokupan.ctx.cachedProtocol");
 export const $cachedHost = Symbol.for("Shokupan.ctx.cachedHost");
 export const $cachedOrigin = Symbol.for("Shokupan.ctx.cachedOrigin");
 export const $cachedQuery = Symbol.for("Shokupan.ctx.cachedQuery");
+export const $ws = Symbol.for("Shokupan.ctx.ws");
+export const $socket = Symbol.for("Shokupan.ctx.socket");
+export const $io = Symbol.for("Shokupan.ctx.io");
+

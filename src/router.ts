@@ -6,12 +6,12 @@ import { serveStatic } from './plugins/middleware/serve-static';
 import type { Shokupan } from './shokupan';
 import { datastore } from './util/datastore';
 import { Container } from './util/di';
-import { getErrorStatus } from './util/http-error';
+import { EventError, getErrorStatus } from './util/http-error';
 import { HTTP_STATUS } from './util/http-status';
 import { traceHandler } from './util/instrumentation';
 import { ShokupanRequest } from './util/request';
 import { getCallerInfo } from './util/stack';
-import { $appRoot, $childControllers, $childRouters, $controllerPath, $debug, $dispatch, $isApplication, $isMounted, $isRouter, $middleware, $mountPath, $parent, $routeArgs, $routeMethods, $routes, $routeSpec } from './util/symbol';
+import { $appRoot, $childControllers, $childRouters, $controllerPath, $debug, $dispatch, $eventMethods, $isApplication, $isMounted, $isRouter, $middleware, $mountPath, $parent, $routeArgs, $routeMethods, $routes, $routeSpec } from './util/symbol';
 import { RouterTrie } from './util/trie';
 import { type GuardAPISpec, type HeadersInit, HTTPMethods, type JSXRenderer, type Method, type MethodAPISpec, type Middleware, type OpenAPIOptions, type ProcessResult, type RequestOptions, type RouteMetadata, type RouteParams, RouteParamType, type ShokupanController, type ShokupanHandler, type ShokupanHooks, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions } from './util/types';
 
@@ -108,6 +108,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     public metadata?: RouteMetadata; // Metadata for the router itself
 
     private currentGuards: { handler: ShokupanHandler<T>; spec?: GuardAPISpec; }[] = [];
+    private eventHandlers = new Map<string, ShokupanHandler<T>[]>();
+
 
     // Registry Accessor
     public getComponentRegistry(): {
@@ -193,6 +195,41 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     private isRouterInstance(target: any): target is ShokupanRouter<T> {
         // Check if it's an object and has your specific symbol
         return typeof target === 'object' && target !== null && $isRouter in target;
+    }
+
+    /**
+     * Registers an event handler for WebSocket.
+     */
+    public event(name: string, handler: ShokupanHandler<T>) {
+        if (this.eventHandlers.has(name)) {
+            const err = new EventError(`Event handler \`${name}\` already exists.`);
+            console.warn(err);
+            const handlers = this.eventHandlers.get(name)!;
+            handlers.push(handler);
+            this.eventHandlers.set(name, handlers);
+        }
+        else {
+            this.eventHandlers.set(name, [handler]);
+        }
+        return this;
+    }
+
+    /**
+     * Finds an event handler(s) by name.
+     */
+    public findEvent(name: string): ShokupanHandler<T>[] | null {
+        // Check local
+        if (this.eventHandlers.has(name)) {
+            return this.eventHandlers.get(name)!;
+        }
+
+        // Check children
+        for (const child of this[$childRouters]) {
+            const handler = child.findEvent(name);
+            if (handler) return handler;
+        }
+
+        return null;
     }
 
     /**
@@ -518,6 +555,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         const decoratedRoutes = (instance as any)[$routeMethods] || (proto && (proto as any)[$routeMethods]);
         const decoratedArgs = (instance as any)[$routeArgs] || (proto && (proto as any)[$routeArgs]);
         const methodMiddlewareMap = (instance as any)[$middleware] || (proto && (proto as any)[$middleware]);
+        const decoratedEvents = (instance as any)[$eventMethods] || (proto && (proto as any)[$eventMethods]);
 
         let routesAttached = 0;
         for (let i = 0; i < Array.from(methods).length; i++) {
@@ -712,6 +750,42 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                 const spec = { tags: [tagName], ...userSpec };
 
                 this.add({ method, path: normalizedPath, handler: finalHandler, spec, controller: instance });
+            }
+
+            // 3. Check for Event Decorator
+            if (decoratedEvents?.has(name)) {
+                routesAttached++;
+                const config = decoratedEvents.get(name);
+                const routeArgs = decoratedArgs?.get(name);
+
+                const wrappedHandler = async (ctx: ShokupanContext<T>) => {
+                    let args: any[] = [ctx];
+                    if (routeArgs?.length > 0) {
+                        args = [];
+                        const sortedArgs = [...routeArgs].sort((a, b) => a.index - b.index);
+                        for (let k = 0; k < sortedArgs.length; k++) {
+                            const arg = sortedArgs[k];
+                            switch (arg.type) {
+                                case RouteParamType.BODY:
+                                    args[arg.index] = await ctx.body();
+                                    break;
+                                case RouteParamType.CONTEXT:
+                                    args[arg.index] = ctx;
+                                    break;
+                                case RouteParamType.REQUEST:
+                                    args[arg.index] = ctx.req;
+                                    break;
+                                case RouteParamType.HEADER:
+                                    args[arg.index] = arg.name ? ctx.req.headers.get(arg.name) : ctx.req.headers;
+                                    break;
+                                default:
+                                    args[arg.index] = undefined;
+                            }
+                        }
+                    }
+                    return originalHandler.apply(instance, args);
+                };
+                this.event(config.eventName, wrappedHandler);
             }
         }
         if (routesAttached === 0) {

@@ -109,7 +109,7 @@ export interface CookieOptions {
 export type ShokupanHandler<
     State extends Record<string, any> = Record<string, any>,
     Params extends Record<string, string> = Record<string, string>
-> = (ctx: ShokupanContext<State, Params>, next?: NextFn) => Promise<any> | any;
+> = ((ctx: ShokupanContext<State, Params>, next?: NextFn) => Promise<any> | any) & { originalHandler?: ShokupanHandler<State, Params>; };
 export const HTTPMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "ALL"];
 export type Method = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "OPTIONS" | "HEAD" | "ALL";
 
@@ -326,6 +326,28 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      * @default 10000
      */
     middlewareTrackingMaxCapacity?: number;
+    /**
+     * Whether to enable the HTTP bridge for WebSocket.
+     * This enables websocket messages to run through the HTTP server.
+     * e.g. 
+     * ```json
+     * {
+     *  "method": "POST",
+     *  "path": "/api/v1/myHttpEndpoint",
+     *  "headers": {},
+     *  "body": {
+     *      "type": "text",
+     *      "data": "Hello, world!"
+     *  }
+     * }
+     * ```
+     * @default false
+     */
+    enableHTTPBridge?: boolean;
+    /**
+     * Handler for WebSocket events that throw an exception.
+     */
+    websocketErrorHandler?: (err: any, ctx: ShokupanContext<T>) => void | Promise<void>;
     /**
      * Unique ID generator function for requests.
      * @default nanoid

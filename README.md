@@ -243,6 +243,59 @@ app.mount('/api', UserController);
 - `@Ctx()` - Access full context
 - `@Req()` - Access request object
 
+### WebSockets
+
+> Notice: The WebSocket API is currently in an experimental stage and subject to change.
+
+Shokupan provides native WebSocket handling and an HTTP Bridge feature.
+
+#### Event Decorator
+
+Handle WebSocket events directly in your controllers:
+
+```typescript
+import { Controller, Event, ShokupanContext } from 'shokupan';
+
+@Controller('/chat')
+export class ChatController {
+
+    @Event('message')
+    async onMessage(ctx: ShokupanContext) {
+        const payload = await ctx.body();
+        console.log('Received:', payload);
+        
+        // Reply using underlying socket
+        // Native Bun: ctx.socket is ServerWebSocket
+        // Socket.IO: ctx.socket is Socket
+        ctx.emit('ack', 'received');
+    }
+}
+```
+
+#### Socket.IO Support
+
+Easily integrate Socket.IO and wire up your event decorators via the built-in helper:
+
+```typescript
+import { Shokupan } from 'shokupan';
+import { Server } from 'socket.io';
+import { attachSocketIOBridge } from 'shokupan';
+
+const app = new Shokupan({ enableHttpBridge: false });
+const server = await app.listen(3000);
+
+// Attach Socket.IO
+const io = new Server(server.nodeServer); // For Node.js
+attachSocketIOBridge(io, app);
+```
+
+#### HTTP Bridge
+
+Expose your HTTP API over WebSockets (set `enableHttpBridge: true` in config).
+
+Client sends: `{ type: "HTTP", method: "GET", path: "/api/users", ... }`
+Server responds: `{ type: "RESPONSE", status: 200, body: ... }`
+
 ### Middleware
 
 Middleware functions have access to the context and can control request flow:

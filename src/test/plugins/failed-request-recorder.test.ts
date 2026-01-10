@@ -20,9 +20,9 @@ describe("FailedRequestRecorder Plugin", () => {
         querySpy = spyOn(datastore, 'query').mockImplementation(async (q) => {
             // Mock responses based on query content
             if (q.includes("SELECT count")) {
-                return [{ result: [{ count: 1 }] }]; // return 1 count by default
+                return [[{ count: 1 }]]; // return 1 count by default
             }
-            return [{ result: [] }];
+            return [[]];
         });
 
         setSpy = spyOn(datastore, 'set').mockImplementation(async (recordId, value) => {
@@ -67,9 +67,9 @@ describe("FailedRequestRecorder Plugin", () => {
         // Mock returning count > max
         querySpy.mockImplementation(async (q: string) => {
             if (q.includes("SELECT count")) {
-                return [{ result: [{ count: 10 }] }];
+                return [[{ count: 10 }]];
             }
-            return [{ result: [] }];
+            return [[]];
         });
 
         app.get("/fail", () => { throw new Error("Fail"); });

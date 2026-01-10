@@ -61,6 +61,7 @@ export default defineConfig({
                         { label: 'Middleware', link: '/core/middleware/' },
                         { label: 'Context', link: '/core/context/' },
                         { label: 'Static Files', link: '/core/static-files/' },
+                        { label: 'WebSockets', link: '/core/websockets/' },
                     ],
                 },
                 {

@@ -63,7 +63,9 @@ export function createHttpServer(): ServerFactory {
             requestIP: (req) => null,
             publish: () => 0,
             subscriberCount: () => 0,
-            url: new URL(`http://${options.hostname}:${options.port}`)
+            url: new URL(`http://${options.hostname}:${options.port}`),
+            // Expose the raw Node.js server for generic socket/websocket support (e.g. Socket.IO)
+            nodeServer: server
         } as unknown as Server;
 
         return new Promise((resolve) => {
@@ -134,7 +136,9 @@ export function createHttpsServer(sslOptions: https.ServerOptions): ServerFactor
             requestIP: (req) => null,
             publish: () => 0,
             subscriberCount: () => 0,
-            url: new URL(`https://${options.hostname}:${options.port}`)
+            url: new URL(`https://${options.hostname}:${options.port}`),
+            // Expose the raw Node.js server for generic socket/websocket support
+            nodeServer: server
         } as unknown as Server;
 
         return new Promise((resolve) => {

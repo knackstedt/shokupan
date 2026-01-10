@@ -1,11 +1,12 @@
-import type { BodyInit, Server } from 'bun';
+import type { BodyInit, Server, ServerWebSocket } from 'bun';
 import { nanoid } from 'nanoid';
 import { readFile } from 'node:fs/promises';
+import type { Socket, Server as SocketServer } from 'socket.io';
 import type { Shokupan } from './shokupan';
 import { VALID_HTTP_STATUSES, VALID_REDIRECT_STATUSES } from './util/http-status';
 import type { ShokupanRequest } from './util/request';
 import { ShokupanResponse } from './util/response';
-import { $bodyParsed, $bodyParseError, $bodyType, $cachedBody, $cachedHost, $cachedHostname, $cachedOrigin, $cachedProtocol, $cachedQuery, $debug, $finalResponse, $rawBody, $requestId, $routeMatched, $url } from './util/symbol';
+import { $bodyParsed, $bodyParseError, $bodyType, $cachedBody, $cachedHost, $cachedHostname, $cachedOrigin, $cachedProtocol, $cachedQuery, $debug, $finalResponse, $io, $rawBody, $requestId, $routeMatched, $socket, $url, $ws } from './util/symbol';
 import type { CookieOptions, HeadersInit, JSXRenderer } from './util/types';
 
 /**
@@ -136,6 +137,9 @@ export class ShokupanContext<
     private [$cachedHost]?: string;
     private [$cachedOrigin]?: string;
     private [$cachedQuery]?: Record<string, any>;
+    private [$ws]?: ServerWebSocket;
+    private [$socket]?: Socket;
+    private [$io]?: SocketServer;
 
     /**
      * JSX Rendering Function
@@ -317,6 +321,21 @@ export class ShokupanContext<
     get res() { return this.response; }
 
     /**
+     * Raw WebSocket connection
+     */
+    get ws() { return this[$ws]; }
+
+    /**
+     * Socket.io socket
+     */
+    get socket() { return this[$socket]; }
+
+    /**
+     * Socket.io server
+     */
+    get io() { return this[$io]; }
+
+    /**
      * Helper to set a header on the response
      * @param key Header key
      * @param value Header value
@@ -324,6 +343,22 @@ export class ShokupanContext<
     public set(key: string, value: string) {
         this.response.set(key, value);
         return this;
+    }
+
+    public isUpgraded: boolean = false;
+
+    /**
+     * Upgrades the request to a WebSocket connection.
+     * @param options Upgrade options
+     * @returns true if upgraded, false otherwise
+     */
+    public upgrade(options?: { data?: any; headers?: HeadersInit; }) {
+        if (!this.server) return false;
+        const success = this.server.upgrade(this.req as any, options);
+        if (success) {
+            this.isUpgraded = true;
+        }
+        return success;
     }
 
     /**
@@ -534,7 +569,7 @@ export class ShokupanContext<
      * @param options Response options
      * @returns Response
      */
-    public send(body?: BodyInit, options?: ResponseInit) {
+    send(body?: BodyInit, options?: ResponseInit) {
         const headers = this.mergeHeaders(options?.headers as any);
         const status = options?.status ?? this.response.status ?? 200;
 
@@ -549,6 +584,19 @@ export class ShokupanContext<
         }
 
         return this[$finalResponse] ??= new Response(body, { status, headers });
+    }
+
+    /**
+     * Emit an event to the client (WebSocket only)
+     * @param event Event name
+     * @param data Event data (Must be JSON serializable)
+     */
+    emit(event: string, data?: any) {
+        if (this[$ws]) {
+            this[$ws].send(JSON.stringify({ event, data }));
+        } else if (this[$socket]) {
+            this[$socket].emit(event, data);
+        }
     }
 
     /**

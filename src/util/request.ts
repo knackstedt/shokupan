@@ -3,7 +3,7 @@ import type { Method } from './types';
 export type ShokupanRequestProps = {
     method: Method;
     url: string;
-    headers: Headers;
+    headers: Headers | Record<string, string>;
     body: any;
 };
 

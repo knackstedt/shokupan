@@ -66,6 +66,7 @@
         "@opentelemetry/semantic-conventions": "^1.38.0",
         "@scalar/openapi-types": "^0.5.3",
         "nanoid": "^5.1.6",
+        "socket.io": "^4.8.3",
         "tslib": "^2.8.1"
     },
     "peerDependencies": {
