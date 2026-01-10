@@ -78,8 +78,6 @@ class Collector implements DebugCollector {
 }
 
 export class Dashboard implements ShokupanPlugin {
-    private static __dirname = dirname(fileURLToPath(import.meta.url));
-
     // Get base path for dashboard files - works in both dev (src/) and production (dist/)
     private static getBasePath() {
         const dir = dirname(fileURLToPath(import.meta.url));

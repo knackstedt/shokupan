@@ -55,9 +55,43 @@ export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin 
     }
 
     private init() {
+        const bootId = Date.now().toString();
+
+        this.get("/_lifecycle", ctx => ctx.json({ boot: bootId }));
+
         this.get("/", ctx => {
             let path = ctx.url.toString();
             if (!path.endsWith("/")) path += "/";
+
+            // Auto-reload script for development mode
+            const devScript = ctx.app?.applicationConfig.development ? `
+                <script>
+                    (function() {
+                        const bootId = "${bootId}";
+                        let isDown = false;
+                        
+                        setInterval(async () => {
+                            try {
+                                const res = await fetch('${path}_lifecycle');
+                                if (!res.ok) throw new Error('Down');
+                                const data = await res.json();
+                                if (data.boot !== bootId) {
+                                    console.log('Server restarted, reloading...');
+                                    window.location.reload();
+                                }
+                                else if (isDown) {
+                                    // Recovered with same ID? Unlikely if ID is strict timestamp
+                                    // But if we thought it was down but it wasn't, just reset
+                                    isDown = false;
+                                }
+                            } catch (e) {
+                                isDown = true;
+                                console.log('Connection lost...');
+                            }
+                        }, 2000);
+                    })();
+                </script>
+            ` : '';
 
             return ctx.html(eta.renderString(`<!doctype html>
                 <html>
@@ -76,9 +110,10 @@ export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin 
                         }
                     ])
                     </script>
+                    <%~ it.devScript %>
                 </body>
 
-                </html>`, { path, config: this.pluginOptions }));
+                </html>`, { path, config: this.pluginOptions, devScript }));
         });
 
         this.get("/openapi.json", async (ctx) => {

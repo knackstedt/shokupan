@@ -87,13 +87,13 @@ export class MetricsCollector {
     private async collect() {
         try {
             const now = Date.now();
-            console.log('[MetricsCollector] collect() called at', new Date(now).toISOString());
+            // console.log('[MetricsCollector] collect() called at', new Date(now).toISOString());
 
             for (const int of INTERVALS) {
                 const start = this.currentIntervalStart[int.label];
                 // If we passed the interval boundary
                 if (now >= start + int.ms) {
-                    console.log(`[MetricsCollector] Flushing ${int.label} interval (boundary crossed)`);
+                    // console.log(`[MetricsCollector] Flushing ${int.label} interval (boundary crossed)`);
                     await this.flushInterval(int.label, start, int.ms);
                     // Advance to next interval (could simply be aligning now, but be careful of gaps if app was down)
                     // For simplicity, just align now.
@@ -107,7 +107,7 @@ export class MetricsCollector {
 
     private async flushInterval(label: string, timestamp: number, durationMs: number) {
         const reqs = this.pendingDetails[label];
-        console.log(`[MetricsCollector] flushInterval(${label}) - ${reqs.length} requests pending`);
+        // console.log(`[MetricsCollector] flushInterval(${label}) - ${reqs.length} requests pending`);
         // Reset pending only if we are moving forward. 
         // NOTE: In a real concurrent scenario, we'd need locking or atomic swap.
         // Javascript is single threaded so this is safe for CPU-bound stuff, 
@@ -115,7 +115,7 @@ export class MetricsCollector {
         this.pendingDetails[label] = [];
 
         if (reqs.length === 0) {
-            console.log(`[MetricsCollector] No requests for ${label}, skipping persist`);
+            // console.log(`[MetricsCollector] No requests for ${label}, skipping persist`);
             // Optional: Don't record empty intervals to save space? 
             // Or record zeros to show gaps in graphs.
             // Let's record zeros for continuity.
@@ -173,19 +173,19 @@ export class MetricsCollector {
             }
         };
 
-        console.log(`[MetricsCollector] Persisting ${label} metric at timestamp ${timestamp}`);
+        // console.log(`[MetricsCollector] Persisting ${label} metric at timestamp ${timestamp}`);
         try {
             const recordId = new RecordId('metrics', timestamp);
             await datastore.set(recordId, metric);
-            console.log(`[MetricsCollector] ✓ Successfully saved ${label} metric to datastore`);
+            // console.log(`[MetricsCollector] ✓ Successfully saved ${label} metric to datastore`);
 
             // DEBUG: Verify we can retrieve it immediately
             const test = await datastore.get(recordId);
-            console.log(`[MetricsCollector] DEBUG: Immediate .get() returned:`, test ? 'DATA' : 'NULL');
+            // console.log(`[MetricsCollector] DEBUG: Immediate .get() returned:`, test ? 'DATA' : 'NULL');
 
             // DEBUG: Try querying for it  
             const queryTest = await datastore.query("SELECT * FROM metrics WHERE id = $id", { id: recordId });
-            console.log(`[MetricsCollector] DEBUG: Query by id returned ${queryTest[0]?.length || 0} records`);
+            // console.log(`[MetricsCollector] DEBUG: Query by id returned ${queryTest[0]?.length || 0} records`);
         } catch (e) {
             console.error(`[MetricsCollector] ✗ Failed to save metrics for ${label}:`, e);
         }
