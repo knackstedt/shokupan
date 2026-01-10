@@ -602,14 +602,14 @@ export class ShokupanContext<
     /**
      * Respond with a JSON object
      */
-    json(data: any, status?: number, headers?: HeadersInit) {
+    async json(data: object | Promise<object>, status?: number, headers?: HeadersInit) {
         const finalStatus = status ?? this.response.status ?? 200;
         // Validate redirect status code
         if (!VALID_HTTP_STATUSES.has(finalStatus)) {
             throw new Error(`Invalid HTTP status code: ${finalStatus}`);
         }
 
-        const jsonString = JSON.stringify(data);
+        const jsonString = JSON.stringify(data instanceof Promise ? await data : data);
 
         // Store raw body for compression middleware
         this[$rawBody] = jsonString;
@@ -633,7 +633,7 @@ export class ShokupanContext<
     /**
      * Respond with a text string
      */
-    text(data: string, status?: number, headers?: HeadersInit) {
+    async text(data: string | Promise<string>, status?: number, headers?: HeadersInit) {
         const finalStatus = status ?? this.response.status ?? 200;
 
         // Validate redirect status code
@@ -642,11 +642,11 @@ export class ShokupanContext<
         }
 
         // Store raw body for compression middleware
-        this[$rawBody] = data;
+        this[$rawBody] = data instanceof Promise ? await data : data;
 
         // Fast path: no custom headers and no response headers set
         if (!headers && !this.response.hasPopulatedHeaders) {
-            this[$finalResponse] = new Response(data, {
+            this[$finalResponse] = new Response(this[$rawBody], {
                 status: finalStatus,
                 headers: { "content-type": "text/plain; charset=utf-8" }
             });
@@ -656,14 +656,14 @@ export class ShokupanContext<
         // Slow path: merge headers
         const finalHeaders = this.mergeHeaders(headers);
         finalHeaders.set("content-type", "text/plain; charset=utf-8");
-        this[$finalResponse] = new Response(data, { status: finalStatus, headers: finalHeaders });
+        this[$finalResponse] = new Response(this[$rawBody], { status: finalStatus, headers: finalHeaders });
         return this[$finalResponse];
     }
 
     /**
      * Respond with HTML content
      */
-    html(html: string, status?: number, headers?: HeadersInit) {
+    async html(html: string | Promise<string>, status?: number, headers?: HeadersInit) {
         const finalStatus = status ?? this.response.status ?? 200;
 
         // Validate redirect status code
@@ -675,24 +675,25 @@ export class ShokupanContext<
         finalHeaders.set("content-type", "text/html; charset=utf-8");
 
         // Store raw body for compression middleware
-        this[$rawBody] = html;
+        this[$rawBody] = html instanceof Promise ? await html : html;
 
-        this[$finalResponse] = new Response(html, { status: finalStatus, headers: finalHeaders });
+        this[$finalResponse] = new Response(this[$rawBody], { status: finalStatus, headers: finalHeaders });
         return this[$finalResponse];
     }
 
     /**
      * Respond with a redirect
      */
-    redirect(url: string, status = 302) {
+    async redirect(url: string | Promise<string>, status = 302) {
         // Validate redirect status code
         if (this.app.applicationConfig.validateStatusCodes && !VALID_REDIRECT_STATUSES.has(status)) {
             throw new Error(`Invalid redirect status code: ${status}`);
         }
 
-        const headers = this.mergeHeaders();
-        headers.set('Location', url);
-        this[$finalResponse] = new Response(null, { status, headers });
+        const finalHeaders = this.mergeHeaders();
+        finalHeaders.set('Location', url instanceof Promise ? await url : url);
+
+        this[$finalResponse] = new Response(null, { status, headers: finalHeaders });
         return this[$finalResponse];
     }
 
@@ -700,14 +701,15 @@ export class ShokupanContext<
      * Respond with a status code
      * DOES NOT CHAIN!
      */
-    status(status: number) {
+    async status(statusCode: number | Promise<number>) {
+        const status = statusCode instanceof Promise ? await statusCode : statusCode;
         // Validate redirect status code
         if (this.app.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(status)) {
             throw new Error(`Invalid HTTP status code: ${status}`);
         }
 
-        const headers = this.mergeHeaders();
-        this[$finalResponse] = new Response(null, { status, headers });
+        const finalHeaders = this.mergeHeaders();
+        this[$finalResponse] = new Response(null, { status, headers: finalHeaders });
         return this[$finalResponse];
     }
 
@@ -715,7 +717,7 @@ export class ShokupanContext<
      * Respond with a file
      */
     public async file(path: string, fileOptions?: BlobPropertyBag, responseOptions?: ResponseInit) {
-        const headers = this.mergeHeaders(responseOptions?.headers as any);
+        const finalHeaders = this.mergeHeaders(responseOptions?.headers as any);
         const status = responseOptions?.status ?? this.response.status;
 
         // Validate redirect status code
@@ -724,7 +726,7 @@ export class ShokupanContext<
         }
 
         if (typeof Bun !== "undefined") {
-            this[$finalResponse] = new Response(Bun.file(path, fileOptions), { status, headers });
+            this[$finalResponse] = new Response(Bun.file(path, fileOptions), { status, headers: finalHeaders });
             return this[$finalResponse];
         } else {
             // Node.js fallback using fs
@@ -732,10 +734,10 @@ export class ShokupanContext<
 
             // Set content-type from fileOptions if provided
             if (fileOptions?.type) {
-                headers.set('content-type', fileOptions.type);
+                finalHeaders.set('content-type', fileOptions.type);
             }
 
-            this[$finalResponse] = new Response(fileBuffer, { status, headers });
+            this[$finalResponse] = new Response(fileBuffer, { status, headers: finalHeaders });
             return this[$finalResponse];
         }
     }
@@ -743,6 +745,7 @@ export class ShokupanContext<
     /**
      * Render a JSX element
      * @param element JSX Element
+     * @param args JSX Element Args/Props
      * @param status HTTP Status
      * @param headers HTTP Headers
      */
