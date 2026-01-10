@@ -7,6 +7,9 @@
             "request": "launch",
             "program": "examples/full/main.ts",
             "cwd": "${workspaceRoot}/",
+            "env": {
+                "PORT": "8372"
+            },
             "watchMode": true,
             "stopOnEntry": false
         }
