@@ -81,6 +81,29 @@ export interface OpenAPIOptions {
     defaultTag?: string;
 }
 
+export interface AsyncAPIOptions {
+    info?: {
+        title: string;
+        version: string;
+        description?: string;
+    };
+    defaultTag?: string;
+}
+
+export interface AsyncAPISpec {
+    type?: 'publish' | 'subscribe';
+    summary?: string;
+    description?: string;
+    tags?: string[];
+    message?: {
+        name?: string;
+        title?: string;
+        summary?: string;
+        payload?: any;
+        headers?: any;
+    };
+}
+
 export interface ShokupanHooks<T = any> {
     onError?: (ctx: ShokupanContext<T>, error: unknown) => void | Promise<void>;
     onRequestStart?: (ctx: ShokupanContext<T>) => void | Promise<void>;
@@ -198,7 +221,7 @@ export type ShokupanRoute = {
     /**
      * OpenAPI spec for the route
      */
-    handlerSpec?: MethodAPISpec;
+    handlerSpec?: MethodAPISpec | AsyncAPISpec;
     /**
      * Group for the route
      */
@@ -269,6 +292,11 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      * @default true
      */
     enableOpenApiGen: boolean;
+    /**
+     * Whether to enable AsyncAPI generation.
+     * @default false
+     */
+    enableAsyncApiGen: boolean;
     /**
      * Whether to reuse the port.
      * @default false

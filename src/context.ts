@@ -1,6 +1,7 @@
 import type { BodyInit, Server, ServerWebSocket } from 'bun';
 import { nanoid } from 'nanoid';
 import { readFile } from 'node:fs/promises';
+import { inspect } from 'node:util';
 import type { Socket, Server as SocketServer } from 'socket.io';
 import type { Shokupan } from './shokupan';
 import { VALID_HTTP_STATUSES, VALID_REDIRECT_STATUSES } from './util/http-status';
@@ -137,6 +138,24 @@ export class ShokupanContext<
     private [$cachedHost]?: string;
     private [$cachedOrigin]?: string;
     private [$cachedQuery]?: Record<string, any>;
+
+    private disconnectCallbacks: (() => void | Promise<void>)[] = [];
+
+    /**
+     * Registers a callback to be executed when the associated WebSocket disconnects.
+     * This is only applicable for requests that are part of a WebSocket interaction or upgrade.
+     */
+    public onSocketDisconnect(callback: () => void | Promise<void>) {
+        this.disconnectCallbacks.push(callback);
+    }
+
+    /**
+     * @internal
+     * Retrieves registered disconnect callbacks for execution.
+     */
+    public getDisconnectCallbacks() {
+        return this.disconnectCallbacks;
+    }
     private [$ws]?: ServerWebSocket;
     private [$socket]?: Socket;
     private [$io]?: SocketServer;
@@ -152,6 +171,22 @@ export class ShokupanContext<
     private [$requestId]: string;
     get requestId() {
         return this[$requestId] ??= (this.app?.applicationConfig?.idGenerator?.() ?? nanoid());
+    }
+
+    [Symbol.for("nodejs.util.inspect.custom")]() {
+        const innerString = inspect({
+            method: this.request.method,
+            url: this.request.url,
+            requestHeaders: new Map(this.request.headers),
+            sessionId: this.sessionID,
+            state: this.state,
+            params: this.params,
+            response: this[$finalResponse]?.body,
+            responseHeaders: new Map(this[$finalResponse]?.headers as any),
+            handlerStack: this.handlerStack.map(h => h.name === "anonymous" ? (h.file + ":" + h.line) : h.name)
+        }, { depth: null, colors: true, numericSeparator: true, customInspect: true });
+
+        return "Context(" + this.requestId + ") {" + innerString.slice(1, -2) + ",\n  ...others\n}";
     }
 
     constructor(

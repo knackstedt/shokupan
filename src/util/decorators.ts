@@ -1,6 +1,6 @@
 import { RateLimitMiddleware, type RateLimitOptions } from "../plugins/middleware/rate-limit";
 import { $controllerPath, $eventMethods, $middleware, $routeArgs, $routeMethods, $routeSpec } from "./symbol";
-import type { GuardAPISpec, MethodAPISpec } from "./types";
+import type { AsyncAPISpec, GuardAPISpec, MethodAPISpec } from "./types";
 import { type Method, type Middleware, RouteParamType } from "./types";
 
 /**
@@ -87,7 +87,7 @@ export const Ctx = createParamDecorator(RouteParamType.CONTEXT);
 /**
  * Decorator: Overrides the OpenAPI specification for a route.
  */
-export function Spec(spec: MethodAPISpec | GuardAPISpec) {
+export function Spec(spec: MethodAPISpec | GuardAPISpec | AsyncAPISpec) {
     return (target: any, propertyKey: string, descriptor: PropertyDescriptor) => {
         if (!target[$routeSpec]) {
             target[$routeSpec] = new Map();

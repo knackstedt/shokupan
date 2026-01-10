@@ -96,6 +96,7 @@ const tracer = trace.getTracer("shokupan.application");
 export class Shokupan<T = any> extends ShokupanRouter<T> {
     readonly applicationConfig: ShokupanConfig = {};
     public openApiSpec?: any;
+    public asyncApiSpec?: any;
     private composedMiddleware?: Middleware;
     private cpuMonitor?: SystemCpuMonitor;
     private server?: Server;
@@ -237,6 +238,11 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             await Promise.all(this.specAvailableHooks.map(hook => hook(this.openApiSpec)));
         }
 
+        if (this.applicationConfig.enableAsyncApiGen) {
+            const { generateAsyncApi } = await import("./plugins/application/asyncapi/generator");
+            this.asyncApiSpec = await generateAsyncApi(this);
+        }
+
         if (port === 0 && process.platform === "linux") {
 
         }
@@ -317,6 +323,13 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                                 // Expose socket on context for reply
                                 (ctx as any)[$ws] = ws;
 
+                                // Link context to socket for disconnect hooks
+                                // Note: This simplistic approach overwrites the context on each event.
+                                // Ideal: Maintain a set of contexts or checking if we need a persistent context per socket.
+                                // For now, we attach it so disconnect hooks work for at least the last active context or shared session.
+                                ws.data ??= {} as any;
+                                ws.data['ctx'] = ctx;
+
                                 try {
                                     await handler(ctx as any);
                                 } catch (err) {
@@ -338,6 +351,16 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 },
                 close(ws: ServerWebSocket<{ handler; }>, code: number, reason: string) {
                     ws.data?.handler?.close?.(ws, code, reason);
+                    // Shokupan Disconnect Hooks
+                    const ctx: any = ws.data?.['ctx'];
+                    if (ctx && typeof ctx.getDisconnectCallbacks === 'function') {
+                        const callbacks = ctx.getDisconnectCallbacks();
+                        if (Array.isArray(callbacks) && callbacks.length > 0) {
+                            Promise.all(callbacks.map(cb => cb())).catch(err => {
+                                console.error("Error executing socket disconnect hook:", err);
+                            });
+                        }
+                    }
                 },
             }
         };
@@ -355,7 +378,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             ? await factory(serveOptions) as Server
             : Bun.serve(serveOptions);
 
-        console.log(`Shokupan server listening on http://${serveOptions.hostname}:${serveOptions.port}`);
         return this.server;
     }
 
@@ -538,16 +560,10 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                         return match.handler(ctx);
                     }
 
-                    // Fallback: If no route matched, check if it's a WebSocket upgrade request that can be handled by default handlers
-                    // This supports Shokupan's Native WebSocket Events if no specific middleware/route handled it
-                    if (ctx.upgrade()) {
-                        return undefined;
-                    }
-
                     return null;
                 });
 
-                let response: Response;
+                let response: Response | Promise<Response>;
                 if (result instanceof Response) {
                     response = result;
                 }
@@ -574,6 +590,12 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                         response = ctx.send(null, { status: ctx.response.status, headers: ctx.response.headers });
                     }
                     else {
+                        // Fallback: If no route matched, check if it's a WebSocket upgrade request that can be handled by default handlers
+                        // This supports Shokupan's Native WebSocket Events if no specific middleware/route handled it
+                        if (ctx.upgrade()) {
+                            return undefined as unknown as Response;
+                        }
+
                         // No route matched - return 404 Not Found
                         // Exception: If middleware manually changed the status from default 200,
                         // respect that (e.g., auth middleware set 401)
@@ -593,6 +615,10 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
                 // Request End Hook - Processing finished, response ready
                 await this.runHooks('onRequestEnd', ctx);
+
+                if (response instanceof Promise) {
+                    response = await response;
+                }
 
                 // Response Start Hook - About to send response
                 await this.runHooks('onResponseStart', ctx, response);

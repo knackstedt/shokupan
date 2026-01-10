@@ -233,6 +233,13 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     }
 
     /**
+     * Returns all registered event handlers.
+     */
+    public getEventHandlers(): Map<string, ShokupanHandler<T>[]> {
+        return this.eventHandlers;
+    }
+
+    /**
      * Mounts a controller instance to a path prefix.
      * 
      * Controller can be a convection router or an arbitrary class.
@@ -721,6 +728,9 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                     const tracedOriginalHandler = ctx.app?.applicationConfig.enableTracing
                         ? traceHandler(originalHandler, normalizedPath)
                         : originalHandler;
+
+
+
                     return tracedOriginalHandler.apply(instance, args);
                 };
 
@@ -785,6 +795,15 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                     }
                     return originalHandler.apply(instance, args);
                 };
+
+                // Attach metadata to the handler for AsyncAPI generator
+                const decoratedSpecs = (instance as any)[$routeSpec] || (proto && (proto as any)[$routeSpec]);
+                const userSpec = decoratedSpecs && decoratedSpecs.get(name);
+
+                const spec = { tags: [{ name: instance.constructor.name }], ...userSpec };
+                (wrappedHandler as any).spec = spec;
+
+                (wrappedHandler as any).originalHandler = originalHandler;
                 this.event(config.eventName, wrappedHandler);
             }
         }
@@ -919,7 +938,16 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         }
 
         // Wrap handler with current guards if any exist
-        let wrappedHandler = handler;
+        let wrappedHandler = async (ctx: ShokupanContext<T>) => {
+            // Check for WebSocket upgrade before executing handler logic
+            // This allows the router to handle the request (running middleware/guards)
+            // but upgrading to WebSocket instead of running the HTTP handler.
+            if (ctx.upgrade()) {
+                return undefined;
+            }
+            return handler(ctx);
+        };
+        (wrappedHandler as any).originalHandler = (handler as any).originalHandler || handler;
         const routeGuards = [...this.currentGuards];
 
         // Wrap for Timeout
@@ -1415,7 +1443,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         this.hooksInitialized = true;
     }
 
-    public async runHooks(name: keyof ShokupanHooks, ...args: any[]) {
+    public runHooks(name: keyof ShokupanHooks, ...args: any[]): void | Promise<void[]> {
         // Optimization: Use hasHook check before calling this usually
         // But we ensure initialized here too just in case
         if (!this.hooksInitialized) {
@@ -1430,7 +1458,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
         if (debug) {
             // Track each hook individually with debug timing
-            await Promise.all(fns.map(async (fn, index) => {
+            return Promise.all(fns.map(async (fn, index) => {
                 const hookId = `hook_${name}_${fn.name || index}`;
                 const previousNode = debug.getCurrentNode();
 
@@ -1452,7 +1480,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             }));
         } else {
             // Fast path: no debug tracking
-            await Promise.all(fns.map(fn => fn(...args)));
+            return Promise.all(fns.map(fn => fn(...args)));
         }
     }
 }

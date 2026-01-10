@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shokupan AsyncAPI Playground</title>
+    <style>
+        :root {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #252525;
+            --text-primary: #e0e0e0;
+            --accent: #ff6b6b;
+            --border: #333;
+        }
+        body { margin: 0; font-family: 'Inter', system-ui, sans-serif; background: var(--bg-primary); color: var(--text-primary); display: flex; height: 100vh; overflow: hidden; }
+        .container { display: grid; grid-template-columns: 300px 1fr 300px; width: 100%; height: 100%; }
+        .sidebar { background: var(--bg-secondary); border-right: 1px solid var(--border); padding: 1rem; overflow-y: auto; }
+        .main { display: flex; flex-direction: column; padding: 1rem; overflow-y: auto; position: relative; }
+        .logs { background: #000; border-top: 1px solid var(--border); height: 200px; padding: 0.5rem; overflow-y: auto; font-family: monospace; font-size: 12px; }
+        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+        h1 { font-size: 1.2rem; margin: 0; }
+        h3 { margin: 0; font-size: 1rem; }
+        input, select, textarea, button { background: #333; border: 1px solid #444; color: white; padding: 0.5rem; border-radius: 4px; margin-bottom: 0.5rem; width: 100%; box-sizing: border-box; }
+        button { background: var(--accent); border: none; cursor: pointer; font-weight: bold; width: auto; margin-bottom: 0; }
+        button:hover { opacity: 0.9; }
+        button.secondary { background: #444; }
+        .message-card { background: #333; padding: 0.5rem;border-radius: 4px; margin-bottom: 0.5rem; cursor: pointer; }
+        .message-card:hover { background: #444; }
+        .log-entry { margin-bottom: 4px; border-bottom: 1px solid #222; padding-bottom: 2px; }
+        .log-entry.out { color: #81c784; }
+        .log-entry.in { color: #64b5f6; }
+        .log-entry.success { color: #4caf50; }
+        .status { padding: 4px 8px; border-radius: 12px; font-size: 12px; background: #444; }
+        .status.connected { background: #4caf50; }
+        .status.reconnecting { background: #ff9800; color: #000; }
+        .split-view { display: flex; flex-direction: column; height: 100%; }
+        #editor-container { height: 200px; border: 1px solid #444; margin-bottom: 0.5rem; }
+        .compose-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+
+        /* Tree View Styles (similar to registry) */
+        .tree-node {
+            margin-left: 1rem;
+            border-left: 1px solid #444;
+            padding-left: 0.5rem;
+        }
+        .tree-item {
+            margin: 0.25rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+        }
+        .tree-item:hover {
+            background: #333;
+        }
+        .tree-label {
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+        .tree-label.group {
+            color: #aaa;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+        .badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7em;
+            font-weight: bold;
+            background: #334155;
+            color: #f8fafc;
+        }
+        .badge-EVENT {
+            background: #0f172a;
+            color: #3b82f6;
+            border: 1px solid #3b82f6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h3>Events</h3>
+            <div id="event-list"></div>
+        </div>
+        <div class="main">
+            <div class="header">
+                <h1>Playground</h1>
+                <span id="connection-status" class="status">Disconnected</span>
+            </div>
+            
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                <select id="protocol" style="width: 120px;">
+                    <option value="ws">Native WS</option>
+                    <option value="socket.io">Socket.IO</option>
+                </select>
+                <input type="text" id="url" value="ws://<%~ it.serverUrl %>" />
+                <button id="connect-btn" style="width: 100px;">Connect</button>
+            </div>
+
+            <div class="split-view">
+                <div style="flex: 1;">
+                    <div class="compose-header">
+                        <h3>Compose Message</h3>
+                        <button id="send-btn">Send</button>
+                    </div>
+                    <input type="text" id="event-name" placeholder="Event Name" style="margin-bottom: 0.5rem;" />
+                    <div id="editor-container"></div>
+                </div>
+                <h3>Logs</h3>
+                <div class="logs" id="logs"></div>
+            </div>
+        </div>
+        <div class="sidebar" style="border-left: 1px solid var(--border); border-right: none;">
+             <h3>Docs</h3>
+             <div id="doc-panel">Select an event to see details.</div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+    <script>
+        const state = {
+            socket: null,
+            isConnected: false,
+            shouldAutoReconnect: true, // Auto-reconnect enabled by default
+            reconnectTimer: null,
+            protocol: 'ws',
+            spec: null,
+            editor: null
+        };
+
+        const els = {
+            url: document.getElementById('url'),
+            protocol: document.getElementById('protocol'),
+            connectBtn: document.getElementById('connect-btn'),
+            status: document.getElementById('connection-status'),
+            logs: document.getElementById('logs'),
+            eventName: document.getElementById('event-name'),
+            sendBtn: document.getElementById('send-btn'),
+            eventList: document.getElementById('event-list'),
+            docPanel: document.getElementById('doc-panel')
+        };
+
+        // Initialize Monaco Editor
+        require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' }});
+        require(['vs/editor/editor.main'], function() {
+            state.editor = monaco.editor.create(document.getElementById('editor-container'), {
+                value: '{\n    "key": "value"\n}',
+                language: 'json',
+                theme: 'vs-dark',
+                minimap: { enabled: false }, // Minimap disabled
+                automaticLayout: true,
+                fontSize: 12
+            });
+            
+            // Try auto-connect on load after editor is ready (or parallel)
+            connect(); 
+        });
+
+        async function loadSpec() {
+            try {
+                const res = await fetch('<%~ it.specPath %>');
+                state.spec = await res.json();
+                renderEventList();
+            } catch(e) {
+                log('System', 'Failed to load spec: ' + e.message);
+            }
+        }
+
+        function renderEventList() {
+            if (!state.spec || !state.spec.channels) return;
+            els.eventList.innerHTML = '';
+            
+            // Build Tree
+            const root = {};
+            
+            Object.keys(state.spec.channels).forEach(channelName => {
+                const channel = state.spec.channels[channelName];
+                // Focus on publish (Client -> Server) for sending
+                if (channel.publish) {
+                    // Group by first Tag if available
+                    const tags = channel.publish.tags || [];
+                    const tagName = tags[0]?.name || 'Global';
+
+                    const parts = [tagName, ...channelName.split(/[\.\/]/)]; // First level is Tag
+                    let current = root;
+                    parts.forEach((part, index) => {
+                        if (!current[part]) {
+                            current[part] = { _children: {} };
+                        }
+                        // If leaf
+                        if (index === parts.length - 1) {
+                            current[part]._isEvent = true;
+                            current[part]._name = channelName;
+                            current[part]._op = channel.publish;
+                        }
+                        current = current[part]._children;
+                    });
+                }
+            });
+
+            // Recursive Render
+            function renderNode(node, container) {
+                Object.keys(node).sort().forEach(key => {
+                    if (key === '_children') return; // skip internal
+                    const item = node[key];
+                    const isEvent = item._isEvent;
+                    
+                    const div = document.createElement('div');
+                    
+                    if (isEvent) {
+                         // Render Event Item
+                         div.className = 'tree-item';
+                         div.innerHTML = `<span class="badge badge-EVENT">EVENT</span> <span class="tree-label">${key}</span>`;
+                         div.onclick = () => selectEvent(item._name, item._op);
+                         container.appendChild(div);
+                    } else {
+                        // Render Group Header
+                        const header = document.createElement('div');
+                        header.className = 'tree-item';
+                        header.innerHTML = `<span class="tree-label group">${key}</span>`;
+                        container.appendChild(header);
+                    }
+
+                    // Render Children if any (even if it's also a leaf, though that's rare in topic structures usually)
+                    if (item._children && Object.keys(item._children).length > 0) {
+                        const childContainer = document.createElement('div');
+                        childContainer.className = 'tree-node';
+                        renderNode(item._children, childContainer);
+                        container.appendChild(childContainer);
+                    }
+                });
+            }
+
+            renderNode(root, els.eventList);
+        }
+
+        function selectEvent(name, op) {
+            els.eventName.value = name;
+            els.docPanel.innerHTML = '<h4>' + name + '</h4>' + 
+                (op.summary ? '<p>' + op.summary + '</p>' : '') + 
+                '<pre>' + JSON.stringify(op.message?.payload || {}, null, 2) + '</pre>';
+            
+            // Try to scaffold body
+            let bodyText = "{}";
+            if (op.message?.payload?.properties) {
+                const scaffold = {};
+                Object.keys(op.message.payload.properties).forEach(k => scaffold[k] = "value");
+                bodyText = JSON.stringify(scaffold, null, 2);
+            }
+            if (state.editor) state.editor.setValue(bodyText);
+        }
+
+        function log(source, msg, type = 'info') {
+            const div = document.createElement('div');
+            div.className = 'log-entry ' + type;
+            div.innerText = '[' + new Date().toLocaleTimeString() + '] ' + source + ': ' + msg;
+            els.logs.prepend(div);
+        }
+
+        els.connectBtn.onclick = () => {
+            if (state.isConnected) {
+                state.shouldAutoReconnect = false; // User initiated disconnect
+                disconnect();
+            } else {
+                state.shouldAutoReconnect = true; // User initiated connect
+                connect();
+            }
+        };
+
+        function scheduleReconnect() {
+            if (!state.shouldAutoReconnect) return;
+            if (state.reconnectTimer) return; // Already scheduled
+
+            state.isConnected = false;
+            els.status.innerText = 'Reconnecting in 5s...';
+            els.status.className = 'status reconnecting';
+            
+            // Update button state while waiting
+            els.connectBtn.innerText = 'Connect'; 
+            els.connectBtn.className = '';
+
+            state.reconnectTimer = setTimeout(() => {
+                state.reconnectTimer = null;
+                connect();
+            }, 5000);
+        }
+
+        function connect() {
+            const url = els.url.value;
+            const proto = els.protocol.value;
+            state.protocol = proto;
+
+            // Clear any pending reconnect
+            if (state.reconnectTimer) {
+                clearTimeout(state.reconnectTimer);
+                state.reconnectTimer = null;
+            }
+
+            log('System', 'Connecting to ' + url + ' via ' + proto + '...');
+
+            if (proto === 'ws') {
+                try {
+                    state.socket = new WebSocket(url);
+                    state.socket.onopen = () => {
+                        state.isConnected = true;
+                        updateStatus();
+                        log('System', 'Connected to ' + url, 'success');
+                        // Reload spec on reconnection (in case of server restart)
+                        loadSpec();
+                    };
+                    state.socket.onclose = () => {
+                         // Only log disconnected if we were connected or if this wasn't a retry loop silence
+                         if (state.isConnected) log('System', 'Disconnected');
+                         state.isConnected = false;
+                         updateStatus();
+                         scheduleReconnect();
+                    };
+                    state.socket.onmessage = (e) => {
+                         log('Server', e.data, 'in');
+                    };
+                    state.socket.onerror = (e) => {
+                        // console.error('WebSocket Error:', e);
+                        // On error, onclose is usually called too
+                    };
+                } catch(e) {
+                    log('System', 'Connection failed: ' + e.message);
+                    scheduleReconnect();
+                }
+            } else if (proto === 'socketio') {
+                try {
+                    state.socket = io(url, { transports: ['websocket'] });
+                    state.socket.on('connect', () => {
+                        state.isConnected = true;
+                        updateStatus();
+                        log('System', 'Connected (ID: ' + state.socket.id + ')');
+                    });
+                    state.socket.on('disconnect', () => {
+                        if (state.isConnected) log('System', 'Disconnected');
+                        state.isConnected = false;
+                        updateStatus();
+                        // Socket.IO has built-in reconnection, but we can respect our manual flag if needed
+                        if (!state.shouldAutoReconnect) {
+                            state.socket.disconnect();
+                        }
+                    });
+                     // Socket.IO auto-reconnection is enabled by default in client, so we might not need scheduleReconnect here
+                     // unless we want to control it manually. For this task, we'll rely on the manual logic for WS
+                     // and let Socket.IO do its thing, but sync UI status.
+                    state.socket.onAny((event, ...args) => {
+                         log('Server', event + ': ' + JSON.stringify(args), 'in');
+                    });
+                } catch(e) {
+                    log('System', 'Connection failed: ' + e.message);
+                }
+            }
+        }
+
+        function disconnect() {
+            state.shouldAutoReconnect = false;
+            if (state.reconnectTimer) {
+                clearTimeout(state.reconnectTimer);
+                state.reconnectTimer = null;
+            }
+            if (state.socket) {
+                if (state.protocol === 'ws') state.socket.close();
+                else state.socket.disconnect();
+            }
+        }
+
+        function updateStatus() {
+            if (state.isConnected) {
+                els.status.innerText = 'Connected';
+                els.status.className = 'status connected';
+                els.connectBtn.innerText = 'Disconnect';
+                els.connectBtn.className = 'secondary';
+            } else {
+                els.status.innerText = 'Disconnected';
+                els.status.className = 'status';
+                els.connectBtn.innerText = 'Connect';
+                els.connectBtn.className = '';
+            }
+        }
+
+        els.sendBtn.onclick = () => {
+             if (!state.isConnected) {
+                 log('System', 'Not connected', 'error');
+                 return;
+             }
+             const event = els.eventName.value;
+             let bodyStr = "{}";
+             if (state.editor) {
+                 bodyStr = state.editor.getValue();
+             }
+             
+             let body;
+             try {
+                 body = JSON.parse(bodyStr);
+             } catch(e) {
+                 log('System', 'Invalid JSON body', 'error');
+                 return;
+             }
+
+             if (state.protocol === 'ws') {
+                 const payload = JSON.stringify({
+                     type: 'EVENT',
+                     event: event,
+                     data: body
+                 });
+                 state.socket.send(payload);
+                 log('Client', payload, 'out');
+             } else {
+                 state.socket.emit(event, body);
+                 log('Client', event + ': ' + bodyStr, 'out');
+             }
+        };
+
+        loadSpec();
+    </script>
+</body>
+</html>
