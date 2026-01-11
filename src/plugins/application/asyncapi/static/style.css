@@ -366,9 +366,8 @@ a {
     padding: 1rem;
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.8rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    display: block;
+    /* flex-direction: column; gap: 0.5rem; -- removed for virtual scroll stability */
     position: relative;
     /* For absolute children */
 }

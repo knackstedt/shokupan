@@ -66,7 +66,8 @@ require(['vs/editor/editor.main'], function () {
     // Virtual scroll listener
     els.logs.addEventListener('scroll', () => {
         const diff = els.logs.scrollHeight - els.logs.scrollTop - els.logs.clientHeight;
-        state.logAutoScroll = diff < 20;
+        // User requested 10px threshold for sticky behavior
+        state.logAutoScroll = diff <= 10;
         renderLogs();
     });
 
@@ -460,10 +461,8 @@ function renderLogs() {
         // We set scrollTop to MAX.
         // But we only want to do this if we were already at bottom OR just added.
         // The event listener handles state.logAutoScroll flag.
-        // If flag is true, force scroll.
-        if (container.scrollTop + clientHeight < els.logShim.offsetHeight) {
-            container.scrollTop = els.logShim.offsetHeight - clientHeight;
-        }
+        // Always force scroll to true bottom if auto-scroll is on
+        container.scrollTop = container.scrollHeight;
     }
 }
 
@@ -474,7 +473,7 @@ function log(source, msg, type = 'info') {
     // If we are already near bottom, keep auto-scroll true
     const container = els.logs;
     const diff = container.scrollHeight - container.scrollTop - container.clientHeight;
-    if (diff < 50) state.logAutoScroll = true;
+    if (diff <= 10) state.logAutoScroll = true;
 
     renderLogs();
 }
