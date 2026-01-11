@@ -161,8 +161,7 @@ export function RateLimitMiddleware(options: RateLimitOptions = {}): Middleware 
 
             // Dispatch 429
             const msg = typeof message === 'function' ? message(ctx, key) : message;
-            const body = typeof msg === 'object' ? JSON.stringify(msg) : String(msg);
-            const res = typeof msg === 'object' ? ctx.json(msg, statusCode) : ctx.text(String(msg), statusCode);
+            const res = await (typeof msg === 'object' ? ctx.json(msg, statusCode) : ctx.text(String(msg), statusCode));
 
             if (headers) {
                 setHeaders(res);

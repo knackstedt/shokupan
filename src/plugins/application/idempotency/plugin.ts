@@ -79,9 +79,9 @@ export function Idempotency(options: IdempotencyOptions = {}): Middleware {
             response = ctx[$finalResponse];
         } else if (result !== null && result !== undefined) {
             if (typeof result === 'object') {
-                response = ctx.json(result);
+                response = await ctx.json(result);
             } else {
-                response = ctx.text(String(result));
+                response = await ctx.text(String(result));
             }
         }
 
