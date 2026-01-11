@@ -1,11 +1,14 @@
 import type { ApiReferenceConfiguration } from '@scalar/api-reference';
 import type { OpenAPI } from '@scalar/openapi-types';
 import { Eta } from 'eta';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { ShokupanRouter } from '../../router';
 import type { Shokupan } from '../../shokupan';
 import { deepMerge } from '../../util/deep-merge';
 import type { DeepPartial, ShokupanPlugin, ShokupanPluginOptions } from '../../util/types';
 import { OpenAPIAnalyzer } from './openapi/analyzer';
+
 
 const eta = new Eta();
 
@@ -80,8 +83,6 @@ export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin 
                                     window.location.reload();
                                 }
                                 else if (isDown) {
-                                    // Recovered with same ID? Unlikely if ID is strict timestamp
-                                    // But if we thought it was down but it wasn't, just reset
                                     isDown = false;
                                 }
                             } catch (e) {
@@ -93,12 +94,43 @@ export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin 
                 </script>
             ` : '';
 
+            // Attempt to read theme.css from src or dist
+            let themeCss = '';
+            try {
+                // Try src location
+                try {
+                    themeCss = readFileSync(join(process.cwd(), 'src/theme.css'), 'utf-8');
+                } catch {
+                    // Try adjacent to main/dist? For now, we rely on src
+                }
+            } catch (e) { }
+
             return ctx.html(eta.renderString(`<!doctype html>
-                <html>
+                <html lang="en">
                 <head>
                     <title>API Reference</title>
                     <meta charset = "utf-8" />
                     <meta name="viewport" content = "width=device-width, initial-scale=1" />
+                    <style>
+                        ${themeCss}
+                        
+                        :root {
+                            --scalar-color-1: var(--primary);
+                            --scalar-color-2: var(--secondary);
+                            --scalar-color-3: var(--accent);
+                            --scalar-color-accent: var(--accent);
+                            
+                            --scalar-background-1: var(--bg-primary);
+                            --scalar-background-2: var(--bg-secondary);
+                            --scalar-background-3: var(--bg-card);
+                            
+                            --scalar-text-1: var(--text-primary);
+                            --scalar-text-2: var(--text-secondary);
+                            --scalar-text-3: var(--text-muted);
+                            
+                            --scalar-border-color: var(--border-color);
+                        }
+                    </style>
                 </head>
 
                 <body>

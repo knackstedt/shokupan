@@ -1,9 +1,83 @@
-/* Custom styles for Shokupan documentation */
+:root {
+    /* Raw Palette - Light */
+    --palette-light-primary: #D99058;   /* Toasted Crust */
+    --palette-light-secondary: #F2C078; /* Honey Butter */
+    --palette-light-accent: #F7F3F0;    /* Steam White */
+    --palette-light-text: #3D2B1F;      /* Espresso */
 
-:root {}
+    /* Raw Palette - Dark */
+    --palette-dark-primary: #FFB380;    /* Warm Filament */
+    --palette-dark-secondary: #7B5E7B;  /* Yeast Purple */
+    --palette-dark-accent: #D6D3D1;     /* Flour Dust */
+    --palette-dark-bg: #1A1614;         /* Oven Depth */
+    --palette-dark-card: #2A2421;       /* Proofing Drawer */
 
-/* Dark mode adjustments */
-:root[data-theme='dark'] {}
+    /* Universal defaults (tokens) */
+    --shokupan-font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
 
-/* Code block improvements */
-.expressive-code {}
+/* Light Mode (Default) */
+:root, :root[data-theme="light"] {
+    --bg-primary: var(--palette-light-accent);
+    --bg-secondary: #FFFFFF; /* High contrast card bg against accent */
+    --bg-card: #FFFFFF;
+    
+    --text-primary: var(--palette-light-text);
+    --text-secondary: rgba(61, 43, 31, 0.7); /* Derived from Espresso with opacity */
+    --text-muted: rgba(61, 43, 31, 0.5);
+
+    --primary: var(--palette-light-primary);
+    --secondary: var(--palette-light-secondary);
+    --accent: var(--palette-light-accent);
+    
+    --border-color: rgba(61, 43, 31, 0.1);
+    --card-border: rgba(61, 43, 31, 0.1);
+
+    --link-color: var(--palette-light-primary);
+    --link-hover: var(--palette-light-secondary);
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg-primary: var(--palette-dark-bg);
+        --bg-secondary: var(--palette-dark-card);
+        --bg-card: var(--palette-dark-card);
+        
+        /* Text in Dark mode */
+        --text-primary: #F0F0F0; /* Brighter than accent for contrast */
+        --text-secondary: var(--palette-dark-accent); /* "Secondary text" usage */
+        --text-muted: rgba(214, 211, 209, 0.5);
+
+        --primary: var(--palette-dark-primary);   /* Active links, CTAs */
+        --secondary: var(--palette-dark-secondary); /* Secondary buttons, decorators */
+        --accent: var(--palette-dark-accent);     /* Borders, icons */
+
+        --border-color: var(--palette-dark-accent);
+        --card-border: rgba(214, 211, 209, 0.2);
+
+        --link-color: var(--palette-dark-primary);
+        --link-hover: #FFCBA0; /* Lighter primary */
+    }
+}
+
+/* Explicit Dark Mode Override */
+:root[data-theme="dark"] {
+    --bg-primary: var(--palette-dark-bg);
+    --bg-secondary: var(--palette-dark-card);
+    --bg-card: var(--palette-dark-card);
+    
+    --text-primary: #F0F0F0;
+    --text-secondary: var(--palette-dark-accent);
+    --text-muted: rgba(214, 211, 209, 0.5);
+
+    --primary: var(--palette-dark-primary);
+    --secondary: var(--palette-dark-secondary);
+    --accent: var(--palette-dark-accent);
+
+    --border-color: var(--palette-dark-accent);
+    --card-border: rgba(214, 211, 209, 0.2);
+
+    --link-color: var(--palette-dark-primary);
+    --link-hover: #FFCBA0;
+}
