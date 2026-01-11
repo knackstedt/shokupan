@@ -31,6 +31,7 @@ export interface RouteInfo {
     description?: string;
     tags?: string[];
     operationId?: string;
+    emits?: { event: string; payload?: any; }[];
 }
 
 /**
@@ -257,7 +258,7 @@ export class OpenAPIAnalyzer {
                                 const expr = d.expression;
                                 if (ts.isCallExpression(expr)) {
                                     const identifier = expr.expression.getText(sourceFile);
-                                    return ['get', 'post', 'put', 'delete', 'patch', 'options', 'head'].includes(identifier.toLowerCase());
+                                    return ['get', 'post', 'put', 'delete', 'patch', 'options', 'head', 'event'].includes(identifier.toLowerCase());
                                 }
                                 return false;
                             });
@@ -339,7 +340,7 @@ export class OpenAPIAnalyzer {
                 const expr = d.expression;
                 if (ts.isCallExpression(expr)) {
                     const identifier = expr.expression.getText(sourceFile);
-                    return ['get', 'post', 'put', 'delete', 'patch', 'options', 'head'].includes(identifier.toLowerCase());
+                    return ['get', 'post', 'put', 'delete', 'patch', 'options', 'head', 'event'].includes(identifier.toLowerCase());
                 }
                 return false;
             });
@@ -371,7 +372,8 @@ export class OpenAPIAnalyzer {
                     handlerSource: methodNode.getText(sourceFile),
                     requestTypes: analysis.requestTypes,
                     responseType: analysis.responseType,
-                    responseSchema: analysis.responseSchema
+                    responseSchema: analysis.responseSchema,
+                    emits: analysis.emits
                 });
             }
         }
@@ -400,7 +402,7 @@ export class OpenAPIAnalyzer {
 
                         // Check if this is our application instance
                         if (objName === app.name) {
-                            if (['get', 'post', 'put', 'delete', 'patch', 'options', 'head'].includes(methodName.toLowerCase())) {
+                            if (['get', 'post', 'put', 'delete', 'patch', 'options', 'head', 'on'].includes(methodName.toLowerCase())) {
                                 // Extract route info
                                 const route = this.extractRouteFromCall(node, sourceFile, methodName.toUpperCase());
                                 if (route) {
@@ -484,9 +486,9 @@ export class OpenAPIAnalyzer {
             path: normalizedPath,
             handlerName: handlerArg.getText(sourceFile).substring(0, 50), // Truncate for display
             handlerSource: handlerArg.getText(sourceFile),
-            requestTypes: handlerInfo.requestTypes,
             responseType: handlerInfo.responseType,
             responseSchema: handlerInfo.responseSchema,
+            emits: handlerInfo.emits,
             ...metadata
         };
     }
@@ -498,11 +500,13 @@ export class OpenAPIAnalyzer {
         requestTypes?: RouteInfo['requestTypes'];
         responseType?: string;
         responseSchema?: any;
+        emits?: { event: string; payload?: any; }[];
     } {
         const requestTypes: RouteInfo['requestTypes'] = {};
         let responseType: string | undefined;
         let responseSchema: any | undefined;
         let hasExplicitReturnType = false;
+        const emits: { event: string; payload?: any; }[] = [];
 
         // Simple scope to track variable types (name -> schema)
         const scope = new Map<string, any>();
@@ -594,6 +598,15 @@ export class OpenAPIAnalyzer {
 
             // Visit the handler body to find ctx usage
             const visit = (node: ts.Node) => {
+                // Track variable declarations
+                if (ts.isVariableDeclaration(node)) {
+                    if (node.initializer && ts.isIdentifier(node.name)) {
+                        const varName = node.name.getText(sourceFile);
+                        const schema = this.convertExpressionToSchema(node.initializer, sourceFile, scope);
+                        scope.set(varName, schema);
+                    }
+                }
+
                 // Check for type assertions on ctx.body()
                 if (ts.isAsExpression(node)) {
                     if (this.isCtxBodyCall(node.expression, sourceFile)) {
@@ -644,6 +657,31 @@ export class OpenAPIAnalyzer {
                 // Implicit Return call (e.g. ctx.json(...) as a statement without return)
                 if (ts.isExpressionStatement(node)) {
                     analyzeReturnExpression(node.expression);
+
+                    // Check for ctx.emit()
+                    if (ts.isCallExpression(node.expression)) {
+                        const expr = node.expression;
+                        if (ts.isPropertyAccessExpression(expr.expression)) {
+                            const objText = expr.expression.expression.getText(sourceFile);
+                            const propText = expr.expression.name.getText(sourceFile);
+
+                            if ((objText === 'ctx' || objText.endsWith('.ctx')) && propText === 'emit') {
+                                if (expr.arguments.length >= 1) {
+                                    const eventNameArg = expr.arguments[0];
+                                    if (ts.isStringLiteral(eventNameArg)) {
+                                        const eventName = eventNameArg.text;
+                                        let payload = { type: 'object' };
+
+                                        if (expr.arguments.length >= 2) {
+                                            payload = this.convertExpressionToSchema(expr.arguments[1], sourceFile, scope);
+                                        }
+
+                                        emits.push({ event: eventName, payload });
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 ts.forEachChild(node, visit);
@@ -662,7 +700,7 @@ export class OpenAPIAnalyzer {
             }
         }
 
-        return { requestTypes, responseType, responseSchema };
+        return { requestTypes, responseType, responseSchema, emits };
     }
 
     /**

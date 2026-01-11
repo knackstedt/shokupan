@@ -3,416 +3,676 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shokupan AsyncAPI Playground</title>
+    <title>Shokupan AsyncAPI</title>
+    <!-- Preload Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         <%~ include("theme.css") %>
-        body { margin: 0; font-family: 'Inter', system-ui, sans-serif; background: var(--bg-primary); color: var(--text-primary); display: flex; height: 100vh; overflow: hidden; }
-        .container { display: grid; grid-template-columns: 300px 1fr 300px; width: 100%; height: 100%; }
-        .sidebar { background: var(--bg-secondary); border-right: 1px solid var(--border-color); border-left: 1px solid var(--border-color); padding: 1rem; overflow-y: auto; }
-        .main { display: flex; flex-direction: column; padding: 1rem; overflow-y: auto; position: relative; }
-        .logs { background: #000; border-top: 1px solid var(--border-color); height: 200px; padding: 0.5rem; overflow-y: auto; font-family: monospace; font-size: 12px; }
-        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-        h1 { font-size: 1.2rem; margin: 0; }
-        h3 { margin: 0; font-size: 1rem; }
-        input, select, textarea, button { background: #333; border: 1px solid #444; color: white; padding: 0.5rem; border-radius: 4px; margin-bottom: 0.5rem; width: 100%; box-sizing: border-box; }
-        button { background: var(--button-bg, var(--accent)); color: var(--button-text, white); border: none; cursor: pointer; font-weight: bold; width: auto; margin-bottom: 0; }
-        button:hover { opacity: 0.9; }
-        button.secondary { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); }
-        .message-card { background: #333; padding: 0.5rem;border-radius: 4px; margin-bottom: 0.5rem; cursor: pointer; }
-        .message-card:hover { background: #444; }
-        .log-entry { margin-bottom: 4px; border-bottom: 1px solid #222; padding-bottom: 2px; }
-        .log-entry.out { color: #81c784; }
-        .log-entry.in { color: #64b5f6; }
-        .log-entry.success { color: #4caf50; }
-        .status { padding: 4px 8px; border-radius: 12px; font-size: 12px; background: #444; }
-        .status.connected { background: #4caf50; }
-        .status.reconnecting { background: #ff9800; color: #000; }
-        .split-view { display: flex; flex-direction: column; height: 100%; }
-        #editor-container { height: 200px; border: 1px solid #444; margin-bottom: 0.5rem; }
-        .compose-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
 
-        /* Tree View Styles (similar to registry) */
+        /* Reset & Base */
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: var(--shokupan-font, 'Inter'), sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        select {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        select:focus-visible {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        select option {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        /* Layout */
+        .app-container {
+            display: grid;
+            grid-template-columns: 280px 1fr 400px; /* Nav | Docs | Console */
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* Common Scrollbar */
+        .scroller {
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--secondary) transparent;
+        }
+
+        /* ================== Left Sidebar: Navigation ================== */
+        .sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 1.5rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .sidebar-header h2 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-list {
+            padding: 1rem 0;
+            flex: 1;
+        }
+
+        /* Tree Styles */
         .tree-node {
-            margin-left: 1rem;
-            border-left: 1px solid #444;
-            padding-left: 0.5rem;
+            margin-left: 12px;
+            border-left: 1px solid rgba(255, 255, 255, 0.05);
         }
         .tree-item {
-            margin: 0.25rem 0;
+            padding: 6px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 4px;
+            margin: 1px 8px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .tree-item:hover {
+            background: rgba(255,255,255,0.03);
+            color: var(--text-primary);
+        }
+        .tree-item.active {
+            background: rgba(255,255,255,0.05);
+            color: var(--primary);
+        }
+        .tree-label {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .group-label {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Badges */
+        .badge {
+            font-size: 0.6rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            min-width: 38px;
+            text-align: center;
+        }
+        .badge.send { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .badge.recv { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+
+        /* ================== Center: Documentation ================== */
+        .main-content {
+            background: var(--bg-primary);
+            padding: 2rem 3rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            max-width: 1000px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .doc-header {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1.5rem;
+        }
+        .doc-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin: 0 0 0.5rem 0;
+            color: var(--text-primary);
+        }
+        .doc-meta {
+            display: flex;
+            gap: 1rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            align-items: center;
+        }
+
+        .section-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin: 2rem 0 1rem 0;
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            cursor: pointer;
-            padding: 4px;
-            border-radius: 4px;
         }
-        .tree-item:hover {
-            background: #333;
-        }
-        .tree-label {
-            color: var(--text-primary);
+
+        /* Structured Schema View */
+        .schema-root {
+            font-family: 'JetBrains Mono', monospace;
             font-size: 0.9rem;
+            background: var(--bg-card);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
         }
-        .tree-label.group {
-            color: #aaa;
-            font-weight: bold;
+        .schema-row {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            padding: 8px 16px;
+        }
+        .schema-row:last-child { border-bottom: none; }
+        .schema-prop { 
+            flex: 0 0 200px; 
+            color: var(--text-primary); 
+            font-weight: 500;
+        }
+        .schema-type { 
+            color: var(--accent);
+            margin-right: 8px;
+        }
+        .schema-desc { color: var(--text-muted); flex: 1; }
+        
+        .nested-schema {
+            margin-left: 20px;
+            border-left: 1px solid var(--border-color);
+        }
+
+        .prop-req {
+            color: #ef4444;
+            margin-left: 4px;
+            font-size: 0.8em;
+        }
+
+        /* ================== Right: Console/Playground ================== */
+        .console-panel {
+            background: #111; 
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+        /* ... existing console styles ... */
+        .console-header {
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .connection-bar {
+            background: rgba(0,0,0,0.3);
+            border-radius: 6px;
+            padding: 0.5rem;
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .connection-bar input {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            flex: 1;
+            font-family: 'JetBrains Mono', monospace;
             font-size: 0.8rem;
         }
-        .badge {
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 0.7em;
-            font-weight: bold;
-            background: #334155;
-            color: #f8fafc;
+        .connection-bar select {
+            background: transparent;
+            border: none;
+            color: var(--primary);
+            font-weight: 600;
+            font-size: 0.8rem;
+            cursor: pointer;
         }
-        .badge-EVENT {
-            background: #0f172a;
-            color: #3b82f6;
-            border: 1px solid #3b82f6;
+        
+        .btn {
+            background: var(--button-bg);
+            color: var(--button-text);
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
         }
+        .btn:hover { filter: brightness(1.1); }
+        .btn.secondary {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+        .btn.secondary:hover { border-color: var(--text-primary); color: var(--text-primary); }
+
+        .status-indicator { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #666; transition: background 0.3s; }
+        .dot.connected { background: #10b981; box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
+        .dot.error { background: #ef4444; }
+
+        .logs-container { flex: 1; overflow-y: auto; padding: 1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; display: flex; flex-direction: column; gap: 0.5rem; }
+        .log-entry { display: flex; gap: 0.5rem; line-height: 1.4; padding: 4px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); }
+        .log-time { color: var(--text-muted); min-width: 60px; font-size: 0.7rem; opacity: 0.7; }
+        .log-content { color: var(--text-primary); word-break: break-all; }
+        .log-entry.in .log-content { color: #60a5fa; }
+        .log-entry.out .log-content { color: #34d399; }
+        .log-entry.error .log-content { color: #ef4444; }
+
+        .compose-area { height: 300px; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; background: var(--bg-secondary); }
+        .compose-header { padding: 0.5rem 1rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); }
+        #editor-container { flex: 1; }
+        .send-bar { padding: 0.5rem; background: var(--bg-card); border-top: 1px solid var(--border-color); }
+
+        .empty-state {
+            display: flex; flex-direction: column; align-items: center; justify-content: center; height: 50%; color: var(--text-muted); text-align: center;
+        }
+        .empty-state svg { width: 48px; height: 48px; margin-bottom: 1rem; opacity: 0.5; color: var(--primary); }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="sidebar">
-            <h3>Events</h3>
-            <div id="event-list"></div>
-        </div>
-        <div class="main">
-            <div class="header">
-                <h1>Playground</h1>
-                <span id="connection-status" class="status">Disconnected</span>
+    <div class="app-container">
+        <!-- LEFT: Navigation -->
+        <div class="sidebar scroller">
+            <div class="sidebar-header">
+                <h2>AsyncAPI</h2>
             </div>
-            
-            <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-                <select id="protocol" style="width: 120px;">
-                    <option value="ws">Native WS</option>
-                    <option value="socket.io">Socket.IO</option>
-                </select>
-                <input type="text" id="url" value="ws://<%~ it.serverUrl %>" />
-                <button id="connect-btn" style="width: 100px;">Connect</button>
+            <div class="nav-list" id="nav-list"></div>
+        </div>
+
+        <!-- CENTER: Documentation -->
+        <main class="main-content scroller" id="doc-panel">
+            <div class="empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                </svg>
+                <h3>Select an event to view details</h3>
+            </div>
+        </main>
+
+        <!-- RIGHT: Console -->
+        <div class="console-panel">
+            <div class="console-header">
+                <div class="connection-bar">
+                    <select id="protocol">
+                        <option value="ws">WS</option>
+                        <option value="wss">WSS</option>
+                        <option value="socket.io">Socket.IO</option>
+                    </select>
+                    <div style="width: 1px; background: rgba(255,255,255,0.1); margin: 2px 0;"></div>
+                    <input type="text" id="url" value="<%~ it.serverUrl %>">
+                </div>
+                <button id="connect-btn" class="btn">Connect</button>
+                <div class="status-indicator">
+                    <div id="status-dot" class="dot"></div>
+                    <span id="connection-status">Disconnected</span>
+                </div>
             </div>
 
-            <div class="split-view">
-                <div style="flex: 1;">
-                    <div class="compose-header">
-                        <h3>Compose Message</h3>
-                        <button id="send-btn">Send</button>
-                    </div>
-                    <input type="text" id="event-name" placeholder="Event Name" style="margin-bottom: 0.5rem;" />
-                    <div id="editor-container"></div>
+            <div class="logs-container scroller" id="logs"></div>
+
+            <div class="compose-area">
+                <div class="compose-header">
+                    <span>Payload</span>
+                    <span id="target-event" style="color: var(--primary);">--</span>
                 </div>
-                <h3>Logs</h3>
-                <div class="logs" id="logs"></div>
+                <div id="editor-container"></div>
+                <div class="send-bar">
+                    <button id="send-btn" class="btn">Send Message</button>
+                </div>
             </div>
-        </div>
-        <div class="sidebar">
-             <h3>Docs</h3>
-             <div id="doc-panel">Select an event to see details.</div>
         </div>
     </div>
 
+    <!-- Scripts -->
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
     <script>
         const state = {
             socket: null,
             isConnected: false,
-            shouldAutoReconnect: true, // Auto-reconnect enabled by default
+            shouldAutoReconnect: true,
             reconnectTimer: null,
             protocol: 'ws',
             spec: null,
-            editor: null
+            editor: null,
+            selectedEvent: null
         };
 
         const els = {
             url: document.getElementById('url'),
             protocol: document.getElementById('protocol'),
             connectBtn: document.getElementById('connect-btn'),
-            status: document.getElementById('connection-status'),
+            statusText: document.getElementById('connection-status'),
+            statusDot: document.getElementById('status-dot'),
             logs: document.getElementById('logs'),
-            eventName: document.getElementById('event-name'),
             sendBtn: document.getElementById('send-btn'),
-            eventList: document.getElementById('event-list'),
-            docPanel: document.getElementById('doc-panel')
+            navList: document.getElementById('nav-list'),
+            docPanel: document.getElementById('doc-panel'),
+            targetEventLabel: document.getElementById('target-event')
         };
 
-        // Initialize Monaco Editor
+        // Initialize Monaco
         require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' }});
         require(['vs/editor/editor.main'], function() {
             state.editor = monaco.editor.create(document.getElementById('editor-container'), {
                 value: '{\n    "key": "value"\n}',
                 language: 'json',
                 theme: 'vs-dark',
-                minimap: { enabled: false }, // Minimap disabled
+                minimap: { enabled: false },
+                lineNumbers: 'off',
+                folding: false,
+                padding: { top: 10, bottom: 10 },
+                fontSize: 12,
+                scrollBeyondLastLine: false,
                 automaticLayout: true,
-                fontSize: 12
+                backgroundColor: 'transparent'
             });
-            
-            // Try auto-connect on load after editor is ready (or parallel)
-            connect(); 
+            connect();
         });
 
         async function loadSpec() {
             try {
                 const res = await fetch('<%~ it.specPath %>');
                 state.spec = await res.json();
-                renderEventList();
+                renderNav();
             } catch(e) {
-                log('System', 'Failed to load spec: ' + e.message);
+                log('System', 'Failed to load spec: ' + e.message, 'error');
             }
         }
 
-        function renderEventList() {
+        /* ================= Navigation Tree Rendering ================= */
+        function renderNav() {
             if (!state.spec || !state.spec.channels) return;
-            els.eventList.innerHTML = '';
+            els.navList.innerHTML = '';
             
-            // Build Tree
-            const root = {};
+            const root = { children: {} };
             
-            Object.keys(state.spec.channels).forEach(channelName => {
-                const channel = state.spec.channels[channelName];
-                // Focus on publish (Client -> Server) for sending
-                if (channel.publish) {
-                    // Group by first Tag if available
-                    const tags = channel.publish.tags || [];
-                    const tagName = tags[0]?.name || 'Global';
-
-                    const parts = [tagName, ...channelName.split(/[\.\/]/)]; // First level is Tag
-                    let current = root;
-                    parts.forEach((part, index) => {
-                        if (!current[part]) {
-                            current[part] = { _children: {} };
-                        }
-                        // If leaf
-                        if (index === parts.length - 1) {
-                            current[part]._isEvent = true;
-                            current[part]._name = channelName;
-                            current[part]._op = channel.publish;
-                        }
-                        current = current[part]._children;
-                    });
-                }
+            // Build Tree: Group by Tag -> split by . or /
+            Object.keys(state.spec.channels).forEach(name => {
+                const ch = state.spec.channels[name];
+                const op = ch.publish || ch.subscribe;
+                const type = ch.publish ? 'publish' : 'subscribe';
+                
+                // Get Tag (Controller Name)
+                const tag = (op.tags && op.tags.length > 0) ? op.tags[0].name : 'General';
+                
+                // Ensure Tag Group Exists
+                if (!root.children[tag]) root.children[tag] = { children: {} };
+                
+                const parts = name.split(/[\.\/]/);
+                let current = root.children[tag];
+                
+                parts.forEach((part, i) => {
+                    if (!current.children[part]) current.children[part] = { children: {} };
+                    current = current.children[part];
+                    
+                    if (i === parts.length - 1) {
+                        current.isLeaf = true;
+                        current.data = { name, op, type };
+                    }
+                });
             });
 
             // Recursive Render
-            function renderNode(node, container) {
-                Object.keys(node).sort().forEach(key => {
-                    if (key === '_children') return; // skip internal
-                    const item = node[key];
-                    const isEvent = item._isEvent;
+            function createNode(node, container, level = 0) {
+                Object.keys(node.children).sort().forEach(key => {
+                    const item = node.children[key];
+                    const hasChildren = Object.keys(item.children).length > 0;
                     
-                    const div = document.createElement('div');
-                    
-                    if (isEvent) {
-                         // Render Event Item
-                         div.className = 'tree-item';
-                         div.innerHTML = `<span class="badge badge-EVENT">EVENT</span> <span class="tree-label">${key}</span>`;
-                         div.onclick = () => selectEvent(item._name, item._op);
-                         container.appendChild(div);
+                    if (item.isLeaf && !hasChildren) {
+                        // Leaf Event
+                        const el = document.createElement('div');
+                        el.className = 'tree-item';
+                        const badgeType = item.data.type === 'publish' ? 'send' : 'recv';
+                        const badgeText = item.data.type === 'publish' ? 'SEND' : 'RECV';
+                        
+                        el.innerHTML = `<span class="badge ${badgeType}">${badgeText}</span> <span class="tree-label">${key}</span>`;
+                        el.onclick = () => selectEvent(item.data, el);
+                        container.appendChild(el);
                     } else {
-                        // Render Group Header
-                        const header = document.createElement('div');
-                        header.className = 'tree-item';
-                        header.innerHTML = `<span class="tree-label group">${key}</span>`;
-                        container.appendChild(header);
-                    }
-
-                    // Render Children if any (even if it's also a leaf, though that's rare in topic structures usually)
-                    if (item._children && Object.keys(item._children).length > 0) {
-                        const childContainer = document.createElement('div');
-                        childContainer.className = 'tree-node';
-                        renderNode(item._children, childContainer);
-                        container.appendChild(childContainer);
+                        // Folder
+                        const el = document.createElement('div');
+                        if (level === 0) {
+                            el.className = 'group-label';
+                            el.innerText = key;
+                            container.appendChild(el);
+                            
+                            // Render children directly under group label if root
+                            const childContainer = document.createElement('div');
+                            childContainer.className = 'tree-node';
+                            // Reset margin for root groups to keep neat
+                            childContainer.style.marginLeft = '0'; 
+                            createNode(item, childContainer, level + 1);
+                            container.appendChild(childContainer);
+                        } else {
+                            // Sub-folder
+                            const folderLabel = document.createElement('div');
+                            folderLabel.className = 'tree-item';
+                            folderLabel.style.color = 'var(--text-muted)';
+                            folderLabel.innerHTML = `<span class="tree-label">${key}</span>`;
+                            container.appendChild(folderLabel);
+                            
+                            const childContainer = document.createElement('div');
+                            childContainer.className = 'tree-node';
+                            createNode(item, childContainer, level + 1);
+                            container.appendChild(childContainer);
+                        }
                     }
                 });
             }
-
-            renderNode(root, els.eventList);
-        }
-
-        function selectEvent(name, op) {
-            els.eventName.value = name;
-            els.docPanel.innerHTML = '<h4>' + name + '</h4>' + 
-                (op.summary ? '<p>' + op.summary + '</p>' : '') + 
-                '<pre>' + JSON.stringify(op.message?.payload || {}, null, 2) + '</pre>';
             
-            // Try to scaffold body
-            let bodyText = "{}";
-            if (op.message?.payload?.properties) {
-                const scaffold = {};
-                Object.keys(op.message.payload.properties).forEach(k => scaffold[k] = "value");
-                bodyText = JSON.stringify(scaffold, null, 2);
-            }
-            if (state.editor) state.editor.setValue(bodyText);
+            createNode(root, els.navList);
         }
 
+        /* ================= Schema & Doc Rendering ================= */
+        function selectEvent(item, el) {
+            document.querySelectorAll('.tree-item').forEach(n => n.classList.remove('active'));
+            if (el) el.classList.add('active');
+
+            state.selectedEvent = item;
+            els.targetEventLabel.innerText = item.name;
+
+            const op = item.op;
+            const desc = op.description || op.summary || 'No description provided.';
+            const payload = op.message?.payload || {};
+
+            els.docPanel.innerHTML = `
+                <div class="doc-header">
+                    <h1 class="doc-title">${item.name}</h1>
+                    <div class="doc-meta">
+                        <span class="badge ${item.type === 'publish' ? 'send' : 'recv'}" style="font-size: 0.8rem; padding: 4px 8px;">${item.type === 'publish' ? 'SEND' : 'RECV'}</span>
+                        <span>${op.operationId || ''}</span>
+                    </div>
+                </div>
+                <div class="doc-body">
+                    <p style="line-height: 1.6; margin-bottom: 2rem;">${desc}</p>
+                    <div class="section-title">Payload Schema</div>
+                    ${renderSchemaToDOM(payload)}
+                </div>
+            `;
+
+            // Scaffold Editor
+            if (item.type === 'publish') {
+                let scaffold = "{}";
+                if (payload.properties) {
+                    const obj = {};
+                    Object.keys(payload.properties).forEach(k => {
+                        obj[k] = payload.properties[k].example || (payload.properties[k].type === 'number' ? 0 : "");
+                    });
+                    scaffold = JSON.stringify(obj, null, 2);
+                }
+                if (state.editor) state.editor.setValue(scaffold);
+            }
+        }
+
+        function renderSchemaToDOM(schema) {
+            if (!schema || schema.type !== 'object') {
+                 return `<div class="code-block">${JSON.stringify(schema, null, 2)}</div>`;
+            }
+            
+            let html = '<div class="schema-root">';
+            
+            function renderProps(props, required = []) {
+                let out = '';
+                Object.keys(props).forEach(key => {
+                    const prop = props[key];
+                    const isReq = required.includes(key);
+                    const type = prop.type || 'any';
+                    const desc = prop.description || '';
+                    
+                    out += `
+                    <div class="schema-row">
+                        <div class="schema-prop">
+                            ${key} ${isReq ? '<span class="prop-req">*</span>' : ''}
+                        </div>
+                        <div style="flex: 1;">
+                            <div style="display:flex; align-items:baseline;">
+                                <span class="schema-type">${type}</span>
+                                <span class="schema-desc">${desc}</span>
+                            </div>
+                            ${prop.properties ? `<div class="nested-schema">${renderProps(prop.properties, prop.required)}</div>` : ''}
+                        </div>
+                    </div>`;
+                });
+                return out;
+            }
+
+            if (schema.properties) {
+                html += renderProps(schema.properties, schema.required);
+            }
+            html += '</div>';
+            return html;
+        }
+
+        /* ================= Console & Utils ================= */
         function log(source, msg, type = 'info') {
             const div = document.createElement('div');
             div.className = 'log-entry ' + type;
-            div.innerText = '[' + new Date().toLocaleTimeString() + '] ' + source + ': ' + msg;
+            const time = new Date().toLocaleTimeString('en-US', {hour12: false});
+            div.innerHTML = `<span class="log-time">${time}</span><span class="log-content">${escapeHtml(msg)}</span>`;
             els.logs.prepend(div);
         }
 
-        els.connectBtn.onclick = () => {
+        function escapeHtml(text) {
+            if (typeof text !== 'string') return text;
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        function updateStatus() {
             if (state.isConnected) {
-                state.shouldAutoReconnect = false; // User initiated disconnect
-                disconnect();
+                els.statusText.innerText = 'Connected';
+                els.statusText.style.color = '#10b981';
+                els.statusDot.className = 'dot connected';
+                els.connectBtn.innerText = 'Disconnect';
+                els.connectBtn.className = 'btn secondary';
             } else {
-                state.shouldAutoReconnect = true; // User initiated connect
-                connect();
+                els.statusText.innerText = 'Disconnected';
+                els.statusText.style.color = '#666';
+                els.statusDot.className = 'dot';
+                els.connectBtn.innerText = 'Connect';
+                els.connectBtn.className = 'btn';
             }
-        };
-
-        function scheduleReconnect() {
-            if (!state.shouldAutoReconnect) return;
-            if (state.reconnectTimer) return; // Already scheduled
-
-            state.isConnected = false;
-            els.status.innerText = 'Reconnecting in 5s...';
-            els.status.className = 'status reconnecting';
-            
-            // Update button state while waiting
-            els.connectBtn.innerText = 'Connect'; 
-            els.connectBtn.className = '';
-
-            state.reconnectTimer = setTimeout(() => {
-                state.reconnectTimer = null;
-                connect();
-            }, 5000);
         }
 
         function connect() {
             const url = els.url.value;
-            const proto = els.protocol.value;
-            state.protocol = proto;
+            state.protocol = els.protocol.value;
+            if (state.reconnectTimer) clearTimeout(state.reconnectTimer);
+            
+            const isWs = state.protocol === 'ws' || state.protocol === 'wss';
+            const fullUrl = (isWs ? (url.startsWith('ws') ? url : state.protocol+'://'+url) : (url.startsWith('http') ? url : 'http://'+url));
+            log('System', `Connecting to ${fullUrl}...`);
 
-            // Clear any pending reconnect
-            if (state.reconnectTimer) {
-                clearTimeout(state.reconnectTimer);
-                state.reconnectTimer = null;
-            }
-
-            log('System', 'Connecting to ' + url + ' via ' + proto + '...');
-
-            if (proto === 'ws') {
+            if (isWs) {
                 try {
-                    state.socket = new WebSocket(url);
+                    state.socket = new WebSocket(fullUrl);
                     state.socket.onopen = () => {
                         state.isConnected = true;
                         updateStatus();
-                        log('System', 'Connected to ' + url, 'success');
-                        // Reload spec on reconnection (in case of server restart)
+                        log('System', 'Connected', 'in');
                         loadSpec();
                     };
                     state.socket.onclose = () => {
-                         // Only log disconnected if we were connected or if this wasn't a retry loop silence
-                         if (state.isConnected) log('System', 'Disconnected');
-                         state.isConnected = false;
-                         updateStatus();
-                         scheduleReconnect();
-                    };
-                    state.socket.onmessage = (e) => {
-                         log('Server', e.data, 'in');
-                    };
-                    state.socket.onerror = (e) => {
-                        // console.error('WebSocket Error:', e);
-                        // On error, onclose is usually called too
-                    };
-                } catch(e) {
-                    log('System', 'Connection failed: ' + e.message);
-                    scheduleReconnect();
-                }
-            } else if (proto === 'socketio') {
-                try {
-                    state.socket = io(url, { transports: ['websocket'] });
-                    state.socket.on('connect', () => {
-                        state.isConnected = true;
-                        updateStatus();
-                        log('System', 'Connected (ID: ' + state.socket.id + ')');
-                    });
-                    state.socket.on('disconnect', () => {
                         if (state.isConnected) log('System', 'Disconnected');
                         state.isConnected = false;
                         updateStatus();
-                        // Socket.IO has built-in reconnection, but we can respect our manual flag if needed
-                        if (!state.shouldAutoReconnect) {
-                            state.socket.disconnect();
-                        }
-                    });
-                     // Socket.IO auto-reconnection is enabled by default in client, so we might not need scheduleReconnect here
-                     // unless we want to control it manually. For this task, we'll rely on the manual logic for WS
-                     // and let Socket.IO do its thing, but sync UI status.
-                    state.socket.onAny((event, ...args) => {
-                         log('Server', event + ': ' + JSON.stringify(args), 'in');
-                    });
-                } catch(e) {
-                    log('System', 'Connection failed: ' + e.message);
-                }
+                        if (state.shouldAutoReconnect) scheduleReconnect();
+                    };
+                    state.socket.onerror = () => log('System', 'Connection Error', 'error');
+                    state.socket.onmessage = (e) => log('Server', e.data, 'in');
+                } catch(e) { log('System', e.message, 'error'); }
+            } else {
+                state.socket = io(fullUrl, { transports: ['websocket'] });
+                state.socket.on('connect', () => { state.isConnected = true; updateStatus(); log('System', `Connected (${state.socket.id})`, 'in'); });
+                state.socket.on('disconnect', () => { state.isConnected = false; updateStatus(); log('System', 'Disconnected'); });
+                state.socket.onAny((e, ...args) => log('Server', `${e}: ${JSON.stringify(args)}`, 'in'));
             }
         }
 
         function disconnect() {
             state.shouldAutoReconnect = false;
-            if (state.reconnectTimer) {
-                clearTimeout(state.reconnectTimer);
-                state.reconnectTimer = null;
-            }
             if (state.socket) {
-                if (state.protocol === 'ws') state.socket.close();
-                else state.socket.disconnect();
+                (state.protocol === 'ws' || state.protocol === 'wss') ? state.socket.close() : state.socket.disconnect();
             }
         }
 
-        function updateStatus() {
-            if (state.isConnected) {
-                els.status.innerText = 'Connected';
-                els.status.className = 'status connected';
-                els.connectBtn.innerText = 'Disconnect';
-                els.connectBtn.className = 'secondary';
-            } else {
-                els.status.innerText = 'Disconnected';
-                els.status.className = 'status';
-                els.connectBtn.innerText = 'Connect';
-                els.connectBtn.className = '';
-            }
+        function scheduleReconnect() {
+            if (state.reconnectTimer) return;
+            els.statusText.innerText = 'Reconnecting...';
+            state.reconnectTimer = setTimeout(() => { state.reconnectTimer = null; connect(); }, 3000);
         }
 
-        els.sendBtn.onclick = () => {
-             if (!state.isConnected) {
-                 log('System', 'Not connected', 'error');
-                 return;
-             }
-             const event = els.eventName.value;
-             let bodyStr = "{}";
-             if (state.editor) {
-                 bodyStr = state.editor.getValue();
-             }
-             
-             let body;
-             try {
-                 body = JSON.parse(bodyStr);
-             } catch(e) {
-                 log('System', 'Invalid JSON body', 'error');
-                 return;
-             }
-
-             if (state.protocol === 'ws') {
-                 const payload = JSON.stringify({
-                     type: 'EVENT',
-                     event: event,
-                     data: body
-                 });
-                 state.socket.send(payload);
-                 log('Client', payload, 'out');
-             } else {
-                 state.socket.emit(event, body);
-                 log('Client', event + ': ' + bodyStr, 'out');
-             }
+        els.connectBtn.onclick = () => {
+            if (state.isConnected) disconnect();
+            else { state.shouldAutoReconnect = true; connect(); }
         };
 
-        loadSpec();
+        els.sendBtn.onclick = () => {
+            if (!state.isConnected) return log('System', 'Not connected', 'error');
+            if (!state.selectedEvent) return log('System', 'Select event', 'error');
+            try {
+                const body = JSON.parse(state.editor.getValue());
+                const evt = state.selectedEvent.name;
+                if (state.protocol === 'ws' || state.protocol === 'wss') {
+                    const pay = JSON.stringify({ type: 'EVENT', event: evt, data: body });
+                    state.socket.send(pay);
+                    log('Client', pay, 'out');
+                } else {
+                    state.socket.emit(evt, body);
+                    log('Client', `${evt}: ${JSON.stringify(body)}`, 'out');
+                }
+            } catch(e) { log('System', 'Invalid JSON', 'error'); }
+        };
     </script>
 </body>
 </html>

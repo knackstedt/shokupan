@@ -9,6 +9,8 @@
     --palette-dark-bg: #1A1614;
     /* Oven Depth */
     --palette-dark-card: #2A2421;
+
+    --palette-dark-header: rgb(39, 27, 19);
     /* Proofing Drawer */
 
     /* Universal defaults (tokens) */
@@ -18,6 +20,7 @@
     --bg-primary: var(--palette-dark-bg);
     --bg-secondary: var(--palette-dark-card);
     --bg-card: var(--palette-dark-card);
+    --bg-header: var(--palette-dark-header);
 
     --text-primary: #F0F0F0;
     --text-secondary: var(--palette-dark-accent);
@@ -37,4 +40,25 @@
 
     --button-bg: var(--palette-dark-primary);
     --button-text: #1A1614;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+    background-color: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+    border-radius: 10px;
+    background-color: var(--secondary);
+    box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+}
+
+::-webkit-scrollbar-track {
+    border-radius: 10px;
+    background-color: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-corner {
+    box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
 }

@@ -11,7 +11,6 @@
     <style id="styles"><%~ include("styles.css") %></style>
     <style id="reactflow"><%~ include("reactflow.css") %></style>
     <style id="registry"><%~ include("registry.css") %></style>
-    <style id="scrollbar"><%~ include("scrollbar.css") %></style>
     <style id="tabulator"><%~ include("tabulator.css") %></style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="text/javascript" src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
@@ -20,7 +19,7 @@
     <div class="container">
         <header>
             <div>
-                <h1>Debug Dashboard</h1>
+                <h1>Dashboard</h1>
                 <div style="color: var(--text-secondary)">Uptime: <span id="uptime"><%= it.uptime %></span></div>
             </div>
             <div class="tabs">
@@ -35,6 +34,7 @@
                 <% if (it.integrations.asyncapi) { %>
                 <button class="tab-btn" onclick="switchTab('asyncapi')">AsyncAPI</button>
                 <% } %>
+                <% /* Reset for VSCode extension theming */ %>
             </div>
         </header>
 
@@ -185,9 +185,9 @@
                 <div id="requests-table" class="table-dark"></div>
             </div>
         </div>
-    </div>
+        </div>
 
-    <!-- Registry Tab -->
+        <!-- Registry Tab -->
         <div id="tab-registry" class="tab-content">
             <div id="registry-container" class="card" style="margin-top: 2rem;">
                 <div class="card-title">Component Registry</div>
@@ -236,13 +236,13 @@
         </div>
 
         <% if (it.integrations.scalar) { %>
-        <div id="tab-scalar" class="tab-content" style="padding: 0; overflow: hidden; height: calc(100vh - 80px);">
+        <div id="tab-scalar" class="tab-content" style="margin: 0; overflow: hidden; height: 100%; max-width: unset">
              <iframe src="<%= it.integrations.scalar %>" style="width: 100%; height: 100%; border: none;"></iframe>
         </div>
         <% } %>
 
         <% if (it.integrations.asyncapi) { %>
-        <div id="tab-asyncapi" class="tab-content" style="padding: 0; overflow: hidden; height: calc(100vh - 80px);">
+        <div id="tab-asyncapi" class="tab-content" style="margin: 0; overflow: hidden; height: 100%; max-width: unset">
              <iframe src="<%= it.integrations.asyncapi %>" style="width: 100%; height: 100%; border: none;"></iframe>
         </div>
         <% } %>
