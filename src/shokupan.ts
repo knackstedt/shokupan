@@ -1,6 +1,5 @@
-import "./util/instrumentation";
-
 import { context, trace } from '@opentelemetry/api';
+import { dump } from 'js-yaml';
 import { ShokupanContext } from "./context";
 import { compose } from "./middleware";
 import { generateOpenApi } from "./plugins/application/openapi/openapi";
@@ -10,10 +9,10 @@ import { HTTP_STATUS } from "./util/http-status";
 import { $appRoot, $dispatch, $finalResponse, $isApplication, $routeMatched, $ws } from './util/symbol';
 import type { Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig, ShokupanPlugin } from './util/types';
 
-
 import type { Server, ServerWebSocket } from 'bun';
 import { ShokupanRouter } from './router';
 import { SystemCpuMonitor } from "./util/cpu-monitor";
+import "./util/instrumentation";
 import { ShokupanRequest } from './util/request';
 import { getCallerInfo } from './util/stack';
 
@@ -234,6 +233,67 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
         if (this.applicationConfig.enableOpenApiGen) {
             this.openApiSpec = await generateOpenApi(this);
+
+            // --- Well-Known Files Implementation ---
+
+            // 1. .well-known/openapi.yaml
+            this.get("/.well-known/openapi.yaml", (ctx) => {
+                try {
+                    const yaml = dump(this.openApiSpec);
+                    return ctx.send(yaml, { status: 200, headers: { 'content-type': 'application/yaml' } });
+                } catch (e) {
+                    this.logger.error("Failed to generate OpenAPI YAML", { error: e });
+                    return ctx.text("Internal Server Error", 500);
+                }
+            });
+
+            // 2. .well-known/ai-plugin.json
+            if (this.applicationConfig.aiPlugin?.enabled !== false) {
+                this.get("/.well-known/ai-plugin.json", async (ctx) => {
+                    const config = this.applicationConfig.aiPlugin || {};
+                    let pkg: any = {};
+                    try {
+                        pkg = await Bun.file("package.json").json();
+                    } catch (e) { }
+
+                    const manifest = {
+                        schema_version: "v1",
+                        name_for_human: config.name_for_human || this.openApiSpec.info.title || pkg.name || "Shokupan App",
+                        name_for_model: config.name_for_model || this.openApiSpec.info.title || pkg.name || "Shokupan App",
+                        description_for_human: config.description_for_human || this.openApiSpec.info.description || pkg.description || "Shokupan Application",
+                        description_for_model: config.description_for_model || this.openApiSpec.info.description || pkg.description || "Shokupan Application",
+                        auth: config.auth || { type: "none" },
+                        api: config.api || {
+                            type: "openapi",
+                            url: `${this.applicationConfig.hostname === 'localhost' ? 'http' : 'https'}://${this.applicationConfig.hostname}:${finalPort}/.well-known/openapi.yaml`,
+                            is_user_authenticated: false
+                        },
+                        logo_url: config.logo_url || `${this.applicationConfig.hostname === 'localhost' ? 'http' : 'https'}://${this.applicationConfig.hostname}:${finalPort}/logo.png`, // Placeholder default
+                        contact_email: config.contact_email || pkg.author?.email || "support@example.com",
+                        legal_info_url: config.legal_info_url || `${this.applicationConfig.hostname === 'localhost' ? 'http' : 'https'}://${this.applicationConfig.hostname}:${finalPort}/legal`
+                    };
+
+                    return ctx.json(manifest);
+                });
+            }
+
+            // 3. .well-known/api-catalog
+            if (this.applicationConfig.apiCatalog?.enabled !== false) {
+                this.get("/.well-known/api-catalog", (ctx) => {
+                    const config = this.applicationConfig.apiCatalog || {};
+                    const catalog = {
+                        versions: config.versions || [
+                            {
+                                name: this.openApiSpec.info.version || "v1",
+                                url: `${this.applicationConfig.hostname === 'localhost' ? 'http' : 'https'}://${this.applicationConfig.hostname}:${finalPort}/`,
+                                spec_url: `${this.applicationConfig.hostname === 'localhost' ? 'http' : 'https'}://${this.applicationConfig.hostname}:${finalPort}/.well-known/openapi.yaml`
+                            }
+                        ]
+                    };
+                    return ctx.json(catalog);
+                });
+            }
+
             // Run spec available hooks
             await Promise.all(this.specAvailableHooks.map(hook => hook(this.openApiSpec)));
         }

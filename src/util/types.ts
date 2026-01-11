@@ -448,6 +448,43 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
     validateStatusCodes: boolean;
 
     /**
+     * Configuration for the AI Plugin manifest (.well-known/ai-plugin.json).
+     * If enabled, Shokupan will serve the manifest at the standard location.
+     */
+    aiPlugin?: {
+        enabled?: boolean;
+        name_for_human?: string;
+        name_for_model?: string;
+        description_for_human?: string;
+        description_for_model?: string;
+        auth?: {
+            type: 'none' | 'service_http' | 'user_http' | 'oauth';
+            [key: string]: any;
+        };
+        api?: {
+            type: 'openapi';
+            url?: string;
+            is_user_authenticated?: boolean;
+        };
+        logo_url?: string;
+        contact_email?: string;
+        legal_info_url?: string;
+    };
+
+    /**
+     * Configuration for the API Catalog (.well-known/api-catalog).
+     * If enabled, Shokupan will serve the catalog at the standard location.
+     */
+    apiCatalog?: {
+        enabled?: boolean;
+        versions?: Array<{
+            name: string;
+            url: string;
+            spec_url: string;
+        }>;
+    };
+
+    /**
      * Any other config options are allowed, but will be ignored. 
      * @deprecated
      */
