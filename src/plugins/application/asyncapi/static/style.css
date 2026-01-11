@@ -1,0 +1,424 @@
+/* Reset & Base */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: var(--shokupan-font, 'Inter'), sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+select {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+select:focus-visible {
+    outline: none;
+    border-color: var(--primary);
+}
+
+select option {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+/* Layout */
+.app-container {
+    display: grid;
+    grid-template-columns: 280px 1fr 400px;
+    /* Nav | Docs | Console */
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Common Scrollbar */
+.scroller {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--secondary) transparent;
+}
+
+/* ================== Left Sidebar: Navigation ================== */
+.sidebar {
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-header {
+    padding: 1.5rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-header h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nav-list {
+    padding: 1rem 0;
+    flex: 1;
+}
+
+/* Tree Styles */
+.tree-node {
+    margin-left: 12px;
+    border-left: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tree-item {
+    padding: 6px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 4px;
+    margin: 1px 8px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.tree-item:hover {
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-primary);
+}
+
+.tree-item.active {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--primary);
+}
+
+.tree-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.group-label {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+/* Badges */
+.badge {
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    min-width: 38px;
+    text-align: center;
+}
+
+.badge.send {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.badge.recv {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* ================== Center: Documentation ================== */
+.main-content {
+    background: var(--bg-primary);
+    padding: 2rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    max-width: 1000px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.doc-header {
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1.5rem;
+}
+
+.doc-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem 0;
+    color: var(--text-primary);
+}
+
+.doc-meta {
+    display: flex;
+    gap: 1rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    align-items: center;
+}
+
+.section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 2rem 0 1rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Structured Schema View */
+.schema-root {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9rem;
+    background: var(--bg-card);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.schema-row {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+    padding: 8px 16px;
+}
+
+.schema-row:last-child {
+    border-bottom: none;
+}
+
+.schema-prop {
+    flex: 0 0 200px;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.schema-type {
+    color: var(--accent);
+    margin-right: 8px;
+}
+
+.schema-desc {
+    color: var(--text-muted);
+    flex: 1;
+}
+
+.nested-schema {
+    margin-left: 20px;
+    border-left: 1px solid var(--border-color);
+}
+
+.prop-req {
+    color: #ef4444;
+    margin-left: 4px;
+    font-size: 0.8em;
+}
+
+/* ================== Right: Console/Playground ================== */
+.console-panel {
+    background: #111;
+    border-left: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+}
+
+/* ... existing console styles ... */
+.console-header {
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.connection-bar {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+    padding: 0.5rem;
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.connection-bar input {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    flex: 1;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+}
+
+.connection-bar select {
+    background: transparent;
+    border: none;
+    color: var(--primary);
+    font-weight: 600;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.btn {
+    background: var(--button-bg);
+    color: var(--button-text);
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+}
+
+.btn:hover {
+    filter: brightness(1.1);
+}
+
+.btn.secondary {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+
+.btn.secondary:hover {
+    border-color: var(--text-primary);
+    color: var(--text-primary);
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #666;
+    transition: background 0.3s;
+}
+
+.dot.connected {
+    background: #10b981;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+
+.dot.error {
+    background: #ef4444;
+}
+
+.logs-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.log-entry {
+    display: flex;
+    gap: 0.5rem;
+    line-height: 1.4;
+    padding: 4px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.log-time {
+    color: var(--text-muted);
+    min-width: 60px;
+    font-size: 0.7rem;
+    opacity: 0.7;
+}
+
+.log-content {
+    color: var(--text-primary);
+    word-break: break-all;
+}
+
+.log-entry.in .log-content {
+    color: #60a5fa;
+}
+
+.log-entry.out .log-content {
+    color: #34d399;
+}
+
+.log-entry.error .log-content {
+    color: #ef4444;
+}
+
+.compose-area {
+    height: 300px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary);
+}
+
+.compose-header {
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+}
+
+#editor-container {
+    flex: 1;
+}
+
+.send-bar {
+    padding: 0.5rem;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border-color);
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 50%;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.empty-state svg {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+    color: var(--primary);
+}
