@@ -20,19 +20,21 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
 
     private static getBasePath() {
         const dir = dirname(fileURLToPath(import.meta.url));
-        // In production (dist/), files are in dist/plugins/application/dashboard/
+        // In production (dist/), files are in dist/plugins/application/asyncapi/
         if (dir.endsWith('dist')) {
-            return dir + '/plugins/application/dashboard';
+            return dir + '/plugins/application/asyncapi';
         }
-        // In dev mode (src/plugins/application/dashboard/), files are in same directory
+        // In dev mode (src/plugins/application/asyncapi/), files are in same directory
         return dir;
     }
 
     constructor(private pluginOptions: AsyncApiPluginOptions = {}) {
         super();
         this.init();
+        const viewsPath = AsyncApiPlugin.getBasePath() + "/static";
+        console.log('[AsyncApiPlugin] Views Path:', viewsPath);
         this.eta = new Eta({
-            views: this.pluginOptions.path + "/static",
+            views: viewsPath,
             cache: false
         });
     }
