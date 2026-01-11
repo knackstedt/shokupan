@@ -31,7 +31,12 @@ export interface RouteInfo {
     description?: string;
     tags?: string[];
     operationId?: string;
-    emits?: { event: string; payload?: any; }[];
+    emits?: { event: string; payload?: any; location?: { startLine: number; endLine: number; }; }[];
+    sourceContext?: {
+        file: string;
+        startLine: number;
+        endLine: number;
+    };
 }
 
 /**
@@ -208,11 +213,22 @@ export class OpenAPIAnalyzer {
 
             // Allow analyzing test files if we are pointing explicitly to a test directory (fixtures)
             // OR if the file is in a fixtures directory (used for OpenAPI spec generation from test apps)
-            const isTestEnv = this.rootDir.includes('/test/') || this.rootDir.includes('/tests/') || this.rootDir.includes('/fixtures/');
-            const isFixtureFile = sourceFile.fileName.includes('/fixtures/');
+            // OR if the file IS the entrypoint
+            const isTestEnv = this.rootDir.includes('/test/') ||
+                this.rootDir.includes('/tests/') ||
+                this.rootDir.includes('/fixtures/') ||
+                (this.entrypoint && (this.entrypoint.includes('/test/') || this.entrypoint.includes('/tests/')));
 
-            if (!isTestEnv && !isFixtureFile) {
-                if (sourceFile.fileName.includes('/test/') || sourceFile.fileName.includes('/tests/')) continue;
+            const isFixtureFile = sourceFile.fileName.includes('/fixtures/');
+            const isEntrypoint = this.entrypoint && sourceFile.fileName === this.entrypoint;
+
+            console.log(`[Analyzer] check ${sourceFile.fileName}: isTestEnv=${isTestEnv}, isFixture=${isFixtureFile}, isEntry=${isEntrypoint}`);
+
+            if (!isTestEnv && !isFixtureFile && !isEntrypoint) {
+                if (sourceFile.fileName.includes('/test/') || sourceFile.fileName.includes('/tests/')) {
+                    // console.log(`[Analyzer] Skipping test file: ${sourceFile.fileName}`);
+                    continue;
+                }
                 if (sourceFile.fileName.includes('/base_test/')) continue;
                 if (sourceFile.fileName.includes('.test.ts') || sourceFile.fileName.includes('.spec.ts')) continue;
             }
@@ -302,6 +318,26 @@ export class OpenAPIAnalyzer {
             }
         }
 
+        // Look for standalone route calls in files that don't instantiate an app
+        if (ts.isCallExpression(node)) {
+            const expr = node.expression;
+            if (ts.isPropertyAccessExpression(expr)) {
+                const method = expr.name.getText(sourceFile);
+                if (['get', 'post', 'put', 'delete', 'patch', 'options', 'head', 'event', 'on'].includes(method)) {
+                    const existing = this.applications.find(a => a.filePath === sourceFile.fileName);
+                    if (!existing) {
+                        this.applications.push({
+                            name: 'GenericModule',
+                            filePath: sourceFile.fileName,
+                            className: 'Shokupan',
+                            routes: [],
+                            mounted: []
+                        });
+                    }
+                }
+            }
+        }
+
         // Recursively visit children
         ts.forEachChild(node, (child) => this.visitNode(child, sourceFile, typeChecker));
     }
@@ -373,7 +409,12 @@ export class OpenAPIAnalyzer {
                     requestTypes: analysis.requestTypes,
                     responseType: analysis.responseType,
                     responseSchema: analysis.responseSchema,
-                    emits: analysis.emits
+                    emits: analysis.emits,
+                    sourceContext: {
+                        file: sourceFile.fileName,
+                        startLine: sourceFile.getLineAndCharacterOfPosition(methodNode.getStart()).line + 1,
+                        endLine: sourceFile.getLineAndCharacterOfPosition(methodNode.getEnd()).line + 1
+                    }
                 });
             }
         }
@@ -401,8 +442,10 @@ export class OpenAPIAnalyzer {
                         const methodName = expr.name.getText(sourceFile);
 
                         // Check if this is our application instance
-                        if (objName === app.name) {
-                            if (['get', 'post', 'put', 'delete', 'patch', 'options', 'head', 'on'].includes(methodName.toLowerCase())) {
+                        // For GenericModule, we accept any variable name as it's likely an argument (e.g. app.event)
+                        if (objName === app.name || (app.name === 'GenericModule' && node.arguments.length >= 2)) {
+                            // console.log(`[Analyzer] Inspecting route call: ${objName}.${methodName} in ${app.name}`);
+                            if (['get', 'post', 'put', 'delete', 'patch', 'options', 'head', 'on', 'event'].includes(methodName.toLowerCase())) {
                                 // Extract route info
                                 const route = this.extractRouteFromCall(node, sourceFile, methodName.toUpperCase());
                                 if (route) {
@@ -439,6 +482,8 @@ export class OpenAPIAnalyzer {
 
         if (ts.isStringLiteral(pathArg)) {
             routePath = pathArg.text;
+        } else {
+            routePath = '__DYNAMIC_EVENT__';
         }
 
         // Normalize path params: /users/:id -> /users/{id}
@@ -489,7 +534,12 @@ export class OpenAPIAnalyzer {
             responseType: handlerInfo.responseType,
             responseSchema: handlerInfo.responseSchema,
             emits: handlerInfo.emits,
-            ...metadata
+            ...metadata,
+            sourceContext: {
+                file: sourceFile.fileName,
+                startLine: sourceFile.getLineAndCharacterOfPosition(handlerArg.getStart()).line + 1,
+                endLine: sourceFile.getLineAndCharacterOfPosition(handlerArg.getEnd()).line + 1
+            }
         };
     }
 
@@ -500,13 +550,13 @@ export class OpenAPIAnalyzer {
         requestTypes?: RouteInfo['requestTypes'];
         responseType?: string;
         responseSchema?: any;
-        emits?: { event: string; payload?: any; }[];
+        emits?: { event: string; payload?: any; location?: { startLine: number; endLine: number; }; }[];
     } {
         const requestTypes: RouteInfo['requestTypes'] = {};
         let responseType: string | undefined;
         let responseSchema: any | undefined;
         let hasExplicitReturnType = false;
-        const emits: { event: string; payload?: any; }[] = [];
+        const emits: { event: string; payload?: any; location?: { startLine: number; endLine: number; }; }[] = [];
 
         // Simple scope to track variable types (name -> schema)
         const scope = new Map<string, any>();
@@ -676,7 +726,17 @@ export class OpenAPIAnalyzer {
                                             payload = this.convertExpressionToSchema(expr.arguments[1], sourceFile, scope);
                                         }
 
-                                        emits.push({ event: eventName, payload });
+                                        const emitLoc = {
+                                            startLine: sourceFile.getLineAndCharacterOfPosition(expr.getStart()).line + 1,
+                                            endLine: sourceFile.getLineAndCharacterOfPosition(expr.getEnd()).line + 1
+                                        };
+                                        emits.push({ event: eventName, payload, location: emitLoc });
+                                    } else {
+                                        const emitLoc = {
+                                            startLine: sourceFile.getLineAndCharacterOfPosition(expr.getStart()).line + 1,
+                                            endLine: sourceFile.getLineAndCharacterOfPosition(expr.getEnd()).line + 1
+                                        };
+                                        emits.push({ event: '__DYNAMIC_EMIT__', payload: { type: 'object' }, location: emitLoc });
                                     }
                                 }
                             }

@@ -74,12 +74,15 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
     let astRoutes: any[] = [];
     try {
         const { OpenAPIAnalyzer } = await import('../openapi/analyzer');
-        const analyzer = new OpenAPIAnalyzer(process.cwd());
+        const entrypoint = (globalThis as any).Bun?.main || require.main?.filename || process.argv[1];
+        const analyzer = new OpenAPIAnalyzer(process.cwd(), entrypoint);
         const { applications } = await analyzer.analyze();
         astRoutes = await getAstRoutes(applications);
     } catch (e) {
         // Silently fail if analysis cannot run
     }
+
+    const matchedAstRoutes = new Set<any>();
 
     const collect = async (router: ShokupanRouter<T>, prefix = "") => {
         // Collect Event Handlers (Client -> Server)
@@ -109,6 +112,39 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                     tags = [{ name: routerTag }];
                 }
 
+                // Match with AST route to find emits and source info
+                let astMatch = astRoutes.find(r =>
+                    (r.method === 'EVENT' || r.method === 'ON') &&
+                    r.path === eventName
+                );
+
+                if (!astMatch) {
+                    // Heuristic matching
+                    const runtimeSource = ((handler as any).originalHandler || handler).toString();
+                    const stripComments = (s: string) => s.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1');
+                    const normalize = (s: string) => stripComments(s).replace(/\s+/g, '');
+
+                    const runtimeHandlerSrc = normalize(runtimeSource);
+
+                    const eventRoutes = astRoutes.filter(r => r.method === 'EVENT' || r.method === 'ON');
+
+                    astMatch = eventRoutes.find(r => {
+                        const astHandlerSrc = normalize(r.handlerSource || r.handlerName || '');
+
+                        if (!astHandlerSrc || astHandlerSrc.length < 5) return false;
+                        return runtimeHandlerSrc.includes(astHandlerSrc) ||
+                            astHandlerSrc.includes(runtimeHandlerSrc) ||
+                            (r.handlerSource && runtimeHandlerSrc.includes(normalize(r.handlerSource).substring(0, 50)));
+                    });
+                }
+
+                if (astMatch) matchedAstRoutes.add(astMatch);
+
+                // Force match for debugging if needed? No.
+                if (eventName === 'dynamic.event' && !astMatch) {
+                    // ...
+                }
+
                 if (!channels[eventName]) {
                     channels[eventName] = {
                         publish: {
@@ -118,7 +154,14 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                                 payload: { type: 'object' },
                                 ...(userSpec?.message ? userSpec.message : {})
                             },
-                            ...(userSpec?.type === 'publish' ? userSpec : {})
+                            ...(userSpec?.type === 'publish' ? userSpec : {}),
+                            "x-source-info": astMatch?.sourceContext ? {
+                                file: astMatch.sourceContext.file,
+                                line: astMatch.sourceContext.startLine,
+                                snippet: astMatch.handlerSource,
+                                offset: astMatch.sourceContext.startLine,
+                                highlightLines: [astMatch.sourceContext.startLine, astMatch.sourceContext.endLine]
+                            } : undefined
                         }
                     };
 
@@ -126,30 +169,16 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                     if (userSpec?.description) channels[eventName].publish.description = userSpec.description;
                 }
 
-                // Match with AST route to find emits
-                let astMatch = astRoutes.find(r =>
-                    (r.method === 'EVENT' || r.method === 'ON') &&
-                    r.path === eventName
-                );
-
-                if (!astMatch) {
-                    // Heuristic matching
-                    const runtimeSource = ((handler as any).originalHandler || handler).toString();
-                    const runtimeHandlerSrc = runtimeSource.replace(/\s+/g, ' ');
-
-                    const eventRoutes = astRoutes.filter(r => r.method === 'EVENT' || r.method === 'ON');
-
-                    astMatch = eventRoutes.find(r => {
-                        const astHandlerSrc = (r.handlerSource || r.handlerName || '').replace(/\s+/g, ' ');
-                        if (!astHandlerSrc || astHandlerSrc.length < 20) return false;
-                        return runtimeHandlerSrc.includes(astHandlerSrc) ||
-                            astHandlerSrc.includes(runtimeHandlerSrc) ||
-                            (r.handlerSource && runtimeHandlerSrc.includes(r.handlerSource.substring(0, 50)));
-                    });
-                }
-
                 // Analyze for outgoing events
                 let emits = astMatch?.emits || [];
+
+                if (eventName === 'trigger-dynamic') {
+                    // console.log(`[Method: ${eventName}] AST Match found?`, !!astMatch);
+                    if (astMatch) {
+                        // console.log(`[Method: ${eventName}] Emits:`, JSON.stringify(astMatch.emits));
+                    }
+                }
+
 
                 // Fallback to basic regex if no AST emits found
                 if (emits.length === 0) {
@@ -158,6 +187,28 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                 }
 
                 for (const emit of emits) {
+                    if (emit.event === '__DYNAMIC_EMIT__') {
+                        const warningKey = `${eventName}/Dynamic Emit`;
+                        channels[warningKey] = {
+                            subscribe: {
+                                operationId: `dynamicEmitWarning${eventName}`,
+                                summary: "Dynamic Emit Detected",
+                                description: "This handler emits an event with a dynamic name that could not be determined statically.",
+                                tags: tags,
+                                "x-warning": true,
+                                "x-source-info": {
+                                    file: astMatch?.sourceContext?.file,
+                                    line: emit.location?.startLine,
+                                    snippet: astMatch?.handlerSource,
+                                    offset: astMatch?.sourceContext?.startLine,
+                                    highlightLines: emit.location ? [emit.location.startLine, emit.location.endLine] : undefined
+                                },
+                                message: { payload: { type: 'object' } }
+                            }
+                        };
+                        continue;
+                    }
+
                     if (!channels[emit.event]) {
                         channels[emit.event] = {
                             subscribe: {
@@ -165,12 +216,19 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                                 tags,
                                 message: {
                                     payload: emit.payload || { type: 'object' }
-                                }
+                                },
+                                "x-source-info": (astMatch?.sourceContext && emit.location) ? {
+                                    file: astMatch.sourceContext.file,
+                                    line: emit.location.startLine,
+                                    snippet: astMatch.handlerSource,
+                                    offset: astMatch.sourceContext.startLine,
+                                    highlightLines: [emit.location.startLine, emit.location.endLine]
+                                } : undefined
                             }
                         };
                     }
                 }
-            }
+            };
         }
 
         // Collect HTTP Routes (Server -> Client Emits Only)
@@ -223,7 +281,14 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                                 tags,
                                 message: {
                                     payload: emit.payload || { type: 'object' }
-                                }
+                                },
+                                "x-source-info": (astMatch?.sourceContext && emit.location) ? {
+                                    file: astMatch.sourceContext.file,
+                                    line: emit.location.startLine,
+                                    snippet: astMatch.handlerSource, // Optional: snippet of HTTP handler
+                                    offset: astMatch.sourceContext.startLine,
+                                    highlightLines: [emit.location.startLine, emit.location.endLine]
+                                } : undefined
                             }
                         };
                     }
@@ -239,6 +304,37 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
     };
 
     await collect(rootRouter);
+
+    // Process detected dynamic/unknown events from AST that weren't matched
+    const dynamicEvents = astRoutes.filter(r => r.path === '__DYNAMIC_EVENT__' && !matchedAstRoutes.has(r));
+    dynamicEvents.forEach((r, i) => {
+        // Try to identify context
+        let prefix = "Anonymous";
+        if (r.handlerName && !r.handlerName.includes('=>') && !r.handlerName.includes('{')) {
+            const parts = r.handlerName.split('.');
+            if (parts.length > 0) prefix = parts[0];
+        }
+
+        const key = `${prefix}.Dynamic Event ${i + 1}`;
+
+        channels[key] = {
+            publish: {
+                operationId: `dynamicEventWarning${i}`,
+                summary: "Dynamic Event Detected",
+                description: `A dynamic event listener was detected in your source code but the event name could not be determined statically.`,
+                tags: [{ name: "Warnings" }],
+                "x-warning": true,
+                "x-source-info": {
+                    file: r.sourceContext?.file,
+                    line: r.sourceContext?.startLine,
+                    snippet: r.handlerSource,
+                    offset: r.sourceContext?.startLine,
+                    highlightLines: r.sourceContext ? [r.sourceContext.startLine, r.sourceContext.endLine] : undefined
+                },
+                message: { payload: { type: 'object' } }
+            }
+        };
+    });
 
     return {
         asyncapi: "3.0.0",

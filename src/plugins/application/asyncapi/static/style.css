@@ -35,13 +35,44 @@ select option {
     color: var(--text-primary);
 }
 
+a {
+    word-break: break-all;
+}
+
 /* Layout */
+:root {
+    --sidebar-width: 280px;
+    --console-width: 400px;
+}
+
 .app-container {
-    display: grid;
-    grid-template-columns: 280px 1fr 400px;
-    /* Nav | Docs | Console */
+    display: flex;
     height: 100%;
     overflow: hidden;
+}
+
+.sidebar {
+    width: var(--sidebar-width);
+    flex-shrink: 0;
+    /* ... existing styles ... */
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+}
+
+.resizer {
+    width: 4px;
+    cursor: col-resize;
+    background: var(--border-color);
+    transition: background 0.2s;
+    flex-shrink: 0;
+    z-index: 10;
+}
+
+.resizer:hover,
+.resizer.resizing {
+    background: var(--primary);
 }
 
 /* Common Scrollbar */
@@ -49,14 +80,6 @@ select option {
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: var(--secondary) transparent;
-}
-
-/* ================== Left Sidebar: Navigation ================== */
-.sidebar {
-    background: var(--bg-secondary);
-    border-right: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
 }
 
 .sidebar-header {
@@ -148,14 +171,16 @@ select option {
 
 /* ================== Center: Documentation ================== */
 .main-content {
+    flex: 1;
+    min-width: 0;
+    /* overflow fix */
     background: var(--bg-primary);
     padding: 2rem 3rem;
     display: flex;
     flex-direction: column;
     gap: 2rem;
-    max-width: 1000px;
-    margin: 0 auto;
-    width: 100%;
+    overflow-y: auto;
+    /* Removed max-width centering to respect resizing */
 }
 
 .doc-header {
@@ -168,6 +193,7 @@ select option {
     font-weight: 700;
     margin: 0 0 0.5rem 0;
     color: var(--text-primary);
+    word-break: break-all;
 }
 
 .doc-meta {
@@ -237,13 +263,14 @@ select option {
 
 /* ================== Right: Console/Playground ================== */
 .console-panel {
+    width: var(--console-width);
+    flex-shrink: 0;
     background: #111;
     border-left: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
 }
 
-/* ... existing console styles ... */
 .console-header {
     padding: 1rem;
     background: var(--bg-secondary);
@@ -320,6 +347,7 @@ select option {
     border-radius: 50%;
     background: #666;
     transition: background 0.3s;
+    margin: 0;
 }
 
 .dot.connected {
@@ -331,6 +359,7 @@ select option {
     background: #ef4444;
 }
 
+/* Virtual Scroll */
 .logs-container {
     flex: 1;
     overflow-y: auto;
@@ -340,9 +369,21 @@ select option {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    position: relative;
+    /* For absolute children */
+}
+
+.log-shim {
+    width: 1px;
+    opacity: 0;
+    pointer-events: none;
 }
 
 .log-entry {
+    position: absolute;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0;
     display: flex;
     gap: 0.5rem;
     line-height: 1.4;
@@ -421,4 +462,72 @@ select option {
     margin-bottom: 1rem;
     opacity: 0.5;
     color: var(--primary);
+}
+
+.warning-line-highlight {
+    background: rgba(251, 191, 36, 0.15);
+    border-left: 3px solid #fbbf24;
+}
+
+/* Header actions */
+.header-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-icon {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.source-link {
+    opacity: 0.6;
+    margin-left: auto;
+    color: var(--text-muted);
+    padding: 2px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    transition: opacity 0.2s;
+}
+
+.tree-item:hover .source-link {
+    opacity: 1;
+}
+
+.source-link:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--primary);
+    opacity: 1;
+}
+
+.doc-source-link {
+    color: var(--text-muted);
+    margin-left: 10px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg-secondary);
+    transition: all 0.2s;
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.doc-source-link:hover {
+    color: var(--primary);
+    border-color: var(--primary);
 }

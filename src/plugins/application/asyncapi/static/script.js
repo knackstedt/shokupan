@@ -6,25 +6,75 @@ const state = {
     protocol: 'ws',
     spec: null,
     editor: null,
-    selectedEvent: null
+    selectedEvent: null,
+    logEntries: [],
+    logAutoScroll: true
 };
 
 const els = {
     url: document.getElementById('url'),
     protocol: document.getElementById('protocol'),
     connectBtn: document.getElementById('connect-btn'),
+    clearBtn: document.getElementById('clear-logs-btn'),
     statusText: document.getElementById('connection-status'),
     statusDot: document.getElementById('status-dot'),
     logs: document.getElementById('logs'),
+    logShim: document.getElementById('log-shim'),
     sendBtn: document.getElementById('send-btn'),
     navList: document.getElementById('nav-list'),
     docPanel: document.getElementById('doc-panel'),
     targetEventLabel: document.getElementById('target-event')
 };
 
+// Resizers
+function initResizers() {
+    const setup = (id, varName, isLeft) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            const root = document.documentElement;
+            const startX = e.clientX;
+            const startW = parseInt(getComputedStyle(root).getPropertyValue(varName), 10);
+            document.body.style.cursor = 'col-resize';
+            el.classList.add('resizing');
+
+            const onMove = (em) => {
+                const diff = em.clientX - startX;
+                const newW = isLeft ? startW + diff : startW - diff;
+                if (newW > 100 && newW < 800) root.style.setProperty(varName, newW + 'px');
+            };
+            const onUp = () => {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                document.body.style.cursor = '';
+                el.classList.remove('resizing');
+            };
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+    };
+    setup('resizer-left', '--sidebar-width', true);
+    setup('resizer-right', '--console-width', false);
+}
+
 // Initialize Monaco
 require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
 require(['vs/editor/editor.main'], function () {
+    initResizers(); // Init resizers
+
+    // Virtual scroll listener
+    els.logs.addEventListener('scroll', () => {
+        const diff = els.logs.scrollHeight - els.logs.scrollTop - els.logs.clientHeight;
+        state.logAutoScroll = diff < 20;
+        renderLogs();
+    });
+
+    els.clearBtn.onclick = () => {
+        state.logEntries = [];
+        renderLogs();
+    };
+
     state.editor = monaco.editor.create(document.getElementById('editor-container'), {
         value: '{\n    "key": "value"\n}',
         language: 'json',
@@ -90,7 +140,20 @@ function renderNav() {
             .sort((a, b) => {
                 const aKey = a[0];
                 const bKey = b[0];
+                const aItem = a[1];
+                const bItem = b[1];
+
+                // Prioritize Warnings
+                const isWarningA = aItem.data?.op?.['x-warning'];
+                const isWarningB = bItem.data?.op?.['x-warning'];
+                if (isWarningA && !isWarningB) return -1;
+                if (!isWarningA && isWarningB) return 1;
+
                 if (aKey === bKey) return 0;
+
+                if (aKey === 'Warning' || aKey === 'Warnings') return -1;
+                if (bKey === 'Warning' || bKey === 'Warnings') return 1;
+
                 if (aKey === 'Application') return -1;
                 if (bKey === 'Application') return 1;
 
@@ -122,10 +185,32 @@ function renderNav() {
                         // Render as Event (even if it has children)
                         const el = document.createElement('div');
                         el.className = 'tree-item';
-                        const badgeType = item.data.type === 'publish' ? 'send' : 'recv';
-                        const badgeText = item.data.type === 'publish' ? 'SEND' : 'RECV';
 
-                        el.innerHTML = `<span class="badge ${badgeType}">${badgeText}</span> <span class="tree-label">${key}</span>`;
+                        let labelHtml = '';
+                        if (item.data.op['x-warning']) {
+                            // Warning Node
+                            el.style.color = '#fbbf24'; // amber-400
+                            labelHtml = `<span style="margin-right: 6px;">⚠️</span> <span class="tree-label">${key}</span>`;
+                        } else {
+                            // Standard Event Node
+                            const badgeType = item.data.type === 'publish' ? 'send' : 'recv';
+                            const badgeText = item.data.type === 'publish' ? 'SEND' : 'RECV';
+                            labelHtml = `<span class="badge ${badgeType}">${badgeText}</span> <span class="tree-label">${key}</span>`;
+                        }
+
+                        // Source Link
+                        const src = item.data.op['x-source-info'];
+                        if (src) {
+                            const link = `vscode://file/${src.file}:${src.line}`;
+                            // Code icon
+                            labelHtml += `<a href="${link}" class="source-link" onclick="event.stopPropagation()" title="${src.file}:${src.line}">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block">
+                                <polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline>
+                                </svg>
+                             </a>`;
+                        }
+                        el.innerHTML = labelHtml;
+
                         el.onclick = () => selectEvent(item.data, el);
                         container.appendChild(el);
                     } else {
@@ -160,12 +245,102 @@ function selectEvent(item, el) {
     els.targetEventLabel.innerText = item.name;
 
     const op = item.op;
+    const isWarning = !!op['x-warning'];
     const desc = op.description || op.summary || 'No description provided.';
     const payload = op.message?.payload || {};
 
+    if (isWarning) {
+        const sourceInfo = op['x-source-info'] || {};
+        const fileLink = `vscode://file/${sourceInfo.file}:${sourceInfo.line}`;
+
+        els.docPanel.innerHTML = `
+            <div class="doc-header" style="border-bottom: 2px solid #fbbf24;">
+                <h1 class="doc-title" style="color: #fbbf24;">⚠️ ${item.name}</h1>
+                <div class="doc-meta">
+                    <span class="badge warning" style="background: #fbbf24; color: #000; font-size: 0.8rem; padding: 4px 8px;">WARNING</span>
+                </div>
+            </div>
+            <div class="doc-body">
+                <div class="alert warning" style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 6px; padding: 16px; margin-bottom: 24px;">
+                    <p style="margin: 0; color: #fbbf24; font-weight: 500;">
+                        ${op.summary || 'Possible Issue Detected'}
+                    </p>
+                    <p style="margin: 8px 0 0 0; opacity: 0.8; line-height: 1.5;">
+                        ${desc}
+                    </p>
+                    <p style="margin: 12px 0 0 0;">
+                        <a href="${fileLink}" style="color: #fbbf24; text-decoration: underline; font-family: monospace;">
+                            ${sourceInfo.file}:${sourceInfo.line}
+                        </a>
+                    </p>
+                </div>
+                
+                ${sourceInfo.snippet ? `
+                <div class="section-title">Source Context</div>
+                <div id="snippet-editor" style="height: 300px; border: 1px solid #333; border-radius: 6px; overflow: hidden;"></div>
+                ` : ''}
+            </div>
+        `;
+
+        // Render snippet editor if available
+        if (sourceInfo.snippet && window.monaco) {
+            monaco.editor.colorize(sourceInfo.snippet, 'typescript', {}).then(() => {
+                const model = monaco.editor.createModel(sourceInfo.snippet, "typescript");
+                const editor = monaco.editor.create(document.getElementById('snippet-editor'), {
+                    model: model,
+                    readOnly: true,
+                    theme: 'vs-dark',
+                    minimap: { enabled: false },
+                    lineNumbers: 'on',
+                    fontSize: 12,
+                    scrollBeyondLastLine: false,
+                    automaticLayout: true,
+                    backgroundColor: 'transparent'
+                });
+
+                // Apply highlighting decoration if lines provided
+                if (sourceInfo.highlightLines && sourceInfo.offset) {
+                    const startLine = sourceInfo.highlightLines[0] - sourceInfo.offset + 1;
+                    const endLine = sourceInfo.highlightLines[1] - sourceInfo.offset + 1;
+
+                    if (startLine > 0) {
+                        editor.deltaDecorations([], [
+                            {
+                                range: new monaco.Range(startLine, 1, endLine, 1),
+                                options: {
+                                    isWholeLine: true,
+                                    className: 'warning-line-highlight',
+                                    glyphMarginClassName: 'warning-glyph'
+                                }
+                            }
+                        ]);
+                        editor.revealLineInCenter(startLine);
+                    }
+                }
+            });
+        }
+        return;
+    }
+
+    // Source Link for Doc Header
+    const sourceInfo = op['x-source-info'];
+    let sourceLink = '';
+    if (sourceInfo) {
+        const filename = sourceInfo.file.split('/').pop();
+        sourceLink = `<a href="vscode://file/${sourceInfo.file}:${sourceInfo.line}" class="doc-source-link" title="${sourceInfo.file}:${sourceInfo.line}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px">
+                <polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline>
+            </svg>
+            ${filename}:${sourceInfo.line}
+        </a>`;
+    }
+
     els.docPanel.innerHTML = `
                 <div class="doc-header">
-                    <h1 class="doc-title">${item.name}</h1>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.5rem;">
+                         <h1 class="doc-title" style="margin:0">${item.name}</h1>
+                         ${sourceLink}
+                    </div>
                     <div class="doc-meta">
                         <span class="badge ${item.type === 'publish' ? 'send' : 'recv'}" style="font-size: 0.8rem; padding: 4px 8px;">${item.type === 'publish' ? 'SEND' : 'RECV'}</span>
                         <span>${op.operationId || ''}</span>
@@ -232,15 +407,76 @@ function renderSchemaToDOM(schema) {
 }
 
 /* ================= Console & Utils ================= */
+const ROW_HEIGHT = 28;
+
+function renderLogs() {
+    const container = els.logs;
+    const total = state.logEntries.length;
+    els.logShim.style.height = (total * ROW_HEIGHT) + 'px';
+
+    // Calculate visible range
+    const scrollTop = container.scrollTop;
+    const clientHeight = container.clientHeight;
+
+    const startNode = Math.floor(scrollTop / ROW_HEIGHT);
+    // Buffer of 2 items
+    const startIndex = Math.max(0, startNode - 2);
+    const endIndex = Math.min(total, Math.ceil((scrollTop + clientHeight) / ROW_HEIGHT) + 2);
+
+    // Remove existing entries
+    // Note: We keep log-shim (which usually has ID)
+    // We can select all .log-entry`
+    const entries = container.getElementsByClassName('log-entry');
+    while (entries.length > 0) {
+        entries[0].remove();
+    }
+
+    for (let i = startIndex; i < endIndex; i++) {
+        const entry = state.logEntries[i];
+        if (!entry) continue;
+
+        const div = document.createElement('div');
+        div.className = 'log-entry ' + entry.type;
+        div.style.top = (i * ROW_HEIGHT) + 'px';
+        div.style.height = ROW_HEIGHT + 'px';
+        div.style.overflow = 'hidden';
+        div.style.whiteSpace = 'nowrap';
+        div.style.textOverflow = 'ellipsis';
+        div.style.display = 'flex';
+        div.style.alignItems = 'center';
+
+        // Escape HTML in msg
+        const safeMsg = entry.msg.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+        div.innerHTML = `<span class="log-time">${entry.time}</span><span class="log-content" title="${safeMsg}">${safeMsg}</span>`;
+        container.appendChild(div);
+    }
+
+    // Auto-scroll logic
+    if (state.logAutoScroll && total > 0) {
+        // If we are auto-scrolling, we want to be at the bottom
+        // But renderLogs is called ON scroll too. 
+        // If called from `log()`, we might need to update scrollTop.
+        // We set scrollTop to MAX.
+        // But we only want to do this if we were already at bottom OR just added.
+        // The event listener handles state.logAutoScroll flag.
+        // If flag is true, force scroll.
+        if (container.scrollTop + clientHeight < els.logShim.offsetHeight) {
+            container.scrollTop = els.logShim.offsetHeight - clientHeight;
+        }
+    }
+}
+
 function log(source, msg, type = 'info') {
-    const div = document.createElement('div');
-    div.className = 'log-entry ' + type;
     const time = new Date().toLocaleTimeString('en-US', { hour12: false });
-    div.innerHTML = `<span class="log-time">${time}</span><span class="log-content"></span>`;
-    const content = div.querySelector('.log-content');
-    content.innerText = msg;
-    content.scrollIntoView({ behavior: 'smooth' });
-    els.logs.append(div);
+    state.logEntries.push({ source, msg, type, time });
+
+    // If we are already near bottom, keep auto-scroll true
+    const container = els.logs;
+    const diff = container.scrollHeight - container.scrollTop - container.clientHeight;
+    if (diff < 50) state.logAutoScroll = true;
+
+    renderLogs();
 }
 
 function updateStatus() {
