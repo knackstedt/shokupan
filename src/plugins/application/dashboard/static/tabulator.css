@@ -1,66 +1,118 @@
+/* Tabulator Theme Overrides - Merged with Layout */
 .tabulator {
     height: 100%;
     width: 100%;
-    background-color: #0f1322;
+    background-color: var(--bg-card);
+    border: 1px solid var(--card-border);
+    color: var(--text-primary);
 }
 
-.tabulator .tabulator-tableholder .tabulator-table {
-    color: #ccc;
-    background-color: #0f1322;
-}
-
+/* Header */
 .tabulator .tabulator-header {
-    color: #ddd;
-    background-color: #0f1322;
-    border-top-color: #0b0b18;
-    border-bottom-color: #0b0b18;
+    background-color: var(--bg-card);
+    border-top: 0;
+    border-bottom: 2px solid var(--table-header-border-color);
+    color: var(--primary);
+    font-weight: bold;
 }
 
 .tabulator .tabulator-header .tabulator-col {
-    border-right-color: #15162f;
-    background-color: #0f1322;
+    background-color: var(--bg-card);
+    border-right: 1px solid var(--card-border);
 }
 
+.tabulator .tabulator-header .tabulator-col:hover {
+    background-color: var(--bg-primary);
+}
+
+.tabulator .tabulator-header .tabulator-col-content {
+    padding: 12px;
+}
+
+/* Sortable Columns */
 .tabulator .tabulator-header .tabulator-col.tabulator-sortable[aria-sort=none] .tabulator-col-content .tabulator-col-sorter {
-    color: #0d0f20;
+    color: var(--text-secondary);
 }
 
 .tabulator .tabulator-header .tabulator-col.tabulator-sortable.tabulator-col-sorter-element:hover {
-    background-color: #111427;
+    background-color: var(--bg-primary);
 }
 
-.tabulator .tabulator-row {
-    border-bottom-color: #0c0d23;
-    transition: background-color 100ms ease;
-}
-
-.tabulator .tabulator-row .tabulator-cell {
-    border-right-color: #11152c;
-    align-content: center;
-}
-
-.tabulator .tabulator-row:hover {
-    background-color: #202540 !important;
-}
-
-.tabulator .tabulator-row.tabulator-row-even {
-    background-color: #1c1e2c;
-}
-
-.tabulator .tabulator-row.tabulator-row-odd {
-    background-color: #171824;
-}
-
-.tabulator .tabulator-row.tabulator-selected {
-    background-color: #252a43;
-}
-
+/* Filter Inputs */
 .tabulator .tabulator-header .tabulator-col .tabulator-header-filter input {
-    background-color: #0e1016ff;
-    color: #ccc;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--card-border);
 }
 
 .tabulator .tabulator-header .tabulator-col .tabulator-header-filter input:focus {
-    background-color: #212637ff;
-    color: #fff
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: var(--primary);
+    outline: none;
+}
+
+/* Rows */
+.tabulator .tabulator-row {
+    background-color: var(--bg-card);
+    border-bottom: 1px solid var(--card-border);
+    color: var(--text-primary);
+    transition: background-color 100ms ease;
+}
+
+/* Higher specificity to override Tabulator default themes */
+.tabulator .tabulator-row.tabulator-row-even,
+.tabulator-row.tabulator-row-even {
+    background-color: var(--bg-primary) !important;
+}
+
+.tabulator .tabulator-row.tabulator-row-odd,
+.tabulator-row.tabulator-row-odd {
+    background-color: var(--bg-card) !important;
+}
+
+.tabulator .tabulator-row.tabulator-selected {
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary);
+}
+
+.tabulator .tabulator-row:hover {
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+/* Cells */
+.tabulator .tabulator-row .tabulator-cell {
+    border-right: 1px solid var(--card-border);
+    padding: 10px;
+    align-content: center;
+}
+
+/* Footer / Pagination */
+.tabulator .tabulator-footer {
+    background-color: var(--bg-card);
+    border-top: 2px solid var(--table-header-border-color);
+}
+
+.tabulator .tabulator-footer .tabulator-page {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.tabulator .tabulator-footer .tabulator-page:hover {
+    background-color: var(--table-header-border-color);
+    color: var(--text-primary);
+}
+
+.tabulator .tabulator-footer .tabulator-page.active {
+    background-color: var(--primary);
+    color: var(--bg-card);
+}
+
+/* Sorting Icons */
+.tabulator .tabulator-header .tabulator-col .tabulator-col-content .tabulator-arrow {
+    border-bottom-color: var(--text-secondary);
 }

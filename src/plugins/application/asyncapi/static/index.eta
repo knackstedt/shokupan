@@ -5,25 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shokupan AsyncAPI Playground</title>
     <style>
-        :root {
-            --bg-primary: #1a1a1a;
-            --bg-secondary: #252525;
-            --text-primary: #e0e0e0;
-            --accent: #ff6b6b;
-            --border: #333;
-        }
+        <%~ include("theme.css") %>
         body { margin: 0; font-family: 'Inter', system-ui, sans-serif; background: var(--bg-primary); color: var(--text-primary); display: flex; height: 100vh; overflow: hidden; }
         .container { display: grid; grid-template-columns: 300px 1fr 300px; width: 100%; height: 100%; }
-        .sidebar { background: var(--bg-secondary); border-right: 1px solid var(--border); padding: 1rem; overflow-y: auto; }
+        .sidebar { background: var(--bg-secondary); border-right: 1px solid var(--border-color); border-left: 1px solid var(--border-color); padding: 1rem; overflow-y: auto; }
         .main { display: flex; flex-direction: column; padding: 1rem; overflow-y: auto; position: relative; }
-        .logs { background: #000; border-top: 1px solid var(--border); height: 200px; padding: 0.5rem; overflow-y: auto; font-family: monospace; font-size: 12px; }
+        .logs { background: #000; border-top: 1px solid var(--border-color); height: 200px; padding: 0.5rem; overflow-y: auto; font-family: monospace; font-size: 12px; }
         .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
         h1 { font-size: 1.2rem; margin: 0; }
         h3 { margin: 0; font-size: 1rem; }
         input, select, textarea, button { background: #333; border: 1px solid #444; color: white; padding: 0.5rem; border-radius: 4px; margin-bottom: 0.5rem; width: 100%; box-sizing: border-box; }
-        button { background: var(--accent); border: none; cursor: pointer; font-weight: bold; width: auto; margin-bottom: 0; }
+        button { background: var(--button-bg, var(--accent)); color: var(--button-text, white); border: none; cursor: pointer; font-weight: bold; width: auto; margin-bottom: 0; }
         button:hover { opacity: 0.9; }
-        button.secondary { background: #444; }
+        button.secondary { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); }
         .message-card { background: #333; padding: 0.5rem;border-radius: 4px; margin-bottom: 0.5rem; cursor: pointer; }
         .message-card:hover { background: #444; }
         .log-entry { margin-bottom: 4px; border-bottom: 1px solid #222; padding-bottom: 2px; }
@@ -113,7 +107,7 @@
                 <div class="logs" id="logs"></div>
             </div>
         </div>
-        <div class="sidebar" style="border-left: 1px solid var(--border); border-right: none;">
+        <div class="sidebar">
              <h3>Docs</h3>
              <div id="doc-panel">Select an event to see details.</div>
         </div>

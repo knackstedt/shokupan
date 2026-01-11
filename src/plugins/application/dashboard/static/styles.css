@@ -1,14 +1,4 @@
-:root {
-    --bg-primary: #0f172a;
-    --bg-secondary: #1e293b;
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --text-emphasis: #60a5fa;
-    --accent: #3b82f6;
-    --success: #22c55e;
-    --error: #ef4444;
-    --card-border: #334155;
-}
+/* :root variables are now provided by theme.css */
 
 * {
     box-sizing: border-box;
