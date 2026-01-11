@@ -286,13 +286,19 @@ function selectEvent(item, el) {
         // Render snippet editor if available
         if (sourceInfo.snippet && window.monaco) {
             monaco.editor.colorize(sourceInfo.snippet, 'typescript', {}).then(() => {
+                const el = document.getElementById('snippet-editor');
                 const model = monaco.editor.createModel(sourceInfo.snippet, "typescript");
-                const editor = monaco.editor.create(document.getElementById('snippet-editor'), {
+
+                const scrollbarWidth = 14;
+                const borderWidth = 6;
+                const lineHeight = 17;
+                el.style.height = (sourceInfo.snippet.match(/\n/g)?.length * lineHeight + borderWidth + scrollbarWidth) + 'px';
+                const editor = monaco.editor.create(el, {
                     model: model,
                     readOnly: true,
                     theme: 'vs-dark',
                     minimap: { enabled: false },
-                    lineNumbers: 'on',
+                    lineNumbers: (num) => String((sourceInfo.offset || 1) + num - 1),
                     fontSize: 12,
                     scrollBeyondLastLine: false,
                     automaticLayout: true,
@@ -461,8 +467,10 @@ function renderLogs() {
         // We set scrollTop to MAX.
         // But we only want to do this if we were already at bottom OR just added.
         // The event listener handles state.logAutoScroll flag.
-        // Always force scroll to true bottom if auto-scroll is on
-        container.scrollTop = container.scrollHeight;
+        // If flag is true, force scroll.
+        if (container.scrollTop + clientHeight < els.logShim.offsetHeight) {
+            container.scrollTop = els.logShim.offsetHeight - clientHeight;
+        }
     }
 }
 
@@ -473,7 +481,7 @@ function log(source, msg, type = 'info') {
     // If we are already near bottom, keep auto-scroll true
     const container = els.logs;
     const diff = container.scrollHeight - container.scrollTop - container.clientHeight;
-    if (diff <= 10) state.logAutoScroll = true;
+    if (diff < 50) state.logAutoScroll = true;
 
     renderLogs();
 }

@@ -156,10 +156,12 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                             },
                             ...(userSpec?.type === 'publish' ? userSpec : {}),
                             "x-source-info": astMatch?.sourceContext ? {
+                                // DEBUG: Check snippet existence
+                                // console.log('DEBUG sourceContext', Object.keys(astMatch.sourceContext));
                                 file: astMatch.sourceContext.file,
                                 line: astMatch.sourceContext.startLine,
-                                snippet: astMatch.handlerSource,
-                                offset: astMatch.sourceContext.startLine,
+                                snippet: astMatch.sourceContext.snippet || astMatch.handlerSource,
+                                offset: astMatch.sourceContext.snippetStartLine || astMatch.sourceContext.startLine,
                                 highlightLines: [astMatch.sourceContext.startLine, astMatch.sourceContext.endLine]
                             } : undefined
                         }
@@ -327,8 +329,8 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                 "x-source-info": {
                     file: r.sourceContext?.file,
                     line: r.sourceContext?.startLine,
-                    snippet: r.handlerSource,
-                    offset: r.sourceContext?.startLine,
+                    snippet: r.sourceContext?.snippet || r.handlerSource,
+                    offset: r.sourceContext?.snippetStartLine || r.sourceContext?.startLine,
                     highlightLines: r.sourceContext ? [r.sourceContext.startLine, r.sourceContext.endLine] : undefined
                 },
                 message: { payload: { type: 'object' } }

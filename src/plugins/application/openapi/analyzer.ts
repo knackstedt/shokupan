@@ -36,6 +36,8 @@ export interface RouteInfo {
         file: string;
         startLine: number;
         endLine: number;
+        snippet?: string;
+        snippetStartLine?: number;
     };
 }
 
@@ -538,7 +540,29 @@ export class OpenAPIAnalyzer {
             sourceContext: {
                 file: sourceFile.fileName,
                 startLine: sourceFile.getLineAndCharacterOfPosition(handlerArg.getStart()).line + 1,
-                endLine: sourceFile.getLineAndCharacterOfPosition(handlerArg.getEnd()).line + 1
+                endLine: sourceFile.getLineAndCharacterOfPosition(handlerArg.getEnd()).line + 1,
+                snippet: (() => {
+                    const funcStart = sourceFile.getLineAndCharacterOfPosition(handlerArg.getStart()).line;
+                    const funcEnd = sourceFile.getLineAndCharacterOfPosition(handlerArg.getEnd()).line;
+                    const maxLine = sourceFile.getLineAndCharacterOfPosition(sourceFile.getEnd()).line;
+
+                    const startLine = Math.max(0, funcStart - 5);
+                    const endLine = Math.min(maxLine, funcEnd + 5);
+
+                    const startPos = sourceFile.getPositionOfLineAndCharacter(startLine, 0);
+                    // End position of the last line (using getPositionOfLineAndCharacter for next line - 1 char? No. just use line start of next line?)
+                    // Safest is getPositionOfLineAndCharacter(endLine + 1, 0) if exists, else EOF.
+                    let endPos = sourceFile.getEnd();
+                    if (endLine < maxLine) {
+                        endPos = sourceFile.getPositionOfLineAndCharacter(endLine + 1, 0);
+                    } else {
+                        // Get end of file
+                        endPos = sourceFile.getEnd();
+                    }
+
+                    return sourceFile.text.substring(startPos, endPos);
+                })(),
+                snippetStartLine: Math.max(0, sourceFile.getLineAndCharacterOfPosition(handlerArg.getStart()).line - 5) + 1
             }
         };
     }

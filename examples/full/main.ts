@@ -85,18 +85,26 @@ const app = new Shokupan<AppState>({
 });
 
 
+app.event("trivial", (ctx) => {
+    console.log("Trivial event received. We will now hug your face!");
+});
+
 // Simple websocket echo server
-app.event("ping", (ctx) => {
-    ctx.emit("pong", { message: Date.now() });
+app.event("simple", (ctx) => {
+    ctx.emit("simpleResponse", { message: Date.now() });
 });
-app.event("ping.1", (ctx) => {
-    ctx.emit("pong", { message: Date.now() });
+app.event("simple.specialAction", (ctx) => {
+    ctx.emit("simple.specialResponse", { message: Date.now() });
 });
-app.event("ping.4", (ctx) => {
-    ctx.emit("pong", { message: Date.now() });
+app.event("simple/otherDomains", (ctx) => {
+    ctx.emit("simple/otherDomainsResponse", { message: Date.now() });
 });
-app.event("ding", (ctx) => {
-    ctx.emit("dong", { message: Date.now() });
+
+app.event("complex/action1", (ctx) => {
+    ctx.emit("complex/action1Result", { message: Date.now() });
+});
+app.event("complex/action2", (ctx) => {
+    ctx.emit("complex/action2Result", { message: Date.now() });
 });
 
 
