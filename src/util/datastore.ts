@@ -1,31 +1,17 @@
-import { RecordId, Surreal, type Range, type Table } from 'surrealdb';
+import { RecordId, Surreal, type RecordIdRange, type Table } from 'surrealdb';
 
 
-const G = globalThis as any;
-G.__shokupan_db = G.__shokupan_db || null;
-G.__shokupan_db_promise = G.__shokupan_db_promise || null;
+export class SurrealDatastore {
+    constructor(
+        private readonly db: Surreal
+    ) {
+        process.on("exit", async () => {
+            await this.disconnect();
+        });
+    }
 
-
-async function ensureDb() {
-    if (G.__shokupan_db) return G.__shokupan_db;
-    if (G.__shokupan_db_promise) return G.__shokupan_db_promise;
-
-    G.__shokupan_db_promise = (async () => {
-        try {
-            const { createNodeEngines } = await import('@surrealdb/node');
-            const surreal = await import('surrealdb');
-
-            const engine = process.env['SHOKUPAN_DB_ENGINE'] === 'memory' ? 'mem://' : 'rocksdb://database';
-
-            const _db = new Surreal({
-                engines: createNodeEngines(),
-            });
-
-            await _db.connect(engine, { namespace: "vendor", database: "shokupan" });
-
-
-            // Define the tables with bare minimum schema
-            await _db.query(`
+    createSchema() {
+        this.db.query(`
             DEFINE TABLE OVERWRITE failed_requests SCHEMALESS COMMENT "Created by Shokupan";
             DEFINE TABLE OVERWRITE sessions SCHEMALESS COMMENT "Created by Shokupan";
             DEFINE TABLE OVERWRITE users SCHEMALESS COMMENT "Created by Shokupan";
@@ -33,52 +19,60 @@ async function ensureDb() {
             DEFINE TABLE OVERWRITE middleware_tracking SCHEMALESS COMMENT "Created by Shokupan";
             DEFINE TABLE OVERWRITE requests SCHEMALESS COMMENT "Created by Shokupan";
             DEFINE TABLE OVERWRITE metrics SCHEMALESS COMMENT "Created by Shokupan";
-        `);
-
-            G.__shokupan_db = _db;
-            return _db;
-        } catch (e: any) {
-            G.__shokupan_db_promise = null; // Reset promise on failure to allow retries
-            if (e.code === 'ERR_MODULE_NOT_FOUND' || e.message.includes('Cannot find module')) {
-                throw new Error("SurrealDB dependencies not found. To use the datastore, please install 'surrealdb' and '@surrealdb/node'.");
-            }
-            throw e;
-        }
-    })();
-
-    return G.__shokupan_db_promise;
-}
-
-// Lazy ready promise that triggers on access if we want, or just a promise that resolves when DB is ready.
-// To maintain compatibility with `await datastore.ready`, we expose a promise that ensures DB is loaded.
-// BUT, if we want it to be optional, we shouldn't trigger it globally.
-// However, existing code might rely on it.
-// We'll make `ready` valid but only checking connection if referenced.
-
-export const datastore = {
-    async get<T extends Record<string, any>>(recordId: RecordId | Table | Range<any, any>) {
-        await ensureDb();
-        return G.__shokupan_db.select(recordId as any) as Promise<T>;
-    },
-    async set(recordId: RecordId, value: Record<string, any>) {
-        await ensureDb();
-        return G.__shokupan_db.upsert(recordId).content(value);
-    },
-    async query<T extends Record<string, any>>(query: string, vars?: Record<string, unknown>) {
-        await ensureDb();
-        try {
-            return G.__shokupan_db.query(query, vars).collect() as Promise<T>;
-        } catch (e) {
-            console.error("DS ERROR:", e);
-            throw e;
-        }
-    },
-    get ready() {
-        return ensureDb().then(() => void 0);
+        `).collect();
     }
-};
 
-process.on("exit", async () => {
-    if (G.__shokupan_db) await G.__shokupan_db.close();
-});
+    /**
+     * Select a record or contents of a table by its ID.
+     */
+    async select<T = unknown>(id: RecordId | RecordIdRange | Table) {
+        return this.db.select<T>(id as any);
+    }
 
+    /**
+     * Merge update data into a record by its ID.
+     */
+    async merge<T extends Record<string, any>>(id: RecordId, data: T) {
+        return this.db.update<T>(id).merge(data);
+    }
+
+    /**
+     * Create a record by its ID.
+     */
+    async create<T extends Record<string, any>>(id: RecordId, data: Omit<T, 'id'>) {
+        return this.db.create(id).content(data);
+    }
+
+    /**
+     * Upsert a record by its ID.
+     */
+    async upsert<T extends Record<string, any>>(id: RecordId, data: T) {
+        return this.db.upsert<T>(id).content(data);
+    }
+
+    /**
+     * Delete a record by its ID.
+     */
+    async delete(id: RecordId) {
+        return this.db.delete(id);
+    }
+
+    /**
+     * Run a SurrealDB query.
+     */
+    async query<T extends Array<unknown>>(query: string, vars?: Record<string, any>) {
+        return this.db.query(query, vars).collect<T>();
+    }
+
+    /**
+     * Create a relationship between two records.
+     */
+    async relate(fromId, edgeId, toId, data?: Record<string, any>) {
+        return this.db.relate(fromId, edgeId, toId, data);
+    }
+
+
+    disconnect() {
+        return this.db.close();
+    }
+}

@@ -1,6 +1,7 @@
 import type { OpenAPI } from '@scalar/openapi-types';
 import type { Server } from 'bun';
 import type { Server as NodeServer } from 'node:http';
+import type { ConnectOptions, Engines } from 'surrealdb';
 import type { ShokupanContext } from '../context';
 import { $isRouter } from "./symbol";
 
@@ -146,7 +147,7 @@ export enum RouteParamType {
 }
 
 export interface ServerFactory {
-    (options: any): Server | Promise<Server> | NodeServer | Promise<NodeServer>;
+    (options: any): Server<any> | Promise<Server<any>> | NodeServer | Promise<NodeServer>;
 }
 
 export type NextFn = () => Promise<any>;
@@ -265,7 +266,7 @@ export type ShokupanRoute = {
     controller?: any;
 };
 
-export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> = DeepPartial<{
+export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> = Partial<{
     /**
      * The port to be used for the server.
      * @default 3000
@@ -446,6 +447,34 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      * @default true
      */
     validateStatusCodes: boolean;
+
+    /**
+     * Configuration for SurrealDB.
+     */
+    surreal?: {
+        /**
+         * SurrealDB engines.
+         * @default Embedded
+         */
+        engines?: Engines;
+        /**
+         * SurrealDB connection URL.
+         * @default 'rocksdb://database'
+         */
+        url?: string;
+        /**
+         * SurrealDB connection options.
+         */
+        connectOptions?: ConnectOptions;
+        /**
+         * SurrealDB namespace.
+         */
+        namespace?: string;
+        /**
+         * SurrealDB database.
+         */
+        database?: string;
+    };
 
     /**
      * Configuration for the AI Plugin manifest (.well-known/ai-plugin.json).

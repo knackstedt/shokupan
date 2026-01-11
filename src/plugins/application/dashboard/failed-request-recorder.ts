@@ -1,7 +1,6 @@
 import { trace } from '@opentelemetry/api';
 import { RecordId } from 'surrealdb';
 import type { ShokupanContext } from '../../../context';
-import { datastore } from '../../../util/datastore';
 import type { Middleware } from '../../../util/types';
 
 export interface FailedRequestRecorderOptions {
@@ -80,7 +79,7 @@ async function recordFailedRequest(ctx: ShokupanContext, error: any, maxCapacity
 
         // Store
         try {
-            await datastore.set(new RecordId('failed_requests', {
+            await ctx.app.db.upsert(new RecordId('failed_requests', {
                 method,
                 path: requestPath,
                 error: errorMsg,
@@ -95,21 +94,21 @@ async function recordFailedRequest(ctx: ShokupanContext, error: any, maxCapacity
         }
 
         // Cleanup Background Task
-        cleanup(maxCapacity, ttl).catch(() => { });
+        cleanup(ctx, maxCapacity, ttl).catch(() => { });
 
     } catch (e) {
         console.error("Failed to record failed request:", e);
     }
 }
 
-async function cleanup(maxCapacity: number, ttl: number) {
+async function cleanup(ctx: ShokupanContext, maxCapacity: number, ttl: number) {
     const cutoff = Date.now() - ttl;
 
     // Delete expired
-    await datastore.query(`DELETE failed_requests WHERE timestamp < ${cutoff}`);
+    await ctx.app.db.query(`DELETE failed_requests WHERE timestamp < ${cutoff}`);
 
     // Check capacity
-    const results = await datastore.query<[{ count: number; }]>('SELECT count() FROM failed_requests GROUP ALL');
+    const results = await ctx.app.db.query<[{ count: number; }]>('SELECT count() FROM failed_requests GROUP ALL');
 
     // Results is [{ result: [{ count: N }], status: 'OK', ... }]
     const countRecords = results?.[0];
@@ -120,6 +119,6 @@ async function cleanup(maxCapacity: number, ttl: number) {
 
     if (count > maxCapacity) {
         const toDelete = count - maxCapacity;
-        await datastore.query(`DELETE failed_requests ORDER BY timestamp ASC LIMIT ${toDelete}`);
+        await ctx.app.db.query(`DELETE failed_requests ORDER BY timestamp ASC LIMIT ${toDelete}`);
     }
 }

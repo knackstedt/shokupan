@@ -4,7 +4,7 @@ import { compose } from './middleware';
 import { generateOpenApi } from './plugins/application/openapi/openapi';
 import { serveStatic } from './plugins/middleware/serve-static';
 import type { Shokupan } from './shokupan';
-import { datastore } from './util/datastore';
+import type { SurrealDatastore } from './util/datastore';
 import { Container } from './util/di';
 import { EventError, getErrorStatus } from './util/http-error';
 import { HTTP_STATUS } from './util/http-status';
@@ -90,6 +90,10 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     private [$parent]: ShokupanRouter<T> | null = null;
     public [$childRouters]: ShokupanRouter<T>[] = [];
     public [$childControllers]: ShokupanController[] = [];
+
+    public get db(): SurrealDatastore | undefined {
+        return this.root?.db;
+    }
 
     private hookCache = new Map<keyof ShokupanHooks, Function[]>();
     private hooksInitialized: boolean = false;
@@ -1042,8 +1046,11 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                     // Execute datastore operations in background without blocking response
                     Promise.resolve().then(async () => {
                         try {
+                            const db = ctx.app?.db;
+                            if (!db) return;
+
                             const timestamp = Date.now();
-                            await datastore.set(new RecordId('middleware_tracking', {
+                            await db.upsert(new RecordId('middleware_tracking', {
                                 timestamp,
                                 name: handler.name || 'anonymous'
                             }), {
@@ -1066,13 +1073,13 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                             const cutoff = Date.now() - ttl;
 
                             // Delete entries older than TTL
-                            await datastore.query(`DELETE middleware_tracking WHERE timestamp < ${cutoff}`);
+                            await db.query(`DELETE middleware_tracking WHERE timestamp < ${cutoff}`);
 
                             // Enforce capacity limit
-                            const results = await datastore.query<[{ count: number; }]>('SELECT count() FROM middleware_tracking GROUP ALL');
+                            const results = await db.query<[{ count: number; }]>('SELECT count() FROM middleware_tracking GROUP ALL');
                             if (results?.[0]?.count > maxCapacity) {
                                 const toDelete = results[0].count - maxCapacity;
-                                await datastore.query(`DELETE middleware_tracking ORDER BY timestamp ASC LIMIT ${toDelete}`);
+                                await db.query(`DELETE middleware_tracking ORDER BY timestamp ASC LIMIT ${toDelete}`);
                             }
                         } catch (datastoreError) {
                             // Silently fail datastore operations to not break request flow

@@ -1,17 +1,18 @@
 import { afterEach, beforeAll, describe, expect, spyOn, test } from "bun:test";
 import { Idempotency } from "../../plugins/application/idempotency/plugin";
 import { Shokupan } from "../../shokupan";
-import { datastore } from "../../util/datastore";
 
-describe("Idempotency Plugin", () => {
+describe("Idempotency Plugin", async () => {
     let getSpy: any;
     let setSpy: any;
     let store: Record<string, any> = {};
+    const app = new Shokupan();
+    app.use(Idempotency());
+    await app.dbPromise;
 
     beforeAll(() => {
         // Mock datastore methods
-        // @ts-ignore
-        getSpy = spyOn(datastore, 'get').mockImplementation(async (recordId) => {
+        getSpy = spyOn(app.db, 'select').mockImplementation(async (recordId) => {
             // RecordId toString gives us "table:id" format
             const recordStr = recordId.toString();
             const [table, key] = recordStr.split(':');
@@ -19,8 +20,7 @@ describe("Idempotency Plugin", () => {
             return (store[key] || null) as any;
         });
 
-        // @ts-ignore
-        setSpy = spyOn(datastore, 'set').mockImplementation(async (recordId, value) => {
+        setSpy = spyOn(app.db, 'upsert').mockImplementation(async (recordId, value) => {
             // RecordId toString gives us "table:id" format
             const recordStr = recordId.toString();
             const [table, key] = recordStr.split(':');
@@ -38,8 +38,7 @@ describe("Idempotency Plugin", () => {
     });
 
     test("Executes handler when no key provided", async () => {
-        const app = new Shokupan();
-        app.use(Idempotency());
+
         let hitCount = 0;
         app.get("/test", () => {
             hitCount++;
@@ -56,8 +55,7 @@ describe("Idempotency Plugin", () => {
     });
 
     test("Executes handler and stores result on first hit with key", async () => {
-        const app = new Shokupan();
-        app.use(Idempotency());
+
         let hitCount = 0;
         app.get("/test", () => {
             hitCount++;
@@ -87,8 +85,7 @@ describe("Idempotency Plugin", () => {
     });
 
     test("Returns stored response on second hit with same key", async () => {
-        const app = new Shokupan();
-        app.use(Idempotency());
+
         let hitCount = 0;
         app.get("/test", () => {
             hitCount++;
@@ -127,8 +124,7 @@ describe("Idempotency Plugin", () => {
 
     test("Handles failed requests appropriately (stores them)", async () => {
         // As per current implementation, we store all responses.
-        const app = new Shokupan();
-        app.use(Idempotency());
+
 
         app.get("/fail", (ctx) => {
             return ctx.text("error", 400);
@@ -146,8 +142,7 @@ describe("Idempotency Plugin", () => {
     });
 
     test("Different keys do not conflict", async () => {
-        const app = new Shokupan();
-        app.use(Idempotency());
+
         let hitCount = 0;
         app.get("/test", () => {
             hitCount++;

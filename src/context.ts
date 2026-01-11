@@ -191,7 +191,7 @@ export class ShokupanContext<
 
     constructor(
         public readonly request: ShokupanRequest<any>,
-        public readonly server?: Server,
+        public readonly server?: Server<any>,
         state?: State,
         public readonly app?: Shokupan,
         public readonly signal?: AbortSignal, // Optional as it might not be provided in tests or simple creates

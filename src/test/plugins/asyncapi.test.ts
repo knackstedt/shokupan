@@ -1,7 +1,7 @@
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { ShokupanContext } from "../../context";
-import { AsyncApiPlugin } from "../../plugins/application/asyncapi-plugin";
+import { AsyncApiPlugin } from "../../plugins/application/asyncapi/plugin";
 import { Shokupan } from "../../shokupan";
 import { Controller, Event, Spec } from "../../util/decorators";
 

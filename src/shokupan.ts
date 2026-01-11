@@ -10,8 +10,10 @@ import { $appRoot, $dispatch, $finalResponse, $isApplication, $routeMatched, $ws
 import type { Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig, ShokupanPlugin } from './util/types';
 
 import type { Server, ServerWebSocket } from 'bun';
+import { Surreal } from 'surrealdb';
 import { ShokupanRouter } from './router';
 import { SystemCpuMonitor } from "./util/cpu-monitor";
+import { SurrealDatastore } from './util/datastore';
 import "./util/instrumentation";
 import { ShokupanRequest } from './util/request';
 import { getCallerInfo } from './util/stack';
@@ -98,12 +100,18 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     public asyncApiSpec?: any;
     private composedMiddleware?: Middleware;
     private cpuMonitor?: SystemCpuMonitor;
-    private server?: Server;
+    private server?: Server<any>;
+    private datastore?: SurrealDatastore;
+    public dbPromise?: Promise<any>;
 
+    public override get db(): SurrealDatastore | undefined {
+        return this.datastore;
+    }
 
     get logger() {
         return this.applicationConfig.logger;
     }
+
 
     constructor(
         applicationConfig: ShokupanConfig = {}
@@ -125,6 +133,23 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             line,
             name: 'ShokupanApplication'
         };
+
+        this.dbPromise = this.initDatastore();
+    }
+
+    private async initDatastore() {
+        const db = new Surreal({ engines: this.applicationConfig.surreal?.engines ?? (await import('@surrealdb/node')).createNodeEngines() });
+        this.datastore = new SurrealDatastore(db);
+
+        await db.connect(
+            this.applicationConfig.surreal?.url ?? (process.env.NODE_ENV === 'test' ? 'mem://' : 'surrealkv://database'),
+            this.applicationConfig.surreal?.connectOptions
+        );
+
+        await db.use({
+            namespace: this.applicationConfig.surreal?.namespace ?? "vendor",
+            database: this.applicationConfig.surreal?.database ?? "shokupan"
+        });
     }
 
     /**
@@ -224,7 +249,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     public async listen(port?: number) {
         const finalPort = port ?? this.applicationConfig.port ?? 3000;
 
-        if (finalPort < 0 || finalPort > 65535) {
+        if (finalPort < 0 || finalPort > 65535 || finalPort % 1 !== 0) {
             throw new Error("Invalid port number");
         }
 
@@ -435,7 +460,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         }
 
         this.server = factory
-            ? await factory(serveOptions) as Server
+            ? await factory(serveOptions) as Server<any>
             : Bun.serve(serveOptions);
 
         return this.server;
@@ -536,7 +561,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
      * @param server - The server instance.
      * @returns The response to send.
      */
-    public async fetch(req: Request, server?: Server): Promise<Response> {
+    public async fetch(req: Request, server?: Server<any>): Promise<Response> {
 
 
         if (this.applicationConfig.enableTracing) {
@@ -571,7 +596,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         return this.handleRequest(req, server);
     }
 
-    private async handleRequest(req: Request, server?: Server): Promise<Response> {
+    private async handleRequest(req: Request, server?: Server<any>): Promise<Response> {
         // Cast to ShokupanRequest if needed, though at runtime it's just a Request
         // But ShokupanContext expects ShokupanRequest.
         const request = req as unknown as ShokupanRequest<T>;

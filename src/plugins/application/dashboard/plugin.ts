@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { RecordId } from 'surrealdb';
 import type { DebugCollector } from "../../../context";
 import { ShokupanRouter } from "../../../router";
-import { datastore } from "../../../util/datastore";
+import type { Shokupan } from '../../../shokupan';
 import { $appRoot, $debug } from "../../../util/symbol";
 import type { ShokupanHooks, ShokupanPlugin } from "../../../util/types";
 import { MetricsCollector } from './metrics-collector';
@@ -78,16 +78,8 @@ class Collector implements DebugCollector {
 }
 
 export class Dashboard implements ShokupanPlugin {
-    // Get base path for dashboard files - works in both dev (src/) and production (dist/)
-    private static getBasePath() {
-        const dir = dirname(fileURLToPath(import.meta.url));
-        // In production (dist/), files are in dist/plugins/application/dashboard/
-        if (dir.endsWith('dist')) {
-            return dir + '/plugins/application/dashboard';
-        }
-        // In dev mode (src/plugins/application/dashboard/), files are in same directory
-        return dir;
-    }
+
+    private [$appRoot]: Shokupan;
 
     private router = new ShokupanRouter();
     private metrics: RequestMetrics = {
@@ -109,13 +101,18 @@ export class Dashboard implements ShokupanPlugin {
     });
     private startTime = Date.now();
     private instrumented = false;
-    private metricsCollector = new MetricsCollector();
+    private metricsCollector: MetricsCollector;
+    get db() {
+        return this[$appRoot].db;
+    }
 
     constructor(private readonly dashboardConfig: DashboardConfig = {}) { }
 
     // ShokupanPlugin interface implementation
     public onInit(app: any, options?: { path?: string; }) {
         this[$appRoot] = app;
+        this.metricsCollector = new MetricsCollector(this.db);
+
         const mountPath = options?.path || this.dashboardConfig.path || '/dashboard';
 
         // Register hooks on the app to track all requests
@@ -150,6 +147,17 @@ export class Dashboard implements ShokupanPlugin {
         this.setupRoutes();
     }
 
+    // Get base path for dashboard files - works in both dev (src/) and production (dist/)
+    private static getBasePath() {
+        const dir = dirname(fileURLToPath(import.meta.url));
+        // In production (dist/), files are in dist/plugins/application/dashboard/
+        if (dir.endsWith('dist')) {
+            return dir + '/plugins/application/dashboard';
+        }
+        // In dev mode (src/plugins/application/dashboard/), files are in same directory
+        return dir;
+    }
+
     private setupRoutes() {
         this.router.get("/metrics", async (ctx) => {
             const uptimeSeconds = Math.floor((Date.now() - this.startTime) / 1000);
@@ -177,7 +185,7 @@ export class Dashboard implements ShokupanPlugin {
                 // For accuracy, query the requests table for the specific window
                 let stats;
                 try {
-                    stats = await datastore.query(`
+                    stats = await this.db.query(`
                         SELECT 
                             count() as total,
                             count(IF status < 400 THEN 1 END) as success,
@@ -247,7 +255,7 @@ export class Dashboard implements ShokupanPlugin {
             const startTime = Date.now() - (periodMs * 3);
             const endTime = Date.now();
 
-            const result = await datastore.query(
+            const result = await this.db.query(
                 "SELECT * FROM metrics WHERE timestamp >= $start AND timestamp <= $end AND interval = $interval ORDER BY timestamp ASC",
                 { start: startTime, end: endTime, interval }
             );
@@ -280,7 +288,7 @@ export class Dashboard implements ShokupanPlugin {
         // Top Requests Endpoint
         this.router.get("/requests/top", async (ctx) => {
             const startTime = getIntervalStartTime(ctx.query['interval']);
-            const result = await datastore.query(
+            const result = await this.db.query(
                 "SELECT method, url, count() as count FROM requests WHERE timestamp >= $start GROUP BY method, url ORDER BY count DESC LIMIT 10",
                 { start: startTime }
             );
@@ -290,7 +298,7 @@ export class Dashboard implements ShokupanPlugin {
         // Top Errors Endpoint
         this.router.get("/errors/top", async (ctx) => {
             const startTime = getIntervalStartTime(ctx.query['interval']);
-            const result = await datastore.query(
+            const result = await this.db.query(
                 "SELECT status, count() as count FROM failed_requests WHERE timestamp >= $start GROUP BY status ORDER BY count DESC LIMIT 10",
                 { start: startTime }
             );
@@ -300,7 +308,7 @@ export class Dashboard implements ShokupanPlugin {
         // Failing Requests Endpoint
         this.router.get("/requests/failing", async (ctx) => {
             const startTime = getIntervalStartTime(ctx.query['interval']);
-            const result = await datastore.query(
+            const result = await this.db.query(
                 "SELECT method, url, count() as count FROM failed_requests WHERE timestamp >= $start GROUP BY method, url ORDER BY count DESC LIMIT 10",
                 { start: startTime }
             );
@@ -310,7 +318,7 @@ export class Dashboard implements ShokupanPlugin {
         // Slowest Requests Endpoint
         this.router.get("/requests/slowest", async (ctx) => {
             const startTime = getIntervalStartTime(ctx.query['interval']);
-            const result = await datastore.query(
+            const result = await this.db.query(
                 "SELECT method, url, duration, status, timestamp FROM requests WHERE timestamp >= $start ORDER BY duration DESC LIMIT 10",
                 { start: startTime }
             );
@@ -331,19 +339,19 @@ export class Dashboard implements ShokupanPlugin {
 
         // Requests Listing Endpoint
         this.router.get("/requests", async (ctx) => {
-            const result = await datastore.query("SELECT * FROM requests ORDER BY timestamp DESC LIMIT 100");
+            const result = await this.db.query("SELECT * FROM requests ORDER BY timestamp DESC LIMIT 100");
             return ctx.json({ requests: result[0] || [] });
         });
 
         // Request Details Endpoint
         this.router.get("/requests/:id", async (ctx) => {
-            const result = await datastore.query("SELECT * FROM requests WHERE id = $id", { id: ctx.params['id'] });
+            const result = await this.db.query("SELECT * FROM requests WHERE id = $id", { id: ctx.params['id'] });
             return ctx.json({ request: result[0]?.[0] });
         });
 
         // Replay/Failed Requests Endpoints
         this.router.get("/failures", async (ctx) => {
-            const result = await datastore.query("SELECT * FROM failed_requests ORDER BY timestamp DESC LIMIT 50");
+            const result = await this.db.query("SELECT * FROM failed_requests ORDER BY timestamp DESC LIMIT 50");
             return ctx.json({ failures: result[0] });
         });
 
@@ -516,7 +524,7 @@ export class Dashboard implements ShokupanPlugin {
                             });
                         }
 
-                        await datastore.set(new RecordId('failed_requests', ctx.requestId), {
+                        await this.db.upsert(new RecordId('failed_requests', ctx.requestId), {
                             method: ctx.method,
                             url: ctx.url.toString(),
                             headers: headers,
@@ -546,7 +554,7 @@ export class Dashboard implements ShokupanPlugin {
 
                 // Persist to datastore for detailed view
                 try {
-                    await datastore.set(new RecordId('requests', ctx.requestId), logEntry);
+                    await this.db.upsert(new RecordId('requests', ctx.requestId), logEntry);
                 } catch (e) {
                     console.error("Failed to record request log", e);
                 }

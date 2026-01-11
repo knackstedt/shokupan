@@ -6,16 +6,14 @@ import { Shokupan } from '../../shokupan';
 const PORT = 4000 + Math.floor(Math.random() * 1000);
 
 describe('Debug Dashboard Metrics', () => {
-    let app: Shokupan;
+    const app = new Shokupan({
+        port: PORT,
+        applicationConfig: { enableTracing: false }
+    });
     let baseUrl: string;
     let server: any;
 
     beforeAll(async () => {
-        app = new Shokupan({
-            port: PORT,
-            applicationConfig: { enableTracing: false }
-        });
-
         // Add some dummy routes
         const router = new ShokupanRouter();
         router.get('/fast', (ctx) => ctx.json({ status: 'ok' }));

@@ -2,7 +2,7 @@
 import * as os from 'node:os';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { RecordId } from 'surrealdb';
-import { datastore } from '../../../util/datastore';
+import type { SurrealDatastore } from '../../../util/datastore';
 
 interface AggregatedMetric {
     timestamp: number;
@@ -59,7 +59,9 @@ export class MetricsCollector {
     private eventLoopHistogram = monitorEventLoopDelay({ resolution: 10 });
     private timer: NodeJS.Timeout | null = null;
 
-    constructor() {
+    constructor(
+        private readonly db: SurrealDatastore
+    ) {
         this.eventLoopHistogram.enable();
         // Initialize start times
         const now = Date.now();
@@ -71,7 +73,7 @@ export class MetricsCollector {
         // Start collection loop - tick every 10 seconds to process high-res intervals?
         // Actually, for 1m interval, we should tick at least every minute.
         // Let's tick every 10s to be safe and accurate enough.
-        this.timer = setInterval(() => this.collect(), 10000);
+        // this.timer = setInterval(() => this.collect(), 10000);
     }
 
     public recordRequest(duration: number, isError: boolean) {
@@ -176,15 +178,15 @@ export class MetricsCollector {
         // console.log(`[MetricsCollector] Persisting ${label} metric at timestamp ${timestamp}`);
         try {
             const recordId = new RecordId('metrics', timestamp);
-            await datastore.set(recordId, metric);
+            await this.db.upsert(recordId, metric);
             // console.log(`[MetricsCollector] ✓ Successfully saved ${label} metric to datastore`);
 
             // DEBUG: Verify we can retrieve it immediately
-            const test = await datastore.get(recordId);
+            const test = await this.db.select(recordId);
             // console.log(`[MetricsCollector] DEBUG: Immediate .get() returned:`, test ? 'DATA' : 'NULL');
 
             // DEBUG: Try querying for it  
-            const queryTest = await datastore.query("SELECT * FROM metrics WHERE id = $id", { id: recordId });
+            const queryTest = await this.db.query("SELECT * FROM metrics WHERE id = $id", { id: recordId });
             // console.log(`[MetricsCollector] DEBUG: Query by id returned ${queryTest[0]?.length || 0} records`);
         } catch (e) {
             console.error(`[MetricsCollector] ✗ Failed to save metrics for ${label}:`, e);

@@ -8,7 +8,7 @@ import type { ServerFactory } from "../../util/types";
  * @returns A ServerFactory compatible with Shokupan.
  */
 export function createHttpServer(): ServerFactory {
-    return async (options: any): Promise<Server> => {
+    return async (options: any): Promise<Server<any>> => {
         const server = http.createServer(async (req, res) => {
             const url = new URL(req.url!, `http://${req.headers.host}`);
             const request = new Request(url.toString(), {
@@ -39,7 +39,7 @@ export function createHttpServer(): ServerFactory {
             }
         });
 
-        const fauxServer: Server = {
+        const fauxServer: Server<any> = {
             stop: () => {
                 server.close();
                 return Promise.resolve(); // Bun.Server stop usually returns void but in type definition it might vary.
@@ -66,7 +66,7 @@ export function createHttpServer(): ServerFactory {
             url: new URL(`http://${options.hostname}:${options.port}`),
             // Expose the raw Node.js server for generic socket/websocket support (e.g. Socket.IO)
             nodeServer: server
-        } as unknown as Server;
+        } as unknown as Server<any>;
 
         return new Promise((resolve) => {
             server.listen(options.port, options.hostname, () => {
@@ -82,7 +82,7 @@ export function createHttpServer(): ServerFactory {
  * @returns A ServerFactory compatible with Shokupan.
  */
 export function createHttpsServer(sslOptions: https.ServerOptions): ServerFactory {
-    return async (options: any): Promise<Server> => {
+    return async (options: any): Promise<Server<any>> => {
         const server = https.createServer(sslOptions, async (req, res) => {
             const url = new URL(req.url!, `https://${req.headers.host}`);
             const request = new Request(url.toString(), {
@@ -113,7 +113,7 @@ export function createHttpsServer(sslOptions: https.ServerOptions): ServerFactor
             }
         });
 
-        const fauxServer: Server = {
+        const fauxServer: Server<any> = {
             stop: () => {
                 server.close();
             },
@@ -139,7 +139,7 @@ export function createHttpsServer(sslOptions: https.ServerOptions): ServerFactor
             url: new URL(`https://${options.hostname}:${options.port}`),
             // Expose the raw Node.js server for generic socket/websocket support
             nodeServer: server
-        } as unknown as Server;
+        } as unknown as Server<any>;
 
         return new Promise((resolve) => {
             server.listen(options.port, options.hostname, () => {
