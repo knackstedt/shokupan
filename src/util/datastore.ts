@@ -33,42 +33,72 @@ export class SurrealDatastore {
      * Merge update data into a record by its ID.
      */
     async merge<T extends Record<string, any>>(id: RecordId, data: T) {
-        return this.db.update<T>(id).merge(data);
+        return this.db.update<T>(id).merge(data).catch((err: any) => {
+            if (err.message.includes('This transaction can be retried')) {
+                return this.db.update<T>(id).merge(data);
+            }
+            throw err;
+        });
     }
 
     /**
      * Create a record by its ID.
      */
     async create<T extends Record<string, any>>(id: RecordId, data: Omit<T, 'id'>) {
-        return this.db.create(id).content(data);
+        return this.db.create(id).content(data).catch((err: any) => {
+            if (err.message.includes('This transaction can be retried')) {
+                return this.db.create(id).content(data);
+            }
+            throw err;
+        });
     }
 
     /**
      * Upsert a record by its ID.
      */
     async upsert<T extends Record<string, any>>(id: RecordId, data: T) {
-        return this.db.upsert<T>(id).content(data);
+        return this.db.upsert<T>(id).content(data).catch((err: any) => {
+            if (err.message.includes('This transaction can be retried')) {
+                return this.db.upsert<T>(id).content(data);
+            }
+            throw err;
+        });
     }
 
     /**
      * Delete a record by its ID.
      */
     async delete(id: RecordId) {
-        return this.db.delete(id);
+        return this.db.delete(id).catch((err: any) => {
+            if (err.message.includes('This transaction can be retried')) {
+                return this.db.delete(id);
+            }
+            throw err;
+        });
     }
 
     /**
      * Run a SurrealDB query.
      */
     async query<T extends Array<unknown>>(query: string, vars?: Record<string, any>) {
-        return this.db.query(query, vars).collect<T>();
+        return this.db.query(query, vars).collect<T>().catch((err: any) => {
+            if (err.message.includes('This transaction can be retried')) {
+                return this.db.query(query, vars).collect<T>();
+            }
+            throw err;
+        });
     }
 
     /**
      * Create a relationship between two records.
      */
     async relate(fromId, edgeId, toId, data?: Record<string, any>) {
-        return this.db.relate(fromId, edgeId, toId, data);
+        return this.db.relate(fromId, edgeId, toId, data).catch((err: any) => {
+            if (err.message.includes('This transaction can be retried')) {
+                return this.db.relate(fromId, edgeId, toId, data);
+            }
+            throw err;
+        });
     }
 
 
