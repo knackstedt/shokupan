@@ -30,6 +30,12 @@ export type ScalarPluginOptions = {
      * Only works with TypeScript entrypoints.
      */
     enableStaticAnalysis?: boolean;
+
+    /**
+     * Path to mount the plugin to.
+     * @default '/reference'
+     */
+    path?: string;
 };
 
 /**
@@ -47,11 +53,8 @@ export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin 
     }
 
     onInit(app: Shokupan, options?: ShokupanPluginOptions) {
-        if (options?.path) {
-            app.mount(options.path, this);
-        } else {
-            app.mount(options.path ?? '/', this);
-        }
+        const path = options?.path || this.pluginOptions.path || '/reference';
+        app.mount(path, this);
 
         // Also run onMount logic if needed
         this.onMount(app);

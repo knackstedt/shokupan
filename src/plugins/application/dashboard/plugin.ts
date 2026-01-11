@@ -7,7 +7,7 @@ import { RecordId } from 'surrealdb';
 import type { DebugCollector } from "../../../context";
 import { ShokupanRouter } from "../../../router";
 import type { Shokupan } from '../../../shokupan';
-import { $appRoot, $debug } from "../../../util/symbol";
+import { $appRoot, $childRouters, $debug, $mountPath } from "../../../util/symbol";
 import type { ShokupanHooks, ShokupanPlugin } from "../../../util/types";
 import { MetricsCollector } from './metrics-collector';
 
@@ -51,6 +51,10 @@ export interface DashboardConfig {
      * Retention time in milliseconds
      */
     retentionMs?: number;
+    integrations?: {
+        scalar?: boolean | { path?: string; };
+        asyncapi?: boolean | { path?: string; };
+    };
 }
 
 class Collector implements DebugCollector {
@@ -145,6 +149,46 @@ export class Dashboard implements ShokupanPlugin {
 
         // Set up all routes on the internal router
         this.setupRoutes();
+    }
+
+    private detectIntegrations() {
+        const integrations: Record<string, string | undefined> = {};
+        const routers = this[$appRoot]?.[$childRouters] || [];
+        // Helper to check config
+        const checkConfig = (key: 'scalar' | 'asyncapi') => {
+            const conf = this.dashboardConfig.integrations?.[key];
+            if (conf === false) return { enabled: false };
+            if (typeof conf === 'object' && conf.path) return { enabled: true, path: conf.path };
+            return { enabled: true };
+        };
+
+        // Scalar
+        const scalarConf = checkConfig('scalar');
+        if (scalarConf.enabled) {
+            if (scalarConf.path) {
+                integrations['scalar'] = scalarConf.path;
+            } else {
+                const plugin = routers.find(r => r.constructor.name === 'ScalarPlugin');
+                if (plugin) {
+                    integrations['scalar'] = (plugin as any)[$mountPath];
+                }
+            }
+        }
+
+        // AsyncAPI
+        const asyncApiConf = checkConfig('asyncapi');
+        if (asyncApiConf.enabled) {
+            if (asyncApiConf.path) {
+                integrations['asyncapi'] = asyncApiConf.path;
+            } else {
+                const plugin = routers.find(r => r.constructor.name === 'AsyncApiPlugin');
+                if (plugin) {
+                    integrations['asyncapi'] = (plugin as any)[$mountPath];
+                }
+            }
+        }
+
+        return integrations;
     }
 
     // Get base path for dashboard files - works in both dev (src/) and production (dist/)
@@ -389,11 +433,14 @@ export class Dashboard implements ShokupanPlugin {
             const linkPattern = this.getLinkPattern();
             const template = await readFile(Dashboard.getBasePath() + "/template.eta", 'utf8');
 
+            const integrations = this.detectIntegrations();
+
             return ctx.html(this.eta.renderString(template, {
                 metrics: this.metrics,
                 uptime,
                 rootPath: process.cwd(),
                 linkPattern,
+                integrations,
                 headers: this.dashboardConfig.getRequestHeaders?.()
             }));
         });
