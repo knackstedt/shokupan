@@ -337,10 +337,19 @@ function renderLogs() {
         div.style.display = 'flex';
         div.style.alignItems = 'center';
 
+        const icons = {
+            in: `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="#7986cb"><path d="M17.707 6.293a1 1 0 0 1 0 1.414L9.414 16H15a1 1 0 1 1 0 2H7a1 1 0 0 1-1-1V9a1 1 0 1 1 2 0v5.586l8.293-8.293a1 1 0 0 1 1.414 0z"/></svg>`,
+            out: `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="#4caf50"><path d="M8 7a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v8a1 1 0 1 1-2 0V9.414l-8.293 8.293a1 1 0 0 1-1.414-1.414L14.586 8H9a1 1 0 0 1-1-1z"/></svg>`,
+            error: `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="#ff5722"><path d="M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10S2 17.523 2 12zm5.793-4.207a1 1 0 0 1 1.414 0L12 10.586l2.793-2.793a1 1 0 1 1 1.414 1.414L13.414 12l2.793 2.793a1 1 0 0 1-1.414 1.414L12 13.414l-2.793 2.793a1 1 0 0 1-1.414-1.414L10.586 12 7.793 9.207a1 1 0 0 1 0-1.414z"/></svg>`,
+            info: `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="#03a9f4"><path d="M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10S2 17.523 2 12z"/><path d="M12 10a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1zm1.5-2.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/></svg>`
+        };
         // Escape HTML in msg
-        const safeMsg = entry.msg.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        div.innerHTML = `<span>${icons[entry.type]}</span><span class="log-time">${entry.time}</span><span class="log-content"></span>`;
 
-        div.innerHTML = `<span class="log-time">${entry.time}</span><span class="log-content" title="${safeMsg}">${safeMsg}</span>`;
+        const logContent = div.querySelector('.log-content');
+        logContent.title = entry.msg;
+        logContent.innerText = entry.msg;
+
         container.appendChild(div);
     }
 
