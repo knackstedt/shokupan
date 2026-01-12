@@ -85,6 +85,7 @@
         "secure-json-parse": "^4.0.0",
         "surrealdb": "^2.0.0-alpha.16",
         "@apollo/server": "^5.2.0",
+        "graphql-yoga": "^5.18.0",
         "graphql": "^16.12.0"
     },
     "peerDependenciesMeta": {
@@ -104,6 +105,9 @@
             "optional": true
         },
         "graphql": {
+            "optional": true
+        },
+        "graphql-yoga": {
             "optional": true
         },
         "class-validator": {
