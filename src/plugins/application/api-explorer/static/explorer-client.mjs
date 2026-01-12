@@ -202,6 +202,7 @@ function renderOperationCard(route, index) {
     const { method, path, op } = route;
     const shokupanSource = op['x-shokupan-source'];
     const sourceInfo = op['x-source-info'];
+    const middleware = op['x-shokupan-middleware'] || [];
 
     const uniqueParams = [];
     const seen = new Set();
@@ -275,6 +276,18 @@ function renderOperationCard(route, index) {
         </div>
     ` : '';
 
+    const middlewareHtml = middleware.length > 0 ? `
+        <div class="middleware-section">
+            <span class="middleware-label">Middleware:</span>
+            <div class="middleware-list">
+                ${middleware.map(mw => {
+        const tooltip = mw.metadata ? `File: ${mw.metadata.file}:${mw.metadata.line}` : '';
+        return `<span class="middleware-badge" title="${tooltip}">${escapeHtml(mw.name)}</span>`;
+    }).join('')}
+            </div>
+        </div>
+    ` : '';
+
     return `
         <section id="${op.operationId}" class="operation-card" data-index="${index}">
             <header class="op-header">
@@ -283,6 +296,7 @@ function renderOperationCard(route, index) {
                     <h2 class="path">${escapeHtml(path)}</h2>
                 </div>
                 <div class="op-summary">${escapeHtml(op.summary || '')}</div>
+                ${middlewareHtml}
                 ${viewInEditorLink}
             </header>
             ${descriptionHtml}
