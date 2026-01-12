@@ -3,6 +3,43 @@
 export function ApiExplorerApp({ spec, asyncSpec, config }: any) {
     // Build hierarchy: router -> controller -> routes
     const hierarchy = new Map();
+    const routerMeta = new Map(); // Store metadata for routers/groups
+
+    // Helper to add route to hierarchy
+    const addRoute = (groupKey: string, route: any) => {
+        if (!hierarchy.has(groupKey)) {
+            hierarchy.set(groupKey, []);
+        }
+        hierarchy.get(groupKey).push(route);
+    };
+
+    // Helper to determine group key
+    const getGroupKey = (op: any, source: any) => {
+        // 1. Prefer explicit tags if they look like "titles" (not paths)
+        if (op.tags && op.tags.length > 0) {
+            const tag = typeof op.tags[0] === 'string' ? op.tags[0] : op.tags[0].name;
+            if (!tag.startsWith('/')) return tag;
+        }
+
+        // 2. Class Name
+        if (source?.className) return source.className;
+
+        // 3. File Name (Pretty)
+        if (source?.file) {
+            const parts = source.file.split('/');
+            const filename = parts[parts.length - 1].replace(/\.(ts|js)$/, '');
+            // Convert snake_case or kebab-case to Title Case
+            return filename.split(/[-_]/).map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        }
+
+        // 4. Fallback to path tag if we ignored it in step 1
+        if (op.tags && op.tags.length > 0) {
+            const tag = typeof op.tags[0] === 'string' ? op.tags[0] : op.tags[0].name;
+            return tag;
+        }
+
+        return 'Ungrouped';
+    };
 
     Object.entries(spec.paths || {}).forEach(([path, methods]: [string, any]) => {
         Object.entries(methods).forEach(([method, op]: [string, any]) => {
@@ -12,52 +49,48 @@ export function ApiExplorerApp({ spec, asyncSpec, config }: any) {
 
             const route = { method, path, op };
             const source = (op as any)['x-shokupan-source'];
+            const groupKey = getGroupKey(op, source);
 
-            // Determine group key (controller/router name)
-            let groupKey = 'Ungrouped';
-            if (op.tags && op.tags.length > 0) {
-                groupKey = op.tags[0];
-            } else if (source?.className) {
-                groupKey = source.className;
-            }
-
-            if (!hierarchy.has(groupKey)) {
-                hierarchy.set(groupKey, []);
-            }
-            hierarchy.get(groupKey).push(route);
+            addRoute(groupKey, route);
         });
     });
 
     // Merge AsyncAPI channels into hierarchy
     Object.entries(asyncSpec?.channels || {}).forEach(([name, ch]: [string, any]) => {
         const operations = [];
-        if (ch.publish) operations.push({ method: 'pub', op: ch.publish });
-        if (ch.subscribe) operations.push({ method: 'sub', op: ch.subscribe });
+        // Map to SEND/RECV per user request
+        if (ch.publish) operations.push({ method: 'recv', op: ch.publish }); // App publishes, Client RECVs
+        if (ch.subscribe) operations.push({ method: 'send', op: ch.subscribe }); // App subscribes, Client SENDs
 
         operations.forEach(({ method, op }) => {
             if (!op.operationId) op.operationId = `${method}-${name.replace(/[^a-zA-Z0-9]/g, '-')}`;
 
             const route = { method, path: name, op };
+            const source = (op as any)['x-shokupan-source'];
+            console.log(`[AsyncAPI Debug] ${name} ${method}:`, { source, tags: op.tags });
+            const groupKey = getGroupKey(op, source);
 
-            // Determine group key
-            let groupKey = 'Ungrouped';
-            // AsyncAPI uses Tag objects { name: string }, OpenAPI uses strings
-            if (op.tags && op.tags.length > 0) {
-                const tag = op.tags[0];
-                groupKey = typeof tag === 'string' ? tag : tag.name;
-            }
-
-            if (!hierarchy.has(groupKey)) {
-                hierarchy.set(groupKey, []);
-            }
-            hierarchy.get(groupKey).push(route);
+            addRoute(groupKey, route);
         });
     });
 
-    const sortedGroups = Array.from(hierarchy.entries()).sort(([a], [b]) => a.localeCompare(b));
+    // Sort groups
+    const sortedGroups = Array.from(hierarchy.entries())
+        .map(([name, routes]) => {
+            // Sort routes within group: simple methods first, then by path length
+            routes.sort((a: any, b: any) => {
+                return a.path.localeCompare(b.path);
+            });
+            return [name, routes] as [string, any[]];
+        })
+        .sort(([a], [b]) => {
+            if (a === 'Ungrouped') return 1;
+            if (b === 'Ungrouped') return -1;
+            return a.localeCompare(b);
+        });
 
-    // Consolidate all operations for MainContent
-    const allRoutes = Array.from(hierarchy.values()).flat();
+    // Flatten for client-side data
+    const allRoutes = sortedGroups.flatMap(([_, routes]) => routes);
 
     return (
         <html lang="en">
@@ -65,10 +98,20 @@ export function ApiExplorerApp({ spec, asyncSpec, config }: any) {
                 <meta charSet="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>{spec.info?.title || 'API Explorer'}</title>
-                <link rel="stylesheet" href="theme.css" />
                 <link rel="stylesheet" href="style.css" />
+                <link rel="stylesheet" href="theme.css" />
                 <script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
                 <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+                <script dangerouslySetInnerHTML={{
+                    __html: `
+                    (function() {
+                        if (!window.location.pathname.endsWith('/') && !window.location.pathname.split('/').pop().includes('.')) {
+                            var newUrl = window.location.pathname + '/' + window.location.search + window.location.hash;
+                            window.history.replaceState(null, null, newUrl);
+                            window.location.reload(); 
+                        }
+                    })();
+                `}}></script>
             </head>
             <body class="dark-theme">
                 <div id="app">
@@ -93,15 +136,24 @@ function Sidebar({ spec, sortedGroups }: any) {
             <div class="sidebar-collapse-trigger">➔</div>
             <nav class="nav-groups">
                 {sortedGroups.map(([groupName, routes]: [string, any[]]) => (
-                    <div class="nav-group" key={groupName}>
-                        <div class="nav-group-title">{groupName}</div>
+                    <div class="nav-group collapsed" key={groupName}>
+                        <div class="nav-group-title">
+                            <span class="chevron">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </span> {groupName}
+                        </div>
                         <div class="nav-items">
-                            {routes.map((route: any) => (
-                                <a key={route.op.operationId} href={`#${route.op.operationId}`} class="nav-item">
-                                    <span class={`method-badge ${route.method}`}>{route.method.toUpperCase()}</span>
-                                    <span class="path">{route.path}</span>
-                                </a>
-                            ))}
+                            {routes.map((route: any) => {
+                                const label = route.op.summary || route.op.title || route.path;
+                                return (
+                                    <a key={route.op.operationId} href={`#${route.op.operationId}`} class="nav-item" data-id={route.op.operationId} title={route.path}>
+                                        <span class={`method-badge ${route.method}`}>{route.method.toUpperCase()}</span>
+                                        <span class="nav-label">{label}</span>
+                                    </a>
+                                );
+                            })}
                         </div>
                     </div>
                 ))}
@@ -111,113 +163,20 @@ function Sidebar({ spec, sortedGroups }: any) {
 }
 
 function MainContent({ allRoutes, config, spec }: any) {
-    return (
-        <main class="content">
-            <div class="info-section">
-                <h1>{spec.info?.title}</h1>
-                {spec.info?.description && <div class="markdown-content" data-markdown="true">{spec.info.description}</div>}
-            </div>
-            <div class="operations">
-                {allRoutes.map((route: any) => <OperationCard key={route.op.operationId} route={route} config={config} />)}
-            </div>
-        </main>
-    );
-}
-
-function OperationCard({ route, config }: any) {
-    const { method, path, op } = route;
-    const shokupanSource = (op as any)['x-shokupan-source'];
-    const sourceInfo = (op as any)['x-source-info'];
-
-    const uniqueParams: any[] = [];
-    const seen = new Set();
-    (op.parameters || []).forEach((p: any) => {
-        const key = `${p.name}-${p.in}`;
-        if (!seen.has(key)) {
-            seen.add(key);
-            uniqueParams.push(p);
-        }
+    // Serialize data for client-side consumption
+    const explorerData = JSON.stringify({
+        routes: allRoutes,
+        config,
+        info: spec.info
     });
 
-    // Extract code from description (embedded in markdown code blocks)
-    let sourceCode = sourceInfo?.snippet || shokupanSource?.code || null;
-    let cleanDescription = op.description || '';
-
-    if (cleanDescription) {
-        const codeBlockMatch = cleanDescription.match(/```(?:typescript|javascript)\n([\s\S]*?)\n```/);
-        if (codeBlockMatch) {
-            sourceCode = codeBlockMatch[1];
-            // Remove code block but keep warning messages
-            cleanDescription = cleanDescription.replace(/```(?:typescript|javascript)\n[\s\S]*?\n```/, '').trim();
-        }
-    }
-
-    // Build "View in Editor" link - always use vscode://
-    let viewInEditorLink = null;
-    if (shokupanSource?.file) {
-        const file = shokupanSource.file;
-        const line = shokupanSource.line || 1;
-        viewInEditorLink = `vscode://file/${file}:${line}`;
-    }
+    const safeJson = explorerData.replace(/<\/script>/g, '<\\/script>');
 
     return (
-        <section id={op.operationId} class="operation-card">
-            <header class="op-header">
-                <div class="op-title">
-                    <span class={`method-badge large ${method}`}>{method.toUpperCase()}</span>
-                    <h2 class="path">{path}</h2>
-                </div>
-                <div class="op-summary">{op.summary}</div>
-                {viewInEditorLink && (
-                    <div style="margin-top: 0.5rem">
-                        <a href={viewInEditorLink} style="color: var(--color-accent); font-size: 0.9rem; text-decoration: none">
-                            📝 View in Editor
-                        </a>
-                    </div>
-                )}
-            </header>
-            {cleanDescription && <div class="op-description markdown-content" data-markdown="true">{cleanDescription}</div>}
-
-            {sourceCode && (
-                <div class="code-section">
-                    <h4>Source Code</h4>
-                    <div class="monaco-editor read-only" data-code={Buffer.from(sourceCode, 'utf-8').toString('base64')} data-language="typescript"></div>
-                </div>
-            )}
-
-            <div class="tester-section">
-                <h3>Try It Out</h3>
-                <form class="tester-form" data-method={method} data-path={path}>
-                    {uniqueParams.length > 0 && (
-                        <div class="params-table">
-                            <h4>Parameters</h4>
-                            {uniqueParams.map((p) => (
-                                <div key={p.name} class="param-row">
-                                    <label>
-                                        <span class="param-name">{p.name}</span>
-                                        <span class="param-in">({p.in})</span>
-                                        {p.required && <span class="required">*</span>}
-                                    </label>
-                                    <input type="text" name={p.name} data-in={p.in} placeholder={p.description || ''} />
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                    <div class="actions">
-                        <button type="submit" class="btn primary">Send Request</button>
-                        <button type="button" class="btn copy-curl">Copy as cURL</button>
-                        <button type="button" class="btn copy-fetch">Copy as Fetch</button>
-                    </div>
-                </form>
-                <div class="response-viewer" style="display: none">
-                    <h4>Response</h4>
-                    <div class="status-bar">
-                        <span class="status-code"></span>
-                        <span class="duration"></span>
-                    </div>
-                    <div class="monaco-response" data-response="true"></div>
-                </div>
-            </div>
-        </section>
+        <main class="content" id="main-content">
+            <div class="info-section-placeholder"></div>
+            <div id="virtual-scroller-container"></div>
+            <script id="explorer-data" type="application/json" dangerouslySetInnerHTML={{ __html: safeJson }}></script>
+        </main>
     );
 }

@@ -273,7 +273,7 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
         // console.warn("OpenAPI AST analysis skipped:", e);
     }
 
-    const collect = (router: ShokupanRouter<T>, prefix = "", currentGroup = defaultTagGroup, defaultTag = defaultTagName) => {
+    const collect = (router: ShokupanRouter<T>, prefix = "", currentGroup = defaultTagGroup, defaultTag = defaultTagName, inheritedMiddleware: any[] = []) => {
         let group = currentGroup;
         let tag = defaultTag;
 
@@ -294,6 +294,8 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
 
         if (!tagGroups.has(group)) tagGroups.set(group, new Set());
 
+        const routerMiddleware = router.middleware || [];
+
         const routes = (router as any)[$routes] || [];
 
         for (const route of routes) {
@@ -313,6 +315,17 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                 responses: { '200': { description: "Successful response" } },
                 tags: [tag]
             };
+
+            // Collect Middleware
+            const routeMiddleware = route.middleware || [];
+            const allMiddleware = [...inheritedMiddleware, ...routerMiddleware, ...routeMiddleware];
+
+            if (allMiddleware.length > 0) {
+                operation['x-shokupan-middleware'] = allMiddleware.map(mw => ({
+                    name: mw.name || 'middleware',
+                    metadata: mw.metadata
+                }));
+            }
 
             if (route.guards) {
                 for (const guard of route.guards) {
@@ -524,7 +537,7 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
             const cleanPrefix = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
             const cleanMount = mountPath.startsWith("/") ? mountPath : "/" + mountPath;
             const nextPrefix = (cleanPrefix + cleanMount) || "/";
-            collect(child, nextPrefix, group, tag);
+            collect(child, nextPrefix, group, tag, [...inheritedMiddleware, ...routerMiddleware]);
         }
     };
 

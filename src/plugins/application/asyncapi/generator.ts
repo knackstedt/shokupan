@@ -155,14 +155,17 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                                 ...(userSpec?.message ? userSpec.message : {})
                             },
                             ...(userSpec?.type === 'publish' ? userSpec : {}),
-                            "x-source-info": astMatch?.sourceContext ? {
-                                // DEBUG: Check snippet existence
-                                // console.log('DEBUG sourceContext', Object.keys(astMatch.sourceContext));
-                                file: astMatch.sourceContext.file,
-                                line: astMatch.sourceContext.startLine,
-                                snippet: astMatch.sourceContext.snippet || astMatch.handlerSource,
-                                offset: astMatch.sourceContext.snippetStartLine || astMatch.sourceContext.startLine,
-                                highlightLines: [astMatch.sourceContext.startLine, astMatch.sourceContext.endLine]
+                            "x-source-info": ((handler as any).source || astMatch?.sourceContext) ? {
+                                file: (handler as any).source?.file || astMatch?.sourceContext?.file,
+                                line: (handler as any).source?.line || astMatch?.sourceContext?.startLine,
+                                snippet: astMatch?.sourceContext?.snippet || astMatch?.handlerSource,
+                                offset: astMatch?.sourceContext?.snippetStartLine || astMatch?.sourceContext?.startLine,
+                                highlightLines: astMatch?.sourceContext ? [astMatch.sourceContext.startLine, astMatch.sourceContext.endLine] : undefined
+                            } : undefined,
+                            "x-shokupan-source": ((handler as any).source || astMatch?.sourceContext) ? {
+                                file: (handler as any).source?.file || astMatch?.sourceContext?.file,
+                                line: (handler as any).source?.line || astMatch?.sourceContext?.startLine,
+                                code: astMatch?.sourceContext?.snippet || astMatch?.handlerSource || ''
                             } : undefined
                         }
                     };
@@ -205,6 +208,11 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                                     offset: astMatch?.sourceContext?.startLine,
                                     highlightLines: emit.location ? [emit.location.startLine, emit.location.endLine] : undefined
                                 },
+                                "x-shokupan-source": {
+                                    file: astMatch?.sourceContext?.file,
+                                    line: emit.location?.startLine,
+                                    code: astMatch?.handlerSource || ''
+                                },
                                 message: { payload: { type: 'object' } }
                             }
                         };
@@ -225,6 +233,11 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                                     snippet: astMatch.handlerSource,
                                     offset: astMatch.sourceContext.startLine,
                                     highlightLines: [emit.location.startLine, emit.location.endLine]
+                                } : undefined,
+                                "x-shokupan-source": (astMatch?.sourceContext && emit.location) ? {
+                                    file: astMatch.sourceContext.file,
+                                    line: emit.location.startLine,
+                                    code: astMatch.handlerSource || ''
                                 } : undefined
                             }
                         };
@@ -290,6 +303,11 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                                     snippet: astMatch.handlerSource, // Optional: snippet of HTTP handler
                                     offset: astMatch.sourceContext.startLine,
                                     highlightLines: [emit.location.startLine, emit.location.endLine]
+                                } : undefined,
+                                "x-shokupan-source": (astMatch?.sourceContext && emit.location) ? {
+                                    file: astMatch.sourceContext.file,
+                                    line: emit.location.startLine,
+                                    code: astMatch.handlerSource || ''
                                 } : undefined
                             }
                         };
@@ -332,6 +350,11 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                     snippet: r.sourceContext?.snippet || r.handlerSource,
                     offset: r.sourceContext?.snippetStartLine || r.sourceContext?.startLine,
                     highlightLines: r.sourceContext ? [r.sourceContext.startLine, r.sourceContext.endLine] : undefined
+                },
+                "x-shokupan-source": {
+                    file: r.sourceContext?.file,
+                    line: r.sourceContext?.startLine,
+                    code: r.sourceContext?.snippet || r.handlerSource || ''
                 },
                 message: { payload: { type: 'object' } }
             }
