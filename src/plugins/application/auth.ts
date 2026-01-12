@@ -1,13 +1,4 @@
 
-import {
-    Apple, Auth0,
-    GitHub, Google, MicrosoftEntraId,
-    OAuth2Client,
-    Okta,
-    generateCodeVerifier,
-    generateState
-} from "arctic";
-import * as jose from "jose";
 import { ShokupanContext } from "../../context";
 import { ShokupanRouter } from "../../router";
 import type { Shokupan } from "../../shokupan";
@@ -127,17 +118,24 @@ export interface AuthConfig {
  */
 export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
     private secret: Uint8Array;
+    private arctic!: typeof import("arctic");
+    private jose!: typeof import("jose");
 
     constructor(private authConfig: AuthConfig) {
         super();
         this.secret = typeof authConfig.jwtSecret === 'string'
             ? new TextEncoder().encode(authConfig.jwtSecret)
             : authConfig.jwtSecret;
-
-        this.init();
     }
 
-    onInit(app: Shokupan, options?: ShokupanPluginOptions) {
+    async onInit(app: Shokupan, options?: ShokupanPluginOptions) {
+        // Load dependencies asynchronously
+        this.arctic = await import("arctic");
+        this.jose = await import("jose");
+
+        // Initialize routes
+        this.init();
+
         // If registered via app.register(), mount it to root or specified path
         if (options?.path) {
             app.mount(options.path, this);
@@ -147,6 +145,8 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
     }
 
     private getProviderInstance(name: string, p: ProviderConfig) {
+        const { GitHub, Google, MicrosoftEntraId, Apple, Auth0, Okta, OAuth2Client } = this.arctic;
+
         switch (name) {
             case 'github':
                 return new GitHub(p.clientId, p.clientSecret, p.redirectUri);
@@ -176,7 +176,7 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
 
     private async createSession(user: AuthUser, ctx: ShokupanContext) {
         const alg = 'HS256';
-        const jwt = await new jose.SignJWT({ ...user })
+        const jwt = await new this.jose.SignJWT({ ...user })
             .setProtectedHeader({ alg })
             .setIssuedAt()
             .setExpirationTime(this.authConfig.jwtExpiration || '24h')
@@ -195,7 +195,9 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
     }
 
     private init() {
+        const { generateState, generateCodeVerifier, GitHub, Google, MicrosoftEntraId, Apple, Auth0, Okta, OAuth2Client } = this.arctic;
         const providerEntries = Object.entries(this.authConfig.providers);
+
         for (let i = 0; i < providerEntries.length; i++) {
             const [providerName, providerConfig] = providerEntries[i];
             if (!providerConfig) continue;
@@ -358,7 +360,7 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
         else if (provider === 'apple') {
             // Apple user info is in the ID Token
             if (idToken) {
-                const payload = jose.decodeJwt(idToken);
+                const payload = this.jose.decodeJwt(idToken);
                 user = {
                     id: payload.sub!,
                     email: payload['email'] as string,
@@ -392,6 +394,12 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
      */
     public getMiddleware() {
         return async (ctx: ShokupanContext, next: () => Promise<any>) => {
+            if (!this.jose) {
+                // Try to load jose if not already loaded (e.g. middleware used without full plugin init?)
+                // Ideally onInit should have run.
+                this.jose = await import("jose");
+            }
+
             const authHeader = ctx.req.headers.get("Authorization");
             let token = authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : null;
 
@@ -403,7 +411,7 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
 
             if (token) {
                 try {
-                    const { payload } = await jose.jwtVerify(token, this.secret);
+                    const { payload } = await this.jose.jwtVerify(token, this.secret);
                     (ctx as any).user = payload;
                 } catch {
                     // Invalid token, just proceed without user or throw?

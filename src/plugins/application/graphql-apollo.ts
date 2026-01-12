@@ -1,4 +1,4 @@
-import { ApolloServer, HeaderMap } from '@apollo/server';
+import type { ApolloServer } from '@apollo/server';
 import { ShokupanRouter } from '../../router';
 import type { Shokupan } from '../../shokupan';
 import type { ShokupanPlugin, ShokupanPluginOptions } from '../../util/types';
@@ -31,20 +31,23 @@ export interface GraphQLPluginOptions {
  * Enables serving GraphQL APIs using Apollo Server 4.
  */
 export class GraphQLApolloPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
-    private apolloServer: ApolloServer;
+    private apolloServer: ApolloServer<any>; // Use generic any or verify type
 
     constructor(private pluginOptions: GraphQLPluginOptions) {
         super();
         this.pluginOptions.path ??= '/graphql';
-
-        this.apolloServer = new ApolloServer({
-            typeDefs: pluginOptions.typeDefs,
-            resolvers: pluginOptions.resolvers,
-            ...(pluginOptions.apolloConfig || {} as any),
-        });
     }
 
-    onInit(app: Shokupan, options?: ShokupanPluginOptions) {
+    async onInit(app: Shokupan, options?: ShokupanPluginOptions) {
+        // Load peer dependencies
+        const { ApolloServer, HeaderMap } = await import('@apollo/server');
+
+        this.apolloServer = new ApolloServer({
+            typeDefs: this.pluginOptions.typeDefs,
+            resolvers: this.pluginOptions.resolvers,
+            ...(this.pluginOptions.apolloConfig || {} as any),
+        });
+
         const path = options?.path || this.pluginOptions.path || '/graphql';
         app.mount(path, this);
 
