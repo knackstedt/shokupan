@@ -205,6 +205,9 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * Registers an event handler for WebSocket.
      */
     public event(name: string, handler: ShokupanHandler<T>) {
+        const info = getCallerInfo();
+        (handler as any).source = { file: info.file, line: info.line };
+
         if (this.eventHandlers.has(name)) {
             const err = new EventError(`Event handler \`${name}\` already exists.`);
             console.warn(err);
