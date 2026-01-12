@@ -150,7 +150,7 @@ function Sidebar({ spec, sortedGroups }: any) {
                                 const isRuntime = route.op['x-source-info']?.isRuntime;
                                 return (
                                     <a key={route.op.operationId} href={`#${route.op.operationId}`} class="nav-item" data-id={route.op.operationId} title={route.path}>
-                                        <span class={`method-badge ${route.method}`}>{route.method.toUpperCase()}</span>
+                                        <span class={`badge badge-${route.method.toUpperCase()}`}>{route.method.toUpperCase()}</span>
                                         <span class="nav-label">{label}</span>
                                         {isRuntime && (
                                             <span class="nav-warning" title="Static Analysis Failed" style="margin-left: auto; color: orange;">
@@ -184,8 +184,9 @@ function MainContent({ allRoutes, config, spec }: any) {
 
     return (
         <main class="content" id="main-content">
-            <div class="info-section-placeholder"></div>
-            <div id="virtual-scroller-container"></div>
+            <div id="ide-container">
+                <div class="empty-state">Select a request to view details</div>
+            </div>
             <script id="explorer-data" type="application/json" dangerouslySetInnerHTML={{ __html: safeJson }}></script>
         </main>
     );

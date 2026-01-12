@@ -79,7 +79,7 @@ a {
 .scroller {
     overflow-y: auto;
     scrollbar-width: thin;
-    scrollbar-color: var(--secondary) transparent;
+    scrollbar-color: var(--primary) transparent;
 }
 
 .sidebar-header {
@@ -155,18 +155,6 @@ a {
     text-transform: uppercase;
     min-width: 38px;
     text-align: center;
-}
-
-.badge.send {
-    background: rgba(59, 130, 246, 0.15);
-    color: #60a5fa;
-    border: 1px solid rgba(59, 130, 246, 0.3);
-}
-
-.badge.recv {
-    background: rgba(16, 185, 129, 0.15);
-    color: #34d399;
-    border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
 /* ================== Center: Documentation ================== */

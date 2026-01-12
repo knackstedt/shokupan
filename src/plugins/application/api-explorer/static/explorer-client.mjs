@@ -2,24 +2,16 @@
 
 // Global State
 let explorerData = { routes: [], config: {}, info: {} };
-let virtualScroller = null;
+let currentRoute = null;
+let currentEditors = { request: null, response: null };
 
 document.addEventListener('DOMContentLoaded', () => {
     loadData();
-    renderInfoSection();
     setupSidebar();
-
-    // Initialize Virtual Scroller
-    virtualScroller = new VirtualScroller(
-        document.querySelector('.content'),
-        document.getElementById('virtual-scroller-container'),
-        explorerData.routes,
-        renderOperationCard,
-        150 // estimated item height (smaller average)
-    );
-
-    // Handle hash navigation manually since elements might not exist yet
     handleHashNavigation();
+
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleHashNavigation);
 });
 
 function loadData() {
@@ -33,217 +25,533 @@ function loadData() {
     }
 }
 
-function renderInfoSection() {
-    // Render the initial info section if it exists
-    const container = document.querySelector('.info-section-placeholder');
-    if (!container || !explorerData.info) return;
+function handleHashNavigation() {
+    const hash = window.location.hash.slice(1);
+    const container = document.getElementById('ide-container');
 
-    const { title, description } = explorerData.info;
-    const html = `
+    // If no hash, show info/empty state
+    if (!hash) {
+        // Show info section if available, otherwise empty state
+        if (explorerData.info) {
+            container.innerHTML = renderInfoSection(explorerData.info);
+        } else {
+            container.innerHTML = '<div class="empty-state">Select a request to view details</div>';
+        }
+        return;
+    }
+
+    // Find route
+    const route = explorerData.routes.find(r => r.op.operationId === hash);
+    if (route) {
+        currentRoute = route;
+        renderRequestView(route, container);
+    } else {
+        container.innerHTML = `<div class="empty-state">Request not found: ${hash}</div>`;
+    }
+}
+
+function renderInfoSection(info) {
+    const { title, description } = info;
+    return `
         <div class="info-section">
             <h1>${title || 'API Explorer'}</h1>
             ${description ? `<div class="markdown-content" data-markdown="true">${parseMarkdown(description)}</div>` : ''}
         </div>
     `;
-    container.innerHTML = html;
 }
 
-// --- Virtual Scroller Implementation ---
+// --- IDE View Implementation ---
 
-class VirtualScroller {
-    constructor(scrollContainer, contentContainer, items, renderItemFn, estimatedHeight = 150) {
-        this.scrollContainer = scrollContainer;
-        this.contentContainer = contentContainer;
-        this.items = items;
-        this.renderItemFn = renderItemFn;
-        this.estimatedHeight = estimatedHeight;
+function renderRequestView(route, container) {
+    const { method, path, op } = route;
 
-        // State for variable height
-        this.itemSizes = new Map(); // index -> height
-        this.itemOffsets = new Map(); // index -> absolute top
-        this.totalInternalHeight = 0;
+    // Build tabs for Request Body, Params, Auth, etc.
+    const uniqueParams = getUniqueParams(op);
+    const hasBody = op.requestBody || (method !== 'get' && method !== 'delete');
 
-        this.visibleItems = new Map(); // index -> { element, resizeObserver }
-        this.buffer = 5; // Number of items above/below to render
-        this.ticking = false;
-        this.isRecalculating = false;
+    const html = `
+        <div class="ide-view">
+            <!-- Request Panel -->
+            <div class="ide-panel request-panel">
+                <div class="request-panel-header">
+                    <div class="request-header-main">
+                        <div class="request-url-bar">
+                            <span class="url-method badge-${method}">${method.toUpperCase()}</span>
+                            <input type="text" class="url-input" value="${path}" readonly />
+                        </div>
+                        <button class="send-btn" id="btn-send">Send</button>
+                    </div>
+                    <div class="request-actions">
+                        <button class="btn icon-btn copy-curl" title="Copy cURL">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            Copy cURL
+                        </button>
+                        <button class="btn icon-btn copy-fetch" title="Copy Fetch">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                            Copy Fetch
+                        </button>
+                    </div>
+                </div>
 
-        this.init();
-    }
+                <div class="panel-tabs">
+                    <div class="panel-tab active" data-tab="params">Params</div>
+                    <div class="panel-tab" data-tab="headers">Headers</div>
+                    ${hasBody ? '<div class="panel-tab" data-tab="body">Body</div>' : ''}
+                    <div class="panel-tab" data-tab="auth">Auth</div>
+                </div>
 
-    init() {
-        this.recalculateOffsets();
+                <div class="panel-content">
+                    <div class="panel-section active" id="tab-params">
+                        ${uniqueParams.length > 0 ? renderParamsTable(uniqueParams) : '<div style="padding:16px; color:var(--text-secondary)">No parameters</div>'}
+                    </div>
+                    <div class="panel-section" id="tab-headers">
+                        <div class="headers-editor" style="padding:16px;">
+                            <div class="headers-table" id="req-headers-table">
+                                <!-- Default headers -->
+                                <div class="header-row">
+                                    <div style="flex:1"><input type="text" class="header-name" value="Accept" placeholder="Header Name" /></div>
+                                    <div style="flex:2"><input type="text" class="header-value" value="*/*" placeholder="Value" /></div>
+                                    <button class="btn icon-btn remove-header" title="Remove Header">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                    </button>
+                                </div>
+                                <div class="header-row">
+                                    <div style="flex:1"><input type="text" class="header-name" value="Content-Type" placeholder="Header Name" /></div>
+                                    <div style="flex:2"><input type="text" class="header-value" value="application/json" placeholder="Value" /></div>
+                                    <button class="btn icon-btn remove-header" title="Remove Header">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <button class="btn" id="btn-add-header" style="margin-top:12px; font-size:0.8rem">+ Add Header</button>
+                        </div>
+                    </div>
+                    ${hasBody ? `
+                    <div class="panel-section" id="tab-body" style="height:100%; display:none; flex-direction:column;">
+                        <div id="monaco-request-body" class="monaco-container"></div>
+                    </div>
+                    ` : ''}
+                    <div class="panel-section" id="tab-auth">
+                        <div style="padding:16px; color:var(--text-secondary)">
+                            No authentication configured
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-        this.scrollContainer.addEventListener('scroll', () => this.onScroll());
-        window.addEventListener('resize', () => {
-            this.recalculateOffsets();
-            this.onScroll();
-        });
+            <!-- Resizer -->
+            <div class="panel-resizer"></div>
 
-        // Initial render
-        this.updateVisibleItems();
-    }
+            <!-- Response Panel -->
+            <div class="ide-panel response-panel">
+                 <div class="response-status-bar">
+                    <span style="margin-right:8px;">Response</span>
+                    <span id="response-meta"></span>
+                    <span style="flex: 1"></span>
+                    <button class="btn" id="btn-download-response" style="display:none; margin-right:8px;">Download</button>
+                    <button class="btn" id="btn-copy-response" style="display:none;">Copy</button>
+                </div>
+                <div class="monaco-container" id="monaco-response-body">
+                    <div class="response-loader" style="display:none">Sending...</div>
+                </div>
+            </div>
+        </div>
+    `;
 
-    // Iterate through all items to calculate their cumulative offsets based on known sizes
-    recalculateOffsets() {
-        let offset = 0;
-        this.itemOffsets.clear();
+    container.innerHTML = html;
 
-        for (let i = 0; i < this.items.length; i++) {
-            this.itemOffsets.set(i, offset);
-            const height = this.itemSizes.get(i) || this.estimatedHeight;
-            offset += height;
-        }
-
-        this.totalInternalHeight = offset;
-        this.contentContainer.style.height = `${this.totalInternalHeight}px`;
-    }
-
-    onScroll() {
-        if (!this.ticking) {
-            window.requestAnimationFrame(() => {
-                this.updateVisibleItems();
-                this.ticking = false;
+    // Setup tabs
+    container.querySelectorAll('.panel-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            container.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+            container.querySelectorAll('.panel-section').forEach(s => {
+                s.style.display = 'none';
+                s.classList.remove('active');
             });
-            this.ticking = true;
-        }
-    }
 
-    // Binary search to find the item index at a given scroll offset
-    findStartIndex(scrollTop) {
-        let low = 0;
-        let high = this.items.length - 1;
+            tab.classList.add('active');
+            const target = container.querySelector(`#tab-${tab.dataset.tab}`);
+            if (target) {
+                target.style.display = 'flex'; // Use flex for monaco containers to fill
+                target.classList.add('active');
 
-        while (low <= high) {
-            const mid = Math.floor((low + high) / 2);
-            const offset = this.itemOffsets.get(mid);
-            const height = this.itemSizes.get(mid) || this.estimatedHeight;
-
-            if (offset <= scrollTop && offset + height > scrollTop) {
-                return mid;
-            } else if (offset < scrollTop) {
-                low = mid + 1;
-            } else {
-                high = mid - 1;
-            }
-        }
-        return Math.max(0, low - 1);
-    }
-
-    updateVisibleItems() {
-        const scrollTop = this.scrollContainer.scrollTop;
-        const viewportHeight = this.scrollContainer.clientHeight;
-
-        const startIndex = Math.max(0, this.findStartIndex(scrollTop) - this.buffer);
-        // We find the end index by looking for the item at (scrollTop + viewportHeight)
-        const endIndex = Math.min(
-            this.items.length - 1,
-            this.findStartIndex(scrollTop + viewportHeight) + this.buffer
-        );
-
-        // Remove items no longer in range
-        for (const [index, data] of this.visibleItems) {
-            if (index < startIndex || index > endIndex) {
-                if (data.resizeObserver) data.resizeObserver.disconnect();
-                data.element.remove();
-                this.visibleItems.delete(index);
-            }
-        }
-
-        // Add new items
-        let needsRecalc = false;
-        for (let i = startIndex; i <= endIndex; i++) {
-            if (!this.visibleItems.has(i)) {
-                this.renderItem(i);
-                // If we rendered a new item and we don't know its size yet, we might need a recalc cycle shortly
-                // but ResizeObserver will trigger that.
-            } else {
-                // Update position if it shifted (e.g. dynamic updates above)
-                const el = this.visibleItems.get(i).element;
-                const expectedTop = this.itemOffsets.get(i);
-                // Optimization: direct style access is fast enough, but avoid layout thrashing
-                if (parseInt(el.style.top) !== expectedTop) {
-                    el.style.top = `${expectedTop}px`;
+                // Layout monaco
+                if (tab.dataset.tab === 'body' && currentEditors.request) {
+                    currentEditors.request.layout();
                 }
             }
-        }
-
-        // Initialize components (Monaco, etc.) - handled internally by renderItem/observers 
-        // passing container to setupMonaco for lazy loading logic inside setupMonaco? 
-        // Actually, we should call setupMonaco for the newly added items.
-        // We can pass the specific elements to setupMonaco.
-
-        const newElements = [];
-        for (let i = startIndex; i <= endIndex; i++) {
-            // We can just grab from map
-            newElements.push(this.visibleItems.get(i).element);
-        }
-        setupMonacoForElements(newElements);
-        setupTesterForElements(newElements);
-    }
-
-    renderItem(index) {
-        const item = this.items[index];
-        const html = this.renderItemFn(item, index);
-
-        const wrapper = document.createElement('div');
-        wrapper.innerHTML = html;
-        const element = wrapper.firstElementChild;
-
-        // Position absolutely
-        const top = this.itemOffsets.get(index);
-        element.style.position = 'absolute';
-        element.style.top = `${top}px`;
-        element.style.left = '0';
-        element.style.right = '0';
-        // element.style.height = 'auto'; // Default
-
-        this.contentContainer.appendChild(element);
-
-        // Observe resize
-        const ro = new ResizeObserver((entries) => {
-            for (const entry of entries) {
-                this.onItemResize(index, entry.borderBoxSize[0].blockSize);
-            }
         });
-        ro.observe(element);
+    });
 
-        this.visibleItems.set(index, { element, resizeObserver: ro });
+    // Initialize Monaco
+    initMonaco();
+
+    // Event Listeners
+    document.getElementById('btn-send').addEventListener('click', () => doSendRequest(route));
+
+    // Copy buttons
+    container.querySelector('.copy-curl').addEventListener('click', () => {
+        const text = buildCurl(route);
+        copyToClipboard(text);
+    });
+    container.querySelector('.copy-fetch').addEventListener('click', () => {
+        const text = buildFetch(route);
+        copyToClipboard(text);
+    });
+
+    document.getElementById('btn-copy-response').addEventListener('click', () => {
+        if (currentEditors.response) {
+            copyToClipboard(currentEditors.response.getValue());
+        }
+    });
+
+    // Headers Management
+    const headersTable = container.querySelector('#req-headers-table');
+
+    // Add Header
+    container.querySelector('#btn-add-header').addEventListener('click', () => {
+        const row = document.createElement('div');
+        row.className = 'header-row';
+        row.innerHTML = `
+            <div style="flex:1"><input type="text" class="header-name" placeholder="Header Name" /></div>
+            <div style="flex:2"><input type="text" class="header-value" placeholder="Value" /></div>
+            <button class="btn icon-btn remove-header" title="Remove Header">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        `;
+        headersTable.appendChild(row);
+        setupRemoveHeaderBtn(row.querySelector('.remove-header'));
+    });
+
+    // Remove Header Delegate
+    function setupRemoveHeaderBtn(btn) {
+        btn.addEventListener('click', (e) => {
+            e.currentTarget.closest('.header-row').remove();
+        });
     }
 
-    onItemResize(index, newHeight) {
-        const oldHeight = this.itemSizes.get(index) || this.estimatedHeight;
-        if (Math.abs(newHeight - oldHeight) > 1) { // Tolerance of 1px
-            this.itemSizes.set(index, newHeight);
+    // Setup initial remove buttons
+    container.querySelectorAll('.remove-header').forEach(setupRemoveHeaderBtn);
 
-            // If this item is resizing, we need to shift everyone below it.
-            // Full recalculate specific to this change is cleaner for correctness:
-            this.recalculateOffsets();
-
-            // Adjust current render positions immediately to prevent visual overlap
-            this.updateVisiblePositions();
-        }
+    // Populate Request Body if example exists
+    if (hasBody && currentEditors.request) {
+        currentEditors.request.setValue('{\n  \n}');
     }
 
-    updateVisiblePositions() {
-        for (const [index, data] of this.visibleItems) {
-            const top = this.itemOffsets.get(index);
-            data.element.style.top = `${top}px`;
+    setupPanelResizer(container);
+}
+
+function setupPanelResizer(container) {
+    const resizer = container.querySelector('.panel-resizer');
+    const topPanel = container.querySelector('.request-panel');
+    const bottomPanel = container.querySelector('.response-panel');
+
+    if (!resizer || !topPanel || !bottomPanel) return;
+
+    let isResizing = false;
+
+    resizer.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        resizer.classList.add('active');
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none'; // Prevent selection
+        e.preventDefault();
+    });
+
+    // Use document for move/up to catch fast movements outside the element
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+
+        const containerRect = container.getBoundingClientRect();
+        // Calculate percentage relative to container height
+        // Offset by top of container
+        const relativeY = e.clientY - containerRect.top;
+        const percentage = (relativeY / containerRect.height) * 100;
+
+        // Clamp between 20% and 80% to prevent full collapse
+        const clamped = Math.max(20, Math.min(80, percentage));
+
+        topPanel.style.flex = `0 0 ${clamped}%`;
+        // bottomPanel is flex: 1, so it takes the rest
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isResizing) {
+            isResizing = false;
+            resizer.classList.remove('active');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+
+            // Trigger monaco layout as size changed
+            if (currentEditors.request) currentEditors.request.layout();
+            if (currentEditors.response) currentEditors.response.layout();
         }
+    });
+}
+
+function renderParamsTable(params) {
+    return `
+        <div class="params-table">
+            ${params.map(p => `
+                <div class="param-row">
+                    <div class="param-key">${p.name}${p.required ? '*' : ''}</div>
+                    <div class="param-value">
+                        <input type="text" name="param-${p.name}" data-in="${p.in}" placeholder="${p.description || ''}" />
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function getUniqueParams(op) {
+    const uniqueParams = [];
+    const seen = new Set();
+    (op.parameters || []).forEach((p) => {
+        const key = `${p.name}-${p.in}`;
+        if (!seen.has(key)) {
+            seen.add(key);
+            uniqueParams.push(p);
+        }
+    });
+    return uniqueParams;
+}
+
+// --- Monaco Integration ---
+
+function initMonaco() {
+    if (typeof require === 'undefined') return;
+
+    require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+
+    require(['vs/editor/editor.main'], function () {
+        // Request Editor
+        const reqContainer = document.getElementById('monaco-request-body');
+        if (reqContainer) {
+            // Dispose old if exists to avoid leaks/duplicates?
+            // Actually new rendering replaces DOM so old editors are detached, but models might linger. 
+            // Monaco should be robust enough, but ideally we dispose.
+            // For now, simple creation.
+            currentEditors.request = monaco.editor.create(reqContainer, {
+                value: '',
+                language: 'json',
+                theme: 'vs-dark',
+                minimap: { enabled: false },
+                lineNumbers: 'on',
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                glyphMargin: false,
+                folding: true,
+                fontSize: 13,
+                fontFamily: 'JetBrains Mono',
+                renderLineHighlight: 'none'
+            });
+        }
+
+        // Response Editor
+        const resContainer = document.getElementById('monaco-response-body');
+        if (resContainer) {
+            currentEditors.response = monaco.editor.create(resContainer, {
+                value: '// Response will appear here',
+                language: 'json',
+                theme: 'vs-dark',
+                minimap: { enabled: false },
+                lineNumbers: 'on',
+                readOnly: true,
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                glyphMargin: false,
+                fontSize: 13,
+                fontFamily: 'JetBrains Mono'
+            });
+        }
+    });
+}
+
+// --- Request Construction Helper ---
+
+function getRequestData(route) {
+    const { method, path } = route;
+    const urlObj = new URL(path, window.location.origin);
+    const headers = {};
+
+    // Collect Params
+    document.querySelectorAll(`input[name^="param-"]`).forEach(input => {
+        const name = input.name.replace('param-', '');
+        const val = input.value;
+        const place = input.dataset.in; // query, path, header
+
+        if (!val) return;
+
+        if (place === 'query') urlObj.searchParams.set(name, val);
+        else if (place === 'header') headers[name] = val;
+        else if (place === 'path') urlObj.pathname = urlObj.pathname.replace(`{${name}}`, encodeURIComponent(val));
+    });
+
+    // Collect Headers
+    document.querySelectorAll('.header-row').forEach(row => {
+        const nameInput = row.querySelector('.header-name');
+        const valueInput = row.querySelector('.header-value');
+        if (nameInput && valueInput && nameInput.value) {
+            headers[nameInput.value] = valueInput.value;
+        }
+    });
+
+    // Body
+    let body = null;
+    if (currentEditors.request) {
+        try {
+            const bodyVal = currentEditors.request.getValue();
+            if (bodyVal && bodyVal.trim()) {
+                body = bodyVal;
+            }
+        } catch (e) { }
     }
 
-    scrollToItem(id) {
-        const index = this.items.findIndex(item => item.op.operationId === id);
-        if (index !== -1) {
-            // Ensure offsets are fresh
-            this.recalculateOffsets();
-            const top = this.itemOffsets.get(index);
-            this.scrollContainer.scrollTop = top;
+    return { url: urlObj.toString(), method: method.toUpperCase(), headers, body };
+}
+
+// --- Request Execution ---
+
+async function doSendRequest(route) {
+    const { url, method, headers, body } = getRequestData(route);
+    const options = { method, headers };
+
+    if (body) {
+        options.body = body;
+    }
+
+    // UI Updates
+    const responseMeta = document.getElementById('response-meta');
+    const loader = document.querySelector('.response-loader');
+    if (loader) loader.style.display = 'flex';
+    if (currentEditors.response) currentEditors.response.setValue('// Loading...');
+
+    const startTime = Date.now();
+    try {
+        const res = await fetch(url, options);
+        const duration = Date.now() - startTime;
+
+        // Handle content
+        const contentType = res.headers.get('content-type') || '';
+        let bodyContent = '';
+        let isBinary = false;
+
+        if (contentType.includes('application/json')) {
+            const json = await res.json();
+            bodyContent = JSON.stringify(json, null, 2);
+            if (currentEditors.response) monaco.editor.setModelLanguage(currentEditors.response.getModel(), 'json');
+        } else if (contentType.includes('text/') || contentType.includes('xml') || contentType.includes('javascript') || contentType.includes('html')) {
+            bodyContent = await res.text();
+            if (currentEditors.response) monaco.editor.setModelLanguage(currentEditors.response.getModel(), 'html'); // or text
+        } else {
+            // Binary / other
+            isBinary = true;
+            bodyContent = `[Binary Content: ${contentType}]`;
+            const blob = await res.blob();
+            setupDownloadButton(blob, 'response');
         }
+
+        // Update Editor
+        if (currentEditors.response) currentEditors.response.setValue(bodyContent);
+
+        // Update Buttons
+        const copyBtn = document.getElementById('btn-copy-response');
+        const dlBtn = document.getElementById('btn-download-response');
+
+        if (!isBinary) {
+            if (copyBtn) copyBtn.style.display = 'block';
+            if (dlBtn) dlBtn.style.display = 'block';
+
+            // Create blob for download text
+            const blob = new Blob([bodyContent], { type: contentType || 'text/plain' });
+            setupDownloadButton(blob, 'response.' + (contentType.includes('json') ? 'json' : 'txt'));
+        } else {
+            if (copyBtn) copyBtn.style.display = 'none';
+            if (dlBtn) dlBtn.style.display = 'block';
+        }
+
+        // Status Bar
+        if (responseMeta) {
+            responseMeta.innerHTML = `
+                <span class="${res.ok ? 'success' : 'error'}" style="${res.ok ? 'color:#4caf50' : 'color:#f44336'}">${res.status} ${res.statusText}</span>
+                <span style="margin-left:12px; opacity:0.7">${duration}ms</span>
+                <span style="margin-left:12px; opacity:0.7">${formatSize(bodyContent.length)}</span>
+            `;
+        }
+
+    } catch (err) {
+        if (currentEditors.response) currentEditors.response.setValue(`Error: ${err.message}`);
+        if (responseMeta) responseMeta.innerHTML = `<span style="color:#f44336">Error</span>`;
+    } finally {
+        if (loader) loader.style.display = 'none';
     }
 }
 
+function setupDownloadButton(blob, filename) {
+    const btn = document.getElementById('btn-download-response');
+    if (!btn) return;
 
+    // Clone to remove old listener
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+
+    newBtn.onclick = () => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+    newBtn.style.display = 'inline-block';
+}
+
+function buildCurl(route) {
+    const { url, method, headers, body } = getRequestData(route);
+    let curl = `curl -X ${method} "${url}"`;
+    for (const [k, v] of Object.entries(headers)) {
+        curl += ` \\\n  -H "${k}: ${v}"`;
+    }
+    if (body) {
+        // Escape quotes? Simplification
+        curl += ` \\\n  -d '${body.replace(/'/g, "'\\''")}'`;
+    }
+    return curl;
+}
+
+function buildFetch(route) {
+    const { url, method, headers, body } = getRequestData(route);
+    const options = {
+        method: method,
+        headers: headers,
+        body: body ? JSON.parse(body) : undefined // simplified, assuming JSON
+    };
+    // If not JSON, leave body as string
+    if (body && options.body === undefined) options.body = body;
+
+    return `fetch("${url}", ${JSON.stringify(options, null, 2)})`;
+}
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        // Optional toast
+    });
+}
+
+
+function formatSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+
+// --- Helpers ---
 function parseMarkdown(text) {
     if (!text) return '';
     if (typeof marked === 'undefined') return text;
@@ -265,174 +573,6 @@ function parseMarkdown(text) {
     };
 
     return marked.parse(text, { renderer });
-}
-
-
-function renderOperationCard(route, index) {
-    const { method, path, op } = route;
-    const shokupanSource = op['x-shokupan-source'];
-    const sourceInfo = op['x-source-info'];
-    const middleware = op['x-shokupan-middleware'] || [];
-
-    const uniqueParams = [];
-    const seen = new Set();
-    (op.parameters || []).forEach((p) => {
-        const key = `${p.name}-${p.in}`;
-        if (!seen.has(key)) {
-            seen.add(key);
-            uniqueParams.push(p);
-        }
-    });
-
-    // Extract code
-    let sourceCode = sourceInfo?.snippet || shokupanSource?.code || null;
-    let cleanDescription = op.description || '';
-    let startLine = 1;
-
-    // Check if we have line info
-    if (shokupanSource?.line) {
-        startLine = shokupanSource.line;
-    }
-
-    // Handle embedded code blocks in description
-    if (cleanDescription) {
-        const codeBlockMatch = cleanDescription.match(/```(?:typescript|javascript)\n([\s\S]*?)\n```/);
-        if (codeBlockMatch) {
-            sourceCode = codeBlockMatch[1];
-            cleanDescription = cleanDescription.replace(/```(?:typescript|javascript)\n[\s\S]*?\n```/, '').trim();
-        }
-    }
-
-    let viewInEditorLink = '';
-    if (shokupanSource?.file) {
-        const file = shokupanSource.file;
-        const line = shokupanSource.line || 1;
-        viewInEditorLink = `<div style="margin-top: 0.5rem">
-            <a href="vscode://file/${file}:${line}" style="color: var(--color-accent); font-size: 0.9rem; text-decoration: none">
-                📝 View in Editor
-            </a>
-        </div>`;
-    }
-
-    const warningIcon = sourceInfo?.isRuntime ? `
-        <span class="warning-icon" title="Static Analysis Failed: Runtime Fallback used. Source may be inaccurate." style="margin-left: 10px; display: inline-flex; align-items: center; cursor: help;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="orange" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                <line x1="12" y1="9" x2="12" y2="13"></line>
-                <line x1="12" y1="17" x2="12.01" y2="17"></line>
-            </svg>
-        </span>
-    ` : '';
-
-    const paramsHtml = uniqueParams.map(p => `
-        <div class="param-row">
-            <label>
-                <span class="param-name">${escapeHtml(p.name)}</span>
-                <span class="param-in">(${p.in})</span>
-                ${p.required ? '<span class="required">*</span>' : ''}
-            </label>
-            <input type="text" name="${p.name}" data-in="${p.in}" placeholder="${escapeHtml(p.description || '')}" />
-        </div>
-    `).join('');
-
-    const descriptionHtml = cleanDescription ? `<div class="op-description markdown-content">${parseMarkdown(cleanDescription)}</div>` : '';
-
-    const sourceHtml = sourceCode ? `
-        <div class="code-section">
-            <div class="source-header">
-                <h4>Source Code</h4>
-            </div>
-            <div class="monaco-editor read-only" 
-                 data-code="${btoa(unescape(encodeURIComponent(sourceCode)))}" 
-                 data-language="typescript"
-                 data-start-line="${startLine}"
-                 ></div>
-        </div>
-    ` : '';
-
-    const middlewareHtml = middleware.length > 0 ? `
-        <div class="middleware-section">
-            <span class="middleware-label">Middleware:</span>
-            <div class="middleware-list">
-                ${middleware.map(mw => {
-        const tooltip = mw.metadata ? `File: ${mw.metadata.file}:${mw.metadata.line}` : '';
-        return `<span class="middleware-badge" title="${tooltip}">${escapeHtml(mw.name)}</span>`;
-    }).join('')}
-            </div>
-        </div>
-    ` : '';
-
-    return `
-        <section id="${op.operationId}" class="operation-card" data-index="${index}">
-            <header class="op-header">
-                <div class="op-title">
-                    <span class="method-badge large ${method}">${method.toUpperCase()}</span>
-                    <h2 class="path">${escapeHtml(path)}</h2>
-                    ${warningIcon}
-                </div>
-                <div class="op-summary">${escapeHtml(op.summary || '')}</div>
-                ${middlewareHtml}
-                ${viewInEditorLink}
-            </header>
-            ${descriptionHtml}
-            ${sourceHtml}
-            
-            <div class="tester-section">
-                <h3>Try It Out</h3>
-                <form class="tester-form" data-method="${method}" data-path="${path}">
-                    ${uniqueParams.length > 0 ? `<div class="params-table"><h4>Parameters</h4>${paramsHtml}</div>` : ''}
-                    <div class="actions">
-                        <button type="submit" class="btn primary">Send Request</button>
-                        <div class="copy-actions">
-                             <button type="button" class="btn secondary copy-curl">Copy cURL</button>
-                             <button type="button" class="btn secondary copy-fetch">Copy Fetch</button>
-                        </div>
-                    </div>
-                </form>
-                <div class="response-viewer" style="display: none">
-                    <h4>Response</h4>
-                    <div class="status-bar">
-                        <span class="status-code"></span>
-                        <span class="duration"></span>
-                    </div>
-                    <div class="monaco-response" data-response="true"></div>
-                </div>
-            </div>
-        </section>
-    `;
-}
-
-function escapeHtml(text) {
-    if (!text) return '';
-    return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
-
-function handleHashNavigation() {
-    const hash = window.location.hash.slice(1);
-    // Wait a brief moment for layout
-    setTimeout(() => {
-        if (hash && virtualScroller) {
-            virtualScroller.scrollToItem(hash);
-        }
-    }, 100);
-
-    // Intercept clicks on nav items
-    document.body.addEventListener('click', (e) => {
-        const link = e.target.closest('a[href^="#"]');
-        if (link) {
-            e.preventDefault();
-            const id = link.getAttribute('href').slice(1);
-            if (virtualScroller) {
-                virtualScroller.scrollToItem(id);
-                history.pushState(null, null, `#${id}`);
-            }
-        }
-    });
 }
 
 function setupSidebar() {
@@ -469,219 +609,11 @@ function setupSidebar() {
         document.addEventListener('mousemove', (e) => {
             if (!isResizing) return;
             const newWidth = Math.max(150, Math.min(600, e.clientX));
-            document.documentElement.style.setProperty('--sidebar-width', newWidth + 'px');
+            sidebar.style.width = newWidth + 'px';
         });
 
         document.addEventListener('mouseup', () => {
             isResizing = false;
         });
     }
-}
-
-// Lazy load Monaco instances using IntersectionObserver
-function setupMonacoForElements(elements) {
-    if (typeof require === 'undefined') return;
-
-    require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
-
-    const observer = new IntersectionObserver((entries, obs) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const el = entry.target;
-                if (!el.dataset.monacoLoading && !el.dataset.initialized) {
-                    el.dataset.monacoLoading = "true";
-                    initMonacoEditor(el);
-                    obs.unobserve(el);
-                }
-            }
-        });
-    }, { rootMargin: "200px 0px" }); // Preload a bit before valid
-
-    elements.forEach(container => {
-        container.querySelectorAll('.monaco-editor').forEach(el => {
-            if (el.dataset.initialized || el.dataset.monacoLoading) return;
-
-            // Initial height setup so the scrollbar doesn't jump too wildly before loading
-            const code = el.dataset.code ? decodeURIComponent(escape(atob(el.dataset.code))) : '';
-            const lineHeight = 18;
-            const lines = code.split('\n').length;
-            el.style.height = ((lines + 1) * lineHeight + 12) + 'px';
-
-            observer.observe(el);
-        });
-    });
-}
-
-function initMonacoEditor(el) {
-    require(['vs/editor/editor.main'], function () {
-        if (el.dataset.initialized) return;
-        el.dataset.initialized = 'true';
-
-        const code = el.dataset.code ? decodeURIComponent(escape(atob(el.dataset.code))) : '';
-        const lang = el.dataset.language || 'typescript';
-        const startLine = parseInt(el.dataset.startLine || '1');
-        const isResponse = el.dataset.response === 'true';
-
-        const lineHeight = 18;
-        // const lines = code.split('\n').length;
-        // el.style.height = ((lines + 1) * lineHeight + 12) + 'px';
-
-        const editor = monaco.editor.create(el, {
-            value: code,
-            language: lang,
-            theme: 'vs-dark',
-            readOnly: true,
-            minimap: { enabled: false },
-            lineNumbers: (num) => (startLine + num - 1).toString(),
-            lineHeight: lineHeight,
-            fontSize: 13,
-            scrollBeyondLastLine: false,
-            scrollbar: { alwaysConsumeMouseWheel: false },
-            automaticLayout: true,
-            overviewRulerBorder: false,
-            hideCursorInOverviewRuler: true,
-            overviewRulerLanes: 0
-        });
-
-        // Add ResizeObserver to update height based on content if needed
-        // For read-only views, getContentHeight is useful
-        const updateHeight = () => {
-            const contentHeight = editor.getContentHeight();
-            if (contentHeight > 0) {
-                el.style.height = `${contentHeight}px`;
-                editor.layout();
-            }
-        };
-
-        // Initial sizing
-        updateHeight();
-
-        // If content changes (for response viewers) or on load
-        editor.onDidChangeModelContent(updateHeight);
-
-        // Trigger a check shortly after creation just in case
-        setTimeout(updateHeight, 50);
-    });
-}
-
-
-function setupTesterForElements(elements) {
-    elements.forEach(container => {
-        container.querySelectorAll('.tester-form').forEach(form => {
-            if (form.dataset.initialized) return;
-            form.dataset.initialized = 'true';
-
-            const method = form.dataset.method;
-            const path = form.dataset.path;
-
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                await sendRequest(form, method, path);
-            });
-
-            // Helpers
-            const section = form.closest('.tester-section');
-            section.querySelector('.copy-curl').addEventListener('click', () => {
-                copyToClipboard(buildCurl(form, method, path));
-            });
-            section.querySelector('.copy-fetch').addEventListener('click', () => {
-                copyToClipboard(buildFetch(form, method, path));
-            });
-        });
-    });
-}
-
-// ... sendRequest, buildRequestFromForm ...
-
-async function sendRequest(form, method, path) {
-    const request = buildRequestFromForm(form, method, path);
-    const responseViewer = form.closest('.tester-section').querySelector('.response-viewer');
-    responseViewer.style.display = 'block';
-
-    const startTime = Date.now();
-    try {
-        const res = await fetch(request.url, request.options);
-        const duration = Date.now() - startTime;
-        const bodyText = await res.text();
-
-        const statusCode = responseViewer.querySelector('.status-code');
-        const durationEl = responseViewer.querySelector('.duration');
-        const responseContainer = responseViewer.querySelector('.monaco-response');
-
-        statusCode.textContent = `Status: ${res.status}`;
-        statusCode.className = `status-code ${res.status >= 200 && res.status < 300 ? 'success' : 'error'}`;
-        durationEl.textContent = `${duration}ms`;
-
-        let displayText = bodyText;
-        let language = 'text';
-        try {
-            const json = JSON.parse(bodyText);
-            displayText = JSON.stringify(json, null, 2);
-            language = 'json';
-        } catch { }
-
-        // Render response Monaco
-        responseContainer.innerHTML = '';
-        responseContainer.removeAttribute('data-initialized');
-        responseContainer.removeAttribute('data-monaco-loading');
-
-        // We can reuse the initMonaco logic but we need to pass the "code" via dataset or reuse the existing editor instance if we kept it.
-        // For simplicity, let's just use the dataset approach and call initMonaco. 
-        // But wait, the previous instance is gone because we cleared innerHTML.
-        // We set attributes for initMonaco to pick up.
-        responseContainer.dataset.code = btoa(unescape(encodeURIComponent(displayText)));
-        responseContainer.dataset.language = language;
-
-        // Since it's in the viewport (user clicked submit), just init immediately
-        initMonacoEditor(responseContainer);
-
-    } catch (err) {
-        console.error(err);
-    }
-}
-
-function buildRequestFromForm(form, method, path) {
-    const url = new URL(path, window.location.origin);
-    const options = { method: method.toUpperCase(), headers: {} };
-
-    // Get params
-    const formData = new FormData(form);
-    // FormData doesn't nicely give us "all inputs" if they are empty, so we iterate elements
-    for (const input of form.elements) {
-        if (!input.name) continue;
-        const value = input.value;
-        const paramIn = input.dataset.in;
-        if (!value && !input.required) continue; // Skip empty optional
-
-        if (paramIn === 'query') {
-            url.searchParams.set(input.name, value);
-        } else if (paramIn === 'header') {
-            options.headers[input.name] = value;
-        } else if (paramIn === 'path') {
-            url.pathname = url.pathname.replace(`{${input.name}}`, encodeURIComponent(value));
-        }
-    }
-
-    return { url: url.toString(), options };
-}
-
-function copyToClipboard(text) {
-    navigator.clipboard.writeText(text).then(() => {
-        // alert('Copied!');
-        // Could show a toast
-    });
-}
-
-function buildCurl(form, method, path) {
-    const { url, options } = buildRequestFromForm(form, method, path);
-    let curl = `curl -X ${options.method} "${url}"`;
-    for (const [k, v] of Object.entries(options.headers)) {
-        curl += ` -H "${k}: ${v}"`;
-    }
-    return curl;
-}
-
-function buildFetch(form, method, path) {
-    const { url, options } = buildRequestFromForm(form, method, path);
-    return `fetch("${url}", ${JSON.stringify(options, null, 2)})`;
 }

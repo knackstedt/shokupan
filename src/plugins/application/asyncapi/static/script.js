@@ -194,9 +194,8 @@ function renderNav() {
                             labelHtml = `<span style="margin-right: 6px;">⚠️</span> <span class="tree-label">${key}</span>`;
                         } else {
                             // Standard Event Node
-                            const badgeType = item.data.type === 'publish' ? 'send' : 'recv';
                             const badgeText = item.data.type === 'publish' ? 'SEND' : 'RECV';
-                            labelHtml = `<span class="badge ${badgeType}">${badgeText}</span> <span class="tree-label">${key}</span>`;
+                            labelHtml = `<span class="badge badge-${badgeText}">${badgeText}</span> <span class="tree-label">${key}</span>`;
                         }
 
                         // Source Link
@@ -349,7 +348,7 @@ function selectEvent(item, el) {
                          ${sourceLink}
                     </div>
                     <div class="doc-meta">
-                        <span class="badge ${item.type === 'publish' ? 'send' : 'recv'}" style="font-size: 0.8rem; padding: 4px 8px;">${item.type === 'publish' ? 'SEND' : 'RECV'}</span>
+                        <span class="badge badge-${item.type === 'publish' ? 'SEND' : 'RECV'}" style="font-size: 0.8rem; padding: 4px 8px;">${item.type === 'publish' ? 'SEND' : 'RECV'}</span>
                         <span>${op.operationId || ''}</span>
                     </div>
                 </div>
