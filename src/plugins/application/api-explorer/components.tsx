@@ -147,10 +147,20 @@ function Sidebar({ spec, sortedGroups }: any) {
                         <div class="nav-items">
                             {routes.map((route: any) => {
                                 const label = route.op.summary || route.op.title || route.path;
+                                const isRuntime = route.op['x-source-info']?.isRuntime;
                                 return (
                                     <a key={route.op.operationId} href={`#${route.op.operationId}`} class="nav-item" data-id={route.op.operationId} title={route.path}>
                                         <span class={`method-badge ${route.method}`}>{route.method.toUpperCase()}</span>
                                         <span class="nav-label">{label}</span>
+                                        {isRuntime && (
+                                            <span class="nav-warning" title="Static Analysis Failed" style="margin-left: auto; color: orange;">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                                </svg>
+                                            </span>
+                                        )}
                                     </a>
                                 );
                             })}

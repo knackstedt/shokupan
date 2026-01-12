@@ -264,6 +264,10 @@ export type ShokupanRoute = {
      * Controller instance this route belongs to
      */
     controller?: any;
+    /**
+     * Middleware stack metadata for this route (Controller/Method level)
+     */
+    middleware?: Middleware[];
 };
 
 export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> = Partial<{

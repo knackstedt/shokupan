@@ -114,6 +114,16 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     private currentGuards: { handler: ShokupanHandler<T>; spec?: GuardAPISpec; }[] = [];
     private eventHandlers = new Map<string, ShokupanHandler<T>[]>();
 
+    /**
+     * Registers middleware for this router.
+     * Middleware will run for all routes matched by this router.
+     */
+    public use(middleware: Middleware) {
+        // Basic middleware registration
+        this.middleware.push(middleware);
+        return this;
+    }
+
 
     // Registry Accessor
     public getComponentRegistry(): {
@@ -774,8 +784,10 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                     path: normalizedPath,
                     handler: finalHandler,
                     spec,
+                    spec,
                     controller: instance,
-                    metadata: methodSource || (instance as any).metadata
+                    metadata: methodSource || (instance as any).metadata,
+                    middleware: allMiddleware // Capture all resolved middleware
                 });
             }
 
@@ -918,7 +930,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * @param arg.renderer - JSX renderer for the route
      * @param arg.controller - Controller for the route
      */
-    public add({ method, path, spec, handler, regex: customRegex, group, requestTimeout, renderer, controller, metadata }: {
+    public add({ method, path, spec, handler, regex: customRegex, group, requestTimeout, renderer, controller, metadata, middleware }: {
         method: Method,
         path: string,
         spec?: MethodAPISpec,
@@ -929,6 +941,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         renderer?: JSXRenderer;
         controller?: any;
         metadata?: { file: string, line: number; };
+        middleware?: Middleware[];
     }) {
         const { regex, keys } = customRegex
             ? { regex: customRegex, keys: [] }
@@ -1129,7 +1142,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                 file,
                 line
             },
-            controller
+            controller,
+            middleware: middleware || []
         });
 
         // Insert into Trie
@@ -1424,7 +1438,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             method,
             path,
             spec,
-            handler: finalHandler
+            handler: finalHandler,
+            middleware: handlers.slice(0, handlers.length - 1) as Middleware[]
         });
     }
 

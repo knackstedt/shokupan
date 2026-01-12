@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('virtual-scroller-container'),
         explorerData.routes,
         renderOperationCard,
-        600 // estimated item height
+        150 // estimated item height (smaller average)
     );
 
     // Handle hash navigation manually since elements might not exist yet
@@ -51,31 +51,52 @@ function renderInfoSection() {
 // --- Virtual Scroller Implementation ---
 
 class VirtualScroller {
-    constructor(scrollContainer, contentContainer, items, renderItemFn, estimatedHeight = 500) {
+    constructor(scrollContainer, contentContainer, items, renderItemFn, estimatedHeight = 150) {
         this.scrollContainer = scrollContainer;
         this.contentContainer = contentContainer;
         this.items = items;
         this.renderItemFn = renderItemFn;
         this.estimatedHeight = estimatedHeight;
 
-        this.itemHeights = new Map(); // id -> height
-        this.visibleItems = new Map(); // index -> element
-        this.buffer = 3; // Number of items above/below to render
+        // State for variable height
+        this.itemSizes = new Map(); // index -> height
+        this.itemOffsets = new Map(); // index -> absolute top
+        this.totalInternalHeight = 0;
+
+        this.visibleItems = new Map(); // index -> { element, resizeObserver }
+        this.buffer = 5; // Number of items above/below to render
         this.ticking = false;
+        this.isRecalculating = false;
 
         this.init();
     }
 
     init() {
-        // Initial height estimation
-        this.totalHeight = this.items.length * this.estimatedHeight;
-        this.contentContainer.style.height = `${this.totalHeight}px`;
+        this.recalculateOffsets();
 
         this.scrollContainer.addEventListener('scroll', () => this.onScroll());
-        window.addEventListener('resize', () => this.onScroll());
+        window.addEventListener('resize', () => {
+            this.recalculateOffsets();
+            this.onScroll();
+        });
 
         // Initial render
         this.updateVisibleItems();
+    }
+
+    // Iterate through all items to calculate their cumulative offsets based on known sizes
+    recalculateOffsets() {
+        let offset = 0;
+        this.itemOffsets.clear();
+
+        for (let i = 0; i < this.items.length; i++) {
+            this.itemOffsets.set(i, offset);
+            const height = this.itemSizes.get(i) || this.estimatedHeight;
+            offset += height;
+        }
+
+        this.totalInternalHeight = offset;
+        this.contentContainer.style.height = `${this.totalInternalHeight}px`;
     }
 
     onScroll() {
@@ -88,39 +109,77 @@ class VirtualScroller {
         }
     }
 
+    // Binary search to find the item index at a given scroll offset
+    findStartIndex(scrollTop) {
+        let low = 0;
+        let high = this.items.length - 1;
+
+        while (low <= high) {
+            const mid = Math.floor((low + high) / 2);
+            const offset = this.itemOffsets.get(mid);
+            const height = this.itemSizes.get(mid) || this.estimatedHeight;
+
+            if (offset <= scrollTop && offset + height > scrollTop) {
+                return mid;
+            } else if (offset < scrollTop) {
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+        return Math.max(0, low - 1);
+    }
+
     updateVisibleItems() {
         const scrollTop = this.scrollContainer.scrollTop;
         const viewportHeight = this.scrollContainer.clientHeight;
 
-        // Simple fixed height calculation for finding index (since we have mixed heights, this is approximate)
-        // A robust solution uses a binary search on accumulated heights, but for simplicity:
-        // We will assume items flow sequentially.
-
-        // For variable heights, we need to track positions.
-        // But since we can't know positions of unrendered items, usually we assume estimatedHeight
-        // and correct it as we render.
-
-        // Simplified approach: Render a range based on estimated height
-        const startIndex = Math.max(0, Math.floor(scrollTop / this.estimatedHeight) - this.buffer);
-        const endIndex = Math.min(this.items.length - 1, Math.ceil((scrollTop + viewportHeight) / this.estimatedHeight) + this.buffer);
+        const startIndex = Math.max(0, this.findStartIndex(scrollTop) - this.buffer);
+        // We find the end index by looking for the item at (scrollTop + viewportHeight)
+        const endIndex = Math.min(
+            this.items.length - 1,
+            this.findStartIndex(scrollTop + viewportHeight) + this.buffer
+        );
 
         // Remove items no longer in range
-        for (const [index, element] of this.visibleItems) {
+        for (const [index, data] of this.visibleItems) {
             if (index < startIndex || index > endIndex) {
-                element.remove();
+                if (data.resizeObserver) data.resizeObserver.disconnect();
+                data.element.remove();
                 this.visibleItems.delete(index);
             }
         }
 
         // Add new items
+        let needsRecalc = false;
         for (let i = startIndex; i <= endIndex; i++) {
             if (!this.visibleItems.has(i)) {
                 this.renderItem(i);
+                // If we rendered a new item and we don't know its size yet, we might need a recalc cycle shortly
+                // but ResizeObserver will trigger that.
+            } else {
+                // Update position if it shifted (e.g. dynamic updates above)
+                const el = this.visibleItems.get(i).element;
+                const expectedTop = this.itemOffsets.get(i);
+                // Optimization: direct style access is fast enough, but avoid layout thrashing
+                if (parseInt(el.style.top) !== expectedTop) {
+                    el.style.top = `${expectedTop}px`;
+                }
             }
         }
 
-        // Initialize components for newly rendered items
-        this.initNewItems();
+        // Initialize components (Monaco, etc.) - handled internally by renderItem/observers 
+        // passing container to setupMonaco for lazy loading logic inside setupMonaco? 
+        // Actually, we should call setupMonaco for the newly added items.
+        // We can pass the specific elements to setupMonaco.
+
+        const newElements = [];
+        for (let i = startIndex; i <= endIndex; i++) {
+            // We can just grab from map
+            newElements.push(this.visibleItems.get(i).element);
+        }
+        setupMonacoForElements(newElements);
+        setupTesterForElements(newElements);
     }
 
     renderItem(index) {
@@ -132,26 +191,54 @@ class VirtualScroller {
         const element = wrapper.firstElementChild;
 
         // Position absolutely
-        element.style.top = `${index * this.estimatedHeight}px`;
+        const top = this.itemOffsets.get(index);
+        element.style.position = 'absolute';
+        element.style.top = `${top}px`;
+        element.style.left = '0';
+        element.style.right = '0';
+        // element.style.height = 'auto'; // Default
 
         this.contentContainer.appendChild(element);
-        this.visibleItems.set(index, element);
+
+        // Observe resize
+        const ro = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                this.onItemResize(index, entry.borderBoxSize[0].blockSize);
+            }
+        });
+        ro.observe(element);
+
+        this.visibleItems.set(index, { element, resizeObserver: ro });
     }
 
-    initNewItems() {
-        // Run setup logic (Monaco, parsed markdown, etc.) for existing elements
-        // We can just query invalid elements
-        // Optimization: only query children of contentContainer
-        setupMonaco(this.contentContainer);
-        setupTester(this.contentContainer);
+    onItemResize(index, newHeight) {
+        const oldHeight = this.itemSizes.get(index) || this.estimatedHeight;
+        if (Math.abs(newHeight - oldHeight) > 1) { // Tolerance of 1px
+            this.itemSizes.set(index, newHeight);
+
+            // If this item is resizing, we need to shift everyone below it.
+            // Full recalculate specific to this change is cleaner for correctness:
+            this.recalculateOffsets();
+
+            // Adjust current render positions immediately to prevent visual overlap
+            this.updateVisiblePositions();
+        }
+    }
+
+    updateVisiblePositions() {
+        for (const [index, data] of this.visibleItems) {
+            const top = this.itemOffsets.get(index);
+            data.element.style.top = `${top}px`;
+        }
     }
 
     scrollToItem(id) {
         const index = this.items.findIndex(item => item.op.operationId === id);
         if (index !== -1) {
-            const top = index * this.estimatedHeight;
+            // Ensure offsets are fresh
+            this.recalculateOffsets();
+            const top = this.itemOffsets.get(index);
             this.scrollContainer.scrollTop = top;
-            // Maybe adjust after render if exact position is needed?
         }
     }
 }
@@ -160,23 +247,6 @@ class VirtualScroller {
 function parseMarkdown(text) {
     if (!text) return '';
     if (typeof marked === 'undefined') return text;
-
-    // Pre-process for GitHub Alerts
-    // > [!NOTE]
-    // > Content...
-
-    const alertRegex = /^>\s+\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*$(?:\n>\s+.*)*/gm;
-    // Actually marked doesn't handle blockquotes with classes easily without raw HTML.
-    // We can replace the alert syntax with a custom HTML block before passing to marked
-    // providing we trust the content or sanitize it.
-
-    // Simple replacement for now:
-    let processed = text.replace(/>\s+\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/g, (match, type) => {
-        return `<div class="markdown-alert ${type.toLowerCase()}"><div class="markdown-alert-title">${type}</div>`;
-    });
-
-    // Closing div is tricky because we need to close it at the end of the blockquote.
-    // Simpler approach: Use a renderer for blockquote
 
     const renderer = new marked.Renderer();
     const originalBlockquote = renderer.blockquote.bind(renderer);
@@ -218,17 +288,11 @@ function renderOperationCard(route, index) {
     let sourceCode = sourceInfo?.snippet || shokupanSource?.code || null;
     let cleanDescription = op.description || '';
     let startLine = 1;
-    let headerLines = 0; // Number of lines to skip for 'context' if any?
 
     // Check if we have line info
     if (shokupanSource?.line) {
         startLine = shokupanSource.line;
     }
-
-    // In many cases, the snippet includes the function signature and body.
-    // We want to highlight the body or differentiate it.
-    // Monaco doesn't have "block highlighting" API via simple attributes easily,
-    // but we can pass metadata to our setupMonaco function via data attributes.
 
     // Handle embedded code blocks in description
     if (cleanDescription) {
@@ -249,6 +313,16 @@ function renderOperationCard(route, index) {
             </a>
         </div>`;
     }
+
+    const warningIcon = sourceInfo?.isRuntime ? `
+        <span class="warning-icon" title="Static Analysis Failed: Runtime Fallback used. Source may be inaccurate." style="margin-left: 10px; display: inline-flex; align-items: center; cursor: help;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="orange" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+        </span>
+    ` : '';
 
     const paramsHtml = uniqueParams.map(p => `
         <div class="param-row">
@@ -294,6 +368,7 @@ function renderOperationCard(route, index) {
                 <div class="op-title">
                     <span class="method-badge large ${method}">${method.toUpperCase()}</span>
                     <h2 class="path">${escapeHtml(path)}</h2>
+                    ${warningIcon}
                 </div>
                 <div class="op-summary">${escapeHtml(op.summary || '')}</div>
                 ${middlewareHtml}
@@ -339,9 +414,12 @@ function escapeHtml(text) {
 
 function handleHashNavigation() {
     const hash = window.location.hash.slice(1);
-    if (hash && virtualScroller) {
-        virtualScroller.scrollToItem(hash);
-    }
+    // Wait a brief moment for layout
+    setTimeout(() => {
+        if (hash && virtualScroller) {
+            virtualScroller.scrollToItem(hash);
+        }
+    }, 100);
 
     // Intercept clicks on nav items
     document.body.addEventListener('click', (e) => {
@@ -349,8 +427,10 @@ function handleHashNavigation() {
         if (link) {
             e.preventDefault();
             const id = link.getAttribute('href').slice(1);
-            virtualScroller.scrollToItem(id);
-            history.pushState(null, null, `#${id}`);
+            if (virtualScroller) {
+                virtualScroller.scrollToItem(id);
+                history.pushState(null, null, `#${id}`);
+            }
         }
     });
 }
@@ -398,69 +478,121 @@ function setupSidebar() {
     }
 }
 
-function setupMonaco(container = document) {
+// Lazy load Monaco instances using IntersectionObserver
+function setupMonacoForElements(elements) {
     if (typeof require === 'undefined') return;
 
     require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
 
-    require(['vs/editor/editor.main'], function () {
+    const observer = new IntersectionObserver((entries, obs) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const el = entry.target;
+                if (!el.dataset.monacoLoading && !el.dataset.initialized) {
+                    el.dataset.monacoLoading = "true";
+                    initMonacoEditor(el);
+                    obs.unobserve(el);
+                }
+            }
+        });
+    }, { rootMargin: "200px 0px" }); // Preload a bit before valid
+
+    elements.forEach(container => {
         container.querySelectorAll('.monaco-editor').forEach(el => {
-            if (el.dataset.initialized) return;
-            el.dataset.initialized = 'true';
+            if (el.dataset.initialized || el.dataset.monacoLoading) return;
 
+            // Initial height setup so the scrollbar doesn't jump too wildly before loading
             const code = el.dataset.code ? decodeURIComponent(escape(atob(el.dataset.code))) : '';
-            const lang = el.dataset.language || 'typescript';
-            const startLine = parseInt(el.dataset.startLine || '1');
-
             const lineHeight = 18;
             const lines = code.split('\n').length;
             el.style.height = ((lines + 1) * lineHeight + 12) + 'px';
 
-            // Create editor
-            const editor = monaco.editor.create(el, {
-                value: code,
-                language: lang,
-                theme: 'vs-dark',
-                readOnly: true,
-                minimap: { enabled: false },
-                lineNumbers: (num) => (startLine + num - 1).toString(),
-                lineHeight: lineHeight,
-                fontSize: 13,
-                scrollBeyondLastLine: false,
-                scrollbar: { alwaysConsumeMouseWheel: false },
-                automaticLayout: true
+            observer.observe(el);
+        });
+    });
+}
+
+function initMonacoEditor(el) {
+    require(['vs/editor/editor.main'], function () {
+        if (el.dataset.initialized) return;
+        el.dataset.initialized = 'true';
+
+        const code = el.dataset.code ? decodeURIComponent(escape(atob(el.dataset.code))) : '';
+        const lang = el.dataset.language || 'typescript';
+        const startLine = parseInt(el.dataset.startLine || '1');
+        const isResponse = el.dataset.response === 'true';
+
+        const lineHeight = 18;
+        // const lines = code.split('\n').length;
+        // el.style.height = ((lines + 1) * lineHeight + 12) + 'px';
+
+        const editor = monaco.editor.create(el, {
+            value: code,
+            language: lang,
+            theme: 'vs-dark',
+            readOnly: true,
+            minimap: { enabled: false },
+            lineNumbers: (num) => (startLine + num - 1).toString(),
+            lineHeight: lineHeight,
+            fontSize: 13,
+            scrollBeyondLastLine: false,
+            scrollbar: { alwaysConsumeMouseWheel: false },
+            automaticLayout: true,
+            overviewRulerBorder: false,
+            hideCursorInOverviewRuler: true,
+            overviewRulerLanes: 0
+        });
+
+        // Add ResizeObserver to update height based on content if needed
+        // For read-only views, getContentHeight is useful
+        const updateHeight = () => {
+            const contentHeight = editor.getContentHeight();
+            if (contentHeight > 0) {
+                el.style.height = `${contentHeight}px`;
+                editor.layout();
+            }
+        };
+
+        // Initial sizing
+        updateHeight();
+
+        // If content changes (for response viewers) or on load
+        editor.onDidChangeModelContent(updateHeight);
+
+        // Trigger a check shortly after creation just in case
+        setTimeout(updateHeight, 50);
+    });
+}
+
+
+function setupTesterForElements(elements) {
+    elements.forEach(container => {
+        container.querySelectorAll('.tester-form').forEach(form => {
+            if (form.dataset.initialized) return;
+            form.dataset.initialized = 'true';
+
+            const method = form.dataset.method;
+            const path = form.dataset.path;
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await sendRequest(form, method, path);
             });
 
-            // Highlight closure block? 
-            // We'll highlight the whole thing mostly, but if we want to distinguish context...
-            // User asked: "show the specific closure apart from the surrounding context lines"
-            // We don't have metadata about WHICH lines are context vs closure here easily unless provided.
-            // Assuming the whole snippet provided IS the context+closure. 
-            // Maybe we can highlight the background of lines?
-            // For now, the improved line numbers + syntax highlighting is a big step up.
+            // Helpers
+            const section = form.closest('.tester-section');
+            section.querySelector('.copy-curl').addEventListener('click', () => {
+                copyToClipboard(buildCurl(form, method, path));
+            });
+            section.querySelector('.copy-fetch').addEventListener('click', () => {
+                copyToClipboard(buildFetch(form, method, path));
+            });
         });
     });
 }
 
-function setupTester(container = document) {
-    container.querySelectorAll('.tester-form').forEach(form => {
-        if (form.dataset.initialized) return;
-        form.dataset.initialized = 'true';
+// ... sendRequest, buildRequestFromForm ...
 
-        const method = form.dataset.method;
-        const path = form.dataset.path;
-
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            await sendRequest(form, method, path);
-        });
-
-        // ... copy handlers ... (simplified for brevity)
-    });
-}
-
-// ... sendRequest, buildRequestFromForm, copyToClipboard ... (existing helper logic)
-// Copying existing helper functions for completeness
 async function sendRequest(form, method, path) {
     const request = buildRequestFromForm(form, method, path);
     const responseViewer = form.closest('.tester-section').querySelector('.response-viewer');
@@ -489,21 +621,20 @@ async function sendRequest(form, method, path) {
         } catch { }
 
         // Render response Monaco
-        if (typeof monaco !== 'undefined') {
-            responseContainer.innerHTML = '';
-            const lineHeight = 18;
-            responseContainer.style.height = '300px';
-            monaco.editor.create(responseContainer, {
-                value: displayText,
-                language,
-                theme: 'vs-dark',
-                readOnly: true,
-                minimap: { enabled: false },
-                automaticLayout: true
-            });
-        } else {
-            responseContainer.innerHTML = `<pre>${escapeHtml(displayText)}</pre>`;
-        }
+        responseContainer.innerHTML = '';
+        responseContainer.removeAttribute('data-initialized');
+        responseContainer.removeAttribute('data-monaco-loading');
+
+        // We can reuse the initMonaco logic but we need to pass the "code" via dataset or reuse the existing editor instance if we kept it.
+        // For simplicity, let's just use the dataset approach and call initMonaco. 
+        // But wait, the previous instance is gone because we cleared innerHTML.
+        // We set attributes for initMonaco to pick up.
+        responseContainer.dataset.code = btoa(unescape(encodeURIComponent(displayText)));
+        responseContainer.dataset.language = language;
+
+        // Since it's in the viewport (user clicked submit), just init immediately
+        initMonacoEditor(responseContainer);
+
     } catch (err) {
         console.error(err);
     }
@@ -513,20 +644,44 @@ function buildRequestFromForm(form, method, path) {
     const url = new URL(path, window.location.origin);
     const options = { method: method.toUpperCase(), headers: {} };
 
+    // Get params
     const formData = new FormData(form);
-    for (const [key, value] of formData.entries()) {
-        const input = form.elements[key];
-        const paramIn = input?.dataset?.in;
-        if (!value || !paramIn) continue;
+    // FormData doesn't nicely give us "all inputs" if they are empty, so we iterate elements
+    for (const input of form.elements) {
+        if (!input.name) continue;
+        const value = input.value;
+        const paramIn = input.dataset.in;
+        if (!value && !input.required) continue; // Skip empty optional
 
         if (paramIn === 'query') {
-            url.searchParams.set(key, value);
+            url.searchParams.set(input.name, value);
         } else if (paramIn === 'header') {
-            options.headers[key] = value;
+            options.headers[input.name] = value;
         } else if (paramIn === 'path') {
-            url.pathname = url.pathname.replace(`{${key}}`, encodeURIComponent(value));
+            url.pathname = url.pathname.replace(`{${input.name}}`, encodeURIComponent(value));
         }
     }
 
     return { url: url.toString(), options };
+}
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        // alert('Copied!');
+        // Could show a toast
+    });
+}
+
+function buildCurl(form, method, path) {
+    const { url, options } = buildRequestFromForm(form, method, path);
+    let curl = `curl -X ${options.method} "${url}"`;
+    for (const [k, v] of Object.entries(options.headers)) {
+        curl += ` -H "${k}: ${v}"`;
+    }
+    return curl;
+}
+
+function buildFetch(form, method, path) {
+    const { url, options } = buildRequestFromForm(form, method, path);
+    return `fetch("${url}", ${JSON.stringify(options, null, 2)})`;
 }
