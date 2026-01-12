@@ -456,6 +456,12 @@ a {
     border-left: 3px solid #fbbf24;
 }
 
+.emit-highlight {
+    background: rgba(59, 130, 246, 0.25);
+    border-bottom: 2px solid rgba(59, 130, 246, 0.8);
+    font-weight: 600;
+}
+
 /* Header actions */
 .header-actions {
     display: flex;

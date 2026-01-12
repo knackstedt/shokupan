@@ -23,7 +23,8 @@ const els = {
     sendBtn: document.getElementById('send-btn'),
     navList: document.getElementById('nav-list'),
     docPanel: document.getElementById('doc-panel'),
-    targetEventLabel: document.getElementById('target-event')
+    targetEventLabel: document.getElementById('target-event'),
+    showSourceToggle: document.getElementById('show-source-toggle')
 };
 
 // Resizers
@@ -100,6 +101,44 @@ async function loadSpec() {
     } catch (e) {
         log('System', 'Failed to load spec: ' + e.message, 'error');
     }
+}
+
+/* ================= Emit Pattern Detection ================= */
+function findEmitDecorations(code, offset = 1) {
+    const decorations = [];
+    const lines = code.split('\n');
+
+    // Patterns to search for:
+    // - ctx.emit(...) or this.emit(...)
+    // - anyVar.event(...) or anyVar.on(...) or anyVar.emit(...)
+    // This will match router1.event, app.emit, etc.
+    const patterns = [
+        /\b(ctx|this)\.emit\s*\(/g,
+        /\b\w+\.(event|on|emit)\s*\(/g
+    ];
+
+    lines.forEach((line, lineIndex) => {
+        const lineNumber = lineIndex + 1; // Monaco uses 1-based line numbers
+
+        patterns.forEach(pattern => {
+            pattern.lastIndex = 0; // Reset regex state
+            let match;
+            while ((match = pattern.exec(line)) !== null) {
+                const startColumn = match.index + 1; // Monaco uses 1-based columns
+                const endColumn = startColumn + match[0].length;
+
+                decorations.push({
+                    range: new monaco.Range(lineNumber, startColumn, lineNumber, endColumn),
+                    options: {
+                        inlineClassName: 'emit-highlight',
+                        hoverMessage: { value: `**Event Emission**: \`${match[0]}\`` }
+                    }
+                });
+            }
+        });
+    });
+
+    return decorations;
 }
 
 /* ================= Navigation Tree Rendering ================= */
@@ -237,7 +276,7 @@ function renderNav() {
 }
 
 /* ================= Schema & Doc Rendering ================= */
-function selectEvent(item, el) {
+async function selectEvent(item, el) {
     document.querySelectorAll('.tree-item').forEach(n => n.classList.remove('active'));
     if (el) el.classList.add('active');
 
@@ -246,12 +285,22 @@ function selectEvent(item, el) {
 
     const op = item.op;
     const isWarning = !!op['x-warning'];
-    const desc = op.description || op.summary || 'No description provided.';
-    const payload = op.message?.payload || {};
+    // Fix: Leave description blank if missing, don't fallback to summary for body
+    const desc = op.description || '';
+    const payload = op.message?.payload;
 
     if (isWarning) {
-        const sourceInfo = op['x-source-info'] || {};
-        const fileLink = `vscode://file/${sourceInfo.file}:${sourceInfo.line}`;
+        const sourceInfos = Array.isArray(op['x-source-info']) ? op['x-source-info'] : (op['x-source-info'] ? [op['x-source-info']] : []);
+
+        let sourceLinksHtml = '';
+        if (sourceInfos.length > 0) {
+            sourceLinksHtml = sourceInfos.map(s => {
+                const filename = s.file ? s.file.split('/').pop() : 'unknown';
+                return `<a href="vscode://file/${s.file}:${s.line}" style="color: #fbbf24; text-decoration: underline; font-family: monospace; display: block;">
+                            ${filename}:${s.line}
+                        </a>`;
+            }).join('');
+        }
 
         els.docPanel.innerHTML = `
             <div class="doc-header" style="border-bottom: 2px solid #fbbf24;">
@@ -269,83 +318,134 @@ function selectEvent(item, el) {
                         ${desc}
                     </p>
                     <p style="margin: 12px 0 0 0;">
-                        <a href="${fileLink}" style="color: #fbbf24; text-decoration: underline; font-family: monospace;">
-                            ${sourceInfo.file}:${sourceInfo.line}
-                        </a>
+                        ${sourceLinksHtml}
                     </p>
                 </div>
                 
-                ${sourceInfo.snippet ? `
+                ${sourceInfos.length > 0 ? `
                 <div class="section-title">Source Context</div>
-                <div id="snippet-editor" style="height: 300px; border: 1px solid #333; border-radius: 6px; overflow: hidden;"></div>
+                <div id="snippet-container"></div>
                 ` : ''}
             </div>
         `;
 
-        // Render snippet editor if available
-        if (sourceInfo.snippet && window.monaco) {
-            monaco.editor.colorize(sourceInfo.snippet, 'typescript', {}).then(() => {
-                const el = document.getElementById('snippet-editor');
-                const model = monaco.editor.createModel(sourceInfo.snippet, "typescript");
+        // Render snippet editors
+        if (window.monaco && sourceInfos.length > 0) {
+            const container = document.getElementById('snippet-container');
+            for (let i = 0; i < sourceInfos.length; i++) {
+                const src = sourceInfos[i];
 
-                const scrollbarWidth = 14;
-                const borderWidth = 6;
-                const lineHeight = 17;
-                el.style.height = (sourceInfo.snippet.match(/\n/g)?.length * lineHeight + borderWidth + scrollbarWidth) + 'px';
-                const editor = monaco.editor.create(el, {
-                    model: model,
-                    readOnly: true,
-                    theme: 'vs-dark',
-                    minimap: { enabled: false },
-                    lineNumbers: (num) => String((sourceInfo.offset || 1) + num - 1),
-                    fontSize: 12,
-                    scrollBeyondLastLine: false,
-                    automaticLayout: true,
-                    backgroundColor: 'transparent'
-                });
-
-                // Apply highlighting decoration if lines provided
-                if (sourceInfo.highlightLines && sourceInfo.offset) {
-                    const startLine = sourceInfo.highlightLines[0] - sourceInfo.offset + 1;
-                    const endLine = sourceInfo.highlightLines[1] - sourceInfo.offset + 1;
-
-                    if (startLine > 0) {
-                        editor.deltaDecorations([], [
-                            {
-                                range: new monaco.Range(startLine, 1, endLine, 1),
-                                options: {
-                                    isWholeLine: true,
-                                    className: 'warning-line-highlight',
-                                    glyphMarginClassName: 'warning-glyph'
-                                }
-                            }
-                        ]);
-                        editor.revealLineInCenter(startLine);
-                    }
+                let code = src.snippet;
+                // Lazy download if no snippet but file info exists
+                if (!code && src.file) {
+                    try {
+                        const res = await fetch(`./_code?file=${encodeURIComponent(src.file)}`);
+                        if (res.ok) code = await res.text();
+                        else code = `// Failed to load source: ${res.statusText}`;
+                    } catch (e) { code = `// Error loading source: ${e.message}`; }
                 }
-            });
+
+                if (code) {
+                    const wrapper = document.createElement('div');
+                    wrapper.style.marginBottom = '16px';
+                    wrapper.innerHTML = `<div style="font-size: 0.8rem; color: #888; margin-bottom: 4px;">${src.file.split('/').pop()}:${src.line}</div>
+                                          <div id="snippet-editor-${i}" style="height: 300px; border: 1px solid #333; border-radius: 6px; overflow: hidden;"></div>`;
+                    container.appendChild(wrapper);
+
+                    monaco.editor.colorize(code, 'typescript', {}).then(() => {
+                        const el = document.getElementById(`snippet-editor-${i}`);
+                        if (!el) return;
+
+                        const model = monaco.editor.createModel(code, "typescript");
+
+                        // Limit height logic
+                        const scrollbarWidth = 14;
+                        const borderWidth = 6;
+                        const lineHeight = 19;
+                        const contentHeight = (code.match(/\n/g)?.length || 1) * lineHeight + borderWidth + scrollbarWidth;
+                        el.style.height = Math.min(Math.max(contentHeight, 100), 500) + 'px';
+
+                        const editor = monaco.editor.create(el, {
+                            model: model,
+                            readOnly: true,
+                            theme: 'vs-dark',
+                            minimap: { enabled: false },
+                            glyphMargin: true,
+                            lineNumbers: (num) => String((src.offset && src.snippet ? src.offset : 1) + num - 1),
+                            fontSize: 12,
+                            scrollBeyondLastLine: false,
+                            automaticLayout: true,
+                            backgroundColor: 'transparent'
+                        });
+
+                        // Apply highlighting
+                        const decorations = [];
+
+                        // Highlight the main event handler if specified
+                        if (src.highlightLines) {
+                            let startLine = src.highlightLines[0];
+                            let endLine = src.highlightLines[1];
+
+                            if (src.snippet && src.offset) {
+                                startLine = startLine - src.offset + 1;
+                                endLine = endLine - src.offset + 1;
+                            }
+
+                            if (startLine > 0) {
+                                decorations.push({
+                                    range: new monaco.Range(startLine, 1, endLine, 1),
+                                    options: {
+                                        isWholeLine: true,
+                                        className: 'warning-line-highlight',
+                                        glyphMarginClassName: 'warning-glyph'
+                                    }
+                                });
+                                editor.revealLineInCenter(startLine);
+                            }
+                        }
+
+                        // Find and highlight emit patterns
+                        decorations.push(...findEmitDecorations(code, src.offset || 1));
+
+                        editor.deltaDecorations([], decorations);
+                    });
+                }
+            }
         }
         return;
     }
 
     // Source Link for Doc Header
-    const sourceInfo = op['x-source-info'];
-    let sourceLink = '';
-    if (sourceInfo) {
-        const filename = sourceInfo.file.split('/').pop();
-        sourceLink = `<a href="vscode://file/${sourceInfo.file}:${sourceInfo.line}" class="doc-source-link" title="${sourceInfo.file}:${sourceInfo.line}">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px">
-                <polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline>
-            </svg>
-            ${filename}:${sourceInfo.line}
-        </a>`;
+    const sourceInfos = Array.isArray(op['x-source-info']) ? op['x-source-info'] : (op['x-source-info'] ? [op['x-source-info']] : []);
+
+    let sourceLinkHtml = '';
+    if (sourceInfos.length > 0) {
+        // Show only first one in header or a "View Sources" dropdown?
+        // For simplicity, let's show the first one if length is 1, else "x Sources"
+        if (sourceInfos.length === 1) {
+            const s = sourceInfos[0];
+            const filename = s.file.split('/').pop();
+            sourceLinkHtml = `<a href="vscode://file/${s.file}:${s.line}" class="doc-source-link" title="${s.file}:${s.line}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px">
+                    <polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline>
+                </svg>
+                ${filename}:${s.line}
+            </a>`;
+        } else {
+            sourceLinkHtml = `<div class="doc-source-link" title="Multiple sources">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px">
+                    <polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline>
+                </svg>
+                ${sourceInfos.length} Locations
+            </div>`;
+        }
     }
 
     els.docPanel.innerHTML = `
                 <div class="doc-header">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.5rem;">
                          <h1 class="doc-title" style="margin:0">${item.name}</h1>
-                         ${sourceLink}
+                         ${sourceLinkHtml}
                     </div>
                     <div class="doc-meta">
                         <span class="badge badge-${item.type === 'publish' ? 'SEND' : 'RECV'}" style="font-size: 0.8rem; padding: 4px 8px;">${item.type === 'publish' ? 'SEND' : 'RECV'}</span>
@@ -353,16 +453,99 @@ function selectEvent(item, el) {
                     </div>
                 </div>
                 <div class="doc-body">
-                    <p style="line-height: 1.6; margin-bottom: 2rem;">${desc}</p>
+                    ${desc ? `<p style="line-height: 1.6; margin-bottom: 2rem;">${desc}</p>` : ''}
+                    
                     <div class="section-title">Payload Schema</div>
-                    ${renderSchemaToDOM(payload)}
+                    ${payload ? renderSchemaToDOM(payload) : '<div class="empty-state-text" style="color:var(--text-muted); font-style:italic;">No payload definition.</div>'}
+                    
+                    ${sourceInfos.length > 0 ? `
+                    <div class="section-title" style="margin-top: 24px;">Source Code</div>
+                    <div id="source-viewer-container" style="margin-top: 12px;"></div>
+                    ` : ''}
                 </div>
             `;
+
+    // Render Source Viewers
+    if (sourceInfos.length > 0 && window.monaco) {
+        const container = document.getElementById('source-viewer-container');
+
+        for (let i = 0; i < sourceInfos.length; i++) {
+            const src = sourceInfos[i];
+            let code = src.snippet;
+            if (!code && src.file) {
+                try {
+                    const res = await fetch(`./_code?file=${encodeURIComponent(src.file)}`);
+                    if (res.ok) code = await res.text();
+                    else code = `// Failed to load source: ${res.statusText}`;
+                } catch (e) { code = `// Error loading source: ${e.message}`; }
+            }
+
+            if (code) {
+                const wrapper = document.createElement('div');
+                wrapper.style.marginBottom = '20px';
+                wrapper.innerHTML = `<div style="font-size: 0.8rem; color: #888; margin-bottom: 4px; display:flex; justify-content:space-between;">
+                        <span>${src.file.split('/').pop()}:${src.line}</span>
+                        <a href="vscode://file/${src.file}:${src.line}" style="color: #666; text-decoration: none;">Open in Editor ↗</a>
+                    </div>
+                    <div id="source-viewer-${i}" style="height: 300px; border: 1px solid #333; border-radius: 6px; overflow: hidden;"></div>`;
+                container.appendChild(wrapper);
+
+                // Render editor
+                (async () => {
+                    const el = document.getElementById(`source-viewer-${i}`);
+                    if (!el) return;
+                    const model = monaco.editor.createModel(code, "typescript");
+                    const editor = monaco.editor.create(el, {
+                        model: model,
+                        readOnly: true,
+                        theme: 'vs-dark',
+                        minimap: { enabled: false },
+                        glyphMargin: true,
+                        lineNumbers: (num) => String((src.snippet ? src.offset || 1 : 1) + num - 1),
+                        fontSize: 12,
+                        scrollBeyondLastLine: false,
+                        automaticLayout: true,
+                        backgroundColor: 'transparent'
+                    });
+
+                    // Apply highlighting
+                    const decorations = [];
+
+                    // Highlight the main event handler if specified
+                    if (src.highlightLines) {
+                        let startLine = src.highlightLines[0];
+                        let endLine = src.highlightLines[1];
+                        if (src.snippet && src.offset) {
+                            startLine = startLine - src.offset + 1;
+                            endLine = endLine - src.offset + 1;
+                        }
+
+                        if (startLine > 0) {
+                            decorations.push({
+                                range: new monaco.Range(startLine, 1, endLine, 1),
+                                options: {
+                                    isWholeLine: true,
+                                    className: 'warning-line-highlight',
+                                    glyphMarginClassName: 'warning-glyph'
+                                }
+                            });
+                            editor.revealLineInCenter(startLine);
+                        }
+                    }
+
+                    // Find and highlight emit patterns
+                    decorations.push(...findEmitDecorations(code, src.offset || 1));
+
+                    editor.deltaDecorations([], decorations);
+                })();
+            }
+        }
+    }
 
     // Scaffold Editor
     if (item.type === 'publish') {
         let scaffold = "{}";
-        if (payload.properties) {
+        if (payload && payload.properties) {
             const obj = {};
             Object.keys(payload.properties).forEach(k => {
                 obj[k] = payload.properties[k].example || (payload.properties[k].type === 'number' ? 0 : "");

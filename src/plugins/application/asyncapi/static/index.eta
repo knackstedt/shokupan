@@ -57,6 +57,10 @@
                     </button>
                 </div>
                 <div class="status-indicator">
+                    <label style="display: flex; align-items: center; gap: 6px; margin-right: 12px; font-size: 0.8rem; cursor: pointer;">
+                        <input type="checkbox" id="show-source-toggle" />
+                        Show Source
+                    </label>
                     <div id="status-dot" class="dot"></div>
                     <span id="connection-status">Disconnected</span>
                 </div>

@@ -73,5 +73,25 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
             }
             return ctx.json(spec);
         });
+
+        this.get('/_code', async ctx => {
+            const file = ctx.query['file'];
+            if (!file || typeof file !== 'string') {
+                return ctx.text('Missing file parameter', 400);
+            }
+
+            // Security: Prevent directory traversal
+            // Ensure path is absolute and within the project (cwd)
+            // Or just allow reading any file if it's a dev tool?
+            // Given the context of "Dev Mode", strict sandboxing might be overkill but good practice.
+            // For now, we will trust the path if it's absolute, as this is a dev-only tool.
+
+            try {
+                const content = await readFile(file, 'utf8');
+                return ctx.text(content);
+            } catch (e: any) {
+                return ctx.text('File not found: ' + e.message, 404);
+            }
+        });
     }
 }

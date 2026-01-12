@@ -100,151 +100,168 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
 
         if (eventHandlers) {
             for (const [eventName, handlers] of eventHandlers.entries()) {
-                const handler = handlers[0]; // Take first handler for spec
-                const specName = `event/${eventName}`;
+                // Iterate through all handlers to accumulate source info
+                for (const handler of handlers) {
+                    const specName = `event/${eventName}`;
 
-                // Check for @Spec metadata
-                const userSpec = (handler as any).spec;
+                    // Check for @Spec metadata
+                    const userSpec = (handler as any).spec;
 
-                // Determine tags: Use userSpec tags (from decorators) or fallback to Router context
-                let tags = userSpec?.tags;
-                if (!tags && routerTag) {
-                    tags = [{ name: routerTag }];
-                }
-
-                // Match with AST route to find emits and source info
-                let astMatch = astRoutes.find(r =>
-                    (r.method === 'EVENT' || r.method === 'ON') &&
-                    r.path === eventName
-                );
-
-                if (!astMatch) {
-                    // Heuristic matching
-                    const runtimeSource = ((handler as any).originalHandler || handler).toString();
-                    const stripComments = (s: string) => s.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1');
-                    const normalize = (s: string) => stripComments(s).replace(/\s+/g, '');
-
-                    const runtimeHandlerSrc = normalize(runtimeSource);
-
-                    const eventRoutes = astRoutes.filter(r => r.method === 'EVENT' || r.method === 'ON');
-
-                    astMatch = eventRoutes.find(r => {
-                        const astHandlerSrc = normalize(r.handlerSource || r.handlerName || '');
-
-                        if (!astHandlerSrc || astHandlerSrc.length < 5) return false;
-                        return runtimeHandlerSrc.includes(astHandlerSrc) ||
-                            astHandlerSrc.includes(runtimeHandlerSrc) ||
-                            (r.handlerSource && runtimeHandlerSrc.includes(normalize(r.handlerSource).substring(0, 50)));
-                    });
-                }
-
-                if (astMatch) matchedAstRoutes.add(astMatch);
-
-                // Force match for debugging if needed? No.
-                if (eventName === 'dynamic.event' && !astMatch) {
-                    // ...
-                }
-
-                if (!channels[eventName]) {
-                    channels[eventName] = {
-                        publish: {
-                            operationId: `on${eventName.charAt(0).toUpperCase() + eventName.slice(1)}`,
-                            tags,
-                            message: {
-                                payload: { type: 'object' },
-                                ...(userSpec?.message ? userSpec.message : {})
-                            },
-                            ...(userSpec?.type === 'publish' ? userSpec : {}),
-                            "x-source-info": ((handler as any).source || astMatch?.sourceContext) ? {
-                                file: (handler as any).source?.file || astMatch?.sourceContext?.file,
-                                line: (handler as any).source?.line || astMatch?.sourceContext?.startLine,
-                                snippet: astMatch?.sourceContext?.snippet || astMatch?.handlerSource,
-                                offset: astMatch?.sourceContext?.snippetStartLine || astMatch?.sourceContext?.startLine,
-                                highlightLines: astMatch?.sourceContext ? [astMatch.sourceContext.startLine, astMatch.sourceContext.endLine] : undefined
-                            } : undefined,
-                            "x-shokupan-source": ((handler as any).source || astMatch?.sourceContext) ? {
-                                file: (handler as any).source?.file || astMatch?.sourceContext?.file,
-                                line: (handler as any).source?.line || astMatch?.sourceContext?.startLine,
-                                code: astMatch?.sourceContext?.snippet || astMatch?.handlerSource || ''
-                            } : undefined
-                        }
-                    };
-
-                    if (userSpec?.summary) channels[eventName].publish.summary = userSpec.summary;
-                    if (userSpec?.description) channels[eventName].publish.description = userSpec.description;
-                }
-
-                // Analyze for outgoing events
-                let emits = astMatch?.emits || [];
-
-                if (eventName === 'trigger-dynamic') {
-                    // console.log(`[Method: ${eventName}] AST Match found?`, !!astMatch);
-                    if (astMatch) {
-                        // console.log(`[Method: ${eventName}] Emits:`, JSON.stringify(astMatch.emits));
-                    }
-                }
-
-
-                // Fallback to basic regex if no AST emits found
-                if (emits.length === 0) {
-                    const regexAnalysis = await analyzeHandler(handler);
-                    emits = regexAnalysis.emits;
-                }
-
-                for (const emit of emits) {
-                    if (emit.event === '__DYNAMIC_EMIT__') {
-                        const warningKey = `${eventName}/Dynamic Emit`;
-                        channels[warningKey] = {
-                            subscribe: {
-                                operationId: `dynamicEmitWarning${eventName}`,
-                                summary: "Dynamic Emit Detected",
-                                description: "This handler emits an event with a dynamic name that could not be determined statically.",
-                                tags: tags,
-                                "x-warning": true,
-                                "x-source-info": {
-                                    file: astMatch?.sourceContext?.file,
-                                    line: emit.location?.startLine,
-                                    snippet: astMatch?.handlerSource,
-                                    offset: astMatch?.sourceContext?.startLine,
-                                    highlightLines: emit.location ? [emit.location.startLine, emit.location.endLine] : undefined
-                                },
-                                "x-shokupan-source": {
-                                    file: astMatch?.sourceContext?.file,
-                                    line: emit.location?.startLine,
-                                    code: astMatch?.handlerSource || ''
-                                },
-                                message: { payload: { type: 'object' } }
-                            }
-                        };
-                        continue;
+                    // Determine tags: Use userSpec tags (from decorators) or fallback to Router context
+                    let tags = userSpec?.tags;
+                    if (!tags && routerTag) {
+                        tags = [{ name: routerTag }];
                     }
 
-                    if (!channels[emit.event]) {
-                        channels[emit.event] = {
-                            subscribe: {
-                                operationId: `emit${emit.event.charAt(0).toUpperCase() + emit.event.slice(1)}`,
+                    // Match with AST route to find emits and source info
+                    let astMatch = astRoutes.find(r =>
+                        (r.method === 'EVENT' || r.method === 'ON') &&
+                        r.path === eventName
+                    );
+
+                    if (!astMatch) {
+                        // Heuristic matching
+                        const runtimeSource = ((handler as any).originalHandler || handler).toString();
+                        const stripComments = (s: string) => s.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1');
+                        const normalize = (s: string) => stripComments(s).replace(/\s+/g, '');
+
+                        const runtimeHandlerSrc = normalize(runtimeSource);
+
+                        const eventRoutes = astRoutes.filter(r => r.method === 'EVENT' || r.method === 'ON');
+
+                        astMatch = eventRoutes.find(r => {
+                            const astHandlerSrc = normalize(r.handlerSource || r.handlerName || '');
+
+                            if (!astHandlerSrc || astHandlerSrc.length < 5) return false;
+                            return runtimeHandlerSrc.includes(astHandlerSrc) ||
+                                astHandlerSrc.includes(runtimeHandlerSrc) ||
+                                (r.handlerSource && runtimeHandlerSrc.includes(normalize(r.handlerSource).substring(0, 50)));
+                        });
+                    }
+
+                    if (astMatch) matchedAstRoutes.add(astMatch);
+
+                    // Force match for debugging if needed? No.
+                    if (eventName === 'dynamic.event' && !astMatch) {
+                        // ...
+                    }
+
+                    const sourceInfo = ((handler as any).source || astMatch?.sourceContext) ? {
+                        file: (handler as any).source?.file || astMatch?.sourceContext?.file,
+                        line: (handler as any).source?.line || astMatch?.sourceContext?.startLine,
+                        snippet: astMatch?.sourceContext?.snippet || astMatch?.handlerSource,
+                        offset: astMatch?.sourceContext?.snippetStartLine || astMatch?.sourceContext?.startLine,
+                        highlightLines: astMatch?.sourceContext ? [astMatch.sourceContext.startLine, astMatch.sourceContext.endLine] : undefined
+                    } : undefined;
+
+                    if (!channels[eventName]) {
+                        channels[eventName] = {
+                            publish: {
+                                operationId: `on${eventName.charAt(0).toUpperCase() + eventName.slice(1)}`,
                                 tags,
                                 message: {
-                                    payload: emit.payload || { type: 'object' }
+                                    payload: { type: 'object' },
+                                    ...(userSpec?.message ? userSpec.message : {})
                                 },
-                                "x-source-info": (astMatch?.sourceContext && emit.location) ? {
-                                    file: astMatch.sourceContext.file,
-                                    line: emit.location.startLine,
-                                    snippet: astMatch.handlerSource,
-                                    offset: astMatch.sourceContext.startLine,
-                                    highlightLines: [emit.location.startLine, emit.location.endLine]
-                                } : undefined,
-                                "x-shokupan-source": (astMatch?.sourceContext && emit.location) ? {
-                                    file: astMatch.sourceContext.file,
-                                    line: emit.location.startLine,
-                                    code: astMatch.handlerSource || ''
+                                ...(userSpec?.type === 'publish' ? userSpec : {}),
+                                "x-source-info": sourceInfo ? [sourceInfo] : [],
+                                "x-shokupan-source": ((handler as any).source || astMatch?.sourceContext) ? {
+                                    file: (handler as any).source?.file || astMatch?.sourceContext?.file,
+                                    line: (handler as any).source?.line || astMatch?.sourceContext?.startLine,
+                                    code: astMatch?.sourceContext?.snippet || astMatch?.handlerSource || ''
                                 } : undefined
                             }
                         };
+
+                        if (userSpec?.summary) channels[eventName].publish.summary = userSpec.summary;
+                        if (userSpec?.description) channels[eventName].publish.description = userSpec.description;
+                    } else {
+                        // Accumulate source info from additional handlers
+                        if (sourceInfo) {
+                            if (!channels[eventName].publish["x-source-info"]) {
+                                channels[eventName].publish["x-source-info"] = [];
+                            }
+                            const exists = channels[eventName].publish["x-source-info"].some((s: any) =>
+                                s.file === sourceInfo.file && s.line === sourceInfo.line
+                            );
+                            if (!exists) {
+                                channels[eventName].publish["x-source-info"].push(sourceInfo);
+                            }
+                        }
+                    }
+
+                    // Analyze for outgoing events
+                    let emits = astMatch?.emits || [];
+
+                    if (eventName === 'trigger-dynamic') {
+                        // console.log(`[Method: ${eventName}] AST Match found?`, !!astMatch);
+                        if (astMatch) {
+                            // console.log(`[Method: ${eventName}] Emits:`, JSON.stringify(astMatch.emits));
+                        }
+                    }
+
+
+                    // Fallback to basic regex if no AST emits found
+                    if (emits.length === 0) {
+                        const regexAnalysis = await analyzeHandler(handler);
+                        emits = regexAnalysis.emits;
+                    }
+
+                    for (const emit of emits) {
+                        if (emit.event === '__DYNAMIC_EMIT__') {
+                            const warningKey = `${eventName}/Dynamic Emit`;
+                            channels[warningKey] = {
+                                subscribe: {
+                                    operationId: `dynamicEmitWarning${eventName}`,
+                                    summary: "Dynamic Emit Detected",
+                                    description: "This handler emits an event with a dynamic name that could not be determined statically.",
+                                    tags: tags,
+                                    "x-warning": true,
+                                    "x-source-info": {
+                                        file: astMatch?.sourceContext?.file,
+                                        line: emit.location?.startLine,
+                                        snippet: astMatch?.handlerSource,
+                                        offset: astMatch?.sourceContext?.startLine,
+                                        highlightLines: emit.location ? [emit.location.startLine, emit.location.endLine] : undefined
+                                    },
+                                    "x-shokupan-source": {
+                                        file: astMatch?.sourceContext?.file,
+                                        line: emit.location?.startLine,
+                                        code: astMatch?.handlerSource || ''
+                                    },
+                                    message: { payload: { type: 'object' } }
+                                }
+                            };
+                            continue;
+                        }
+
+                        if (!channels[emit.event]) {
+                            channels[emit.event] = {
+                                subscribe: {
+                                    operationId: `emit${emit.event.charAt(0).toUpperCase() + emit.event.slice(1)}`,
+                                    tags,
+                                    message: {
+                                        payload: emit.payload || { type: 'object' }
+                                    },
+                                    "x-source-info": (astMatch?.sourceContext && emit.location) ? {
+                                        file: astMatch.sourceContext.file,
+                                        line: emit.location.startLine,
+                                        snippet: astMatch.handlerSource,
+                                        offset: astMatch.sourceContext.startLine,
+                                        highlightLines: [emit.location.startLine, emit.location.endLine]
+                                    } : undefined,
+                                    "x-shokupan-source": (astMatch?.sourceContext && emit.location) ? {
+                                        file: astMatch.sourceContext.file,
+                                        line: emit.location.startLine,
+                                        code: astMatch.handlerSource || ''
+                                    } : undefined
+                                }
+                            };
+                        }
                     }
                 }
-            };
-        }
+            } // end for handler
+        }; // end for eventHandlers\n        }
 
         // Collect HTTP Routes (Server -> Client Emits Only)
         const httpRoutes = router[$routes];
@@ -366,4 +383,4 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
         info: { title: "Shokupan AsyncAPI", version: "1.0.0", ...options.info },
         channels
     };
-}
+};
