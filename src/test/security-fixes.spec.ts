@@ -165,7 +165,7 @@ describe("Security Vulnerability Tests", () => {
             expect(res.data.query).not.toHaveProperty("prototype");
         });
 
-        test.skip("should allow normal query parameters (SKIPPED - query parsing bug in context.ts line 236)", async () => {
+        test("should allow normal query parameters", async () => {
             const app = new Shokupan();
 
             app.get("/test", (ctx) => {
@@ -465,7 +465,7 @@ describe("Security Vulnerability Tests", () => {
         });
     });
 
-    describe.skip("Integration: Multiple Security Layers (SKIPPED - related to query parsing bug)", () => {
+    describe("Integration: Multiple Security Layers", () => {
         test("should handle multiple security checks correctly", async () => {
             const app = new Shokupan();
 

@@ -591,6 +591,7 @@ export class OpenAPIAnalyzer {
             path: normalizedPath,
             handlerName: handlerArg.getText(sourceFile).substring(0, 50), // Truncate for display
             handlerSource: handlerArg.getText(sourceFile),
+            requestTypes: handlerInfo.requestTypes,
             responseType: handlerInfo.responseType,
             responseSchema: handlerInfo.responseSchema,
             emits: handlerInfo.emits,

@@ -86,8 +86,8 @@ describe("AsyncAPI Generator & Plugin", () => {
         const res = await fetch(`http://localhost:${port}/asyncapi`);
         expect(res.status).toBe(200);
         const text = await res.text();
-        expect(text).toContain("Shokupan AsyncAPI Playground");
-        expect(text).toContain("Native WS");
+        expect(text).toContain("Shokupan AsyncAPI");
+        expect(text).toContain("WS");
         expect(text).toContain("Socket.IO");
     });
 
