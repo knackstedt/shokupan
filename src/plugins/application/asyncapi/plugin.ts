@@ -1,12 +1,12 @@
-
-import { Eta } from 'eta';
 import { readFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import renderToString from 'preact-render-to-string';
 import { ShokupanRouter } from '../../../router';
 import type { Shokupan } from '../../../shokupan';
 import { deepMerge } from '../../../util/deep-merge';
 import type { DeepPartial, ShokupanPlugin, ShokupanPluginOptions } from '../../../util/types';
+import { AsyncApiApp } from './components.tsx';
 import { generateAsyncApi } from './generator';
 
 export interface AsyncApiPluginOptions {
@@ -15,8 +15,6 @@ export interface AsyncApiPluginOptions {
 }
 
 export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
-
-    private eta: Eta;
 
     private static getBasePath() {
         const dir = dirname(fileURLToPath(import.meta.url));
@@ -29,14 +27,9 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
     }
 
     constructor(private pluginOptions: AsyncApiPluginOptions = {}) {
-        super();
+        super({ renderer: renderToString });
+        this.pluginOptions.path ??= '/asyncapi';
         this.init();
-        const viewsPath = AsyncApiPlugin.getBasePath() + "/static";
-        console.log('[AsyncApiPlugin] Views Path:', viewsPath);
-        this.eta = new Eta({
-            views: viewsPath,
-            cache: false
-        });
     }
 
     onInit(app: Shokupan, options?: ShokupanPluginOptions) {
@@ -50,15 +43,29 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
     }
 
     private init() {
-        this.get('/', async ctx => {
-            const specPath = `${ctx.path.endsWith('/') ? ctx.path : ctx.path + '/'}json`;
-            const template = await readFile(AsyncApiPlugin.getBasePath() + "/static/index.eta", 'utf8');
+        const serveFile = async (ctx: any, file: string, type: string) => {
+            const content = await readFile(join(AsyncApiPlugin.getBasePath(), 'static', file), 'utf-8');
+            ctx.set('Content-Type', type);
+            return ctx.send(content);
+        };
 
-            const str = this.eta.renderString(template, {
-                specPath,
-                serverUrl: `${ctx.hostname}:${ctx.app?.applicationConfig.port}`
-            });
-            return ctx.html(str);
+        this.get('/style.css', ctx => serveFile(ctx, 'style.css', 'text/css'));
+        this.get('/theme.css', ctx => serveFile(ctx, 'theme.css', 'text/css'));
+        this.get('/asyncapi-client.mjs', ctx => serveFile(ctx, 'asyncapi-client.mjs', 'application/javascript'));
+
+        this.get('/', async ctx => {
+            let spec = ctx.app?.asyncApiSpec;
+            if (!spec) {
+                spec = await generateAsyncApi(ctx.app!);
+            }
+            if (this.pluginOptions.spec) {
+                deepMerge(spec, this.pluginOptions.spec);
+            }
+
+            const serverUrl = `${ctx.hostname}:${ctx.app?.applicationConfig.port}`;
+            const basePath = this.pluginOptions.path!;
+
+            return ctx.jsx(AsyncApiApp({ spec, serverUrl, basePath }));
         });
 
         this.get('/json', async ctx => {
