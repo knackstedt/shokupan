@@ -83,7 +83,9 @@
         "parse-json": "^8.0.0",
         "reflect-metadata": "^0.2.0",
         "secure-json-parse": "^4.0.0",
-        "surrealdb": "^2.0.0-alpha.16"
+        "surrealdb": "^2.0.0-alpha.16",
+        "@apollo/server": "^5.2.0",
+        "graphql": "^16.12.0"
     },
     "peerDependenciesMeta": {
         "ajv": {
@@ -96,6 +98,12 @@
             "optional": true
         },
         "class-transformer": {
+            "optional": true
+        },
+        "@apollo/server": {
+            "optional": true
+        },
+        "graphql": {
             "optional": true
         },
         "class-validator": {
@@ -136,6 +144,8 @@
         "@types/js-yaml": "^4.0.9",
         "@types/node": "^25.0.6",
         "@types/supertest": "^6.0.3",
+        "@apollo/server": "^5.2.0",
+        "graphql": "^16.12.0",
         "ajv": "^8.17.1",
         "ajv-formats": "^3.0.1",
         "arctic": "^3.7.0",
