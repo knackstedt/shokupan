@@ -279,12 +279,9 @@ export class ShokupanContext<
         // Security: Blocklist dangerous property names
         const blocklist = ['__proto__', 'constructor', 'prototype'];
 
-        const entries = Object.entries(this.url.searchParams);
-        for (let i = 0; i < entries.length; i++) {
-            const [key, value] = entries[i];
-
+        this.url.searchParams.forEach((value, key) => {
             // Security: Skip dangerous keys
-            if (blocklist.includes(key)) continue;
+            if (blocklist.includes(key)) return;
 
             // Use hasOwnProperty to avoid prototype chain issues
             if (Object.prototype.hasOwnProperty.call(q, key)) {
@@ -296,7 +293,7 @@ export class ShokupanContext<
             } else {
                 q[key] = value;
             }
-        }
+        });
         this[$cachedQuery] = q;
         return q;
     }
