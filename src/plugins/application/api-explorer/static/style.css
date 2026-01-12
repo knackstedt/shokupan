@@ -201,12 +201,12 @@ body {
 }
 
 .method-badge {
-    font-size: 0.65rem;
-    font-weight: 700;
+    font-size: 0.7em;
+    font-weight: bold;
     padding: 2px 6px;
     border-radius: 4px;
     margin-right: 8px;
-    min-width: 35px;
+    min-width: 50px;
     text-align: center;
     flex-shrink: 0;
     font-family: 'JetBrains Mono', monospace;
@@ -539,37 +539,56 @@ body {
 
 /* Method Colors */
 .get {
-    background-color: rgba(97, 175, 254, 0.2);
-    color: #61affe;
+    background: #0f172a;
+    color: #3b82f6;
+    border: 1px solid #3b82f6;
 }
 
 .post {
-    background-color: rgba(73, 204, 144, 0.2);
-    color: #49cc90;
+    background: #0f172a;
+    color: #22c55e;
+    border: 1px solid #22c55e;
 }
 
 .put {
-    background-color: rgba(252, 161, 48, 0.2);
-    color: #fca130;
+    background: #0f172a;
+    color: #eab308;
+    border: 1px solid #eab308;
 }
 
 .delete {
-    background-color: rgba(249, 62, 62, 0.2);
-    color: #f93e3e;
+    background: #0f172a;
+    color: #ef4444;
+    border: 1px solid #ef4444;
 }
 
 .patch {
-    background-color: rgba(80, 227, 194, 0.2);
-    color: #50e3c2;
+    background: #0f172a;
+    color: #08d3ea;
+    border: 1px solid #08eae6;
+}
+
+.head {
+    background: #0f172a;
+    color: #e3ea08;
+    border: 1px solid #e3ea08;
+}
+
+.options {
+    background: #0f172a;
+    color: #838383;
+    border: 1px solid #838383;
 }
 
 /* Websocket / AsyncAPI Colors */
 .send {
-    background-color: rgba(214, 88, 235, 0.2);
+    background: #0f172a;
     color: #d658eb;
+    border: 1px solid #d658eb;
 }
 
 .recv {
-    background-color: rgba(27, 208, 208, 0.2);
+    background: #0f172a;
     color: #1bd0d0;
+    border: 1px solid #1bd0d0;
 }
