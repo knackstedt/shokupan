@@ -9,6 +9,9 @@ router.event("jeff", (ctx) => {
 router.event("fred", (ctx) => {
     ctx.emit("pong", { message: Date.now() });
 });
+router.event("should_warn", (ctx) => {
+    ctx.emit(process.env['FOO'] || 'bar');
+});
 
 router.get("/service_fetch", async (ctx) => {
     const [data, data2] = await Promise.all([

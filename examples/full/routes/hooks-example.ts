@@ -19,7 +19,7 @@ import type { ShokupanHooks } from '../../../src/util/types';
 
 // App-level hooks (passed in ShokupanConfig)
 export const appLevelHooks: ShokupanHooks = {
-    onError: async (error, ctx) => {
+    onError: async (ctx, error) => {
         console.log('[APP HOOK] onError:', error);
         // Log to monitoring service, etc.
     },

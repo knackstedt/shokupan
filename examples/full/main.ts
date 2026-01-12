@@ -5,9 +5,9 @@ import "./otel";
 process.env['SHOKUPAN_DB_ENGINE'] = process.env['SHOKUPAN_DB_ENGINE'] || 'memory';
 Error.stackTraceLimit = 50;
 
+import { ApiExplorerPlugin } from '../../src/plugins/application/api-explorer/plugin';
 import { AsyncApiPlugin } from '../../src/plugins/application/asyncapi/plugin';
 import { Dashboard } from '../../src/plugins/application/dashboard/plugin';
-import { ScalarPlugin } from '../../src/plugins/application/scalar';
 import { Compression } from '../../src/plugins/middleware/compression';
 import { Cors } from '../../src/plugins/middleware/cors';
 import { RateLimitMiddleware } from '../../src/plugins/middleware/rate-limit';
@@ -18,6 +18,7 @@ import { DecoratorTestController } from './controllers/decorator-controller';
 import { UserController } from './controllers/implicit-controller';
 import { appLevelHooks, HooksExampleRouter, PerRouteHooksRouter } from './routes/hooks-example';
 import { JSXExampleRouter } from './routes/jsx-example';
+import { NestedRouter } from './routes/nested_router';
 import { ServiceFetchRouter } from './routes/service_fetch';
 import { TrackingDemoRouter } from './routes/tracking';
 import { AjvValidationRouter } from './routes/validators/validation-ajv';
@@ -87,6 +88,9 @@ const app = new Shokupan<AppState>({
 
 app.event("trivial", (ctx) => {
     console.log("Trivial event received. We will now hug your face!");
+});
+app.event("warning", (ctx) => {
+    ctx.emit(process.env['FOO'] || 'bar');
 });
 
 // Simple websocket echo server
@@ -210,6 +214,7 @@ app.get("/implicit", ctx => {
     ctx.text("Implicit");
 });
 
+app.mount("/nested", NestedRouter);
 
 // Health check endpoint
 app.get("/health", {
@@ -298,8 +303,9 @@ app.register(new Dashboard({
 // OPENAPI DOCUMENTATION
 // ============================================================================
 
-app.mount('/openapi', new ScalarPlugin({
-    enableStaticAnalysis: true,
+app.mount('/openapi', new ApiExplorerPlugin({
+    showCode: true,
+    showLinks: true,
     baseDocument: {
         info: {
             title: 'Shokupan Comprehensive Example API',
@@ -340,8 +346,7 @@ Explore the different sections to see examples of each feature.
             { name: 'Hooks', description: 'Event lifecycle hooks examples' },
             { name: 'JSX', description: 'JSX rendering examples' }
         ]
-    },
-    config: {}
+    }
 }));
 
 app.register(new AsyncApiPlugin({ path: "/asyncapi" }));
