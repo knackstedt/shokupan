@@ -58,6 +58,7 @@ export interface ApplicationInstance {
     name: string;
     filePath: string;
     className: 'Shokupan' | 'ShokupanRouter' | 'Controller';
+    controllerPrefix?: string;
     routes: RouteInfo[];
     mounted: MountInfo[];
 }
@@ -65,6 +66,7 @@ export interface ApplicationInstance {
 interface MountInfo {
     prefix: string;
     target: string; // Controller/Router name or file path
+    targetFilePath?: string;
     dependency?: DependencyInfo;
 }
 
@@ -105,8 +107,56 @@ export class OpenAPIAnalyzer {
         // Step 4: Extract route information
         await this.extractRoutes();
 
+        // Step 5: Prune unreachable GenericModules
+        this.pruneApplications();
+
         // Return the raw application data for further processing
         return { applications: this.applications };
+    }
+
+    /**
+     * Remove GenericModules that are not mounted by any Shokupan application/router
+     */
+    private pruneApplications(): void {
+        const reachable = new Set<string>();
+        const queue: ApplicationInstance[] = [];
+
+        // Seed with explicit applications (Shokupan, ShokupanRouter, Controller)
+        for (const app of this.applications) {
+            if (app.name !== 'GenericModule') {
+                reachable.add(app.filePath);
+                queue.push(app);
+            }
+        }
+
+        // BFS to find all reachable modules via mounts
+        while (queue.length > 0) {
+            const app = queue.shift()!;
+
+            for (const mount of app.mounted) {
+                if (mount.targetFilePath && !reachable.has(mount.targetFilePath)) {
+                    reachable.add(mount.targetFilePath);
+
+                    // Find the app instance for this file
+                    const mountedApp = this.applications.find(a => a.filePath === mount.targetFilePath);
+                    if (mountedApp) {
+                        queue.push(mountedApp);
+                    }
+                }
+            }
+        }
+
+        // Filter out unreachable GenericModules
+        const initialCount = this.applications.length;
+        this.applications = this.applications.filter(app => {
+            if (app.name === 'GenericModule' && !reachable.has(app.filePath)) {
+                // console.log(`[Analyzer] Pruning unreachable module: ${app.filePath}`);
+                return false;
+            }
+            return true;
+        });
+
+        // console.log(`[Analyzer] Pruned ${initialCount - this.applications.length} unreachable modules.`);
     }
 
     /**
@@ -249,6 +299,7 @@ export class OpenAPIAnalyzer {
         if (ts.isClassDeclaration(node)) {
             // Check for @Controller decorator
             let isController = false;
+            let controllerPrefix: string | undefined;
             let className = node.name?.getText(sourceFile);
 
             const decorators: ts.Decorator[] = (node as any).decorators || node.modifiers?.filter((m: any) => ts.isDecorator(m));
@@ -262,7 +313,13 @@ export class OpenAPIAnalyzer {
                     }
                     return false;
                 });
-                if (controllerDecorator) isController = true;
+                if (controllerDecorator) {
+                    isController = true;
+                    const expr = controllerDecorator.expression as ts.CallExpression;
+                    if (expr.arguments.length > 0 && ts.isStringLiteral(expr.arguments[0])) {
+                        controllerPrefix = expr.arguments[0].text;
+                    }
+                }
             }
 
             // Fallback: Check for method decorators (@Get, @Post, etc.)
@@ -294,6 +351,7 @@ export class OpenAPIAnalyzer {
                     name: className,
                     filePath: sourceFile.fileName,
                     className: 'Controller',
+                    controllerPrefix,
                     routes: [],
                     mounted: []
                 });
@@ -986,10 +1044,68 @@ export class OpenAPIAnalyzer {
 
         // Check if target is from node_modules
         const dependency = this.checkIfExternalDependency(target, sourceFile);
+        let targetFilePath: string | undefined;
+
+        if (!dependency) {
+            // Check for internal import
+            let modulePath: string | undefined;
+            ts.forEachChild(sourceFile, (node) => {
+                if (targetFilePath || modulePath) return; // Found
+
+                if (ts.isImportDeclaration(node)) {
+                    const specifier = node.moduleSpecifier;
+                    if (ts.isStringLiteral(specifier)) {
+                        const path = specifier.text;
+                        if (path.startsWith('.')) {
+                            // Check default import: import target from './...'
+                            if (node.importClause?.name?.getText(sourceFile) === target) {
+                                modulePath = path;
+                            }
+                            // Check named imports: import { target } from './...'
+                            else if (node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)) {
+                                for (const element of node.importClause.namedBindings.elements) {
+                                    if (element.name.getText(sourceFile) === target) {
+                                        modulePath = path;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            if (modulePath) {
+                const dir = path.dirname(sourceFile.fileName);
+                const absolutePath = path.resolve(dir, modulePath);
+
+                // Try to resolve extension
+                const extensions = ['.ts', '.js', '.tsx', '.jsx', '/index.ts', '/index.js'];
+                for (const ext of extensions) {
+                    if (fs.existsSync(absolutePath + ext)) {
+                        targetFilePath = absolutePath + ext;
+                        break;
+                    }
+                    // If absolutePath ends in /index (implicit)
+                    // Or if modulePath points to directory
+                }
+                // Try straight (if user included extension)
+                if (!targetFilePath && fs.existsSync(absolutePath)) {
+                    targetFilePath = absolutePath;
+                }
+                // Try directory index
+                if (!targetFilePath && fs.existsSync(path.join(absolutePath, 'index.ts'))) {
+                    targetFilePath = path.join(absolutePath, 'index.ts');
+                }
+
+                // Normalize result?
+            }
+        }
 
         return {
             prefix,
             target,
+            targetFilePath,
             dependency
         };
     }

@@ -2,7 +2,7 @@
  * Captures the file and line number of the caller.
  * Use skipFrames to skip helper functions in the stack trace.
  */
-export function getCallerInfo(skipFrames = 1): { file: string; line: number } {
+export function getCallerInfo(skipFrames = 1): { file: string; line: number; } {
     let file = 'unknown';
     let line = 0;
 
@@ -16,18 +16,6 @@ export function getCallerInfo(skipFrames = 1): { file: string; line: number } {
         //  at getCallerInfo (...)
         //  at callingFunction (...)
         //
-        // Index 0: Error
-        // Index 1: getCallerInfo (this function)
-        // Index 2: caller (or whatever calls this)
-
-        // So we scan starting from a reasonable offset
-
-        // However, stack trace format depends on many things. 
-        // A more robust way is to just look for the first line that ISN'T internal.
-
-        // Filter out this file itself if possible, but identifying "this file" is tricky without context.
-        // So we rely on skipFrames OR we filter known internal files.
-
         // Standard Bun Stack Line: "at functionName (/path/to/file.ts:123:45)" or "at /path/to/file.ts:123:45"
 
         let found = 0;
@@ -40,6 +28,7 @@ export function getCallerInfo(skipFrames = 1): { file: string; line: number } {
             if (l.includes('bun:main')) continue;
             if (l.includes('src/util/stack.ts')) continue; // Ignore self
             if (l.includes('src/router.ts')) continue; // Ignore router internals
+            if (l.includes('src/util/decorators.ts')) continue; // Ignore decorators
             if (l.includes('src/shokupan.ts')) continue; // Ignore framework internals
 
             found++;

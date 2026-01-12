@@ -193,8 +193,15 @@ async function getAstRoutes(applications: any[]) {
 
         const expanded: any[] = [];
 
+        let currentPrefix = prefix;
+        if (app.controllerPrefix) {
+            const cleanPrefix = currentPrefix.endsWith('/') ? currentPrefix.slice(0, -1) : currentPrefix;
+            const cleanCont = app.controllerPrefix.startsWith('/') ? app.controllerPrefix : '/' + app.controllerPrefix;
+            currentPrefix = cleanPrefix + cleanCont;
+        }
+
         for (const route of app.routes) {
-            const cleanPrefix = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
+            const cleanPrefix = currentPrefix.endsWith('/') ? currentPrefix.slice(0, -1) : currentPrefix;
             const cleanPath = route.path.startsWith('/') ? route.path : '/' + route.path;
             let joined = cleanPrefix + cleanPath;
             if (joined.length > 1 && joined.endsWith('/')) {
@@ -355,6 +362,28 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                 if (astMatch.tags) operation.tags = astMatch.tags;
                 if (astMatch.operationId) operation.operationId = astMatch.operationId;
 
+                // Add source info
+                if (astMatch.sourceContext) {
+                    const sc = astMatch.sourceContext;
+                    operation["x-source-info"] = {
+                        file: sc.file,
+                        line: sc.startLine,
+                        snippet: sc.snippet || astMatch.handlerSource, // Fallback
+                        offset: sc.snippetStartLine || sc.startLine,
+                        highlightLines: [sc.startLine, sc.endLine]
+                    };
+
+                    // Add x-shokupan-source for standard frontend handling
+                    operation["x-shokupan-source"] = {
+                        file: sc.file,
+                        line: sc.startLine,
+                        code: sc.snippet || astMatch.handlerSource || ''
+                    };
+
+                    const sourceMd = `\n\n### Source Code\n\`\`\`typescript\n${sc.snippet || astMatch.handlerSource || ''}\n\`\`\``;
+                    operation.description = (operation.description || '') + sourceMd;
+                }
+
                 if (astMatch.requestTypes?.body) {
                     operation.requestBody = {
                         content: { 'application/json': { schema: astMatch.requestTypes.body } }
@@ -382,6 +411,37 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                 }
                 if (params.length > 0) {
                     operation.parameters = params;
+                }
+            } else {
+                // No static analysis match - Add Warning and Runtime Source
+                const runtimeSource = ((route.handler as any).originalHandler || route.handler).toString();
+                const warningMd = `\n\n> [!WARNING]\n> **Static Analysis Failed**\n> This endpoint could not be statically analyzed. Showing runtime source code.\n\n\`\`\`typescript\n${runtimeSource}\n\`\`\``;
+                operation.description = (operation.description || '') + warningMd;
+
+                // Extract file/line from Error stack if available
+                let file: string | undefined;
+                let line: number | undefined;
+
+                // Try to get source info from route metadata if present
+                if (route.metadata?.file) {
+                    file = route.metadata.file;
+                    line = route.metadata.line || 1;
+                }
+
+                // Provide x-source-info with available metadata
+                operation["x-source-info"] = {
+                    snippet: runtimeSource,
+                    isRuntime: true,
+                    ...(file ? { file, line: line || 1 } : {})
+                };
+
+                // If we have file info, add it to x-shokupan-source for the API Explorer
+                if (file) {
+                    operation["x-shokupan-source"] = {
+                        file,
+                        line: line || 1,
+                        code: runtimeSource
+                    };
                 }
             }
 

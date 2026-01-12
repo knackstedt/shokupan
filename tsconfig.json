@@ -25,6 +25,8 @@
         "allowJs": true,
         "target": "esnext",
         "module": "Preserve",
+        "jsx": "react-jsx",
+        "jsxImportSource": "preact",
         "lib": [
             "ESNext"
         ],

@@ -1,4 +1,5 @@
 import { RateLimitMiddleware, type RateLimitOptions } from "../plugins/middleware/rate-limit";
+import { getCallerInfo } from "./stack";
 import { $controllerPath, $eventMethods, $middleware, $routeArgs, $routeMethods, $routeSpec } from "./symbol";
 import type { AsyncAPISpec, GuardAPISpec, MethodAPISpec } from "./types";
 import { type Method, type Middleware, RouteParamType } from "./types";
@@ -108,8 +109,12 @@ function createMethodDecorator(method: Method) {
 
             target[$routeMethods].set(propertyKey, {
                 method,
-                path
+                path,
+                source: getCallerInfo(2)
             });
+            if (path.includes('/user')) {
+                console.log(`[Decorator] Captured source for ${propertyKey}:`, getCallerInfo());
+            }
         };
     };
 }

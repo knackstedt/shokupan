@@ -581,10 +581,13 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             let subPath = "";
 
             // 1. Check for Decorator Metadata
+            let methodSource: { file: string, line: number; } | undefined;
+
             if (decoratedRoutes && decoratedRoutes.has(name)) {
                 const config = decoratedRoutes.get(name);
                 method = config.method;
                 subPath = config.path;
+                methodSource = config.source;
             }
             // 2. Fallback to Convention
             else {
@@ -763,7 +766,14 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                 // Merge with existing spec from decorator if available
                 const spec = { tags: [tagName], ...userSpec };
 
-                this.add({ method, path: normalizedPath, handler: finalHandler, spec, controller: instance });
+                this.add({
+                    method,
+                    path: normalizedPath,
+                    handler: finalHandler,
+                    spec,
+                    controller: instance,
+                    metadata: methodSource || (instance as any).metadata
+                });
             }
 
             // 3. Check for Event Decorator
@@ -905,7 +915,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * @param arg.renderer - JSX renderer for the route
      * @param arg.controller - Controller for the route
      */
-    public add({ method, path, spec, handler, regex: customRegex, group, requestTimeout, renderer, controller }: {
+    public add({ method, path, spec, handler, regex: customRegex, group, requestTimeout, renderer, controller, metadata }: {
         method: Method,
         path: string,
         spec?: MethodAPISpec,
@@ -915,6 +925,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         requestTimeout?: number;
         renderer?: JSXRenderer;
         controller?: any;
+        metadata?: { file: string, line: number; };
     }) {
         const { regex, keys } = customRegex
             ? { regex: customRegex, keys: [] }
@@ -1013,7 +1024,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         }
 
         // --- Middleware Tracking Logic ---
-        const { file, line } = getCallerInfo();
+        // If metadata is provided (e.g. from controller), use it. Otherwise capture caller info.
+        const { file, line } = metadata || getCallerInfo();
 
         const trackingHandler = wrappedHandler;
         wrappedHandler = async (ctx: ShokupanContext<T>) => {
