@@ -274,7 +274,7 @@ export class OpenAPIAnalyzer {
             const isFixtureFile = sourceFile.fileName.includes('/fixtures/');
             const isEntrypoint = this.entrypoint && sourceFile.fileName === this.entrypoint;
 
-            console.log(`[Analyzer] check ${sourceFile.fileName}: isTestEnv=${isTestEnv}, isFixture=${isFixtureFile}, isEntry=${isEntrypoint}`);
+            // console.log(`[Analyzer] check ${sourceFile.fileName}: isTestEnv=${isTestEnv}, isFixture=${isFixtureFile}, isEntry=${isEntrypoint}`);
 
             if (!isTestEnv && !isFixtureFile && !isEntrypoint) {
                 if (sourceFile.fileName.includes('/test/') || sourceFile.fileName.includes('/tests/')) {
