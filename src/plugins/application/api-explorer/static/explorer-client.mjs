@@ -698,7 +698,8 @@ async function doSendRequest(route) {
     const { url, method, headers, body } = getRequestData(route);
     const options = { method, headers };
 
-    if (body) {
+    // Only include body for methods that support it (not GET/HEAD)
+    if (body && method.toUpperCase() !== 'GET' && method.toUpperCase() !== 'HEAD') {
         options.body = body;
     }
 
