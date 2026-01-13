@@ -49,27 +49,37 @@ export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin 
     ) {
         pluginOptions.config ??= {};
         super();
+        // Initialize routes immediately so the plugin works when mounted directly
+        this.initRoutes();
     }
 
     async onInit(app: Shokupan, options?: ShokupanPluginOptions) {
+        // Eagerly load Eta during app initialization
         const { Eta } = await import('eta');
         this.eta = new Eta();
 
         const path = options?.path || this.pluginOptions.path || '/reference';
         app.mount(path, this);
 
-        this.init();
-
         // Also run onMount logic if needed
         this.onMount(app);
     }
 
-    private init() {
+    private async ensureEta() {
+        if (!this.eta) {
+            const { Eta } = await import('eta');
+            this.eta = new Eta();
+        }
+    }
+
+    private initRoutes() {
         const bootId = Date.now().toString();
 
         this.get("/_lifecycle", ctx => ctx.json({ boot: bootId }));
 
-        this.get("/", ctx => {
+        this.get("/", async (ctx) => {
+            await this.ensureEta();
+
             let path = ctx.url.toString();
             if (!path.endsWith("/")) path += "/";
 

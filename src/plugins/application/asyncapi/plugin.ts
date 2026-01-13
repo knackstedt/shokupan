@@ -6,7 +6,7 @@ import { ShokupanRouter } from '../../../router';
 import type { Shokupan } from '../../../shokupan';
 import { deepMerge } from '../../../util/deep-merge';
 import type { DeepPartial, ShokupanPlugin, ShokupanPluginOptions } from '../../../util/types';
-import { AsyncApiApp } from './components.tsx';
+import { AsyncApiApp, buildNavTree } from './components.tsx';
 import { generateAsyncApi } from './generator';
 
 export interface AsyncApiPluginOptions {
@@ -64,11 +64,14 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
             }
 
             const serverUrl = `${ctx.hostname}:${ctx.app?.applicationConfig.port}`;
-            const basePath = this.pluginOptions.path!;
+            const base = this.pluginOptions.path!;
 
             const disableSourceView = this.pluginOptions.disableSourceView;
 
-            return ctx.jsx(AsyncApiApp({ spec, serverUrl, basePath, disableSourceView }));
+            // Build navigation tree from spec
+            const navTree = buildNavTree(spec);
+
+            return ctx.jsx(AsyncApiApp({ spec, serverUrl, base, disableSourceView, navTree }));
         });
 
         this.get('/json', async ctx => {

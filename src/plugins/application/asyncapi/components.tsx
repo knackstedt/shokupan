@@ -262,7 +262,7 @@ function ConsolePanel({ serverUrl }: any) {
 }
 
 // Logic to build the tree from spec
-function buildNavTree(spec: any) {
+export function buildNavTree(spec: any) {
     if (!spec || !spec.channels) return { children: {} };
 
     const root: any = { children: {} };

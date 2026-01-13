@@ -337,6 +337,9 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                 fullPath = fullPath.slice(0, -1);
             }
 
+            // Convert Express-style :param to OpenAPI-style {param}
+            fullPath = fullPath.replace(/:([a-zA-Z0-9_]+)/g, '{$1}');
+
             if (!paths[fullPath]) paths[fullPath] = {};
 
             const operation: any = {
