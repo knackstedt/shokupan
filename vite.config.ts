@@ -14,12 +14,16 @@ export default defineConfig({
         viteStaticCopy({
             targets: [
                 {
-                    src: 'src/plugins/application/dashboard/template.eta',
-                    dest: 'plugins/application/dashboard'
-                },
-                {
                     src: 'src/plugins/application/dashboard/static/*',
                     dest: 'plugins/application/dashboard/static'
+                },
+                {
+                    src: 'src/plugins/application/asyncapi/static/*',
+                    dest: 'plugins/application/asyncapi/static'
+                },
+                {
+                    src: 'src/plugins/application/api-explorer/static/*',
+                    dest: 'plugins/application/api-explorer/static'
                 }
             ]
         })
