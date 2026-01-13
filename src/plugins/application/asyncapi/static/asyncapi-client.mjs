@@ -9,7 +9,8 @@ const state = {
     selectedEvent: null,
     logEntries: [],
     logAutoScroll: true,
-    isConsoleMaximized: false
+    isConsoleMaximized: false,
+    disableSourceView: !!window.DISABLE_SOURCE_VIEW
 };
 
 const els = {
@@ -236,7 +237,7 @@ async function selectEvent(name, el) {
         const sourceInfos = Array.isArray(op['x-source-info']) ? op['x-source-info'] : (op['x-source-info'] ? [op['x-source-info']] : []);
 
         let sourceLinksHtml = '';
-        if (sourceInfos.length > 0) {
+        if (!state.disableSourceView && sourceInfos.length > 0) {
             sourceLinksHtml = sourceInfos.map(s => {
                 const filename = s.file ? s.file.split('/').pop() : 'unknown';
                 return `<a href="vscode://file/${s.file}:${s.line}" style="color: #fbbf24; text-decoration: underline; font-family: monospace; display: block;">
@@ -265,7 +266,7 @@ async function selectEvent(name, el) {
                     </p>
                 </div>
                 
-                ${sourceInfos.length > 0 ? `
+                ${!state.disableSourceView && sourceInfos.length > 0 ? `
                 <div class="section-title">Source Context</div>
                 <div id="snippet-container"></div>
                 ` : ''}
@@ -273,7 +274,7 @@ async function selectEvent(name, el) {
         `;
 
         // Render snippet editors
-        if (window.monaco && sourceInfos.length > 0) {
+        if (!state.disableSourceView && window.monaco && sourceInfos.length > 0) {
             const container = document.getElementById('snippet-container');
             for (let i = 0; i < sourceInfos.length; i++) {
                 const src = sourceInfos[i];
@@ -349,7 +350,7 @@ async function selectEvent(name, el) {
     const sourceInfos = Array.isArray(op['x-source-info']) ? op['x-source-info'] : (op['x-source-info'] ? [op['x-source-info']] : []);
 
     let sourceLinkHtml = '';
-    if (sourceInfos.length > 0) {
+    if (!state.disableSourceView && sourceInfos.length > 0) {
         // Show only first one in header or a "View Sources" dropdown?
         // For simplicity, let's show the first one if length is 1, else "x Sources"
         if (sourceInfos.length === 1) {
@@ -388,7 +389,7 @@ async function selectEvent(name, el) {
             <div class="section-title">Payload Schema</div>
             ${payload ? renderSchemaToDOM(payload) : '<div class="empty-state-text" style="color:var(--text-muted); font-style:italic;">No payload definition.</div>'}
             
-            ${sourceInfos.length > 0 ? `
+            ${!state.disableSourceView && sourceInfos.length > 0 ? `
             <div class="section-title" style="margin-top: 24px;">Source Code</div>
             <div id="source-viewer-container"></div>
             ` : ''}
@@ -396,7 +397,7 @@ async function selectEvent(name, el) {
     `;
 
     // Render Source Viewers
-    if (sourceInfos.length > 0 && window.monaco) {
+    if (!state.disableSourceView && sourceInfos.length > 0 && window.monaco) {
         const container = document.getElementById('source-viewer-container');
         container.innerHTML = '';
 

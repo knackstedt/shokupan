@@ -4,65 +4,64 @@
  * @jsxFrag Fragment
  */
 
-export function AsyncApiApp({ spec, serverUrl, basePath }: any) {
-    // Build Navigation Tree
-    const navTree = buildNavTree(spec);
-
-    // Ensure basePath doesn't have trailing slash
-    const base = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
-
-    return (
-        <html lang="en">
-            <head>
-                <meta charSet="UTF-8" />
-                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-                <title>Shokupan AsyncAPI</title>
-                <link rel="preconnect" href="https://fonts.googleapis.com" />
-                <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-                <link rel="stylesheet" href={`${base}/theme.css`} />
-                <link rel="stylesheet" href={`${base}/style.css`} />
-                <script dangerouslySetInnerHTML={{
-                    __html: `
+return (
+    <html lang="en">
+        <head>
+            <meta charSet="UTF-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <title>Shokupan AsyncAPI</title>
+            <link rel="preconnect" href="https://fonts.googleapis.com" />
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+            <link rel="stylesheet" href={`${base}/theme.css`} />
+            <link rel="stylesheet" href={`${base}/style.css`} />
+            <script dangerouslySetInnerHTML={{
+                __html: `
                     window.INITIAL_SPEC = ${JSON.stringify(spec)};
                     window.INITIAL_SERVER_URL = "${serverUrl}";
+                    window.DISABLE_SOURCE_VIEW = ${JSON.stringify(disableSourceView)};
                 `}} />
-            </head>
-            <body>
-                <div class="app-container">
-                    <Sidebar navTree={navTree} />
+        </head>
+        <body>
+            <div class="app-container">
+                <Sidebar navTree={navTree} disableSourceView={disableSourceView} />
 
-                    <div class="resizer" id="resizer-left"></div>
+                <div class="resizer" id="resizer-left"></div>
 
-                    <MainContent />
+                <MainContent />
 
-                    <div class="resizer" id="resizer-right"></div>
+                <div class="resizer" id="resizer-right"></div>
 
-                    <ConsolePanel serverUrl={serverUrl} />
-                </div>
+                <ConsolePanel serverUrl={serverUrl} />
+            </div>
 
-                <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
-                <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
-                <script src={`${base}/asyncapi-client.mjs`} type="module"></script>
-            </body>
-        </html>
-    );
+            <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+            <script src={`${base}/asyncapi-client.mjs`} type="module"></script>
+        </body>
+    </html>
+);
 }
 
-function Sidebar({ navTree }: any) {
+function Sidebar({ navTree, disableSourceView }: any) {
     return (
         <div class="sidebar scroller" id="sidebar">
-            <div class="sidebar-header">
+            <div class="sidebar-header" style="display:flex; justify-content:space-between; align-items:center;">
                 <h2>AsyncAPI</h2>
+                <button id="btn-collapse-nav" class="btn-icon" title="Collapse Sidebar">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
             </div>
             <div class="nav-list" id="nav-list">
-                <NavNode node={navTree} level={0} />
+                <NavNode node={navTree} level={0} disableSourceView={disableSourceView} />
             </div>
         </div>
     );
 }
 
-function NavNode({ node, level }: any) {
+function NavNode({ node, level, disableSourceView }: any) {
     // Sort children
     const sortedEntries = Object.entries(node.children || {}).sort((a, b) => {
         const [aKey, aItem] = a as [string, any];
@@ -100,7 +99,7 @@ function NavNode({ node, level }: any) {
                             <div class="group-label">{key}</div>
                             {hasChildren && (
                                 <div class="tree-node" style="margin-left: 0">
-                                    <NavNode node={item} level={level + 1} />
+                                    <NavNode node={item} level={level + 1} disableSourceView={disableSourceView} />
                                 </div>
                             )}
                         </div>
@@ -113,7 +112,7 @@ function NavNode({ node, level }: any) {
                 return (
                     <div key={key}>
                         {isLeaf ? (
-                            <LeafNode item={item} label={key} />
+                            <LeafNode item={item} label={key} disableSourceView={disableSourceView} />
                         ) : (
                             <div class="tree-item" style="color: var(--text-muted)">
                                 <span class="tree-label">{key}</span>
@@ -122,7 +121,7 @@ function NavNode({ node, level }: any) {
 
                         {hasChildren && (
                             <div class="tree-node">
-                                <NavNode node={item} level={level + 1} />
+                                <NavNode node={item} level={level + 1} disableSourceView={disableSourceView} />
                             </div>
                         )}
                     </div>
@@ -132,7 +131,7 @@ function NavNode({ node, level }: any) {
     );
 }
 
-function LeafNode({ item, label }: any) {
+function LeafNode({ item, label, disableSourceView }: any) {
     const isWarning = item.data?.op?.['x-warning'];
     const opId = item.data?.name; // Using name as ID for referencing
     const sourceInfo = item.data?.op?.['x-source-info'];
@@ -158,7 +157,7 @@ function LeafNode({ item, label }: any) {
     return (
         <div class="tree-item" data-event={opId} style={isWarning ? "color: #fbbf24" : ""}>
             {content}
-            {sourceInfo && (
+            {sourceInfo && !disableSourceView && (
                 <a href={`vscode://file/${sourceInfo.file}:${sourceInfo.line}`}
                     class="source-link"
                     onClick={(e) => { e.stopPropagation(); }} // This won't work in SSR string, handled in client script
@@ -175,15 +174,28 @@ function LeafNode({ item, label }: any) {
 
 function MainContent() {
     return (
-        <main class="main-content scroller" id="doc-panel">
-            <div class="empty-state">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+        <div id="main-wrapper" style="flex: 1; min-width: 0; position: relative; overflow: hidden;">
+            <button id="btn-expand-nav" class="btn-icon floating-toggle left" title="Expand Sidebar" style="display:none;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9 18 15 12 9 6"></polyline>
                 </svg>
-                <h3>Select an event to view details</h3>
-            </div>
-        </main>
+            </button>
+            <button id="btn-expand-console" class="btn-icon floating-toggle right" title="Expand Console" style="display:none;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+            </button>
+
+            <main class="main-content scroller" id="doc-panel" style="height: 100%;">
+                <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                    </svg>
+                    <h3>Select an event to view details</h3>
+                </div>
+            </main>
+        </div>
     );
 }
 
@@ -191,6 +203,21 @@ function ConsolePanel({ serverUrl }: any) {
     return (
         <div class="console-panel" id="console-panel">
             <div class="console-header">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                    <h3 style="margin:0; font-size:1rem;">Console</h3>
+                    <div style="display:flex; gap: 4px;">
+                        <button id="btn-maximize-console" class="btn-icon" title="Maximize Console">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            </svg>
+                        </button>
+                        <button id="btn-collapse-console" class="btn-icon" title="Collapse Console">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
                 <div class="connection-bar">
                     <select id="protocol">
                         <option value="ws">WS</option>

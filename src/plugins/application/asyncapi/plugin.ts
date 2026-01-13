@@ -12,6 +12,7 @@ import { generateAsyncApi } from './generator';
 export interface AsyncApiPluginOptions {
     path?: string;
     spec?: DeepPartial<any>;
+    disableSourceView?: boolean;
 }
 
 export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
@@ -65,7 +66,9 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
             const serverUrl = `${ctx.hostname}:${ctx.app?.applicationConfig.port}`;
             const basePath = this.pluginOptions.path!;
 
-            return ctx.jsx(AsyncApiApp({ spec, serverUrl, basePath }));
+            const disableSourceView = this.pluginOptions.disableSourceView;
+
+            return ctx.jsx(AsyncApiApp({ spec, serverUrl, basePath, disableSourceView }));
         });
 
         this.get('/json', async ctx => {
