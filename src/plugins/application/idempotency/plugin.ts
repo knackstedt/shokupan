@@ -1,4 +1,4 @@
-import { RecordId } from 'surrealdb';
+import type { RecordId } from 'surrealdb';
 import type { ShokupanContext } from "../../../context";
 import { $finalResponse } from '../../../util/symbol';
 import type { Middleware } from "../../../util/types";
@@ -33,6 +33,8 @@ export function Idempotency(options: IdempotencyOptions = {}): Middleware {
     const headerName = options.header || "Idempotency-Key";
     const ttl = options.ttl || 24 * 60 * 60 * 1000;
 
+    let RecordIdClass: typeof RecordId;
+
     const idempotencyMiddleware: Middleware = async function IdempotencyMiddleware(ctx: ShokupanContext, next) {
         const key = ctx.headers.get(headerName);
 
@@ -41,8 +43,13 @@ export function Idempotency(options: IdempotencyOptions = {}): Middleware {
         }
 
         // Check if key exists
+        // Check if key exists
         try {
-            const stored = await ctx.app.db.select<StoredResponse>(new RecordId('idempotency', key));
+            if (!RecordIdClass) {
+                const mod = await import('surrealdb');
+                RecordIdClass = mod.RecordId;
+            }
+            const stored = await ctx.app.db.select<StoredResponse>(new RecordIdClass('idempotency', key));
             if (stored) {
                 // Check TTL (though database cleaning might happen elsewhere, good to check here too if needed, 
                 // but usually we rely on DB or just return if found. 
@@ -109,7 +116,7 @@ export function Idempotency(options: IdempotencyOptions = {}): Middleware {
             // Fire and forget storage? Or await?
             // Await to ensure persistence before returning to client (safer for "guarantee")
             try {
-                await ctx.app.db.upsert(new RecordId('idempotency', key), toStore);
+                await ctx.app.db.upsert(new RecordIdClass('idempotency', key), toStore);
             } catch (e) {
                 console.error("Idempotency write error:", e);
             }

@@ -4,7 +4,7 @@ const state = {
     shouldAutoReconnect: true,
     reconnectTimer: null,
     protocol: 'ws',
-    spec: null,
+    spec: window.INITIAL_SPEC || null,
     editor: null,
     selectedEvent: null,
     logEntries: [],
@@ -59,10 +59,33 @@ function initResizers() {
     setup('resizer-right', '--console-width', false);
 }
 
+// Hydrate Navigation
+function hydrateNav() {
+    const items = document.querySelectorAll('.tree-item[data-event]');
+    items.forEach(el => {
+        el.addEventListener('click', () => {
+            const eventName = el.dataset.event;
+            selectEvent(eventName, el);
+        });
+    });
+}
+
+function resolveItem(name) {
+    if (!state.spec || !state.spec.channels) return null;
+    const ch = state.spec.channels[name];
+    if (!ch) return null;
+
+    // Logic matching buildNavTree:
+    const op = ch.publish || ch.subscribe;
+    const type = ch.publish ? 'publish' : 'subscribe';
+    return { name, op, type };
+}
+
 // Initialize Monaco
 require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
 require(['vs/editor/editor.main'], function () {
     initResizers(); // Init resizers
+    hydrateNav();   // Hydrate pre-rendered nav
 
     // Virtual scroll listener
     els.logs.addEventListener('scroll', () => {
@@ -90,18 +113,11 @@ require(['vs/editor/editor.main'], function () {
         automaticLayout: true,
         backgroundColor: 'transparent'
     });
+
+    // Auto-connect if URL is present (or wait for user?)
+    // Original script called connect() immediately.
     connect();
 });
-
-async function loadSpec() {
-    try {
-        const res = await fetch('<%~ it.specPath %>');
-        state.spec = await res.json();
-        renderNav();
-    } catch (e) {
-        log('System', 'Failed to load spec: ' + e.message, 'error');
-    }
-}
 
 /* ================= Emit Pattern Detection ================= */
 function findEmitDecorations(code, offset = 1) {
@@ -141,142 +157,10 @@ function findEmitDecorations(code, offset = 1) {
     return decorations;
 }
 
-/* ================= Navigation Tree Rendering ================= */
-function renderNav() {
-    if (!state.spec || !state.spec.channels) return;
-    els.navList.innerHTML = '';
-
-    const root = { children: {} };
-
-    // Build Tree: Group by Tag -> split by . or /
-    Object.keys(state.spec.channels).forEach(name => {
-        const ch = state.spec.channels[name];
-        const op = ch.publish || ch.subscribe;
-        const type = ch.publish ? 'publish' : 'subscribe';
-
-        // Get Tag (Controller Name)
-        const tag = (op.tags && op.tags.length > 0) ? op.tags[0].name : 'General';
-
-        // Ensure Tag Group Exists
-        if (!root.children[tag]) root.children[tag] = { children: {} };
-
-        const parts = name.split(/[\.\/]/);
-        let current = root.children[tag];
-
-        parts.forEach((part, i) => {
-            if (!current.children[part]) current.children[part] = { children: {} };
-            current = current.children[part];
-
-            if (i === parts.length - 1) {
-                current.isLeaf = true;
-                current.data = { name, op, type };
-            }
-        });
-    });
-
-    // Recursive Render
-    function createNode(node, container, level = 0) {
-        Object.entries(node.children)
-            .sort((a, b) => {
-                const aKey = a[0];
-                const bKey = b[0];
-                const aItem = a[1];
-                const bItem = b[1];
-
-                // Prioritize Warnings
-                const isWarningA = aItem.data?.op?.['x-warning'];
-                const isWarningB = bItem.data?.op?.['x-warning'];
-                if (isWarningA && !isWarningB) return -1;
-                if (!isWarningA && isWarningB) return 1;
-
-                if (aKey === bKey) return 0;
-
-                if (aKey === 'Warning' || aKey === 'Warnings') return -1;
-                if (bKey === 'Warning' || bKey === 'Warnings') return 1;
-
-                if (aKey === 'Application') return -1;
-                if (bKey === 'Application') return 1;
-
-                if (aKey[0] === '/') return 1;
-                if (bKey[0] === '/') return -1;
-
-                return aKey.localeCompare(bKey);
-            })
-            .forEach(([key, item]) => {
-                const hasChildren = Object.keys(item.children).length > 0;
-
-                if (level === 0) {
-                    // Top Level Group (Tag)
-                    const el = document.createElement('div');
-                    el.className = 'group-label';
-                    el.innerText = key;
-                    container.appendChild(el);
-
-                    if (hasChildren) {
-                        const childContainer = document.createElement('div');
-                        childContainer.className = 'tree-node';
-                        childContainer.style.marginLeft = '0';
-                        createNode(item, childContainer, level + 1);
-                        container.appendChild(childContainer);
-                    }
-                } else {
-                    // Nested Nodes
-                    if (item.isLeaf) {
-                        // Render as Event (even if it has children)
-                        const el = document.createElement('div');
-                        el.className = 'tree-item';
-
-                        let labelHtml = '';
-                        if (item.data.op['x-warning']) {
-                            // Warning Node
-                            el.style.color = '#fbbf24'; // amber-400
-                            labelHtml = `<span style="margin-right: 6px;">⚠️</span> <span class="tree-label">${key}</span>`;
-                        } else {
-                            // Standard Event Node
-                            const badgeText = item.data.type === 'publish' ? 'SEND' : 'RECV';
-                            labelHtml = `<span class="badge badge-${badgeText}">${badgeText}</span> <span class="tree-label">${key}</span>`;
-                        }
-
-                        // Source Link
-                        const src = item.data.op['x-source-info'];
-                        if (src) {
-                            const link = `vscode://file/${src.file}:${src.line}`;
-                            // Code icon
-                            labelHtml += `<a href="${link}" class="source-link" onclick="event.stopPropagation()" title="${src.file}:${src.line}">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block">
-                                <polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline>
-                                </svg>
-                             </a>`;
-                        }
-                        el.innerHTML = labelHtml;
-
-                        el.onclick = () => selectEvent(item.data, el);
-                        container.appendChild(el);
-                    } else {
-                        // Render as Folder Label (only if NOT a leaf)
-                        const folderLabel = document.createElement('div');
-                        folderLabel.className = 'tree-item';
-                        folderLabel.style.color = 'var(--text-muted)';
-                        folderLabel.innerHTML = `<span class="tree-label">${key}</span>`;
-                        container.appendChild(folderLabel);
-                    }
-
-                    // If it has children, render them in a container
-                    if (hasChildren) {
-                        const childContainer = document.createElement('div');
-                        childContainer.className = 'tree-node';
-                        createNode(item, childContainer, level + 1);
-                        container.appendChild(childContainer);
-                    }
-                }
-            });
-    }
-
-    createNode(root, els.navList);
-}
-
 /* ================= Schema & Doc Rendering ================= */
-async function selectEvent(item, el) {
+async function selectEvent(name, el) {
+    const item = resolveItem(name);
+    if (!item) return;
     document.querySelectorAll('.tree-item').forEach(n => n.classList.remove('active'));
     if (el) el.classList.add('active');
 
@@ -634,22 +518,24 @@ function renderLogs() {
         div.style.display = 'flex';
         div.style.alignItems = 'center';
 
+        const icons = {
+            in: `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="#7986cb"><path d="M17.707 6.293a1 1 0 0 1 0 1.414L9.414 16H15a1 1 0 1 1 0 2H7a1 1 0 0 1-1-1V9a1 1 0 1 1 2 0v5.586l8.293-8.293a1 1 0 0 1 1.414 0z"/></svg>`,
+            out: `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="#4caf50"><path d="M8 7a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v8a1 1 0 1 1-2 0V9.414l-8.293 8.293a1 1 0 0 1-1.414-1.414L14.586 8H9a1 1 0 0 1-1-1z"/></svg>`,
+            error: `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="#ff5722"><path d="M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10S2 17.523 2 12zm5.793-4.207a1 1 0 0 1 1.414 0L12 10.586l2.793-2.793a1 1 0 1 1 1.414 1.414L13.414 12l2.793 2.793a1 1 0 0 1-1.414 1.414L12 13.414l-2.793 2.793a1 1 0 0 1-1.414-1.414L10.586 12 7.793 9.207a1 1 0 0 1 0-1.414z"/></svg>`,
+            info: `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="#03a9f4"><path d="M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10S2 17.523 2 12z"/><path d="M12 10a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1zm1.5-2.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/></svg>`
+        };
         // Escape HTML in msg
-        const safeMsg = entry.msg.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        div.innerHTML = `<span>${icons[entry.type]}</span><span class="log-time">${entry.time}</span><span class="log-content"></span>`;
 
-        div.innerHTML = `<span class="log-time">${entry.time}</span><span class="log-content" title="${safeMsg}">${safeMsg}</span>`;
+        const logContent = div.querySelector('.log-content');
+        logContent.title = entry.msg;
+        logContent.innerText = entry.msg;
+
         container.appendChild(div);
     }
 
     // Auto-scroll logic
     if (state.logAutoScroll && total > 0) {
-        // If we are auto-scrolling, we want to be at the bottom
-        // But renderLogs is called ON scroll too. 
-        // If called from `log()`, we might need to update scrollTop.
-        // We set scrollTop to MAX.
-        // But we only want to do this if we were already at bottom OR just added.
-        // The event listener handles state.logAutoScroll flag.
-        // If flag is true, force scroll.
         if (container.scrollTop + clientHeight < els.logShim.offsetHeight) {
             container.scrollTop = els.logShim.offsetHeight - clientHeight;
         }
@@ -700,7 +586,7 @@ function connect() {
                 state.isConnected = true;
                 updateStatus();
                 log('System', 'Connected', 'in');
-                loadSpec();
+                // No need to loadSpec again here, handled by initial load
             };
             state.socket.onclose = () => {
                 if (state.isConnected) log('System', 'Disconnected');

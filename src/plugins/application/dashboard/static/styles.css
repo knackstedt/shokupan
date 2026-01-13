@@ -17,7 +17,8 @@ body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     background-color: var(--bg-primary);
     color: var(--text-primary);
-    min-height: 100vh;
+    height: 100vh;
+    overflow: hidden;
 }
 
 header {
@@ -89,7 +90,6 @@ select {
     color: var(--text-secondary);
     font-size: 0.875rem;
     margin-bottom: 0.5rem;
-    text-transform: uppercase;
     letter-spacing: 0.05em;
     height: 48px;
     line-height: 48px;

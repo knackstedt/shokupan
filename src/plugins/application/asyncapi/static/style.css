@@ -414,7 +414,6 @@ a {
 .compose-header {
     padding: 0.5rem 1rem;
     font-size: 0.75rem;
-    text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--text-muted);
     display: flex;

@@ -78,6 +78,7 @@ export default defineConfig({
                         { label: 'Compression', link: '/plugins/compression/' },
                         { label: 'Debug Dashboard', link: '/plugins/debug-dashboard/' },
                         { label: 'Failed Request Recorder', link: '/plugins/failed-request-recorder/' },
+                        { label: 'GraphQL (Apollo)', link: '/plugins/graphql/' },
                         { label: 'Idempotency', link: '/plugins/idempotency/' },
                         { label: 'OpenAPI Validation', link: '/plugins/openapi-validation/' },
                         { label: 'Proxy', link: '/plugins/proxy/' },

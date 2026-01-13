@@ -1,6 +1,6 @@
 import type { ApiReferenceConfiguration } from '@scalar/api-reference';
 import type { OpenAPI } from '@scalar/openapi-types';
-import { Eta } from 'eta';
+import type { Eta } from 'eta';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ShokupanRouter } from '../../router';
@@ -9,8 +9,6 @@ import { deepMerge } from '../../util/deep-merge';
 import type { DeepPartial, ShokupanPlugin, ShokupanPluginOptions } from '../../util/types';
 import { OpenAPIAnalyzer } from './openapi/analyzer';
 
-
-const eta = new Eta();
 
 export type ScalarPluginOptions = {
     /**
@@ -44,17 +42,23 @@ export type ScalarPluginOptions = {
  * @returns Scalar plugin instance
  */
 export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
+    private eta: Eta | undefined;
+
     constructor(
         private readonly pluginOptions: ScalarPluginOptions = {}
     ) {
         pluginOptions.config ??= {};
         super();
-        this.init();
     }
 
-    onInit(app: Shokupan, options?: ShokupanPluginOptions) {
+    async onInit(app: Shokupan, options?: ShokupanPluginOptions) {
+        const { Eta } = await import('eta');
+        this.eta = new Eta();
+
         const path = options?.path || this.pluginOptions.path || '/reference';
         app.mount(path, this);
+
+        this.init();
 
         // Also run onMount logic if needed
         this.onMount(app);
@@ -108,7 +112,9 @@ export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin 
                 }
             } catch (e) { }
 
-            return ctx.html(eta.renderString(`<!doctype html>
+            if (!this.eta) throw new Error("Eta not initialized");
+
+            return ctx.html(this.eta.renderString(`<!doctype html>
                 <html lang="en">
                 <head>
                     <title>API Reference</title>

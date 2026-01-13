@@ -1,14 +1,15 @@
 import type { HeadersInit } from 'bun';
-import { Eta } from "eta";
 import { readFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import renderToString from 'preact-render-to-string';
 import { RecordId } from 'surrealdb';
 import type { DebugCollector } from "../../../context";
 import { ShokupanRouter } from "../../../router";
 import type { Shokupan } from '../../../shokupan';
 import { $appRoot, $childRouters, $debug, $mountPath } from "../../../util/symbol";
 import type { ShokupanHooks, ShokupanPlugin } from "../../../util/types";
+import { DashboardApp } from './components';
 import { MetricsCollector } from './metrics-collector';
 
 interface RequestMetrics {
@@ -85,7 +86,7 @@ export class Dashboard implements ShokupanPlugin {
 
     private [$appRoot]: Shokupan;
 
-    private router = new ShokupanRouter();
+    private router = new ShokupanRouter({ renderer: renderToString });
     private metrics: RequestMetrics = {
         totalRequests: 0,
         successfulRequests: 0,
@@ -99,10 +100,7 @@ export class Dashboard implements ShokupanPlugin {
         edgeMetrics: {}
     };
 
-    private eta = new Eta({
-        views: Dashboard.getBasePath() + "/static",
-        cache: false
-    });
+
     private startTime = Date.now();
     private instrumented = false;
     private metricsCollector: MetricsCollector;
@@ -426,23 +424,54 @@ export class Dashboard implements ShokupanPlugin {
             }
         });
 
-        this.router.get("/", async (ctx) => {
+        this.router.get("/**", async (ctx) => {
+            // Determine relative path by stripping the mount path
+            const mountPath = this.router[$mountPath] || this.dashboardConfig.path || '/dashboard';
+
+            let relativePath = ctx.path;
+            if (relativePath.startsWith(mountPath)) {
+                relativePath = relativePath.slice(mountPath.length);
+            }
+            // Strip leading slash
+            if (relativePath.startsWith('/')) {
+                relativePath = relativePath.slice(1);
+            }
+
+            const path = relativePath;
+
+            // Serve static files if they match known extensions/files
+            const staticFiles = [
+                'charts.js', 'failures.js', 'graph.mjs', 'poll.js',
+                'reactflow.css', 'registry.css', 'registry.js', 'requests.js',
+                'styles.css', 'tables.js', 'tabs.js', 'tabulator.css', 'theme.css'
+            ];
+
+            if (staticFiles.includes(path)) {
+                const content = await readFile(join(Dashboard.getBasePath(), 'static', path), 'utf-8');
+                if (path.endsWith('.css')) ctx.set('Content-Type', 'text/css');
+                else if (path.endsWith('.js') || path.endsWith('.mjs')) ctx.set('Content-Type', 'application/javascript');
+                return ctx.send(content);
+            }
+
+            // Otherwise serve Dashboard
             const uptimeSeconds = Math.floor((Date.now() - this.startTime) / 1000);
             const uptime = `${Math.floor(uptimeSeconds / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m ${uptimeSeconds % 60}s`;
 
             const linkPattern = this.getLinkPattern();
-            const template = await readFile(Dashboard.getBasePath() + "/template.eta", 'utf8');
-
             const integrations = this.detectIntegrations();
 
-            return ctx.html(this.eta.renderString(template, {
+            const getRequestHeadersSource = this.dashboardConfig.getRequestHeaders ? this.dashboardConfig.getRequestHeaders.toString() : "undefined";
+
+            const html = renderToString(DashboardApp({
                 metrics: this.metrics,
                 uptime,
                 rootPath: process.cwd(),
                 linkPattern,
                 integrations,
-                headers: this.dashboardConfig.getRequestHeaders?.()
+                base: mountPath,
+                getRequestHeadersSource
             }));
+            return ctx.html(`<!DOCTYPE html>${html}`);
         });
     }
 
