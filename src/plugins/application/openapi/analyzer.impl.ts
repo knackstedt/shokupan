@@ -36,6 +36,7 @@ export interface RouteInfo {
         file: string;
         startLine: number;
         endLine: number;
+        highlights?: { startLine: number; endLine: number; type: 'emit' | 'return-success' | 'return-warning'; }[];
     };
 }
 
@@ -66,6 +67,11 @@ interface MountInfo {
     target: string; // Controller/Router name or file path
     targetFilePath?: string;
     dependency?: DependencyInfo;
+    sourceContext?: {
+        file: string;
+        startLine: number;
+        endLine: number;
+    };
 }
 
 /**
@@ -471,7 +477,8 @@ export class OpenAPIAnalyzer {
                     sourceContext: {
                         file: sourceFile.fileName,
                         startLine: sourceFile.getLineAndCharacterOfPosition(methodNode.getStart()).line + 1,
-                        endLine: sourceFile.getLineAndCharacterOfPosition(methodNode.getEnd()).line + 1
+                        endLine: sourceFile.getLineAndCharacterOfPosition(methodNode.getEnd()).line + 1,
+                        highlights: analysis.highlights
                     }
                 });
             }
@@ -597,7 +604,8 @@ export class OpenAPIAnalyzer {
             sourceContext: {
                 file: sourceFile.fileName,
                 startLine: sourceFile.getLineAndCharacterOfPosition(handlerArg.getStart()).line + 1,
-                endLine: sourceFile.getLineAndCharacterOfPosition(handlerArg.getEnd()).line + 1
+                endLine: sourceFile.getLineAndCharacterOfPosition(handlerArg.getEnd()).line + 1,
+                highlights: handlerInfo.highlights
             }
         };
     }
@@ -610,12 +618,14 @@ export class OpenAPIAnalyzer {
         responseType?: string;
         responseSchema?: any;
         emits?: { event: string; payload?: any; location?: { startLine: number; endLine: number; }; }[];
+        highlights?: { startLine: number; endLine: number; type: 'emit' | 'return-success' | 'return-warning'; }[];
     } {
         const requestTypes: RouteInfo['requestTypes'] = {};
         let responseType: string | undefined;
         let responseSchema: any | undefined;
         let hasExplicitReturnType = false;
         const emits: { event: string; payload?: any; location?: { startLine: number; endLine: number; }; }[] = [];
+        const highlights: { startLine: number; endLine: number; type: 'emit' | 'return-success' | 'return-warning'; }[] = [];
 
         // Simple scope to track variable types (name -> schema)
         const scope = new Map<string, any>();
@@ -669,6 +679,10 @@ export class OpenAPIAnalyzer {
                     }
                     else if (callProp === 'text') {
                         responseType = 'string';
+                        return;
+                    }
+                    else if (callProp === 'html' || callProp === 'jsx') {
+                        responseType = 'html';
                         return;
                     }
                 }
@@ -748,6 +762,35 @@ export class OpenAPIAnalyzer {
                     }
                 }
 
+                // Look for ctx calls (json, text, html, send, emit) to highlight
+                if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+                    const objText = node.expression.expression.getText(sourceFile);
+                    const propText = node.expression.name.getText(sourceFile);
+
+                    if (objText === 'ctx' || objText.endsWith('.ctx') || objText === 'this') {
+                        const startLine = sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1;
+                        const endLine = sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
+
+                        if (['text', 'html', 'jsx'].includes(propText)) {
+                            // text/html/jsx are always strings, so statically valid
+                            highlights.push({ startLine, endLine, type: 'return-success' });
+                        } else if (propText === 'json') {
+                            // Check if we can extract a schema for the argument
+                            let isStatic = false;
+                            if (node.arguments.length > 0) {
+                                const schema = this.convertExpressionToSchema(node.arguments[0], sourceFile, scope);
+                                // If schema is not just a bare object or any, it's static
+                                if (schema && (schema.type !== 'object' || (schema.properties && Object.keys(schema.properties).length > 0))) {
+                                    isStatic = true;
+                                }
+                            }
+                            highlights.push({ startLine, endLine, type: isStatic ? 'return-success' : 'return-warning' });
+                        } else if (['send', 'emit'].includes(propText)) {
+                            highlights.push({ startLine, endLine, type: 'emit' });
+                        }
+                    }
+                }
+
                 // Look for ctx usage
                 if (ts.isPropertyAccessExpression(node)) {
                     const objText = node.expression.getText(sourceFile);
@@ -769,14 +812,42 @@ export class OpenAPIAnalyzer {
                 }
 
                 // Explicit Return
-                if (ts.isReturnStatement(node) && node.expression) {
-                    analyzeReturnExpression(node.expression);
+                if (ts.isReturnStatement(node)) {
+                    const startLine = sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1;
+                    const endLine = sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
+
+                    let isStatic = false;
+                    if (node.expression) {
+                        analyzeReturnExpression(node.expression);
+                        // If analyzeReturnExpression successfully set responseSchema to something specific, it's static
+                        // Note: analyzeReturnExpression updates local 'responseSchema' variable. 
+                        // We check if it's "good"
+                        if (responseSchema && (responseSchema.type !== 'object' || (responseSchema.properties && Object.keys(responseSchema.properties).length > 0))) {
+                            isStatic = true;
+                        }
+                    } else if (hasExplicitReturnType) {
+                        // void return or similar
+                        isStatic = true;
+                    }
+
+                    highlights.push({ startLine, endLine, type: isStatic ? 'return-success' : 'return-warning' });
                 }
 
                 // Implicit Return (Concise Arrow Function)
                 // e.g. (ctx) => ctx.json(...) or .then(res => ctx.json(res))
                 if (ts.isArrowFunction(node) && !ts.isBlock(node.body)) {
+                    // For concise arrow function, the body IS the return value
+                    const startLine = sourceFile.getLineAndCharacterOfPosition(node.body.getStart()).line + 1;
+                    const endLine = sourceFile.getLineAndCharacterOfPosition(node.body.getEnd()).line + 1;
+
                     analyzeReturnExpression(node.body as ts.Expression);
+
+                    let isStatic = false;
+                    if (responseSchema && (responseSchema.type !== 'object' || (responseSchema.properties && Object.keys(responseSchema.properties).length > 0))) {
+                        isStatic = true;
+                    }
+
+                    highlights.push({ startLine, endLine, type: isStatic ? 'return-success' : 'return-warning' });
                 }
 
                 // Implicit Return call (e.g. ctx.json(...) as a statement without return)
@@ -835,7 +906,7 @@ export class OpenAPIAnalyzer {
             }
         }
 
-        return { requestTypes, responseType, responseSchema, emits };
+        return { requestTypes, responseType, responseSchema, emits, highlights };
     }
 
     /**
@@ -1099,7 +1170,12 @@ export class OpenAPIAnalyzer {
             prefix,
             target,
             targetFilePath,
-            dependency
+            dependency,
+            sourceContext: {
+                file: sourceFile.fileName,
+                startLine: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
+                endLine: sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line + 1
+            }
         };
     }
 

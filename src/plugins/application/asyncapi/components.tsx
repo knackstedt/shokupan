@@ -4,43 +4,45 @@
  * @jsxFrag Fragment
  */
 
-return (
-    <html lang="en">
-        <head>
-            <meta charSet="UTF-8" />
-            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-            <title>Shokupan AsyncAPI</title>
-            <link rel="preconnect" href="https://fonts.googleapis.com" />
-            <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-            <link rel="stylesheet" href={`${base}/theme.css`} />
-            <link rel="stylesheet" href={`${base}/style.css`} />
-            <script dangerouslySetInnerHTML={{
-                __html: `
+
+export function AsyncApiApp({ spec, serverUrl, base, disableSourceView, navTree }: any) {
+    return (
+        <html lang="en">
+            <head>
+                <meta charSet="UTF-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                <title>Shokupan AsyncAPI</title>
+                <link rel="preconnect" href="https://fonts.googleapis.com" />
+                <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+                <link rel="stylesheet" href={`${base}/theme.css`} />
+                <link rel="stylesheet" href={`${base}/style.css`} />
+                <script dangerouslySetInnerHTML={{
+                    __html: `
                     window.INITIAL_SPEC = ${JSON.stringify(spec)};
                     window.INITIAL_SERVER_URL = "${serverUrl}";
                     window.DISABLE_SOURCE_VIEW = ${JSON.stringify(disableSourceView)};
                 `}} />
-        </head>
-        <body>
-            <div class="app-container">
-                <Sidebar navTree={navTree} disableSourceView={disableSourceView} />
+            </head>
+            <body>
+                <div class="app-container">
+                    <Sidebar navTree={navTree} disableSourceView={disableSourceView} />
 
-                <div class="resizer" id="resizer-left"></div>
+                    <div class="resizer" id="resizer-left"></div>
 
-                <MainContent />
+                    <MainContent />
 
-                <div class="resizer" id="resizer-right"></div>
+                    <div class="resizer" id="resizer-right"></div>
 
-                <ConsolePanel serverUrl={serverUrl} />
-            </div>
+                    <ConsolePanel serverUrl={serverUrl} />
+                </div>
 
-            <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
-            <script src={`${base}/asyncapi-client.mjs`} type="module"></script>
-        </body>
-    </html>
-);
+                <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+                <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+                <script src={`${base}/asyncapi-client.mjs`} type="module"></script>
+            </body>
+        </html>
+    );
 }
 
 function Sidebar({ navTree, disableSourceView }: any) {

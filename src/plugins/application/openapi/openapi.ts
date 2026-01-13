@@ -186,7 +186,7 @@ async function getAstRoutes(applications: any[]) {
     const astRoutes: any[] = [];
     const expandedApps = new Map<string, any[]>();
 
-    const getExpandedRoutes = (app: any, prefix: string = '', seen = new Set<string>()): any[] => {
+    const getExpandedRoutes = (app: any, prefix: string = '', seen = new Set<string>(), sourceOverride?: any): any[] => {
         if (seen.has(app.name)) return [];
         const newSeen = new Set(seen);
         newSeen.add(app.name);
@@ -208,10 +208,16 @@ async function getAstRoutes(applications: any[]) {
                 joined = joined.slice(0, -1);
             }
 
-            expanded.push({
+            const expandedRoute = {
                 ...route,
                 path: joined || '/'
-            });
+            };
+
+            if (sourceOverride) {
+                expandedRoute.sourceContext = sourceOverride;
+            }
+
+            expanded.push(expandedRoute);
         }
 
         if (app.mounted) {
@@ -220,7 +226,25 @@ async function getAstRoutes(applications: any[]) {
                 if (targetApp) {
                     const cleanPrefix = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
                     const mountPrefix = mount.prefix.startsWith('/') ? mount.prefix : '/' + mount.prefix;
-                    expanded.push(...getExpandedRoutes(targetApp, cleanPrefix + mountPrefix, newSeen));
+
+                    // Check for builtin/external dependency to override source
+                    let nextSourceOverride = sourceOverride;
+                    if (mount.dependency || (mount.targetFilePath && mount.targetFilePath.includes('node_modules'))) {
+                        if (mount.sourceContext) {
+                            nextSourceOverride = {
+                                ...mount.sourceContext,
+                                // Add highlight for the mount line to make it clear
+                                highlightLines: [mount.sourceContext.startLine, mount.sourceContext.endLine],
+                                highlights: [{
+                                    startLine: mount.sourceContext.startLine,
+                                    endLine: mount.sourceContext.endLine,
+                                    type: 'return-success' // Use the success color (cyan) for the mount point
+                                }]
+                            };
+                        }
+                    }
+
+                    expanded.push(...getExpandedRoutes(targetApp, cleanPrefix + mountPrefix, newSeen, nextSourceOverride));
                 }
             }
         }
@@ -299,11 +323,15 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
         const routes = (router as any)[$routes] || [];
 
         for (const route of routes) {
+            // Filter out non-HTTP methods (e.g. AsyncAPI PUB/SUB events)
+            if (!['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'].includes(route.method.toUpperCase())) {
+                continue;
+            }
+
             const routeGroup = route.group || group;
             const cleanPrefix = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
             const cleanSubPath = route.path.startsWith("/") ? route.path : "/" + route.path;
             let fullPath = (cleanPrefix + cleanSubPath) || "/";
-            fullPath = fullPath.replace(/:([a-zA-Z0-9_]+)/g, "{$1}");
 
             if (fullPath.length > 1 && fullPath.endsWith('/')) {
                 fullPath = fullPath.slice(0, -1);
@@ -383,7 +411,8 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                         line: sc.startLine,
                         snippet: sc.snippet || astMatch.handlerSource, // Fallback
                         offset: sc.snippetStartLine || sc.startLine,
-                        highlightLines: [sc.startLine, sc.endLine]
+                        highlightLines: [sc.startLine, sc.endLine],
+                        highlights: sc.highlights
                     };
 
                     // Add x-shokupan-source for standard frontend handling
@@ -393,8 +422,7 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                         code: sc.snippet || astMatch.handlerSource || ''
                     };
 
-                    const sourceMd = `\n\n### Source Code\n\`\`\`typescript\n${sc.snippet || astMatch.handlerSource || ''}\n\`\`\``;
-                    operation.description = (operation.description || '') + sourceMd;
+                    // Removed markdown source block per request
                 }
 
                 if (astMatch.requestTypes?.body) {
@@ -409,10 +437,13 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                         content: { 'application/json': { schema: astMatch.responseSchema } }
                     };
                 } else if (astMatch.responseType) {
-                    const contentType = astMatch.responseType === 'string' ? 'text/plain' : 'application/json';
+                    let contentType = 'application/json';
+                    if (astMatch.responseType === 'string') contentType = 'text/plain';
+                    else if (astMatch.responseType === 'html') contentType = 'text/html';
+
                     operation.responses['200'] = {
                         description: 'Successful response',
-                        content: { [contentType]: { schema: { type: astMatch.responseType } } }
+                        content: { [contentType]: { schema: { type: 'string' } } }
                     };
                 }
 
@@ -428,8 +459,9 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
             } else {
                 // No static analysis match - Add Warning and Runtime Source
                 const runtimeSource = ((route.handler as any).originalHandler || route.handler).toString();
-                const warningMd = `\n\n> [!WARNING]\n> **Static Analysis Failed**\n> This endpoint could not be statically analyzed. Showing runtime source code.\n\n\`\`\`typescript\n${runtimeSource}\n\`\`\``;
-                operation.description = (operation.description || '') + warningMd;
+                // Removed markdown source block and warning per request (or simplified)
+                // Minimal warning
+                // operation.description = (operation.description || '') + "\n\n> [!WARNING]\n> **Static Analysis Failed**";
 
                 // Extract file/line from Error stack if available
                 let file: string | undefined;

@@ -784,7 +784,6 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                     path: normalizedPath,
                     handler: finalHandler,
                     spec,
-                    spec,
                     controller: instance,
                     metadata: methodSource || (instance as any).metadata,
                     middleware: allMiddleware // Capture all resolved middleware

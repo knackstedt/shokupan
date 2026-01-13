@@ -3,7 +3,7 @@
 // Global State
 let explorerData = { routes: [], config: {}, info: {} };
 let currentRoute = null;
-let currentEditors = { request: null, response: null };
+let currentEditors = { request: null, response: null, source: null };
 
 document.addEventListener('DOMContentLoaded', () => {
     loadData();
@@ -60,10 +60,71 @@ function renderInfoSection(info) {
     `;
 }
 
+// Helper to recursively render schema properties
+function renderSchema(schema, depth = 0) {
+    if (!schema) return '';
+
+    const indent = depth * 16;
+    const type = schema.type || 'any';
+    const required = schema.required || [];
+
+    if (type === 'object' && schema.properties) {
+        const props = Object.entries(schema.properties).map(([key, prop]) => {
+            const isRequired = required.includes(key);
+            const propType = prop.type || 'any';
+            const hasNested = (propType === 'object' && prop.properties) || (propType === 'array' && prop.items);
+
+            return `
+                <div style="margin-left: ${indent}px;">
+                    <div class="property-heading" style="display: flex; align-items: center; gap: 8px; padding: 6px 0;">
+                        <div class="property-name" style="font-family: monospace; font-weight: 500; color: var(--text-primary);">${key}</div>
+                        <span class="property-detail" style="color: var(--text-secondary); font-size: 0.85rem;">
+                            <span class="property-detail-value">${propType}</span>
+                        </span>
+                        ${isRequired ? '<div class="property-required" style="margin-left: auto; font-size: 0.75rem; color: #f44336; text-transform: uppercase;">required</div>' : ''}
+                    </div>
+                    ${prop.description ? `<div style="color: var(--text-secondary); font-size: 0.85rem; margin-left: 0; margin-top: -4px; margin-bottom: 4px;">${prop.description}</div>` : ''}
+                    ${hasNested ? renderSchema(propType === 'array' ? prop.items : prop, depth + 1) : ''}
+                </div>
+            `;
+        }).join('');
+        return props;
+    } else if (type === 'array' && schema.items) {
+        return `
+            <div style="margin-left: ${indent}px; margin-top: 4px;">
+                <div style="font-family: monospace; font-size: 0.85rem; color: var(--text-secondary);">
+                    [array items]
+                </div>
+                ${renderSchema(schema.items, depth + 1)}
+            </div>
+        `;
+    }
+
+    return '';
+}
+
+// Helper to highlight path operators
+function highlightPath(path) {
+    if (!path) return '';
+
+    return path
+        // Highlight {{substitution}} patterns
+        .replace(/\{\{([^}]+)\}\}/g, '<span style="color: #4caf50;">{{$1}}</span>')
+        // Highlight :parameter patterns
+        .replace(/:([a-zA-Z0-9_]+)/g, '<span style="color: #2196f3;">:$1</span>')
+        // Highlight * wildcards
+        .replace(/\*/g, '<span style="color: #ff9800;">*</span>');
+}
+
 // --- IDE View Implementation ---
 
 function renderRequestView(route, container) {
     const { method, path, op } = route;
+
+    // Extract metadata
+    const source = op['x-shokupan-source'];
+    const middlewares = op['x-shokupan-middleware'] || [];
+    const summary = op.summary || highlightPath(route.path);
 
     // Build tabs for Request Body, Params, Auth, etc.
     const uniqueParams = getUniqueParams(op);
@@ -77,7 +138,7 @@ function renderRequestView(route, container) {
                     <div class="request-header-main">
                         <div class="request-url-bar">
                             <span class="url-method badge-${method}">${method.toUpperCase()}</span>
-                            <input type="text" class="url-input" value="${path}" readonly />
+                            <div class="url-input" style="display: flex; align-items: center; font-family: monospace; white-space: nowrap; overflow-x: auto;">${highlightPath(path)}</div>
                         </div>
                         <button class="send-btn" id="btn-send">Send</button>
                     </div>
@@ -94,14 +155,138 @@ function renderRequestView(route, container) {
                 </div>
 
                 <div class="panel-tabs">
-                    <div class="panel-tab active" data-tab="params">Params</div>
+                    <div class="panel-tab active" data-tab="info">Info</div>
+                    <div class="panel-tab" data-tab="params">Params</div>
                     <div class="panel-tab" data-tab="headers">Headers</div>
                     ${hasBody ? '<div class="panel-tab" data-tab="body">Body</div>' : ''}
                     <div class="panel-tab" data-tab="auth">Auth</div>
                 </div>
 
                 <div class="panel-content">
-                    <div class="panel-section active" id="tab-params">
+                    <div class="panel-section active" id="tab-info">
+                        <div class="info-content" style="padding:16px; overflow-y:auto; flex:1;">
+                            <div class="info-header">
+                                <h2 class="info-title">${summary}</h2>
+                                <div class="info-meta">
+                                    ${op.tags ? `<div class="meta-row"><strong>Tags:</strong> ${op.tags.map(t => `<span class="badge">${t}</span>`).join('')}</div>` : ''}
+                                </div>
+                            </div>
+                            
+                            ${op.description ? `<div class="markdown-content" style="margin:16px 0;">${parseMarkdown(op.description)}</div>` : ''}
+                            
+                            ${op.tags && op.tags.length > 0 ? `
+                            <div class="hierarchy-section" style="margin:16px 0;">
+                                <div style="display: flex; align-items: center; gap: 6px; font-size: 0.9rem; color: var(--text-secondary);">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M3 3v18h18"></path>
+                                        <path d="M7 12h4"></path>
+                                        <path d="M11 8v8"></path>
+                                        <path d="M15 16h4"></path>
+                                        <path d="M19 12v8"></path>
+                                    </svg>
+                                    ${op.tags.map((tag, idx) => `<span>${tag}</span>${idx < op.tags.length - 1 ? '<span style="opacity: 0.5;">›</span>' : ''}`).join('')}
+                                </div>
+                            </div>
+                            ` : ''}
+                            
+                            ${middlewares.length > 0 ? `
+                            <div class="middleware-section">
+                                <h3>Middleware Pipeline</h3>
+                                <div class="middleware-list" style="display: flex; flex-direction: column; gap: 4px;">
+                                    ${middlewares.map((mw, idx) => `<div style="display: flex; align-items: center; gap: 8px;">
+                                        <span style="font-family: monospace; color: var(--text-secondary); min-width: 20px;">${idx + 1}.</span>
+                                        <span class="middleware-badge" title="${mw.metadata ? JSON.stringify(mw.metadata).replace(/"/g, '&quot;') : ''}">${mw.name}</span>
+                                    </div>`).join('')}
+                                </div>
+                            </div>
+                            ` : ''}
+                            
+                            <div class="request-overview" style="margin:16px 0; background: var(--bg-secondary); border-radius: 8px; padding: 16px;">
+                                <h3 style="margin-top: 0; margin-bottom: 12px; font-size: 1rem;">Request</h3>
+                                <div style="display: grid; gap: 8px; font-size: 0.9rem;">
+                                    <div style="display: flex; gap: 8px;">
+                                        <span class="badge badge-${method.toUpperCase()}">${method.toUpperCase()}</span>
+                                        <code style="background: var(--bg-primary); padding: 2px 6px; border-radius: 4px;">${path}</code>
+                                    </div>
+                                    ${op.parameters && op.parameters.length > 0 ? `
+                                    <div style="display: grid; grid-template-columns: 120px 1fr; gap: 8px;">
+                                        <span style="color: var(--text-secondary);">Parameters:</span>
+                                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                            ${op.parameters.filter(p => p.in === 'query').map(p =>
+        `<span style="background: var(--bg-primary); padding: 2px 6px; border-radius: 4px; font-size: 0.85rem;">
+                                                    <code>${p.name}</code>${p.required ? '*' : ''}
+                                                </span>`
+    ).join('')}
+                                            ${op.parameters.filter(p => p.in === 'path').map(p =>
+        `<span style="background: var(--bg-primary); padding: 2px 6px; border-radius: 4px; font-size: 0.85rem;">
+                                                    <code>{${p.name}}</code>
+                                                </span>`
+    ).join('')}
+                                        </div>
+                                    </div>
+                                    ` : ''}
+                                    ${op.requestBody ? `
+                                    <div style="display: grid; grid-template-columns: 120px 1fr; gap: 8px;">
+                                        <span style="color: var(--text-secondary);">Body:</span>
+                                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                            ${Object.keys(op.requestBody.content || {}).map(ct =>
+        `<code style="background: var(--bg-primary); padding: 2px 6px; border-radius: 4px; font-size: 0.85rem;">${ct}</code>`
+    ).join('')}
+                                        </div>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                                
+                                <h3 style="margin-top: 16px; margin-bottom: 12px; font-size: 1rem;">Response</h3>
+                                <div style="display: grid; gap: 12px; font-size: 0.9rem;">
+                                    ${Object.entries(op.responses || {}).map(([code, resp]) => {
+        const contentTypes = resp.content ? Object.keys(resp.content) : [];
+        const firstContentType = contentTypes[0];
+        const schema = firstContentType && resp.content[firstContentType]?.schema;
+
+        return `
+                                        <div style="border-left: 2px solid var(--text-secondary); padding-left: 12px;">
+                                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                                <code style="background: var(--bg-primary); padding: 2px 8px; border-radius: 4px; font-weight: bold;">${code}</code>
+                                                <span style="color: var(--text-secondary);">${resp.description || 'Response'}</span>
+                                            </div>
+                                            ${contentTypes.length > 0 ? `
+                                                <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;">
+                                                    ${contentTypes.map(ct =>
+            `<code style="background: var(--bg-primary); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem;">${ct}</code>`
+        ).join('')}
+                                                </div>
+                                            ` : ''}
+                                            ${schema ? `
+                                                <div style="margin-top: 8px; background: var(--bg-primary); padding: 8px; border-radius: 4px;">
+                                                    ${renderSchema(schema)}
+                                                </div>
+                                            ` : ''}
+                                        </div>
+                                    `;
+    }).join('')}
+                                </div>
+                            </div>
+                            
+                            
+                            ${source ? `
+                            <div class="source-section">
+                                <h3 style="margin-bottom:8px; font-size:1.1rem; color:var(--text-primary);">Source Code</h3>
+                                <div class="source-header" style="justify-content: flex-start; margin-bottom: 8px;">
+                                    <a href="vscode://file/${source.file}:${source.line}" class="doc-source-link" title="${source.file}:${source.line}">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px">
+                                            <polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline>
+                                        </svg>
+                                        ${source.file.split('/').pop()}:${source.line}
+                                    </a>
+                                </div>
+                                <div id="monaco-source-viewer" class="monaco-container"></div>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    
+                    <div class="panel-section" id="tab-params">
                         ${uniqueParams.length > 0 ? renderParamsTable(uniqueParams) : '<div style="padding:16px; color:var(--text-secondary)">No parameters</div>'}
                     </div>
                     <div class="panel-section" id="tab-headers">
@@ -178,6 +363,9 @@ function renderRequestView(route, container) {
                 // Layout monaco
                 if (tab.dataset.tab === 'body' && currentEditors.request) {
                     currentEditors.request.layout();
+                }
+                if (tab.dataset.tab === 'info' && currentEditors.source) {
+                    currentEditors.source.layout();
                 }
             }
         });
@@ -285,6 +473,7 @@ function setupPanelResizer(container) {
             // Trigger monaco layout as size changed
             if (currentEditors.request) currentEditors.request.layout();
             if (currentEditors.response) currentEditors.response.layout();
+            if (currentEditors.source) currentEditors.source.layout();
         }
     });
 }
@@ -325,13 +514,103 @@ function initMonaco() {
     require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
 
     require(['vs/editor/editor.main'], function () {
+        // Source Editor (In Info Tab)
+        const sourceContainer = document.getElementById('monaco-source-viewer');
+        if (sourceContainer && currentRoute && currentRoute.op['x-shokupan-source']) {
+            const source = currentRoute.op['x-shokupan-source'];
+            if (currentEditors.source) currentEditors.source.dispose();
+
+            // Initial placeholder
+            currentEditors.source = monaco.editor.create(sourceContainer, {
+                value: '// Loading source...',
+                language: 'typescript',
+                theme: 'vs-dark',
+                minimap: { enabled: false },
+                lineNumbers: 'on',
+                readOnly: true,
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                glyphMargin: false, // Removed per request
+                folding: false,     // Removed per request (extra gutter room)
+                lineNumbersMinChars: 3,
+                fontSize: 13,
+                fontFamily: 'JetBrains Mono',
+                renderLineHighlight: 'none'
+            });
+
+            // Lazy load source
+            fetch(`_source?file=${encodeURIComponent(source.file)}`)
+                .then(res => {
+                    if (!res.ok) throw new Error(res.statusText);
+                    return res.text();
+                })
+                .then(text => {
+                    if (currentEditors.source) {
+                        currentEditors.source.setValue(text);
+
+                        const op = currentRoute.op;
+                        const sourceInfo = op['x-source-info'] || {};
+                        const highlights = sourceInfo.highlightLines || (source.line ? [source.line, source.line] : null);
+
+                        const decorations = [];
+
+                        // 1. Highlight the main range (Closure)
+                        if (highlights) {
+                            const startLine = highlights[0];
+                            const endLine = highlights[1] || startLine;
+
+                            if (startLine > 0) {
+                                decorations.push({
+                                    range: new monaco.Range(startLine, 1, endLine, 1),
+                                    options: {
+                                        isWholeLine: true,
+                                        className: 'closure-highlight'
+                                    }
+                                });
+                                currentEditors.source.revealLineInCenter(startLine);
+                            }
+                        }
+
+                        // 2. Highlight specific statements (returns, emits)
+                        if (sourceInfo.highlights) {
+                            sourceInfo.highlights.forEach(h => {
+                                if (h.startLine > 0) {
+                                    let className = 'warning-line-highlight'; // verification default
+                                    if (h.type === 'emit') className = 'emit-highlight';
+                                    else if (h.type === 'return-success') className = 'success-line-highlight';
+                                    else if (h.type === 'return-warning') className = 'warning-line-highlight';
+                                    // Fallback for older 'return' type if any mixed
+                                    else if (h.type === 'return') className = 'warning-line-highlight';
+
+                                    decorations.push({
+                                        range: new monaco.Range(h.startLine, 1, h.endLine, 1),
+                                        options: {
+                                            isWholeLine: true,
+                                            className: className
+                                            // glyphMarginClassName removed as glyphMargin is false
+                                        }
+                                    });
+                                }
+                            });
+                        }
+
+                        currentEditors.source.deltaDecorations([], decorations);
+                    }
+                })
+                .catch(err => {
+                    if (currentEditors.source) {
+                        currentEditors.source.setValue(`// Failed to load source: ${err.message}`);
+                    }
+                });
+        }
+
         // Request Editor
         const reqContainer = document.getElementById('monaco-request-body');
         if (reqContainer) {
-            // Dispose old if exists to avoid leaks/duplicates?
-            // Actually new rendering replaces DOM so old editors are detached, but models might linger. 
-            // Monaco should be robust enough, but ideally we dispose.
-            // For now, simple creation.
+            if (currentEditors.request) currentEditors.request.dispose();
+
             currentEditors.request = monaco.editor.create(reqContainer, {
                 value: '',
                 language: 'json',
@@ -351,6 +630,8 @@ function initMonaco() {
         // Response Editor
         const resContainer = document.getElementById('monaco-response-body');
         if (resContainer) {
+            if (currentEditors.response) currentEditors.response.dispose();
+
             currentEditors.response = monaco.editor.create(resContainer, {
                 value: '// Response will appear here',
                 language: 'json',
@@ -577,18 +858,11 @@ function parseMarkdown(text) {
 
 function setupSidebar() {
     const sidebar = document.querySelector('.sidebar');
-    const resizeHandle = document.querySelector('.resize-handle');
     const toggleBtn = document.querySelector('.toggle-sidebar');
-    const collapseTrigger = document.querySelector('.sidebar-collapse-trigger');
+    // ... no resizer logic here for sidebar, might have missed it in copy?
+    // oh resizing logic was inline in html before maybe.
 
     if (!sidebar) return;
-
-    function toggleSidebar() {
-        sidebar.classList.toggle('collapsed');
-    }
-
-    if (toggleBtn) toggleBtn.addEventListener('click', toggleSidebar);
-    if (collapseTrigger) collapseTrigger.addEventListener('click', toggleSidebar);
 
     // Collapsible Groups
     document.querySelectorAll('.nav-group-title').forEach(title => {
@@ -597,23 +871,4 @@ function setupSidebar() {
             group.classList.toggle('collapsed');
         });
     });
-
-    if (resizeHandle) {
-        let isResizing = false;
-
-        resizeHandle.addEventListener('mousedown', (e) => {
-            isResizing = true;
-            e.preventDefault();
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (!isResizing) return;
-            const newWidth = Math.max(150, Math.min(600, e.clientX));
-            sidebar.style.width = newWidth + 'px';
-        });
-
-        document.addEventListener('mouseup', () => {
-            isResizing = false;
-        });
-    }
 }

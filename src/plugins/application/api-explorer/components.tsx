@@ -146,7 +146,7 @@ function Sidebar({ spec, sortedGroups }: any) {
                         </div>
                         <div class="nav-items">
                             {routes.map((route: any) => {
-                                const label = route.op.summary || route.op.title || route.path;
+                                const label = route.path;
                                 const isRuntime = route.op['x-source-info']?.isRuntime;
                                 return (
                                     <a key={route.op.operationId} href={`#${route.op.operationId}`} class="nav-item" data-id={route.op.operationId} title={route.path}>
