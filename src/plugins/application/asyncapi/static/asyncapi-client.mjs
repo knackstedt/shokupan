@@ -327,31 +327,73 @@ async function selectEvent(name, el) {
     // Render Source Viewers
     if (sourceInfos.length > 0 && window.monaco) {
         const container = document.getElementById('source-viewer-container');
+        container.innerHTML = '';
 
-        for (let i = 0; i < sourceInfos.length; i++) {
-            const src = sourceInfos[i];
-            let code = null;
-            if (src.file) {
+        // Group by file
+        const grouped = {};
+        sourceInfos.forEach(s => {
+            if (!s.file) return;
+            if (!grouped[s.file]) grouped[s.file] = [];
+            grouped[s.file].push(s);
+        });
+        const files = Object.keys(grouped);
+
+        // Render Tabs if multiple files
+        if (files.length > 1) {
+            const tabBar = document.createElement('div');
+            tabBar.style.display = 'flex';
+            tabBar.style.gap = '8px';
+            tabBar.style.marginBottom = '12px';
+            tabBar.style.borderBottom = '1px solid var(--border-color)';
+            tabBar.style.paddingBottom = '8px';
+
+            files.forEach((f, idx) => {
+                const tab = document.createElement('button');
+                tab.className = idx === 0 ? 'btn' : 'btn secondary';
+                tab.style.padding = '4px 12px';
+                tab.style.fontSize = '0.8rem';
+                tab.innerText = f.split('/').pop();
+                tab.onclick = () => {
+                    // Toggle active state
+                    Array.from(tabBar.children).forEach(b => b.className = 'btn secondary');
+                    tab.className = 'btn';
+                    // Toggle visibility
+                    files.forEach((_, otherIdx) => {
+                        const el = document.getElementById(`source-group-${otherIdx}`);
+                        if (el) el.style.display = otherIdx === idx ? 'block' : 'none';
+                    });
+                };
+                tabBar.appendChild(tab);
+            });
+            container.appendChild(tabBar);
+        }
+
+        // Render Editors
+        for (let i = 0; i < files.length; i++) {
+            const fileName = files[i];
+            const sources = grouped[fileName];
+
+            const wrapper = document.createElement('div');
+            wrapper.id = `source-group-${i}`;
+            wrapper.style.display = i === 0 ? 'block' : 'none';
+            wrapper.style.marginBottom = '20px';
+
+            wrapper.innerHTML = `<div style="font-size: 0.8rem; color: #888; margin-bottom: 4px; display:flex; justify-content:flex-end;">
+                        <a href="vscode://file/${fileName}:${sources[0].line}" style="color: #666; text-decoration: none;">Open in Editor ↗</a>
+                    </div>
+                    <div id="source-editor-${i}" style="height: 300px; border: 1px solid #333; border-radius: 6px; overflow: hidden;"></div>`;
+            container.appendChild(wrapper);
+
+            (async () => {
+                let code = null;
                 try {
-                    const res = await fetch(`./_code?file=${encodeURIComponent(src.file)}`);
+                    const res = await fetch(`./_code?file=${encodeURIComponent(fileName)}`);
                     if (res.ok) code = await res.text();
                     else code = `// Failed to load source: ${res.statusText}`;
                 } catch (e) { code = `// Error loading source: ${e.message}`; }
-            }
 
-            if (code) {
-                const wrapper = document.createElement('div');
-                wrapper.style.marginBottom = '20px';
-                wrapper.innerHTML = `<div style="font-size: 0.8rem; color: #888; margin-bottom: 4px; display:flex; justify-content:space-between;">
-                        <span>${src.file.split('/').pop()}:${src.line}</span>
-                        <a href="vscode://file/${src.file}:${src.line}" style="color: #666; text-decoration: none;">Open in Editor ↗</a>
-                    </div>
-                    <div id="source-viewer-${i}" style="height: 300px; border: 1px solid #333; border-radius: 6px; overflow: hidden;"></div>`;
-                container.appendChild(wrapper);
-
-                // Render editor
-                (async () => {
-                    const el = document.getElementById(`source-viewer-${i}`);
+                if (code) {
+                    const el = document.getElementById(`source-editor-${i}`);
                     if (!el) return;
                     const model = monaco.editor.createModel(code, "typescript");
                     const editor = monaco.editor.create(el, {
@@ -367,38 +409,44 @@ async function selectEvent(name, el) {
                         backgroundColor: 'transparent'
                     });
 
-                    // Apply highlighting
+                    // Aggregate Highlights
                     const decorations = [];
+                    let firstScrollLine = null;
 
-                    // Determine scroll target: specific emit takes precedence
-                    const scrollLine = src.emitHighlightLines ? src.emitHighlightLines[0] : (src.highlightLines ? src.highlightLines[0] : 1);
-                    if (scrollLine > 1) {
-                        editor.revealLineInCenter(scrollLine);
-                    }
-
-                    // Highlight the handler context with a subtle background
-                    // Only apply context highlight if we are NOT highlighting a specific emit
-                    if (src.highlightLines && !src.emitHighlightLines) {
-                        let startLine = src.highlightLines[0];
-                        let endLine = src.highlightLines[1];
-
-                        if (startLine > 0) {
-                            decorations.push({
-                                range: new monaco.Range(startLine, 1, endLine, 1),
-                                options: {
-                                    isWholeLine: true,
-                                    className: 'closure-highlight'
-                                }
-                            });
+                    sources.forEach(src => {
+                        // Determine potential scroll target
+                        const scrollLine = src.emitHighlightLines ? src.emitHighlightLines[0] : (src.highlightLines ? src.highlightLines[0] : 1);
+                        if (!firstScrollLine && scrollLine > 1) {
+                            firstScrollLine = scrollLine;
                         }
-                    }
 
-                    // Highlight the specific emit call
-                    applyEmitHighlight(decorations, src);
+                        // Apply Context Highlight (if no emit highlight for this specific entry)
+                        if (src.highlightLines && !src.emitHighlightLines) {
+                            let startLine = src.highlightLines[0];
+                            let endLine = src.highlightLines[1];
+                            if (startLine > 0) {
+                                decorations.push({
+                                    range: new monaco.Range(startLine, 1, endLine, 1),
+                                    options: {
+                                        isWholeLine: true,
+                                        className: 'closure-highlight'
+                                    }
+                                });
+                            }
+                        }
+
+                        // Apply Emit Highlight
+                        applyEmitHighlight(decorations, src);
+                    });
+
+                    // Scroll to the first relevant line found
+                    if (firstScrollLine) {
+                        editor.revealLineInCenter(firstScrollLine);
+                    }
 
                     editor.deltaDecorations([], decorations);
-                })();
-            }
+                }
+            })();
         }
     }
 

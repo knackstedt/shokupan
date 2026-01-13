@@ -193,10 +193,19 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                             continue;
                         }
 
-                        if (!channels[emit.event]) {
-                            const emitStart = emit.location?.startLine;
-                            const emitEnd = emit.location?.endLine;
+                        const emitStart = emit.location?.startLine;
+                        const emitEnd = emit.location?.endLine;
 
+                        const newSourceInfo = (sourceInfo && emitStart) ? {
+                            file: sourceInfo.file,
+                            line: emitStart,
+                            startLine: emitStart,
+                            endLine: emitEnd,
+                            highlightLines: sourceInfo.highlightLines,
+                            emitHighlightLines: [emitStart, emitEnd]
+                        } : undefined;
+
+                        if (!channels[emit.event]) {
                             channels[emit.event] = {
                                 subscribe: {
                                     operationId: `emit${emit.event.charAt(0).toUpperCase() + emit.event.slice(1)}`,
@@ -204,20 +213,26 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                                     message: {
                                         payload: emit.payload || { type: 'object' }
                                     },
-                                    "x-source-info": (sourceInfo && emitStart) ? {
-                                        file: sourceInfo.file,
-                                        line: emitStart,
-                                        startLine: emitStart,
-                                        endLine: emitEnd,
-                                        highlightLines: sourceInfo.highlightLines,
-                                        emitHighlightLines: [emitStart, emitEnd]
-                                    } : undefined,
+                                    "x-source-info": newSourceInfo ? [newSourceInfo] : [],
                                     "x-shokupan-source": (sourceInfo && emitStart) ? {
                                         file: sourceInfo.file,
                                         line: emitStart,
                                     } : undefined
                                 }
                             };
+                        } else {
+                            if (newSourceInfo) {
+                                if (!channels[emit.event].subscribe["x-source-info"]) {
+                                    channels[emit.event].subscribe["x-source-info"] = [];
+                                }
+                                const existing = channels[emit.event].subscribe["x-source-info"];
+                                const exists = existing.some((s: any) =>
+                                    s.file === newSourceInfo.file && s.line === newSourceInfo.line
+                                );
+                                if (!exists) {
+                                    existing.push(newSourceInfo);
+                                }
+                            }
                         }
                     }
                 }
@@ -269,11 +284,20 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                 let emits = astMatch?.emits || [];
 
                 for (const emit of emits) {
+                    const emitStart = emit.location?.startLine;
+                    const emitEnd = emit.location?.endLine;
+
+                    const newSourceInfo = (sourceInfo && emitStart) ? {
+                        file: sourceInfo.file,
+                        line: emitStart,
+                        startLine: emitStart,
+                        endLine: emitEnd,
+                        highlightLines: sourceInfo.highlightLines,
+                        emitHighlightLines: [emitStart, emitEnd]
+                    } : undefined;
+
                     // Only add if not already defined
                     if (!channels[emit.event]) {
-                        const emitStart = emit.location?.startLine;
-                        const emitEnd = emit.location?.endLine;
-
                         channels[emit.event] = {
                             subscribe: {
                                 operationId: `emit${emit.event.charAt(0).toUpperCase() + emit.event.slice(1)}`,
@@ -281,20 +305,26 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                                 message: {
                                     payload: emit.payload || { type: 'object' }
                                 },
-                                "x-source-info": (sourceInfo && emitStart) ? {
-                                    file: sourceInfo.file,
-                                    line: emitStart,
-                                    startLine: emitStart,
-                                    endLine: emitEnd,
-                                    highlightLines: sourceInfo.highlightLines,
-                                    emitHighlightLines: [emitStart, emitEnd]
-                                } : undefined,
+                                "x-source-info": newSourceInfo ? [newSourceInfo] : [],
                                 "x-shokupan-source": (sourceInfo && emitStart) ? {
                                     file: sourceInfo.file,
                                     line: emitStart,
                                 } : undefined
                             }
                         };
+                    } else {
+                        if (newSourceInfo) {
+                            if (!channels[emit.event].subscribe["x-source-info"]) {
+                                channels[emit.event].subscribe["x-source-info"] = [];
+                            }
+                            const existing = channels[emit.event].subscribe["x-source-info"];
+                            const exists = existing.some((s: any) =>
+                                s.file === newSourceInfo.file && s.line === newSourceInfo.line
+                            );
+                            if (!exists) {
+                                existing.push(newSourceInfo);
+                            }
+                        }
                     }
                 }
             }
