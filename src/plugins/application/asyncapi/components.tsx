@@ -146,11 +146,10 @@ function LeafNode({ item, label }: any) {
             </>
         );
     } else {
-        const badgeType = item.data.type === 'publish' ? 'send' : 'recv';
         const badgeText = item.data.type === 'publish' ? 'SEND' : 'RECV';
         content = (
             <>
-                <span class={`badge ${badgeType}`}>{badgeText}</span>
+                <span class={`badge badge-${badgeText}`}>{badgeText}</span>
                 <span class="tree-label">{label}</span>
             </>
         );

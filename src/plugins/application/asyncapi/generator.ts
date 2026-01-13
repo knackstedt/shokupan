@@ -342,6 +342,7 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
 
     await collect(rootRouter);
 
+
     // Process detected dynamic/unknown events from AST that weren't matched
     const dynamicEvents = astRoutes.filter(r => r.path === '__DYNAMIC_EVENT__' && !matchedAstRoutes.has(r));
     dynamicEvents.forEach((r, i) => {
