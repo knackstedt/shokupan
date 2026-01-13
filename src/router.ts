@@ -1446,7 +1446,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * Generates an OpenAPI 3.1 Document by recursing through the router and its descendants.
      * Now includes runtime analysis of handler functions to infer request/response types.
      */
-    public generateApiSpec(options: OpenAPIOptions = {}): any {
+    public generateApiSpec(options: OpenAPIOptions = {}): Promise<any> {
         return generateOpenApi(this, options);
     }
 
