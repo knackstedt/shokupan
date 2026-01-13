@@ -186,9 +186,8 @@ function handleWSOpen(ws: ServerWebSocket, ctx: ShokupanContext, options: ProxyO
         }
     });
 
-    const upstream = new WebSocket(url.toString(), {
-        headers
-    });
+    // TODO: Is this the correct WebSocket constructor?
+    const upstream = new WebSocket(url.toString());
 
     wsMap.set(ws, upstream);
 

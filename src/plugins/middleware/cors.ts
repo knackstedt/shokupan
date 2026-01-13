@@ -130,7 +130,7 @@ export function Cors(options: CorsOptions = {}): Middleware {
         const response = await next();
 
         if (response instanceof Response) {
-            const headerEntries = Array.from(headers.entries());
+            const headerEntries = Object.entries(headers);
             for (let i = 0; i < headerEntries.length; i++) {
                 const [key, value] = headerEntries[i];
                 response.headers.set(key, value);

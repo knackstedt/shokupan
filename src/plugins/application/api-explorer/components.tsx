@@ -254,7 +254,6 @@ function Sidebar({ spec, hierarchicalGroups }: any) {
                             href={`vscode://file/${source.file}:${source.line || 1}`}
                             class="nav-source-link"
                             title={`${source.file}:${source.line || 1}`}
-                            onclick="event.stopPropagation();"
                         >
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="16 18 22 12 16 6"></polyline>

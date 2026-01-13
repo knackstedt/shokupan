@@ -155,7 +155,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     /**
      * Adds middleware to the application.
      */
-    public use(middleware: Middleware) {
+    public override use(middleware: Middleware) {
 
         // --- Middleware Tracking Logic ---
         const { file, line } = getCallerInfo();

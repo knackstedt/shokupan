@@ -615,7 +615,8 @@ export class ShokupanContext<
             this[$rawBody] = body;
         }
 
-        return this[$finalResponse] ??= new Response(body, { status, headers });
+        // :as any because there are multiple bodyinit providers. What the hell.
+        return this[$finalResponse] ??= new Response(body as any, { status, headers });
     }
 
     /**

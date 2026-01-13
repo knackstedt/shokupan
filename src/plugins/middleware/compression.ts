@@ -82,7 +82,7 @@ export function Compression(options: CompressionOptions = {}): Middleware {
 
             if (bodySize < threshold) {
                 // Don't compress, but we consumed the body so recreate the response
-                return new Response(body, {
+                return new Response(body as any, {
                     status: response.status,
                     statusText: response.statusText,
                     headers: new Headers(response.headers)
@@ -124,7 +124,7 @@ export function Compression(options: CompressionOptions = {}): Middleware {
             headers.set("Content-Encoding", method);
             headers.set("Content-Length", String(compressed.length));
 
-            return new Response(compressed, {
+            return new Response(compressed as any, {
                 status: response.status,
                 statusText: response.statusText,
                 headers

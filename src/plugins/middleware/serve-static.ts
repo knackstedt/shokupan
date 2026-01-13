@@ -188,7 +188,7 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
             response = new Response(Bun.file(finalPath));
         } else {
             // Node.js fallback using fs
-            const fileBuffer = await readFile(finalPath);
+            const fileBuffer = await readFile(finalPath, { encoding: 'binary' });
 
             // Set content-type from fileOptions if provided
             // if (fileOptions?.type) {
