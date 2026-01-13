@@ -116,6 +116,7 @@ describe('OpenAPI Analyzer', () => {
             // The fixture: const body = await ctx.body() as { name: string; age: number; };
             // So requestBody should have schema.
 
+            expect(op).toBeDefined();
             expect(op.requestBody).toBeDefined();
             const schema = op.requestBody.content['application/json'].schema;
             expect(schema.properties.name.type).toBe('string');

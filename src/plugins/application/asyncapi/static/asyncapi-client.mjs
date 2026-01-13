@@ -119,42 +119,23 @@ require(['vs/editor/editor.main'], function () {
     connect();
 });
 
-/* ================= Emit Pattern Detection ================= */
-function findEmitDecorations(code, offset = 1) {
-    const decorations = [];
-    const lines = code.split('\n');
+/* ================= Targeted Highlighting Helper ================= */
+function applyEmitHighlight(decorations, src) {
+    // Apply emit-specific highlighting if available
+    if (src.emitHighlightLines) {
+        let startLine = src.emitHighlightLines[0];
+        let endLine = src.emitHighlightLines[1];
 
-    // Patterns to search for:
-    // - ctx.emit(...) or this.emit(...)
-    // - anyVar.event(...) or anyVar.on(...) or anyVar.emit(...)
-    // This will match router1.event, app.emit, etc.
-    const patterns = [
-        /\b(ctx|this)\.emit\s*\(/g,
-        /\b\w+\.(event|on|emit)\s*\(/g
-    ];
-
-    lines.forEach((line, lineIndex) => {
-        const lineNumber = lineIndex + 1; // Monaco uses 1-based line numbers
-
-        patterns.forEach(pattern => {
-            pattern.lastIndex = 0; // Reset regex state
-            let match;
-            while ((match = pattern.exec(line)) !== null) {
-                const startColumn = match.index + 1; // Monaco uses 1-based columns
-                const endColumn = startColumn + match[0].length;
-
-                decorations.push({
-                    range: new monaco.Range(lineNumber, startColumn, lineNumber, endColumn),
-                    options: {
-                        inlineClassName: 'emit-highlight',
-                        hoverMessage: { value: `**Event Emission**: \`${match[0]}\`` }
-                    }
-                });
-            }
-        });
-    });
-
-    return decorations;
+        if (startLine > 0) {
+            decorations.push({
+                range: new monaco.Range(startLine, 1, endLine, 1),
+                options: {
+                    isWholeLine: true,
+                    className: 'emit-highlight'
+                }
+            });
+        }
+    }
 }
 
 /* ================= Schema & Doc Rendering ================= */
@@ -219,9 +200,8 @@ async function selectEvent(name, el) {
             for (let i = 0; i < sourceInfos.length; i++) {
                 const src = sourceInfos[i];
 
-                let code = src.snippet;
-                // Lazy download if no snippet but file info exists
-                if (!code && src.file) {
+                let code = null;
+                if (src.file) {
                     try {
                         const res = await fetch(`./_code?file=${encodeURIComponent(src.file)}`);
                         if (res.ok) code = await res.text();
@@ -246,16 +226,19 @@ async function selectEvent(name, el) {
                         const scrollbarWidth = 14;
                         const borderWidth = 6;
                         const lineHeight = 19;
-                        const contentHeight = (code.match(/\n/g)?.length || 1) * lineHeight + borderWidth + scrollbarWidth;
-                        el.style.height = Math.min(Math.max(contentHeight, 100), 500) + 'px';
+                        // const contentHeight = (code.match(/\n/g)?.length || 1) * lineHeight + borderWidth + scrollbarWidth;
+                        // Always use max height or reasonable height since it's full file
+                        // But maybe we want to focus on the snippet area?
+                        // Let's keep fixed height or adaptive but capped.
+                        el.style.height = '400px';
 
                         const editor = monaco.editor.create(el, {
                             model: model,
                             readOnly: true,
                             theme: 'vs-dark',
-                            minimap: { enabled: false },
+                            minimap: { enabled: true },
                             glyphMargin: true,
-                            lineNumbers: (num) => String((src.offset && src.snippet ? src.offset : 1) + num - 1),
+                            lineNumbers: 'on',
                             fontSize: 12,
                             scrollBeyondLastLine: false,
                             automaticLayout: true,
@@ -265,15 +248,10 @@ async function selectEvent(name, el) {
                         // Apply highlighting
                         const decorations = [];
 
-                        // Highlight the main event handler if specified
+                        // Highlight the warning lines if specified
                         if (src.highlightLines) {
                             let startLine = src.highlightLines[0];
                             let endLine = src.highlightLines[1];
-
-                            if (src.snippet && src.offset) {
-                                startLine = startLine - src.offset + 1;
-                                endLine = endLine - src.offset + 1;
-                            }
 
                             if (startLine > 0) {
                                 decorations.push({
@@ -287,9 +265,6 @@ async function selectEvent(name, el) {
                                 editor.revealLineInCenter(startLine);
                             }
                         }
-
-                        // Find and highlight emit patterns
-                        decorations.push(...findEmitDecorations(code, src.offset || 1));
 
                         editor.deltaDecorations([], decorations);
                     });
@@ -355,8 +330,8 @@ async function selectEvent(name, el) {
 
         for (let i = 0; i < sourceInfos.length; i++) {
             const src = sourceInfos[i];
-            let code = src.snippet;
-            if (!code && src.file) {
+            let code = null;
+            if (src.file) {
                 try {
                     const res = await fetch(`./_code?file=${encodeURIComponent(src.file)}`);
                     if (res.ok) code = await res.text();
@@ -383,9 +358,9 @@ async function selectEvent(name, el) {
                         model: model,
                         readOnly: true,
                         theme: 'vs-dark',
-                        minimap: { enabled: false },
+                        minimap: { enabled: true },
                         glyphMargin: true,
-                        lineNumbers: (num) => String((src.snippet ? src.offset || 1 : 1) + num - 1),
+                        lineNumbers: 'on',
                         fontSize: 12,
                         scrollBeyondLastLine: false,
                         automaticLayout: true,
@@ -395,30 +370,31 @@ async function selectEvent(name, el) {
                     // Apply highlighting
                     const decorations = [];
 
-                    // Highlight the main event handler if specified
-                    if (src.highlightLines) {
+                    // Determine scroll target: specific emit takes precedence
+                    const scrollLine = src.emitHighlightLines ? src.emitHighlightLines[0] : (src.highlightLines ? src.highlightLines[0] : 1);
+                    if (scrollLine > 1) {
+                        editor.revealLineInCenter(scrollLine);
+                    }
+
+                    // Highlight the handler context with a subtle background
+                    // Only apply context highlight if we are NOT highlighting a specific emit
+                    if (src.highlightLines && !src.emitHighlightLines) {
                         let startLine = src.highlightLines[0];
                         let endLine = src.highlightLines[1];
-                        if (src.snippet && src.offset) {
-                            startLine = startLine - src.offset + 1;
-                            endLine = endLine - src.offset + 1;
-                        }
 
                         if (startLine > 0) {
                             decorations.push({
                                 range: new monaco.Range(startLine, 1, endLine, 1),
                                 options: {
                                     isWholeLine: true,
-                                    className: 'warning-line-highlight',
-                                    glyphMarginClassName: 'warning-glyph'
+                                    className: 'closure-highlight'
                                 }
                             });
-                            editor.revealLineInCenter(startLine);
                         }
                     }
 
-                    // Find and highlight emit patterns
-                    decorations.push(...findEmitDecorations(code, src.offset || 1));
+                    // Highlight the specific emit call
+                    applyEmitHighlight(decorations, src);
 
                     editor.deltaDecorations([], decorations);
                 })();

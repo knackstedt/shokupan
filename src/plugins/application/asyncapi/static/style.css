@@ -455,10 +455,16 @@ a {
     border-left: 3px solid #fbbf24;
 }
 
+.closure-highlight {
+    background: rgba(59, 130, 246, 0.1);
+    /* Blue - SEND (Handler) */
+    border-left: 2px solid rgba(59, 130, 246, 0.5);
+}
+
 .emit-highlight {
-    background: rgba(59, 130, 246, 0.25);
-    border-bottom: 2px solid rgba(59, 130, 246, 0.8);
-    font-weight: 600;
+    background: rgba(16, 185, 129, 0.15);
+    /* Green - RECV (Emit) */
+    border-left: 3px solid #34d399;
 }
 
 /* Header actions */

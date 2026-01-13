@@ -11,6 +11,8 @@ import type { ApplicationInstance } from './analyzer.impl';
  * and the 'typescript' module are only loaded when `analyze()` is called.
  */
 export class OpenAPIAnalyzer {
+    private analyzerImpl: any;
+
     constructor(private rootDir: string, private entrypoint?: string) { }
 
     /**
@@ -20,8 +22,19 @@ export class OpenAPIAnalyzer {
     public async analyze(): Promise<{ applications: ApplicationInstance[]; }> {
         // Dynamic import to avoid loading 'typescript' peer dependency if not needed (e.g. at runtime)
         const { OpenAPIAnalyzer: AnalyzerImpl } = await import('./analyzer.impl');
-        const instance = new AnalyzerImpl(this.rootDir, this.entrypoint);
-        return instance.analyze();
+        this.analyzerImpl = new AnalyzerImpl(this.rootDir, this.entrypoint);
+        return this.analyzerImpl.analyze();
+    }
+
+    /**
+     * Generate OpenAPI specification.
+     * Must be called after analyze().
+     */
+    public generateOpenAPISpec(): any {
+        if (!this.analyzerImpl) {
+            throw new Error('Must call analyze() before generateOpenAPISpec()');
+        }
+        return this.analyzerImpl.generateOpenAPISpec();
     }
 }
 

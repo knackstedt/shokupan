@@ -6,32 +6,14 @@ import type { AsyncAPIOptions } from '../../../util/types';
 /**
  * Regex patterns for detecting emit calls.
  */
-const REGEX_PATTERNS = {
-    EMIT: /(?:ctx|this)\.emit\(['"]([\w:.\/-]+)['"](?:\s*,\s*({[\s\S]*?}|[^)]+))?\)/g
-};
 
-async function analyzeHandler(handler: Function): Promise<{ emits: { event: string; payload?: any; }[]; }> {
-    const sourceFn = (handler as any).originalHandler || handler;
-    const handlerSource = sourceFn.toString();
-    const emits: { event: string; payload?: any; }[] = [];
-
-    // Parse emit calls
-    const emitMatches = Array.from(handlerSource.matchAll(REGEX_PATTERNS.EMIT));
-    for (const match of emitMatches) {
-        const event = match[1];
-        if (event) {
-            emits.push({ event, payload: { type: 'object' } }); // Default payload schema
-        }
-    }
-
-    return { emits };
-}
 
 /**
  * Gets deduped AST routes if available.
  * Duplicated from openapi.ts to avoid cross-module dependency issues.
  */
 async function getAstRoutes(applications: any[]) {
+    // ... (unchanged)
     const astRoutes: any[] = [];
 
     const getExpandedRoutes = (app: any, prefix: string = '', seen = new Set<string>()): any[] => {
@@ -141,16 +123,11 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
 
                     if (astMatch) matchedAstRoutes.add(astMatch);
 
-                    // Force match for debugging if needed? No.
-                    if (eventName === 'dynamic.event' && !astMatch) {
-                        // ...
-                    }
-
                     const sourceInfo = ((handler as any).source || astMatch?.sourceContext) ? {
                         file: (handler as any).source?.file || astMatch?.sourceContext?.file,
                         line: (handler as any).source?.line || astMatch?.sourceContext?.startLine,
-                        snippet: astMatch?.sourceContext?.snippet || astMatch?.handlerSource,
-                        offset: astMatch?.sourceContext?.snippetStartLine || astMatch?.sourceContext?.startLine,
+                        startLine: (handler as any).source?.line || astMatch?.sourceContext?.startLine,
+                        endLine: astMatch?.sourceContext?.endLine,
                         highlightLines: astMatch?.sourceContext ? [astMatch.sourceContext.startLine, astMatch.sourceContext.endLine] : undefined
                     } : undefined;
 
@@ -165,11 +142,7 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                                 },
                                 ...(userSpec?.type === 'publish' ? userSpec : {}),
                                 "x-source-info": sourceInfo ? [sourceInfo] : [],
-                                "x-shokupan-source": ((handler as any).source || astMatch?.sourceContext) ? {
-                                    file: (handler as any).source?.file || astMatch?.sourceContext?.file,
-                                    line: (handler as any).source?.line || astMatch?.sourceContext?.startLine,
-                                    code: astMatch?.sourceContext?.snippet || astMatch?.handlerSource || ''
-                                } : undefined
+                                "x-shokupan-source": sourceInfo // Simplified
                             }
                         };
 
@@ -193,20 +166,6 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                     // Analyze for outgoing events
                     let emits = astMatch?.emits || [];
 
-                    if (eventName === 'trigger-dynamic') {
-                        // console.log(`[Method: ${eventName}] AST Match found?`, !!astMatch);
-                        if (astMatch) {
-                            // console.log(`[Method: ${eventName}] Emits:`, JSON.stringify(astMatch.emits));
-                        }
-                    }
-
-
-                    // Fallback to basic regex if no AST emits found
-                    if (emits.length === 0) {
-                        const regexAnalysis = await analyzeHandler(handler);
-                        emits = regexAnalysis.emits;
-                    }
-
                     for (const emit of emits) {
                         if (emit.event === '__DYNAMIC_EMIT__') {
                             const warningKey = `${eventName}/Dynamic Emit`;
@@ -220,14 +179,13 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                                     "x-source-info": {
                                         file: astMatch?.sourceContext?.file,
                                         line: emit.location?.startLine,
-                                        snippet: astMatch?.handlerSource,
-                                        offset: astMatch?.sourceContext?.startLine,
+                                        startLine: emit.location?.startLine,
+                                        endLine: emit.location?.endLine,
                                         highlightLines: emit.location ? [emit.location.startLine, emit.location.endLine] : undefined
                                     },
                                     "x-shokupan-source": {
                                         file: astMatch?.sourceContext?.file,
                                         line: emit.location?.startLine,
-                                        code: astMatch?.handlerSource || ''
                                     },
                                     message: { payload: { type: 'object' } }
                                 }
@@ -236,6 +194,9 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                         }
 
                         if (!channels[emit.event]) {
+                            const emitStart = emit.location?.startLine;
+                            const emitEnd = emit.location?.endLine;
+
                             channels[emit.event] = {
                                 subscribe: {
                                     operationId: `emit${emit.event.charAt(0).toUpperCase() + emit.event.slice(1)}`,
@@ -243,17 +204,17 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                                     message: {
                                         payload: emit.payload || { type: 'object' }
                                     },
-                                    "x-source-info": (astMatch?.sourceContext && emit.location) ? {
-                                        file: astMatch.sourceContext.file,
-                                        line: emit.location.startLine,
-                                        snippet: astMatch.handlerSource,
-                                        offset: astMatch.sourceContext.startLine,
-                                        highlightLines: [emit.location.startLine, emit.location.endLine]
+                                    "x-source-info": (sourceInfo && emitStart) ? {
+                                        file: sourceInfo.file,
+                                        line: emitStart,
+                                        startLine: emitStart,
+                                        endLine: emitEnd,
+                                        highlightLines: sourceInfo.highlightLines,
+                                        emitHighlightLines: [emitStart, emitEnd]
                                     } : undefined,
-                                    "x-shokupan-source": (astMatch?.sourceContext && emit.location) ? {
-                                        file: astMatch.sourceContext.file,
-                                        line: emit.location.startLine,
-                                        code: astMatch.handlerSource || ''
+                                    "x-shokupan-source": (sourceInfo && emitStart) ? {
+                                        file: sourceInfo.file,
+                                        line: emitStart,
                                     } : undefined
                                 }
                             };
@@ -261,7 +222,7 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                     }
                 }
             } // end for handler
-        }; // end for eventHandlers\n        }
+        }; // end for eventHandlers
 
         // Collect HTTP Routes (Server -> Client Emits Only)
         const httpRoutes = router[$routes];
@@ -275,8 +236,7 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                     tags = [{ name: routerTag }];
                 }
 
-                // Find AST match for this HTTP route
-                // Similar to OpenAPI logic but we only care about emits
+                // Find AST match
                 const methodUpper = route.method.toUpperCase();
                 let astMatch = astRoutes.find(r =>
                     r.method === methodUpper &&
@@ -297,16 +257,23 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                     });
                 }
 
-                let emits = astMatch?.emits || [];
+                // Reconstruct SourceInfo for reuse
+                const sourceInfo = ((handler as any).source || astMatch?.sourceContext) ? {
+                    file: (handler as any).source?.file || astMatch?.sourceContext?.file,
+                    line: (handler as any).source?.line || astMatch?.sourceContext?.startLine,
+                    startLine: (handler as any).source?.line || astMatch?.sourceContext?.startLine,
+                    endLine: astMatch?.sourceContext?.endLine,
+                    highlightLines: astMatch?.sourceContext ? [astMatch.sourceContext.startLine, astMatch.sourceContext.endLine] : undefined
+                } : undefined;
 
-                if (emits.length === 0) {
-                    const regexAnalysis = await analyzeHandler(handler);
-                    emits = regexAnalysis.emits;
-                }
+                let emits = astMatch?.emits || [];
 
                 for (const emit of emits) {
                     // Only add if not already defined
                     if (!channels[emit.event]) {
+                        const emitStart = emit.location?.startLine;
+                        const emitEnd = emit.location?.endLine;
+
                         channels[emit.event] = {
                             subscribe: {
                                 operationId: `emit${emit.event.charAt(0).toUpperCase() + emit.event.slice(1)}`,
@@ -314,17 +281,17 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                                 message: {
                                     payload: emit.payload || { type: 'object' }
                                 },
-                                "x-source-info": (astMatch?.sourceContext && emit.location) ? {
-                                    file: astMatch.sourceContext.file,
-                                    line: emit.location.startLine,
-                                    snippet: astMatch.handlerSource, // Optional: snippet of HTTP handler
-                                    offset: astMatch.sourceContext.startLine,
-                                    highlightLines: [emit.location.startLine, emit.location.endLine]
+                                "x-source-info": (sourceInfo && emitStart) ? {
+                                    file: sourceInfo.file,
+                                    line: emitStart,
+                                    startLine: emitStart,
+                                    endLine: emitEnd,
+                                    highlightLines: sourceInfo.highlightLines,
+                                    emitHighlightLines: [emitStart, emitEnd]
                                 } : undefined,
-                                "x-shokupan-source": (astMatch?.sourceContext && emit.location) ? {
-                                    file: astMatch.sourceContext.file,
-                                    line: emit.location.startLine,
-                                    code: astMatch.handlerSource || ''
+                                "x-shokupan-source": (sourceInfo && emitStart) ? {
+                                    file: sourceInfo.file,
+                                    line: emitStart,
                                 } : undefined
                             }
                         };
@@ -365,14 +332,13 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                 "x-source-info": {
                     file: r.sourceContext?.file,
                     line: r.sourceContext?.startLine,
-                    snippet: r.sourceContext?.snippet || r.handlerSource,
-                    offset: r.sourceContext?.snippetStartLine || r.sourceContext?.startLine,
+                    startLine: r.sourceContext?.startLine,
+                    endLine: r.sourceContext?.endLine,
                     highlightLines: r.sourceContext ? [r.sourceContext.startLine, r.sourceContext.endLine] : undefined
                 },
                 "x-shokupan-source": {
                     file: r.sourceContext?.file,
                     line: r.sourceContext?.startLine,
-                    code: r.sourceContext?.snippet || r.handlerSource || ''
                 },
                 message: { payload: { type: 'object' } }
             }

@@ -36,8 +36,6 @@ export interface RouteInfo {
         file: string;
         startLine: number;
         endLine: number;
-        snippet?: string;
-        snippetStartLine?: number;
     };
 }
 
@@ -274,7 +272,7 @@ export class OpenAPIAnalyzer {
             const isFixtureFile = sourceFile.fileName.includes('/fixtures/');
             const isEntrypoint = this.entrypoint && sourceFile.fileName === this.entrypoint;
 
-            console.log(`[Analyzer] check ${sourceFile.fileName}: isTestEnv=${isTestEnv}, isFixture=${isFixtureFile}, isEntry=${isEntrypoint}`);
+            // console.log(`[Analyzer] check ${sourceFile.fileName}: isTestEnv=${isTestEnv}, isFixture=${isFixtureFile}, isEntry=${isEntrypoint}`);
 
             if (!isTestEnv && !isFixtureFile && !isEntrypoint) {
                 if (sourceFile.fileName.includes('/test/') || sourceFile.fileName.includes('/tests/')) {
@@ -591,6 +589,7 @@ export class OpenAPIAnalyzer {
             path: normalizedPath,
             handlerName: handlerArg.getText(sourceFile).substring(0, 50), // Truncate for display
             handlerSource: handlerArg.getText(sourceFile),
+            requestTypes: handlerInfo.requestTypes,
             responseType: handlerInfo.responseType,
             responseSchema: handlerInfo.responseSchema,
             emits: handlerInfo.emits,
@@ -598,29 +597,7 @@ export class OpenAPIAnalyzer {
             sourceContext: {
                 file: sourceFile.fileName,
                 startLine: sourceFile.getLineAndCharacterOfPosition(handlerArg.getStart()).line + 1,
-                endLine: sourceFile.getLineAndCharacterOfPosition(handlerArg.getEnd()).line + 1,
-                snippet: (() => {
-                    const funcStart = sourceFile.getLineAndCharacterOfPosition(handlerArg.getStart()).line;
-                    const funcEnd = sourceFile.getLineAndCharacterOfPosition(handlerArg.getEnd()).line;
-                    const maxLine = sourceFile.getLineAndCharacterOfPosition(sourceFile.getEnd()).line;
-
-                    const startLine = Math.max(0, funcStart - 5);
-                    const endLine = Math.min(maxLine, funcEnd + 5);
-
-                    const startPos = sourceFile.getPositionOfLineAndCharacter(startLine, 0);
-                    // End position of the last line (using getPositionOfLineAndCharacter for next line - 1 char? No. just use line start of next line?)
-                    // Safest is getPositionOfLineAndCharacter(endLine + 1, 0) if exists, else EOF.
-                    let endPos = sourceFile.getEnd();
-                    if (endLine < maxLine) {
-                        endPos = sourceFile.getPositionOfLineAndCharacter(endLine + 1, 0);
-                    } else {
-                        // Get end of file
-                        endPos = sourceFile.getEnd();
-                    }
-
-                    return sourceFile.text.substring(startPos, endPos);
-                })(),
-                snippetStartLine: Math.max(0, sourceFile.getLineAndCharacterOfPosition(handlerArg.getStart()).line - 5) + 1
+                endLine: sourceFile.getLineAndCharacterOfPosition(handlerArg.getEnd()).line + 1
             }
         };
     }
@@ -734,8 +711,24 @@ export class OpenAPIAnalyzer {
                 if (ts.isVariableDeclaration(node)) {
                     if (node.initializer && ts.isIdentifier(node.name)) {
                         const varName = node.name.getText(sourceFile);
-                        const schema = this.convertExpressionToSchema(node.initializer, sourceFile, scope);
-                        scope.set(varName, schema);
+
+                        // Check if initializer is a type assertion on ctx.body()
+                        let initializer = node.initializer;
+                        if (ts.isAsExpression(initializer)) {
+                            if (this.isCtxBodyCall(initializer.expression, sourceFile)) {
+                                const schema = this.convertTypeNodeToSchema(initializer.type, sourceFile);
+                                if (schema) {
+                                    requestTypes.body = schema;
+                                    scope.set(varName, schema);
+                                }
+                            } else {
+                                const schema = this.convertExpressionToSchema(initializer, sourceFile, scope);
+                                scope.set(varName, schema);
+                            }
+                        } else {
+                            const schema = this.convertExpressionToSchema(initializer, sourceFile, scope);
+                            scope.set(varName, schema);
+                        }
                     }
                 }
 
@@ -790,14 +783,14 @@ export class OpenAPIAnalyzer {
                 if (ts.isExpressionStatement(node)) {
                     analyzeReturnExpression(node.expression);
 
-                    // Check for ctx.emit()
+                    // Check for ctx.emit() or this.emit()
                     if (ts.isCallExpression(node.expression)) {
                         const expr = node.expression;
                         if (ts.isPropertyAccessExpression(expr.expression)) {
                             const objText = expr.expression.expression.getText(sourceFile);
                             const propText = expr.expression.name.getText(sourceFile);
 
-                            if ((objText === 'ctx' || objText.endsWith('.ctx')) && propText === 'emit') {
+                            if (((objText === 'ctx' || objText.endsWith('.ctx')) || (objText === 'this' || objText.endsWith('.this'))) && propText === 'emit') {
                                 if (expr.arguments.length >= 1) {
                                     const eventNameArg = expr.arguments[0];
                                     if (ts.isStringLiteral(eventNameArg)) {
