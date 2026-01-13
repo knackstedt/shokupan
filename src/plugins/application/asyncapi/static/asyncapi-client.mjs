@@ -8,7 +8,8 @@ const state = {
     editor: null,
     selectedEvent: null,
     logEntries: [],
-    logAutoScroll: true
+    logAutoScroll: true,
+    isConsoleMaximized: false
 };
 
 const els = {
@@ -24,7 +25,19 @@ const els = {
     navList: document.getElementById('nav-list'),
     docPanel: document.getElementById('doc-panel'),
     targetEventLabel: document.getElementById('target-event'),
-    showSourceToggle: document.getElementById('show-source-toggle')
+    targetEventLabel: document.getElementById('target-event'),
+    showSourceToggle: document.getElementById('show-source-toggle'),
+    btnCollapseNav: document.getElementById('btn-collapse-nav'),
+    btnExpandNav: document.getElementById('btn-expand-nav'),
+    btnCollapseConsole: document.getElementById('btn-collapse-console'),
+    btnExpandConsole: document.getElementById('btn-expand-console'),
+    sidebar: document.getElementById('sidebar'),
+    resizerLeft: document.getElementById('resizer-left'),
+    resizerRight: document.getElementById('resizer-right'),
+    resizerRight: document.getElementById('resizer-right'),
+    consolePanel: document.getElementById('console-panel'),
+    mainWrapper: document.getElementById('main-wrapper'),
+    btnMaximizeConsole: document.getElementById('btn-maximize-console')
 };
 
 // Resizers
@@ -57,6 +70,37 @@ function initResizers() {
     };
     setup('resizer-left', '--sidebar-width', true);
     setup('resizer-right', '--console-width', false);
+}
+
+function toggleConsoleMaximize() {
+    state.isConsoleMaximized = !state.isConsoleMaximized;
+    const btn = els.btnMaximizeConsole;
+
+    if (state.isConsoleMaximized) {
+        // Maximize
+        els.mainWrapper.style.display = 'none';
+        els.resizerRight.style.display = 'none';
+        els.consolePanel.style.flex = '1';
+        els.consolePanel.style.width = 'auto'; // Reset width if resized
+
+        // Update Icon to Restore
+        btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>`;
+        btn.title = "Restore Console";
+    } else {
+        // Restore
+        els.mainWrapper.style.display = 'block'; // Or flex/whatever logic
+        // Actually main-wrapper was display:flex via style attribute in HTML, 
+        // but let's check if we hid it. display='none' hides it.
+        // We can just set it empty to revert to stylesheet or inline default.
+        els.mainWrapper.style.display = '';
+        els.resizerRight.style.display = 'block';
+        els.consolePanel.style.flex = ''; // Revert to CSS default
+        els.consolePanel.style.width = ''; // Revert width
+
+        // Update Icon to Maximize
+        btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>`;
+        btn.title = "Maximize Console";
+    }
 }
 
 // Hydrate Navigation
@@ -107,6 +151,9 @@ require(['vs/editor/editor.main'], function () {
         minimap: { enabled: false },
         lineNumbers: 'off',
         folding: false,
+        glyphMargin: false,
+        lineDecorationsWidth: 0,
+        lineNumbersMinChars: 0,
         padding: { top: 10, bottom: 10 },
         fontSize: 12,
         scrollBeyondLastLine: false,
@@ -116,6 +163,37 @@ require(['vs/editor/editor.main'], function () {
 
     // Auto-connect if URL is present (or wait for user?)
     // Original script called connect() immediately.
+    // Toggles
+    if (els.btnCollapseNav) els.btnCollapseNav.onclick = () => {
+        els.sidebar.style.display = 'none';
+        els.resizerLeft.style.display = 'none';
+        els.btnExpandNav.style.display = 'flex';
+    };
+    if (els.btnExpandNav) els.btnExpandNav.onclick = () => {
+        els.sidebar.style.display = 'flex';
+        els.resizerLeft.style.display = 'block';
+        els.btnExpandNav.style.display = 'none';
+    };
+
+    if (els.btnCollapseConsole) els.btnCollapseConsole.onclick = () => {
+        // If maximized, restore first to ensure main content/buttons are visible
+        if (state.isConsoleMaximized) toggleConsoleMaximize();
+
+        els.consolePanel.style.display = 'none';
+        els.resizerRight.style.display = 'none';
+        els.btnExpandConsole.style.display = 'flex';
+    };
+    if (els.btnExpandConsole) els.btnExpandConsole.onclick = () => {
+        els.consolePanel.style.display = 'flex';
+        els.resizerRight.style.display = 'block';
+        els.btnExpandConsole.style.display = 'none';
+
+        // Reset maximize state if it was maximized
+        if (state.isConsoleMaximized) toggleConsoleMaximize();
+    };
+
+    if (els.btnMaximizeConsole) els.btnMaximizeConsole.onclick = toggleConsoleMaximize;
+
     connect();
 });
 
@@ -222,14 +300,6 @@ async function selectEvent(name, el) {
 
                         const model = monaco.editor.createModel(code, "typescript");
 
-                        // Limit height logic
-                        const scrollbarWidth = 14;
-                        const borderWidth = 6;
-                        const lineHeight = 19;
-                        // const contentHeight = (code.match(/\n/g)?.length || 1) * lineHeight + borderWidth + scrollbarWidth;
-                        // Always use max height or reasonable height since it's full file
-                        // But maybe we want to focus on the snippet area?
-                        // Let's keep fixed height or adaptive but capped.
                         el.style.height = '400px';
 
                         const editor = monaco.editor.create(el, {
@@ -238,6 +308,7 @@ async function selectEvent(name, el) {
                             theme: 'vs-dark',
                             minimap: { enabled: true },
                             glyphMargin: true,
+                            folding: false,
                             lineNumbers: 'on',
                             fontSize: 12,
                             scrollBeyondLastLine: false,
@@ -301,28 +372,28 @@ async function selectEvent(name, el) {
     }
 
     els.docPanel.innerHTML = `
-                <div class="doc-header">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.5rem;">
-                         <h1 class="doc-title" style="margin:0">${item.name}</h1>
-                         ${sourceLinkHtml}
-                    </div>
-                    <div class="doc-meta">
-                        <span class="badge badge-${item.type === 'publish' ? 'SEND' : 'RECV'}" style="font-size: 0.8rem; padding: 4px 8px;">${item.type === 'publish' ? 'SEND' : 'RECV'}</span>
-                        <span>${op.operationId || ''}</span>
-                    </div>
-                </div>
-                <div class="doc-body">
-                    ${desc ? `<p style="line-height: 1.6; margin-bottom: 2rem;">${desc}</p>` : ''}
-                    
-                    <div class="section-title">Payload Schema</div>
-                    ${payload ? renderSchemaToDOM(payload) : '<div class="empty-state-text" style="color:var(--text-muted); font-style:italic;">No payload definition.</div>'}
-                    
-                    ${sourceInfos.length > 0 ? `
-                    <div class="section-title" style="margin-top: 24px;">Source Code</div>
-                    <div id="source-viewer-container" style="margin-top: 12px;"></div>
-                    ` : ''}
-                </div>
-            `;
+        <div class="doc-header">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.5rem;">
+                    <h1 class="doc-title" style="margin:0">${item.name}</h1>
+                    ${sourceLinkHtml}
+            </div>
+            <div class="doc-meta">
+                <span class="badge badge-${item.type === 'publish' ? 'SEND' : 'RECV'}" style="font-size: 0.8rem; padding: 4px 8px;">${item.type === 'publish' ? 'SEND' : 'RECV'}</span>
+                <span>${op.operationId || ''}</span>
+            </div>
+        </div>
+        <div class="doc-body">
+            ${desc ? `<p style="line-height: 1.6; margin-bottom: 2rem;">${desc}</p>` : ''}
+            
+            <div class="section-title">Payload Schema</div>
+            ${payload ? renderSchemaToDOM(payload) : '<div class="empty-state-text" style="color:var(--text-muted); font-style:italic;">No payload definition.</div>'}
+            
+            ${sourceInfos.length > 0 ? `
+            <div class="section-title" style="margin-top: 24px;">Source Code</div>
+            <div id="source-viewer-container"></div>
+            ` : ''}
+        </div>
+    `;
 
     // Render Source Viewers
     if (sourceInfos.length > 0 && window.monaco) {
@@ -360,7 +431,7 @@ async function selectEvent(name, el) {
                     // Toggle visibility
                     files.forEach((_, otherIdx) => {
                         const el = document.getElementById(`source-group-${otherIdx}`);
-                        if (el) el.style.display = otherIdx === idx ? 'block' : 'none';
+                        if (el) el.style.display = otherIdx === idx ? 'flex' : 'none';
                     });
                 };
                 tabBar.appendChild(tab);
@@ -375,13 +446,23 @@ async function selectEvent(name, el) {
 
             const wrapper = document.createElement('div');
             wrapper.id = `source-group-${i}`;
-            wrapper.style.display = i === 0 ? 'block' : 'none';
-            wrapper.style.marginBottom = '20px';
+            wrapper.classList.add('source-group');
+            wrapper.style.display = i === 0 ? 'flex' : 'none';
 
-            wrapper.innerHTML = `<div style="font-size: 0.8rem; color: #888; margin-bottom: 4px; display:flex; justify-content:flex-end;">
-                        <a href="vscode://file/${fileName}:${sources[0].line}" style="color: #666; text-decoration: none;">Open in Editor ↗</a>
+            wrapper.innerHTML = `<div class="source-header-actions" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                        <a href="vscode://file/${fileName}:${sources[0].line}" class="doc-source-link" title="${fileName}:${sources[0].line}">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px">
+                                <polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline>
+                            </svg>
+                            ${fileName.split('/').pop()}:${sources[0].line}
+                        </a>
+                        <button class="btn-icon" title="Toggle Fullscreen" onclick="toggleFullscreen('source-group-${i}', 'source-editor-${i}')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path>
+                            </svg>
+                        </button>
                     </div>
-                    <div id="source-editor-${i}" style="height: 300px; border: 1px solid #333; border-radius: 6px; overflow: hidden;"></div>`;
+                    <div id="source-editor-${i}" style="height: 100%; border: 1px solid #333; border-radius: 6px; overflow: hidden;"></div>`;
             container.appendChild(wrapper);
 
             (async () => {
@@ -401,7 +482,8 @@ async function selectEvent(name, el) {
                         readOnly: true,
                         theme: 'vs-dark',
                         minimap: { enabled: true },
-                        glyphMargin: true,
+                        glyphMargin: false,
+                        folding: false,
                         lineNumbers: 'on',
                         fontSize: 12,
                         scrollBeyondLastLine: false,
