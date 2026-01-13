@@ -858,17 +858,22 @@ function parseMarkdown(text) {
 
 function setupSidebar() {
     const sidebar = document.querySelector('.sidebar');
-    const toggleBtn = document.querySelector('.toggle-sidebar');
-    // ... no resizer logic here for sidebar, might have missed it in copy?
-    // oh resizing logic was inline in html before maybe.
-
     if (!sidebar) return;
 
-    // Collapsible Groups
+    // Collapsible Groups (top-level)
     document.querySelectorAll('.nav-group-title').forEach(title => {
         title.addEventListener('click', (e) => {
             const group = e.currentTarget.parentElement;
             group.classList.toggle('collapsed');
+        });
+    });
+
+    // Collapsible Subgroups (nested)
+    document.querySelectorAll('.nav-subgroup-title').forEach(title => {
+        title.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent bubbling to parent group
+            const subgroup = e.currentTarget.parentElement;
+            subgroup.classList.toggle('collapsed');
         });
     });
 }
