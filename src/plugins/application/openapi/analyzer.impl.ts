@@ -27,6 +27,7 @@ export interface RouteInfo {
     };
     responseType?: string;
     responseSchema?: any;
+    hasUnknownFields?: boolean;
     summary?: string;
     description?: string;
     tags?: string[];
@@ -473,6 +474,7 @@ export class OpenAPIAnalyzer {
                     requestTypes: analysis.requestTypes,
                     responseType: analysis.responseType,
                     responseSchema: analysis.responseSchema,
+                    hasUnknownFields: analysis.hasUnknownFields,
                     emits: analysis.emits,
                     sourceContext: {
                         file: sourceFile.fileName,
@@ -617,6 +619,7 @@ export class OpenAPIAnalyzer {
         requestTypes?: RouteInfo['requestTypes'];
         responseType?: string;
         responseSchema?: any;
+        hasUnknownFields?: boolean;
         emits?: { event: string; payload?: any; location?: { startLine: number; endLine: number; }; }[];
         highlights?: { startLine: number; endLine: number; type: 'emit' | 'return-success' | 'return-warning'; }[];
     } {
@@ -723,25 +726,79 @@ export class OpenAPIAnalyzer {
             const visit = (node: ts.Node) => {
                 // Track variable declarations
                 if (ts.isVariableDeclaration(node)) {
-                    if (node.initializer && ts.isIdentifier(node.name)) {
-                        const varName = node.name.getText(sourceFile);
+                    if (node.initializer) {
+                        // Handle simple identifier: const varName = ...
+                        if (ts.isIdentifier(node.name)) {
+                            const varName = node.name.getText(sourceFile);
 
-                        // Check if initializer is a type assertion on ctx.body()
-                        let initializer = node.initializer;
-                        if (ts.isAsExpression(initializer)) {
-                            if (this.isCtxBodyCall(initializer.expression, sourceFile)) {
-                                const schema = this.convertTypeNodeToSchema(initializer.type, sourceFile);
-                                if (schema) {
-                                    requestTypes.body = schema;
+                            // Check if initializer is a type assertion on ctx.body()
+                            let initializer = node.initializer;
+                            if (ts.isAsExpression(initializer)) {
+                                if (this.isCtxBodyCall(initializer.expression, sourceFile)) {
+                                    const schema = this.convertTypeNodeToSchema(initializer.type, sourceFile);
+                                    if (schema) {
+                                        requestTypes.body = schema;
+                                        scope.set(varName, schema);
+                                    }
+                                } else {
+                                    const schema = this.convertExpressionToSchema(initializer, sourceFile, scope);
                                     scope.set(varName, schema);
                                 }
                             } else {
                                 const schema = this.convertExpressionToSchema(initializer, sourceFile, scope);
                                 scope.set(varName, schema);
                             }
-                        } else {
-                            const schema = this.convertExpressionToSchema(initializer, sourceFile, scope);
-                            scope.set(varName, schema);
+                        }
+                        // Handle array destructuring: const [a, b] = ...
+                        else if (ts.isArrayBindingPattern(node.name)) {
+                            // Get the initializer schema
+                            const initializerSchema = this.convertExpressionToSchema(node.initializer, sourceFile, scope);
+
+                            // If the initializer is an array, try to infer element types
+                            if (initializerSchema?.type === 'array' && initializerSchema.items) {
+                                // Track each destructured element with the array's item type
+                                for (let i = 0; i < node.name.elements.length; i++) {
+                                    const element = node.name.elements[i];
+                                    if (ts.isBindingElement(element) && ts.isIdentifier(element.name)) {
+                                        const elementName = element.name.getText(sourceFile);
+                                        scope.set(elementName, initializerSchema.items);
+                                    }
+                                }
+                            } else {
+                                // For non-array initializers or unknown types, track as unknown
+                                for (let i = 0; i < node.name.elements.length; i++) {
+                                    const element = node.name.elements[i];
+                                    if (ts.isBindingElement(element) && ts.isIdentifier(element.name)) {
+                                        const elementName = element.name.getText(sourceFile);
+                                        scope.set(elementName, { 'x-unknown': true });
+                                    }
+                                }
+                            }
+                        }
+                        // Handle object destructuring: const { a, b } = ...
+                        else if (ts.isObjectBindingPattern(node.name)) {
+                            const initializerSchema = this.convertExpressionToSchema(node.initializer, sourceFile, scope);
+
+                            // If the initializer is an object with properties, extract the types
+                            if (initializerSchema?.type === 'object' && initializerSchema.properties) {
+                                for (let i = 0; i < node.name.elements.length; i++) {
+                                    const element = node.name.elements[i];
+                                    if (ts.isBindingElement(element) && ts.isIdentifier(element.name)) {
+                                        const elementName = element.name.getText(sourceFile);
+                                        const propertySchema = initializerSchema.properties[elementName];
+                                        scope.set(elementName, propertySchema || { 'x-unknown': true });
+                                    }
+                                }
+                            } else {
+                                // For non-object initializers, track as any
+                                for (let i = 0; i < node.name.elements.length; i++) {
+                                    const element = node.name.elements[i];
+                                    if (ts.isBindingElement(element) && ts.isIdentifier(element.name)) {
+                                        const elementName = element.name.getText(sourceFile);
+                                        scope.set(elementName, { 'x-unknown': true });
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -906,7 +963,14 @@ export class OpenAPIAnalyzer {
             }
         }
 
-        return { requestTypes, responseType, responseSchema, emits, highlights };
+        return {
+            requestTypes,
+            responseType,
+            responseSchema,
+            hasUnknownFields: responseSchema ? this.hasUnknownFields(responseSchema) : false,
+            emits,
+            highlights
+        };
     }
 
     /**
@@ -970,12 +1034,119 @@ export class OpenAPIAnalyzer {
             return { type: 'string' };
         }
 
+        // Await Expression: await somePromise
+        if (ts.isAwaitExpression(node)) {
+            // Unwrap the await and analyze the underlying expression
+            return this.convertExpressionToSchema(node.expression, sourceFile, scope);
+        }
+
+        // Call Expression: Date.now(), Math.random(), etc.
+        if (ts.isCallExpression(node)) {
+            const callText = node.getText(sourceFile);
+
+            // Common numeric-returning functions
+            if (callText.startsWith('Date.now()') ||
+                callText.startsWith('Math.') ||
+                callText.startsWith('Number(') ||
+                callText.startsWith('parseInt(') ||
+                callText.startsWith('parseFloat(')) {
+                return { type: 'number' };
+            }
+
+            // String-returning functions
+            if (callText.startsWith('String(') ||
+                callText.endsWith('.toString()') ||
+                callText.endsWith('.join(')) {
+                return { type: 'string' };
+            }
+
+            // Boolean-returning functions
+            if (callText.startsWith('Boolean(')) {
+                return { type: 'boolean' };
+            }
+
+            // Array-returning functions
+            if (callText.endsWith('.split(') ||
+                callText.endsWith('.map(') ||
+                callText.endsWith('.filter(')) {
+                return { type: 'array', items: {} };
+            }
+
+            // For unknown function calls, default to any (empty schema)
+            return { 'x-unknown': true };
+        }
+
+        // Binary Expression: a + b, a - b, etc.
+        if (ts.isBinaryExpression(node)) {
+            const operator = node.operatorToken.kind;
+
+            // Arithmetic operators return number
+            if (operator === ts.SyntaxKind.PlusToken ||
+                operator === ts.SyntaxKind.MinusToken ||
+                operator === ts.SyntaxKind.AsteriskToken ||
+                operator === ts.SyntaxKind.SlashToken ||
+                operator === ts.SyntaxKind.PercentToken ||
+                operator === ts.SyntaxKind.AsteriskAsteriskToken) {
+
+                // Special case: + with strings is concatenation
+                if (operator === ts.SyntaxKind.PlusToken) {
+                    const leftSchema = this.convertExpressionToSchema(node.left, sourceFile, scope);
+                    const rightSchema = this.convertExpressionToSchema(node.right, sourceFile, scope);
+
+                    // If either operand is a string, result is string
+                    if (leftSchema.type === 'string' || rightSchema.type === 'string') {
+                        return { type: 'string' };
+                    }
+                }
+
+                return { type: 'number' };
+            }
+
+            // Comparison operators return boolean
+            if (operator === ts.SyntaxKind.GreaterThanToken ||
+                operator === ts.SyntaxKind.LessThanToken ||
+                operator === ts.SyntaxKind.GreaterThanEqualsToken ||
+                operator === ts.SyntaxKind.LessThanEqualsToken ||
+                operator === ts.SyntaxKind.EqualsEqualsToken ||
+                operator === ts.SyntaxKind.EqualsEqualsEqualsToken ||
+                operator === ts.SyntaxKind.ExclamationEqualsToken ||
+                operator === ts.SyntaxKind.ExclamationEqualsEqualsToken) {
+                return { type: 'boolean' };
+            }
+
+            // Logical operators - infer from operands
+            if (operator === ts.SyntaxKind.AmpersandAmpersandToken ||
+                operator === ts.SyntaxKind.BarBarToken) {
+                const leftSchema = this.convertExpressionToSchema(node.left, sourceFile, scope);
+                const rightSchema = this.convertExpressionToSchema(node.right, sourceFile, scope);
+
+                // Return the non-boolean schema if available, otherwise boolean
+                if (leftSchema.type && leftSchema.type !== 'boolean') {
+                    return leftSchema;
+                }
+                if (rightSchema.type && rightSchema.type !== 'boolean') {
+                    return rightSchema;
+                }
+                return { type: 'boolean' };
+            }
+
+            // Bitwise operators return number
+            if (operator === ts.SyntaxKind.AmpersandToken ||
+                operator === ts.SyntaxKind.BarToken ||
+                operator === ts.SyntaxKind.CaretToken ||
+                operator === ts.SyntaxKind.LessThanLessThanToken ||
+                operator === ts.SyntaxKind.GreaterThanGreaterThanToken ||
+                operator === ts.SyntaxKind.GreaterThanGreaterThanGreaterThanToken) {
+                return { type: 'number' };
+            }
+        }
+
         // Identifier (Variable reference)
         if (ts.isIdentifier(node)) {
             const name = node.getText(sourceFile);
             const scopedSchema = scope.get(name);
             if (scopedSchema) return scopedSchema;
-            return { type: 'object' }; // Unknown reference
+            return { type: 'object', 'x-unknown': true }; // Unknown reference
         }
 
         // Literals
@@ -984,7 +1155,27 @@ export class OpenAPIAnalyzer {
         if (node.kind === ts.SyntaxKind.TrueKeyword || node.kind === ts.SyntaxKind.FalseKeyword) return { type: 'boolean' };
 
         // Unknown
-        return { type: 'object' };
+        return { type: 'object', 'x-unknown': true };
+    }
+
+    /**
+     * Check if a schema contains fields with unknown types
+     */
+    private hasUnknownFields(schema: any): boolean {
+        if (!schema) return false;
+        if (schema['x-unknown']) return true;
+
+        if (schema.type === 'object' && schema.properties) {
+            return Object.values(schema.properties).some((prop: any) =>
+                this.hasUnknownFields(prop)
+            );
+        }
+
+        if (schema.type === 'array' && schema.items) {
+            return this.hasUnknownFields(schema.items);
+        }
+
+        return false;
     }
 
     /**

@@ -71,8 +71,9 @@ function renderSchema(schema, depth = 0) {
     if (type === 'object' && schema.properties) {
         const props = Object.entries(schema.properties).map(([key, prop]) => {
             const isRequired = required.includes(key);
-            const propType = prop.type || 'any';
-            const hasNested = (propType === 'object' && prop.properties) || (propType === 'array' && prop.items);
+            const isUnknown = prop['x-unknown'] === true;
+            const propType = isUnknown ? 'unknown' : (prop.type || 'any');
+            const hasNested = (prop.type === 'object' && prop.properties) || (prop.type === 'array' && prop.items);
 
             return `
                 <div style="margin-left: ${indent}px;">
@@ -80,6 +81,7 @@ function renderSchema(schema, depth = 0) {
                         <div class="property-name" style="font-family: monospace; font-weight: 500; color: var(--text-primary);">${key}</div>
                         <span class="property-detail" style="color: var(--text-secondary); font-size: 0.85rem;">
                             <span class="property-detail-value">${propType}</span>
+                            ${isUnknown ? '<span class="unknown-marker" title="Type could not be determined statically" style="color: #ff9800; margin-left: 4px; cursor: help;">⚠️</span>' : ''}
                         </span>
                         ${isRequired ? '<div class="property-required" style="margin-left: auto; font-size: 0.75rem; color: #f44336; text-transform: uppercase;">required</div>' : ''}
                     </div>
@@ -173,6 +175,12 @@ function renderRequestView(route, container) {
                             </div>
                             
                             ${op.description ? `<div class="markdown-content" style="margin:16px 0;">${parseMarkdown(op.description)}</div>` : ''}
+                            
+                            ${op['x-warning'] ? `
+                            <div class="alert alert-warning" style="margin: 16px 0; padding: 12px; background: rgba(255, 152, 0, 0.1); border-left: 3px solid #ff9800; border-radius: 4px;">
+                                <strong style="color: #ff9800;">⚠️ Warning:</strong> ${op['x-warning-reason'] || 'This operation could not be fully analyzed statically'}
+                            </div>
+                            ` : ''}
                             
                             ${op.tags && op.tags.length > 0 ? `
                             <div class="hierarchy-section" style="margin:16px 0;">

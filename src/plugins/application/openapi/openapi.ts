@@ -441,6 +441,12 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                         description: 'Successful response',
                         content: { 'application/json': { schema: astMatch.responseSchema } }
                     };
+
+                    // Add warning if schema has unknown fields
+                    if (astMatch.hasUnknownFields) {
+                        operation['x-warning'] = true;
+                        operation['x-warning-reason'] = 'Response contains fields with unknown types that could not be statically analyzed';
+                    }
                 } else if (astMatch.responseType) {
                     let contentType = 'application/json';
                     if (astMatch.responseType === 'string') contentType = 'text/plain';

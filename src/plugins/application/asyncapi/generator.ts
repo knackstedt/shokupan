@@ -7,6 +7,25 @@ import type { AsyncAPIOptions } from '../../../util/types';
  * Regex patterns for detecting emit calls.
  */
 
+/**
+ * Check if a schema contains fields with unknown types
+ */
+function hasUnknownFields(schema: any): boolean {
+    if (!schema) return false;
+    if (schema['x-unknown']) return true;
+
+    if (schema.type === 'object' && schema.properties) {
+        return Object.values(schema.properties).some((prop: any) =>
+            hasUnknownFields(prop)
+        );
+    }
+
+    if (schema.type === 'array' && schema.items) {
+        return hasUnknownFields(schema.items);
+    }
+
+    return false;
+}
 
 /**
  * Gets deduped AST routes if available.
@@ -206,13 +225,20 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                         } : undefined;
 
                         if (!channels[emit.event]) {
+                            const payload = emit.payload || { type: 'object' };
+                            const warning = hasUnknownFields(payload);
+
                             channels[emit.event] = {
                                 subscribe: {
                                     operationId: `emit${emit.event.charAt(0).toUpperCase() + emit.event.slice(1)}`,
                                     tags,
                                     message: {
-                                        payload: emit.payload || { type: 'object' }
+                                        payload
                                     },
+                                    ...(warning ? {
+                                        'x-warning': true,
+                                        'x-warning-reason': 'Payload contains fields with unknown types that could not be statically analyzed'
+                                    } : {}),
                                     "x-source-info": newSourceInfo ? [newSourceInfo] : [],
                                     "x-shokupan-source": (sourceInfo && emitStart) ? {
                                         file: sourceInfo.file,
@@ -298,13 +324,20 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
 
                     // Only add if not already defined
                     if (!channels[emit.event]) {
+                        const payload = emit.payload || { type: 'object' };
+                        const warning = hasUnknownFields(payload);
+
                         channels[emit.event] = {
                             subscribe: {
                                 operationId: `emit${emit.event.charAt(0).toUpperCase() + emit.event.slice(1)}`,
                                 tags,
                                 message: {
-                                    payload: emit.payload || { type: 'object' }
+                                    payload
                                 },
+                                ...(warning ? {
+                                    'x-warning': true,
+                                    'x-warning-reason': 'Payload contains fields with unknown types that could not be statically analyzed'
+                                } : {}),
                                 "x-source-info": newSourceInfo ? [newSourceInfo] : [],
                                 "x-shokupan-source": (sourceInfo && emitStart) ? {
                                     file: sourceInfo.file,
