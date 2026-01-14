@@ -1,5 +1,6 @@
 export * from "./context";
 export * from "./middleware";
+export * from "./router";
 export * from "./shokupan";
 export * from "./util/decorators";
 export * from "./util/di";
