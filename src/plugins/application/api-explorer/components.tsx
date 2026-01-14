@@ -55,8 +55,34 @@ export function ApiExplorerApp({ spec, asyncSpec, config }: any) {
         return 'Ungrouped';
     };
 
+    // Helper to find the longest common prefix of all paths in a group
+    const findCommonPrefix = (routes: Route[]): string[] => {
+        if (routes.length === 0) return [];
+
+        const allSegments = routes.map(r => {
+            const cleaned = r.path.replace(/^\/|\/$/g, '');
+            return cleaned.split('/');
+        });
+
+        // Find the shortest path length
+        const minLength = Math.min(...allSegments.map(s => s.length));
+
+        const commonPrefix: string[] = [];
+        for (let i = 0; i < minLength; i++) {
+            const segment = allSegments[0][i];
+            if (allSegments.every(segments => segments[i] === segment)) {
+                commonPrefix.push(segment);
+            } else {
+                break;
+            }
+        }
+
+        return commonPrefix;
+    };
+
     // Recursive function to create subgroups based on path prefixes
-    const createSubgroups = (routes: Route[], depth: number = 0): GroupNode[] => {
+    // Only creates subgroups when 3+ routes share a common prefix AND have diverging subpaths
+    const createSubgroups = (routes: Route[], depth: number = 0, commonPrefixLength: number = 0): GroupNode[] => {
         if (routes.length < 3 || depth > 5) {
             // Don't create subgroups if less than 3 routes or too deep
             return routes.map(route => ({
@@ -71,7 +97,9 @@ export function ApiExplorerApp({ spec, asyncSpec, config }: any) {
         const pathSegments = routes.map(r => {
             // Remove leading/trailing slashes and split
             const cleaned = r.path.replace(/^\/|\/$/g, '');
-            return cleaned.split('/');
+            const segments = cleaned.split('/');
+            // Strip the common prefix for this group
+            return segments.slice(commonPrefixLength);
         });
 
         // Find common prefix groups
@@ -93,19 +121,44 @@ export function ApiExplorerApp({ spec, asyncSpec, config }: any) {
             prefixGroups.get(prefix)!.push(route);
         });
 
-        // Create subgroups for prefixes with 3+ routes, otherwise add to ungrouped
+        // Create subgroups for prefixes with 3+ routes that actually diverge
         const result: GroupNode[] = [];
 
         prefixGroups.forEach((groupRoutes, prefix) => {
             if (groupRoutes.length >= 3) {
-                // Create a subgroup and recurse
-                const prefixName = prefix.split('/').pop() || prefix;
-                result.push({
-                    name: prefixName,
-                    type: 'subgroup' as const,
-                    path: '/' + prefix,
-                    children: createSubgroups(groupRoutes, depth + 1)
+                // Check if routes diverge after this prefix
+                // If all routes in this group have the same next segment, don't create a subgroup yet
+                const nextSegments = new Set<string>();
+                groupRoutes.forEach((route, idx) => {
+                    const routeIdx = routes.indexOf(route);
+                    const segments = pathSegments[routeIdx];
+                    if (segments.length > depth + 1) {
+                        nextSegments.add(segments[depth + 1]);
+                    }
                 });
+
+                // Only create a subgroup if there are diverging paths (2+ different next segments)
+                // OR if we're at terminal paths (no more segments)
+                const hasDivergingPaths = nextSegments.size >= 2;
+                const allTerminal = groupRoutes.every((route, idx) => {
+                    const routeIdx = routes.indexOf(route);
+                    return pathSegments[routeIdx].length === depth + 1;
+                });
+
+                if (hasDivergingPaths || allTerminal) {
+                    // Create a subgroup and recurse
+                    const prefixName = prefix.split('/').pop() || prefix;
+                    result.push({
+                        name: prefixName,
+                        type: 'subgroup' as const,
+                        path: '/' + prefix,
+                        children: createSubgroups(groupRoutes, depth + 1, commonPrefixLength)
+                    });
+                } else {
+                    // Don't create a subgroup, just recurse with increased depth
+                    // This flattens the common mount path
+                    result.push(...createSubgroups(groupRoutes, depth + 1, commonPrefixLength));
+                }
             } else {
                 // Add to ungrouped
                 ungrouped.push(...groupRoutes);
@@ -147,22 +200,22 @@ export function ApiExplorerApp({ spec, asyncSpec, config }: any) {
         });
     });
 
-    // Merge AsyncAPI channels into hierarchy
-    Object.entries(asyncSpec?.channels || {}).forEach(([name, ch]: [string, any]) => {
-        const operations = [];
-        if (ch.publish) operations.push({ method: 'recv', op: ch.publish });
-        if (ch.subscribe) operations.push({ method: 'send', op: ch.subscribe });
+    // Skip AsyncAPI channels - they should only appear in the AsyncAPI plugin
+    // Object.entries(asyncSpec?.channels || {}).forEach(([name, ch]: [string, any]) => {
+    //     const operations = [];
+    //     if (ch.publish) operations.push({ method: 'recv', op: ch.publish });
+    //     if (ch.subscribe) operations.push({ method: 'send', op: ch.subscribe });
 
-        operations.forEach(({ method, op }) => {
-            if (!op.operationId) op.operationId = `${method}-${name.replace(/[^a-zA-Z0-9]/g, '-')}`;
+    //     operations.forEach(({ method, op }) => {
+    //         if (!op.operationId) op.operationId = `${method}-${name.replace(/[^a-zA-Z0-9]/g, '-')}`;
 
-            const route: Route = { method, path: name, op };
-            const source = (op as any)['x-shokupan-source'] || (op as any)['x-source-info'];
-            const groupKey = getGroupKey(op, source);
+    //         const route: Route = { method, path: name, op };
+    //         const source = (op as any)['x-shokupan-source'] || (op as any)['x-source-info'];
+    //         const groupKey = getGroupKey(op, source);
 
-            addRoute(groupKey, route);
-        });
-    });
+    //         addRoute(groupKey, route);
+    //     });
+    // });
 
     // Build hierarchical groups with subgroups
     const hierarchicalGroups = Array.from(hierarchy.entries())
@@ -170,8 +223,12 @@ export function ApiExplorerApp({ spec, asyncSpec, config }: any) {
             // Sort routes by path
             routes.sort((a, b) => a.path.localeCompare(b.path));
 
-            // Create subgroups recursively
-            const children = createSubgroups(routes);
+            // Find the common prefix for all routes in this group
+            const commonPrefix = findCommonPrefix(routes);
+            const commonPrefixLength = commonPrefix.length;
+
+            // Create subgroups recursively, stripping the common prefix
+            const children = createSubgroups(routes, 0, commonPrefixLength);
 
             return {
                 name,
