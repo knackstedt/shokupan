@@ -11,6 +11,7 @@ export * from "./util/types";
 
 // Plugins
 // Application Plugins
+export * from "./plugins/application/api-explorer/plugin";
 export * from "./plugins/application/asyncapi/plugin";
 export * from "./plugins/application/auth";
 export * from "./plugins/application/cluster";
