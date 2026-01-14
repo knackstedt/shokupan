@@ -1,5 +1,6 @@
 import { readFile } from 'fs/promises';
-import { join } from 'path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import renderToString from 'preact-render-to-string';
 import { ShokupanRouter } from '../../../router';
 import type { Shokupan } from '../../../shokupan.ts';
@@ -28,9 +29,20 @@ export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin 
         }
     }
 
+    private static getBasePath() {
+        const dir = dirname(fileURLToPath(import.meta.url));
+        // In production (dist/), files are in dist/plugins/application/api-explorer/
+        if (dir.endsWith('dist')) {
+            return dir + '/plugins/application/api-explorer';
+        }
+        // In dev mode (src/plugins/application/api-explorer/), files are in same directory
+        return dir;
+    }
+
     init() {
+
         const serveFile = async (ctx: any, file: string, type: string) => {
-            const content = await readFile(join(__dirname, 'static', file), 'utf-8');
+            const content = await readFile(join(ApiExplorerPlugin.getBasePath(), 'static', file), 'utf-8');
             ctx.set('Content-Type', type);
             return ctx.send(content);
         };
