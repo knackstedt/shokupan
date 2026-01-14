@@ -61,7 +61,7 @@ function renderInfoSection(info) {
 }
 
 // Helper to recursively render schema properties
-function renderSchema(schema, depth = 0) {
+function renderSchema(schema, depth = 0, isResponse = false) {
     if (!schema) return '';
 
     const indent = depth * 16;
@@ -75,6 +75,19 @@ function renderSchema(schema, depth = 0) {
             const propType = isUnknown ? 'unknown' : (prop.type || 'any');
             const hasNested = (prop.type === 'object' && prop.properties) || (prop.type === 'array' && prop.items);
 
+            // For responses, show "optional" for non-required fields
+            // For requests, show "required" for required fields
+            let badgeHtml = '';
+            if (isResponse) {
+                if (!isRequired) {
+                    badgeHtml = '<div class="property-optional" style="margin-left: auto; font-size: 0.75rem; color: #9e9e9e; text-transform: uppercase; font-style: italic;">optional</div>';
+                }
+            } else {
+                if (isRequired) {
+                    badgeHtml = '<div class="property-required" style="margin-left: auto; font-size: 0.75rem; color: #f44336; text-transform: uppercase;">required</div>';
+                }
+            }
+
             return `
                 <div style="margin-left: ${indent}px;">
                     <div class="property-heading" style="display: flex; align-items: center; gap: 8px; padding: 6px 0;">
@@ -83,10 +96,10 @@ function renderSchema(schema, depth = 0) {
                             <span class="property-detail-value">${propType}</span>
                             ${isUnknown ? '<span class="unknown-marker" title="Type could not be determined statically" style="color: #ff9800; margin-left: 4px; cursor: help;">⚠️</span>' : ''}
                         </span>
-                        ${isRequired ? '<div class="property-required" style="margin-left: auto; font-size: 0.75rem; color: #f44336; text-transform: uppercase;">required</div>' : ''}
+                        ${badgeHtml}
                     </div>
                     ${prop.description ? `<div style="color: var(--text-secondary); font-size: 0.85rem; margin-left: 0; margin-top: -4px; margin-bottom: 4px;">${prop.description}</div>` : ''}
-                    ${hasNested ? renderSchema(propType === 'array' ? prop.items : prop, depth + 1) : ''}
+                    ${hasNested ? renderSchema(propType === 'array' ? prop.items : prop, depth + 1, isResponse) : ''}
                 </div>
             `;
         }).join('');
@@ -97,7 +110,7 @@ function renderSchema(schema, depth = 0) {
                 <div style="font-family: monospace; font-size: 0.85rem; color: var(--text-secondary);">
                     [array items]
                 </div>
-                ${renderSchema(schema.items, depth + 1)}
+                ${renderSchema(schema.items, depth + 1, isResponse)}
             </div>
         `;
     }
@@ -267,7 +280,7 @@ function renderRequestView(route, container) {
                                             ` : ''}
                                             ${schema ? `
                                                 <div style="margin-top: 8px; background: var(--bg-primary); padding: 8px; border-radius: 4px;">
-                                                    ${renderSchema(schema)}
+                                                    ${renderSchema(schema, 0, true)}
                                                 </div>
                                             ` : ''}
                                         </div>
