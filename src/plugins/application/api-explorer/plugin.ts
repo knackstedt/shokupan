@@ -2,6 +2,8 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import renderToString from 'preact-render-to-string';
 import { ShokupanRouter } from '../../../router';
+import type { Shokupan } from '../../../shokupan.ts';
+import type { ShokupanPlugin, ShokupanPluginOptions } from '../../../util/types.ts';
 import { ApiExplorerApp } from './components.tsx';
 
 export interface ApiExplorerOptions {
@@ -9,12 +11,24 @@ export interface ApiExplorerOptions {
     path?: string;
 }
 
-export class ApiExplorerPlugin extends ShokupanRouter {
+export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin {
 
-    constructor(private readonly pluginOptions?: ApiExplorerOptions) {
+    constructor(private readonly pluginOptions: ApiExplorerOptions = {}) {
         super({ renderer: renderToString });
         pluginOptions.path ??= '/explorer';
+    }
 
+    onInit(app: Shokupan, options?: ShokupanPluginOptions) {
+        const path = this.pluginOptions.path || options?.path || '/apiexplorer';
+        app.mount(path, this);
+
+        // Ensure async api gen is enabled if this plugin is used
+        if (app.applicationConfig.enableOpenApiGen !== true) {
+            console.warn('ApiExplorerPlugin: enableOpenApiGen is disabled. ApiExplorerPlugin will not generate spec.');
+        }
+    }
+
+    init() {
         const serveFile = async (ctx: any, file: string, type: string) => {
             const content = await readFile(join(__dirname, 'static', file), 'utf-8');
             ctx.set('Content-Type', type);
