@@ -272,13 +272,18 @@ function renderRequestView(route, container) {
                             ${source ? `
                             <div class="source-section">
                                 <h3 style="margin-bottom:8px; font-size:1.1rem; color:var(--text-primary);">Source Code</h3>
-                                <div class="source-header" style="justify-content: flex-start; margin-bottom: 8px;">
+                                <div class="source-header" style="justify-content: space-between; margin-bottom: 8px; align-items: center;">
                                     <a href="vscode://file/${source.file}:${source.line}" class="doc-source-link" title="${source.file}:${source.line}">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px">
                                             <polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline>
                                         </svg>
                                         ${source.file.split('/').pop()}:${source.line}
                                     </a>
+                                    <button class="btn icon-btn" id="btn-source-fullscreen" title="Toggle Fullscreen">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                                        </svg>
+                                    </button>
                                 </div>
                                 <div id="monaco-source-viewer" class="monaco-container"></div>
                             </div>
@@ -420,6 +425,48 @@ function renderRequestView(route, container) {
 
     // Setup initial remove buttons
     container.querySelectorAll('.remove-header').forEach(setupRemoveHeaderBtn);
+
+    // Source viewer fullscreen toggle
+    const fullscreenBtn = document.getElementById('btn-source-fullscreen');
+    if (fullscreenBtn) {
+        const updateFullscreenIcon = (isFullscreen) => {
+            const svg = fullscreenBtn.querySelector('svg');
+            if (isFullscreen) {
+                // Exit fullscreen icon (minimize)
+                svg.innerHTML = '<path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>';
+            } else {
+                // Enter fullscreen icon (maximize)
+                svg.innerHTML = '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>';
+            }
+        };
+
+        fullscreenBtn.addEventListener('click', () => {
+            const sourceSection = container.querySelector('.source-section');
+            if (sourceSection) {
+                const isFullscreen = sourceSection.classList.toggle('fullscreen');
+                updateFullscreenIcon(isFullscreen);
+
+                // Update Monaco layout after transition
+                setTimeout(() => {
+                    if (currentEditors.source) currentEditors.source.layout();
+                }, 300);
+            }
+        });
+
+        // ESC key to exit fullscreen
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const sourceSection = container.querySelector('.source-section');
+                if (sourceSection && sourceSection.classList.contains('fullscreen')) {
+                    sourceSection.classList.remove('fullscreen');
+                    updateFullscreenIcon(false);
+                    setTimeout(() => {
+                        if (currentEditors.source) currentEditors.source.layout();
+                    }, 300);
+                }
+            }
+        });
+    }
 
     // Populate Request Body if example exists
     if (hasBody && currentEditors.request) {
