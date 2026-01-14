@@ -625,7 +625,7 @@ export class OpenAPIAnalyzer {
     } {
         const requestTypes: RouteInfo['requestTypes'] = {};
         let responseType: string | undefined;
-        let responseSchema: any | undefined;
+        let responseSchemas: any[] = []; // Track multiple schemas from different code paths
         let hasExplicitReturnType = false;
         const emits: { event: string; payload?: any; location?: { startLine: number; endLine: number; }; }[] = [];
         const highlights: { startLine: number; endLine: number; type: 'emit' | 'return-success' | 'return-warning'; }[] = [];
@@ -651,7 +651,7 @@ export class OpenAPIAnalyzer {
             if (handler.type) {
                 const returnSchema = this.convertTypeNodeToSchema(handler.type, sourceFile);
                 if (returnSchema) {
-                    responseSchema = returnSchema;
+                    responseSchemas.push(returnSchema);
                     responseType = returnSchema.type;
                     hasExplicitReturnType = true;
                 }
@@ -675,7 +675,8 @@ export class OpenAPIAnalyzer {
                 if (callObj === 'ctx' || callObj.endsWith('.ctx')) {
                     if (callProp === 'json') {
                         if (node.arguments.length > 0) {
-                            responseSchema = this.convertExpressionToSchema(node.arguments[0], sourceFile, scope);
+                            const schema = this.convertExpressionToSchema(node.arguments[0], sourceFile, scope);
+                            responseSchemas.push(schema);
                             responseType = 'object';
                         }
                         return;
@@ -694,16 +695,16 @@ export class OpenAPIAnalyzer {
             // Case 2: Direct object return
             // Only use this if we haven't found a better schema yet, or if it looks specific
             // And if we don't have an explicit return type
-            if (!hasExplicitReturnType && (!responseSchema || responseSchema.type === 'object')) {
+            if (!hasExplicitReturnType && responseSchemas.length === 0) {
                 const schema = this.convertExpressionToSchema(node, sourceFile, scope);
                 if (schema && (schema.type !== 'object' || Object.keys(schema.properties || {}).length > 0)) {
-                    responseSchema = schema;
+                    responseSchemas.push(schema);
                     responseType = schema.type;
                 }
             }
 
             // Fallback to text matching if schema inference failed and we still don't have a type
-            if (!responseSchema && !responseType) {
+            if (responseSchemas.length === 0 && !responseType) {
                 const returnText = node.getText(sourceFile);
                 if (returnText.startsWith('{')) {
                     responseType = 'object';
@@ -875,11 +876,10 @@ export class OpenAPIAnalyzer {
 
                     let isStatic = false;
                     if (node.expression) {
+                        const schemasBeforeReturn = responseSchemas.length;
                         analyzeReturnExpression(node.expression);
-                        // If analyzeReturnExpression successfully set responseSchema to something specific, it's static
-                        // Note: analyzeReturnExpression updates local 'responseSchema' variable. 
-                        // We check if it's "good"
-                        if (responseSchema && (responseSchema.type !== 'object' || (responseSchema.properties && Object.keys(responseSchema.properties).length > 0))) {
+                        // If analyzeReturnExpression added schemas, it's static
+                        if (responseSchemas.length > schemasBeforeReturn) {
                             isStatic = true;
                         }
                     } else if (hasExplicitReturnType) {
@@ -897,10 +897,11 @@ export class OpenAPIAnalyzer {
                     const startLine = sourceFile.getLineAndCharacterOfPosition(node.body.getStart()).line + 1;
                     const endLine = sourceFile.getLineAndCharacterOfPosition(node.body.getEnd()).line + 1;
 
+                    const schemasBeforeReturn = responseSchemas.length;
                     analyzeReturnExpression(node.body as ts.Expression);
 
                     let isStatic = false;
-                    if (responseSchema && (responseSchema.type !== 'object' || (responseSchema.properties && Object.keys(responseSchema.properties).length > 0))) {
+                    if (responseSchemas.length > schemasBeforeReturn) {
                         isStatic = true;
                     }
 
@@ -963,11 +964,28 @@ export class OpenAPIAnalyzer {
             }
         }
 
+        // Merge multiple response schemas using oneOf if there are multiple distinct schemas
+        let finalResponseSchema: any | undefined;
+        if (responseSchemas.length > 1) {
+            // Check if all schemas are identical - if so, just use one
+            const uniqueSchemas = this.deduplicateSchemas(responseSchemas);
+            if (uniqueSchemas.length === 1) {
+                finalResponseSchema = uniqueSchemas[0];
+            } else {
+                // Multiple different schemas - use oneOf
+                finalResponseSchema = {
+                    oneOf: uniqueSchemas
+                };
+            }
+        } else if (responseSchemas.length === 1) {
+            finalResponseSchema = responseSchemas[0];
+        }
+
         return {
             requestTypes,
             responseType,
-            responseSchema,
-            hasUnknownFields: responseSchema ? this.hasUnknownFields(responseSchema) : false,
+            responseSchema: finalResponseSchema,
+            hasUnknownFields: finalResponseSchema ? this.hasUnknownFields(finalResponseSchema) : false,
             emits,
             highlights
         };
@@ -1156,6 +1174,20 @@ export class OpenAPIAnalyzer {
 
         // Unknown
         return { type: 'object', 'x-unknown': true };
+    }
+
+    /**
+     * Deduplicate schemas by comparing their JSON representations
+     */
+    private deduplicateSchemas(schemas: any[]): any[] {
+        const seen = new Map<string, any>();
+        for (const schema of schemas) {
+            const key = JSON.stringify(schema);
+            if (!seen.has(key)) {
+                seen.set(key, schema);
+            }
+        }
+        return Array.from(seen.values());
     }
 
     /**

@@ -68,6 +68,23 @@ function renderSchema(schema, depth = 0, isResponse = false) {
     const type = schema.type || 'any';
     const required = schema.required || [];
 
+    // Handle oneOf (multiple possible schemas)
+    if (schema.oneOf) {
+        return `
+            <div style="margin-left: ${indent}px;">
+                <div style="font-weight: 500; color: var(--text-primary); margin-bottom: 8px;">
+                    <span style="color: var(--text-secondary); font-size: 0.85rem;">One of the following:</span>
+                </div>
+                ${schema.oneOf.map((subSchema, idx) => `
+                    <div style="border-left: 3px solid #4caf50; padding-left: 12px; margin-bottom: 12px;">
+                        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px;">Option ${idx + 1}:</div>
+                        ${renderSchema(subSchema, 0, isResponse)}
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
     if (type === 'object' && schema.properties) {
         const props = Object.entries(schema.properties).map(([key, prop]) => {
             const isRequired = required.includes(key);
