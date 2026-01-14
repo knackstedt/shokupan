@@ -225,15 +225,16 @@ export function ApiExplorerApp({ spec, asyncSpec, config }: any) {
 
             // Find the common prefix for all routes in this group
             const commonPrefix = findCommonPrefix(routes);
-            const commonPrefixLength = commonPrefix.length;
+            const commonPrefixPath = '/' + commonPrefix.join('/');
 
             // Create subgroups recursively, stripping the common prefix
-            const children = createSubgroups(routes, 0, commonPrefixLength);
+            const children = createSubgroups(routes, 0, commonPrefix.length);
 
             return {
                 name,
                 type: 'group' as const,
-                children
+                children,
+                commonPrefixPath // Store for display stripping
             };
         })
         .sort((a, b) => {
@@ -277,13 +278,35 @@ export function ApiExplorerApp({ spec, asyncSpec, config }: any) {
     );
 }
 
+
 function Sidebar({ spec, hierarchicalGroups }: any) {
+    // Helper to strip common prefix from path for display
+    const stripPrefix = (path: string, prefix: string): string => {
+        if (!prefix || prefix === '/') return path;
+        if (path.startsWith(prefix)) {
+            const stripped = path.substring(prefix.length);
+            return stripped || '/';
+        }
+        return path;
+    };
+
+    // Helper to convert OpenAPI params to original format and highlight them
+    const formatAndHighlightPath = (path: string): string => {
+        // Convert {param} to :param
+        const converted = path.replace(/\{([^}]+)\}/g, ':$1');
+
+        // Highlight :param with color
+        return converted.replace(/:([a-zA-Z0-9_]+)/g, '<span class="param-highlight">:$1</span>');
+    };
+
     // Recursive function to render navigation nodes
-    const renderNavNode = (node: GroupNode, depth: number = 0): any => {
+    const renderNavNode = (node: GroupNode, depth: number = 0, commonPrefix: string = ''): any => {
         if (node.type === 'route') {
             const route = node.routes![0];
             const source = route.op['x-shokupan-source'] || route.op['x-source-info'];
             const isRuntime = route.op['x-source-info']?.isRuntime;
+            const displayPath = stripPrefix(route.path, commonPrefix);
+            const highlightedPath = formatAndHighlightPath(displayPath);
 
             return (
                 <div class="nav-item-wrapper" style={`padding-left: ${depth * 12}px;`}>
@@ -295,7 +318,7 @@ function Sidebar({ spec, hierarchicalGroups }: any) {
                         title={route.path}
                     >
                         <span class={`badge badge-${route.method.toUpperCase()}`}>{route.method.toUpperCase()}</span>
-                        <span class="nav-label">{node.name}</span>
+                        <span class="nav-label" dangerouslySetInnerHTML={{ __html: highlightedPath }}></span>
                         {isRuntime && (
                             <span class="nav-warning" title="Static Analysis Failed">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -332,7 +355,7 @@ function Sidebar({ spec, hierarchicalGroups }: any) {
                         <span>{node.name}</span>
                     </div>
                     <div class="nav-subgroup-items">
-                        {node.children?.map((child: GroupNode) => renderNavNode(child, depth + 1))}
+                        {node.children?.map((child: GroupNode) => renderNavNode(child, depth + 1, commonPrefix))}
                     </div>
                 </div>
             );
@@ -349,7 +372,7 @@ function Sidebar({ spec, hierarchicalGroups }: any) {
             </header>
             <div class="sidebar-collapse-trigger">➔</div>
             <nav class="nav-groups">
-                {hierarchicalGroups.map((group: GroupNode) => (
+                {hierarchicalGroups.map((group: any) => (
                     <div class="nav-group collapsed" key={group.name}>
                         <div class="nav-group-title">
                             <span class="chevron">
@@ -359,7 +382,7 @@ function Sidebar({ spec, hierarchicalGroups }: any) {
                             </span> {group.name}
                         </div>
                         <div class="nav-items">
-                            {group.children?.map((child: GroupNode) => renderNavNode(child, 0))}
+                            {group.children?.map((child: GroupNode) => renderNavNode(child, 0, group.commonPrefixPath || ''))}
                         </div>
                     </div>
                 ))}

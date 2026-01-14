@@ -121,7 +121,6 @@ body {
 .nav-group-title {
     padding: 8px 16px;
     font-size: 0.8rem;
-    text-transform: uppercase;
     color: var(--text-secondary);
     font-weight: 600;
     user-select: none;
@@ -198,6 +197,12 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     flex: 1;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.nav-label .param-highlight {
+    color: #2196f3;
+    font-weight: 600;
 }
 
 /* Nav Item Wrapper (for items with source links) */
@@ -243,7 +248,6 @@ body {
 .nav-subgroup-title {
     padding: 6px 16px 6px 36px;
     font-size: 0.75rem;
-    text-transform: uppercase;
     color: var(--text-secondary);
     font-weight: 600;
     user-select: none;
@@ -442,7 +446,6 @@ body {
 
 .send-btn {
     background: var(--primary);
-    color: #fff;
     border: none;
     border-radius: 6px;
     padding: 0 20px;

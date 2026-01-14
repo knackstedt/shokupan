@@ -297,7 +297,7 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
         // console.warn("OpenAPI AST analysis skipped:", e);
     }
 
-    const collect = (router: ShokupanRouter<T>, prefix = "", currentGroup = defaultTagGroup, defaultTag = defaultTagName, inheritedMiddleware: any[] = []) => {
+    const collect = (router: ShokupanRouter<T>, prefix = "", currentGroup = defaultTagGroup, defaultTag = defaultTagName, inheritedMiddleware: any[] = [], isRootLevel = true) => {
         let group = currentGroup;
         let tag = defaultTag;
 
@@ -307,7 +307,9 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
         }
         else {
             const mountPath = router[$mountPath];
-            if (mountPath && mountPath !== "/") {
+            // Only create a new tag from mountPath if this is a root-level router
+            // Otherwise, inherit the tag from the parent
+            if (isRootLevel && mountPath && mountPath !== "/") {
                 const segments = mountPath.split("/").filter(Boolean);
                 if (segments.length > 0) {
                     const lastSegment = segments[segments.length - 1];
@@ -572,7 +574,8 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
             const cleanPrefix = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
             const cleanMount = mountPath.startsWith("/") ? mountPath : "/" + mountPath;
             const nextPrefix = (cleanPrefix + cleanMount) || "/";
-            collect(child, nextPrefix, group, tag, [...inheritedMiddleware, ...routerMiddleware]);
+            // Pass false for isRootLevel since these are child routers
+            collect(child, nextPrefix, group, tag, [...inheritedMiddleware, ...routerMiddleware], false);
         }
     };
 
