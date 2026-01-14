@@ -1,6 +1,6 @@
 # GitHub Pages Setup
 
-The documentation is configured to automatically deploy to GitHub Pages when you push to the `main` branch.
+The documentation is configured to automatically deploy to GitHub Pages when you push to the `dev` branch.
 
 ## One-Time Setup
 
@@ -15,7 +15,7 @@ The documentation is configured to automatically deploy to GitHub Pages when you
    git add .github/workflows/deploy-docs.yml
    git add docs/
    git commit -m "Add documentation site with GitHub Pages deployment"
-   git push origin main
+   git push origin dev
    ```
 
 3. **First deployment:**
