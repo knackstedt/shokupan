@@ -17,6 +17,7 @@ export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin 
     constructor(private readonly pluginOptions: ApiExplorerOptions = {}) {
         super({ renderer: renderToString });
         pluginOptions.path ??= '/explorer';
+        this.init();
     }
 
     onInit(app: Shokupan, options?: ShokupanPluginOptions) {
