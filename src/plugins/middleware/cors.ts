@@ -44,11 +44,14 @@ export function Cors(options: CorsOptions = {}): Middleware {
     const opts = { ...defaults, ...options };
 
     const corsMiddleware: Middleware = async function CorsMiddleware(ctx: ShokupanContext, next: NextFn) {
-        const headers = new Headers();
+        const headers: Record<string, string> = {};
         const origin = ctx.headers.get("origin");
 
-        const set = (k: string, v: string) => headers.set(k, v);
-        const append = (k: string, v: string) => headers.append(k, v);
+        const set = (k: string, v: string) => headers[k] = v;
+        const append = (k: string, v: string) => {
+            const current = headers[k];
+            headers[k] = current ? current + ',' + v : v;
+        };
 
         // Security: Reject null origin by default (can be used in attacks)
         if (origin === 'null' && opts.origin !== 'null') {
@@ -130,10 +133,10 @@ export function Cors(options: CorsOptions = {}): Middleware {
         const response = await next();
 
         if (response instanceof Response) {
-            const headerEntries = Object.entries(headers);
-            for (let i = 0; i < headerEntries.length; i++) {
-                const [key, value] = headerEntries[i];
-                response.headers.set(key, value);
+            const keys = Object.keys(headers);
+            for (let i = 0; i < keys.length; i++) {
+                const key = keys[i];
+                response.headers.set(key, headers[key]);
             }
         }
 
