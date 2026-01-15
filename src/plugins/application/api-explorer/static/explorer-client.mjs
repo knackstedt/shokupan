@@ -111,7 +111,7 @@ function renderSchema(schema, depth = 0, isResponse = false) {
                         <div class="property-name" style="font-family: monospace; font-weight: 500; color: var(--text-primary);">${key}</div>
                         <span class="property-detail" style="color: var(--text-secondary); font-size: 0.85rem;">
                             <span class="property-detail-value">${propType}</span>
-                            ${isUnknown ? '<span class="unknown-marker" title="Type could not be determined statically" style="color: #ff9800; margin-left: 4px; cursor: help;">⚠️</span>' : ''}
+                            ${isUnknown ? '<span class="unknown-marker" title="Type could not be determined statically" style="color: #ff9800; margin-left: 4px;">⚠️</span>' : ''}
                         </span>
                         ${badgeHtml}
                     </div>

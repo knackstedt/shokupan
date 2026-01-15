@@ -557,7 +557,6 @@ body {
     border-radius: 12px;
     font-size: 0.8rem;
     color: var(--text-secondary);
-    cursor: help;
 }
 
 /* Source Viewer */
@@ -787,3 +786,29 @@ body {
     /* Cyan - Success/Static */
     border-left: 3px solid #06b6d4;
 }
+
+.property-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+}
+
+.property-name {
+    font-family: monospace;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.property-detail {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.property-detail-value {
+    color: #4ec9b0;
+}
+
+.type-any {}
+
+.type-unknown {}
