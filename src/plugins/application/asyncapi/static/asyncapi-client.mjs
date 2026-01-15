@@ -10,8 +10,35 @@ const state = {
     logEntries: [],
     logAutoScroll: true,
     isConsoleMaximized: false,
-    disableSourceView: !!window.DISABLE_SOURCE_VIEW
+    disableSourceView: !!window.DISABLE_SOURCE_VIEW,
+    // Layout State names
+    STORAGE_KEYS: {
+        SIDEBAR_WIDTH: 'asyncapi_sidebar_width',
+        CONSOLE_WIDTH: 'asyncapi_console_width',
+        NAV_COLLAPSED: 'asyncapi_nav_collapsed',
+        CONSOLE_COLLAPSED: 'asyncapi_console_collapsed',
+        CONSOLE_MAXIMIZED: 'asyncapi_console_maximized'
+    }
 };
+
+const STORAGE_PREFIX = 'shokupan:asyncapi:';
+
+function saveState(key, value) {
+    try {
+        localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));
+    } catch (e) {
+        console.warn('Failed to save state', e);
+    }
+}
+
+function getState(key, defaultValue) {
+    try {
+        const item = localStorage.getItem(STORAGE_PREFIX + key);
+        return item ? JSON.parse(item) : defaultValue;
+    } catch (e) {
+        return defaultValue;
+    }
+}
 
 const els = {
     url: document.getElementById('url'),
@@ -42,6 +69,7 @@ const els = {
 };
 
 // Resizers
+// Resizers
 function initResizers() {
     const setup = (id, varName, isLeft) => {
         const el = document.getElementById(id);
@@ -64,6 +92,10 @@ function initResizers() {
                 document.removeEventListener('mouseup', onUp);
                 document.body.style.cursor = '';
                 el.classList.remove('resizing');
+
+                // Save new width
+                const finalW = parseInt(getComputedStyle(root).getPropertyValue(varName), 10);
+                saveState(varName === '--sidebar-width' ? state.STORAGE_KEYS.SIDEBAR_WIDTH : state.STORAGE_KEYS.CONSOLE_WIDTH, finalW);
             };
             document.addEventListener('mousemove', onMove);
             document.addEventListener('mouseup', onUp);
@@ -73,8 +105,10 @@ function initResizers() {
     setup('resizer-right', '--console-width', false);
 }
 
-function toggleConsoleMaximize() {
-    state.isConsoleMaximized = !state.isConsoleMaximized;
+function toggleConsoleMaximize(save = true) {
+    if (save) state.isConsoleMaximized = !state.isConsoleMaximized;
+    // implied else: state already toggled if called from restore
+
     const btn = els.btnMaximizeConsole;
 
     if (state.isConsoleMaximized) {
@@ -89,10 +123,6 @@ function toggleConsoleMaximize() {
         btn.title = "Restore Console";
     } else {
         // Restore
-        els.mainWrapper.style.display = 'block'; // Or flex/whatever logic
-        // Actually main-wrapper was display:flex via style attribute in HTML, 
-        // but let's check if we hid it. display='none' hides it.
-        // We can just set it empty to revert to stylesheet or inline default.
         els.mainWrapper.style.display = '';
         els.resizerRight.style.display = 'block';
         els.consolePanel.style.flex = ''; // Revert to CSS default
@@ -101,6 +131,49 @@ function toggleConsoleMaximize() {
         // Update Icon to Maximize
         btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>`;
         btn.title = "Maximize Console";
+    }
+
+    if (save) {
+        saveState(state.STORAGE_KEYS.CONSOLE_MAXIMIZED, state.isConsoleMaximized);
+    }
+}
+
+function restoreLayout() {
+    const root = document.documentElement;
+
+    // Widths
+    const sidebarW = getState(state.STORAGE_KEYS.SIDEBAR_WIDTH, null);
+    if (sidebarW) root.style.setProperty('--sidebar-width', sidebarW + 'px');
+
+    const consoleW = getState(state.STORAGE_KEYS.CONSOLE_WIDTH, null);
+    if (consoleW) root.style.setProperty('--console-width', consoleW + 'px');
+
+    // Nav State
+    const navCollapsed = getState(state.STORAGE_KEYS.NAV_COLLAPSED, false);
+    if (navCollapsed && els.btnCollapseNav) {
+        els.sidebar.style.display = 'none';
+        els.resizerLeft.style.display = 'none';
+        els.btnExpandNav.style.display = 'flex';
+        // Ensure collapse button is hidden? Stylesheet handles it via display:none on expand usually? 
+        // Based on original logic:
+        // collapse click -> sidebar none, resizer none, expand flex.
+        // expand click -> sidebar flex, resizer block, expand none.
+        // We assume collapse btn is always visible when sidebar is visible.
+    }
+
+    // Console State
+    const consoleCollapsed = getState(state.STORAGE_KEYS.CONSOLE_COLLAPSED, false);
+    if (consoleCollapsed && els.btnCollapseConsole) {
+        els.consolePanel.style.display = 'none';
+        els.resizerRight.style.display = 'none';
+        els.btnExpandConsole.style.display = 'flex';
+    }
+
+    // Maximize State
+    const consoleMaximized = getState(state.STORAGE_KEYS.CONSOLE_MAXIMIZED, false);
+    if (consoleMaximized && els.btnMaximizeConsole && !consoleCollapsed) { // Don't maximize if collapsed?
+        state.isConsoleMaximized = true;
+        toggleConsoleMaximize(false);
     }
 }
 
@@ -165,15 +238,18 @@ require(['vs/editor/editor.main'], function () {
     // Auto-connect if URL is present (or wait for user?)
     // Original script called connect() immediately.
     // Toggles
+
     if (els.btnCollapseNav) els.btnCollapseNav.onclick = () => {
         els.sidebar.style.display = 'none';
         els.resizerLeft.style.display = 'none';
         els.btnExpandNav.style.display = 'flex';
+        saveState(state.STORAGE_KEYS.NAV_COLLAPSED, true);
     };
     if (els.btnExpandNav) els.btnExpandNav.onclick = () => {
         els.sidebar.style.display = 'flex';
         els.resizerLeft.style.display = 'block';
         els.btnExpandNav.style.display = 'none';
+        saveState(state.STORAGE_KEYS.NAV_COLLAPSED, false);
     };
 
     if (els.btnCollapseConsole) els.btnCollapseConsole.onclick = () => {
@@ -183,17 +259,21 @@ require(['vs/editor/editor.main'], function () {
         els.consolePanel.style.display = 'none';
         els.resizerRight.style.display = 'none';
         els.btnExpandConsole.style.display = 'flex';
+        saveState(state.STORAGE_KEYS.CONSOLE_COLLAPSED, true);
     };
     if (els.btnExpandConsole) els.btnExpandConsole.onclick = () => {
         els.consolePanel.style.display = 'flex';
         els.resizerRight.style.display = 'block';
         els.btnExpandConsole.style.display = 'none';
+        saveState(state.STORAGE_KEYS.CONSOLE_COLLAPSED, false);
 
-        // Reset maximize state if it was maximized
+        // Reset maximize state if it was maximized (handled by collapse logic mostly, but good to be safe)
         if (state.isConsoleMaximized) toggleConsoleMaximize();
     };
 
-    if (els.btnMaximizeConsole) els.btnMaximizeConsole.onclick = toggleConsoleMaximize;
+    if (els.btnMaximizeConsole) els.btnMaximizeConsole.onclick = () => toggleConsoleMaximize(true);
+
+    restoreLayout();
 
     connect();
 });
@@ -240,8 +320,8 @@ async function selectEvent(name, el) {
         if (!state.disableSourceView && sourceInfos.length > 0) {
             sourceLinksHtml = sourceInfos.map(s => {
                 const filename = s.file ? s.file.split('/').pop() : 'unknown';
-                return `<a href="vscode://file/${s.file}:${s.line}" style="color: #fbbf24; text-decoration: underline; font-family: monospace; display: block;">
-                            ${filename}:${s.line}
+                return `<a href="vscode://file/${s.file}:${s.line}" style="color: #fbbf24; text-decoration: none; display: block;" class="code-link">
+                            <code style="font-family: 'JetBrains Mono', monospace; background: rgba(251, 191, 36, 0.1); padding: 2px 4px; border-radius: 4px;">${filename}:${s.line}</code>
                         </a>`;
             }).join('');
         }
@@ -267,7 +347,7 @@ async function selectEvent(name, el) {
                 </div>
                 
                 ${!state.disableSourceView && sourceInfos.length > 0 ? `
-                <div class="section-title">Source Context</div>
+                <div class="section-title">Source Code</div>
                 <div id="snippet-container"></div>
                 ` : ''}
             </div>
@@ -291,8 +371,14 @@ async function selectEvent(name, el) {
                 if (code) {
                     const wrapper = document.createElement('div');
                     wrapper.style.marginBottom = '16px';
-                    wrapper.innerHTML = `<div style="font-size: 0.8rem; color: #888; margin-bottom: 4px;">${src.file.split('/').pop()}:${src.line}</div>
-                                          <div id="snippet-editor-${i}" style="height: 300px; border: 1px solid #333; border-radius: 6px; overflow: hidden;"></div>`;
+                    wrapper.innerHTML = `
+                    <a href="vscode://file/${src.file}:${src.line}" class="doc-source-link" title="${src.file}:${src.line}">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px">
+                            <polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline>
+                        </svg>
+                        ${src.file.split('/').pop()}:${src.line}
+                    </a>
+                    <div id="snippet-editor-${i}" style="height: 400px; border: 1px solid #333; border-radius: 6px; overflow: hidden;"></div>`;
                     container.appendChild(wrapper);
 
                     monaco.editor.colorize(code, 'typescript', {}).then(() => {
@@ -300,9 +386,6 @@ async function selectEvent(name, el) {
                         if (!el) return;
 
                         const model = monaco.editor.createModel(code, "typescript");
-
-                        el.style.height = '400px';
-
                         const editor = monaco.editor.create(el, {
                             model: model,
                             readOnly: true,
@@ -342,6 +425,13 @@ async function selectEvent(name, el) {
                     });
                 }
             }
+
+            container.innerHTML += `<button class="btn icon-btn" id="btn-source-fullscreen" title="Toggle Fullscreen">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                </svg>
+            </button>`;
+
         }
         return;
     }
@@ -360,7 +450,7 @@ async function selectEvent(name, el) {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px">
                     <polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline>
                 </svg>
-                ${filename}:${s.line}
+                <code style="font-family: inherit;">${filename}:${s.line}</code>
             </a>`;
         } else {
             sourceLinkHtml = `<div class="doc-source-link" title="Multiple sources">
@@ -455,7 +545,7 @@ async function selectEvent(name, el) {
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px">
                                 <polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline>
                             </svg>
-                            ${fileName.split('/').pop()}:${sources[0].line}
+                            <code style="font-family: inherit;">${fileName.split('/').pop()}:${sources[0].line}</code>
                         </a>
                         <button class="btn-icon" title="Toggle Fullscreen" onclick="toggleFullscreen('source-group-${i}', 'source-editor-${i}')">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -745,4 +835,42 @@ els.sendBtn.onclick = () => {
             log('Client', `${evt}: ${JSON.stringify(body)}`, 'out');
         }
     } catch (e) { log('System', 'Invalid JSON', 'error'); }
+};
+
+/* ================= Fullscreen Toggle ================= */
+window.toggleFullscreen = function (containerId, editorId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const isFullscreen = container.classList.toggle('fullscreen');
+
+    // Find the button to update icon
+    // The button is inside .source-header-actions
+    const btn = container.querySelector('button[title="Toggle Fullscreen"]') || container.querySelector('button[title="Exit Fullscreen"]');
+
+    if (btn) {
+        if (isFullscreen) {
+            btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path></svg>`;
+            btn.title = "Exit Fullscreen";
+        } else {
+            btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path></svg>`;
+            btn.title = "Toggle Fullscreen";
+        }
+    }
+
+    // ESC to exit
+    if (isFullscreen) {
+        const onEsc = (e) => {
+            if (e.key === 'Escape') {
+                window.toggleFullscreen(containerId, editorId);
+            }
+        };
+        container._escHandler = onEsc;
+        document.addEventListener('keydown', onEsc);
+    } else {
+        if (container._escHandler) {
+            document.removeEventListener('keydown', container._escHandler);
+            delete container._escHandler;
+        }
+    }
 };

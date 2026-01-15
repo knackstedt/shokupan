@@ -362,13 +362,9 @@ a {
 .logs-container {
     flex: 1;
     overflow-y: auto;
-    padding: 1rem;
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.8rem;
-    display: block;
-    /* flex-direction: column; gap: 0.5rem; -- removed for virtual scroll stability */
     position: relative;
-    /* For absolute children */
 }
 
 .log-shim {
@@ -562,4 +558,24 @@ a {
 
 .floating-toggle.right {
     right: 10px;
+}
+
+/* Fullscreen Mode */
+.source-group.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    background: var(--bg-primary);
+    padding: 1rem;
+    border: none;
+    border-radius: 0;
+    display: flex !important;
+    /* Force display flex for fullscreen */
+}
+
+.source-group.fullscreen .source-header-actions {
+    margin-bottom: 1rem;
 }
