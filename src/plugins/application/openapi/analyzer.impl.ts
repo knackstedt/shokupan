@@ -37,7 +37,7 @@ export interface RouteInfo {
         file: string;
         startLine: number;
         endLine: number;
-        highlights?: { startLine: number; endLine: number; type: 'emit' | 'return-success' | 'return-warning'; }[];
+        highlights?: { startLine: number; endLine: number; type: 'emit' | 'return-success' | 'return-warning' | 'dynamic-path'; }[];
     };
 }
 
@@ -626,6 +626,52 @@ export class OpenAPIAnalyzer {
     }
 
     /**
+     * Resolve string value from expression (literals, concatenation, templates, constants)
+     */
+    private resolveStringValue(node: ts.Node, sourceFile: ts.SourceFile): string | null {
+        if (ts.isStringLiteral(node)) {
+            return node.text;
+        }
+        if (ts.isNoSubstitutionTemplateLiteral(node)) {
+            return node.text;
+        }
+        if (ts.isTemplateExpression(node)) {
+            let result = node.head.text;
+            for (const span of node.templateSpans) {
+                const val = this.resolveStringValue(span.expression, sourceFile);
+                if (val === null) return null;
+                result += val + span.literal.text;
+            }
+            return result;
+        }
+        if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+            const left = this.resolveStringValue(node.left, sourceFile);
+            const right = this.resolveStringValue(node.right, sourceFile);
+            if (left !== null && right !== null) {
+                return left + right;
+            }
+            return null;
+        }
+        if (ts.isParenthesizedExpression(node)) {
+            return this.resolveStringValue(node.expression, sourceFile);
+        }
+        if (ts.isIdentifier(node)) {
+            if (this.program) {
+                const checker = this.program.getTypeChecker();
+                const symbol = checker.getSymbolAtLocation(node);
+                if (symbol && symbol.valueDeclaration && ts.isVariableDeclaration(symbol.valueDeclaration) && symbol.valueDeclaration.initializer) {
+                    return this.resolveStringValue(symbol.valueDeclaration.initializer, sourceFile);
+                }
+            }
+            // Fallback: Check top-level statements in same file if not using TypeChecker or finding symbol failed
+            // (Only for const/let defined in the same file)
+            // ... Simple scan omitted for now as program.getTypeChecker returns reliable results if program is created correctly.
+        }
+
+        return null;
+    }
+
+    /**
      * Extract route information from a route call (e.g., app.get('/path', handler))
      */
     private extractRouteFromCall(node: ts.CallExpression, sourceFile: ts.SourceFile, method: string): RouteInfo | null {
@@ -634,12 +680,26 @@ export class OpenAPIAnalyzer {
         if (args.length < 2) return null;
 
         const pathArg = args[0];
-        let routePath = '/';
+        let routePath = this.resolveStringValue(pathArg, sourceFile);
 
-        if (ts.isStringLiteral(pathArg)) {
-            routePath = pathArg.text;
-        } else {
-            routePath = '__DYNAMIC_EVENT__';
+        let dynamicHighlights: { startLine: number; endLine: number; type: 'dynamic-path'; }[] = [];
+
+        if (!routePath) {
+            if (['EVENT', 'ON'].includes(method.toUpperCase())) {
+                routePath = '__DYNAMIC_EVENT__';
+            } else {
+                routePath = '__DYNAMIC_ROUTE__';
+            }
+
+            // Capture location of the dynamic expression for highlighting
+            const start = sourceFile.getLineAndCharacterOfPosition(pathArg.getStart());
+            const end = sourceFile.getLineAndCharacterOfPosition(pathArg.getEnd());
+
+            dynamicHighlights.push({
+                startLine: start.line + 1,
+                endLine: end.line + 1,
+                type: 'dynamic-path'
+            });
         }
 
         // Normalize path params: /users/:id -> /users/{id}
@@ -696,7 +756,7 @@ export class OpenAPIAnalyzer {
                 file: sourceFile.fileName,
                 startLine: sourceFile.getLineAndCharacterOfPosition(handlerArg.getStart()).line + 1,
                 endLine: sourceFile.getLineAndCharacterOfPosition(handlerArg.getEnd()).line + 1,
-                highlights: handlerInfo.highlights
+                highlights: [...(handlerInfo.highlights || []), ...dynamicHighlights]
             }
         };
     }

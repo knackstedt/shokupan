@@ -456,6 +456,8 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                 r.path === fullPath
             );
 
+
+
             if (!astMatch) {
                 // Heuristic matching based on source code similarity
                 const runtimeSource = ((route.handler as any).originalHandler || route.handler).toString();

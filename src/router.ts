@@ -887,6 +887,10 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     }
 
     private parsePath(path: string): { regex: RegExp; keys: string[]; } {
+        if (typeof path !== 'string') {
+            throw new Error(`Route path must be a string or regexp, received ${typeof path == "function" ? (path['name'] || path['constructor']?.['name'] || 'function') : typeof path}. Dynamic paths are **highly** discouraged.`);
+        }
+
         const keys: string[] = [];
 
         // Security: Validate path length to prevent ReDoS
@@ -1448,6 +1452,14 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      */
     public generateApiSpec(options: OpenAPIOptions = {}): Promise<any> {
         return generateOpenApi(this, options);
+    }
+
+    public hasHooks(name: keyof ShokupanHooks): boolean {
+        if (!this.hooksInitialized) {
+            this.ensureHooksInitialized();
+        }
+        const hooks = this.hookCache.get(name);
+        return hooks !== undefined && hooks.length > 0;
     }
 
     private ensureHooksInitialized() {

@@ -367,7 +367,16 @@ function renderRequestView(route, container) {
                             </div>
                             
                             ${op.description ? `<div class="markdown-content" style="margin:16px 0;">${parseMarkdown(op.description)}</div>` : ''}
-                            
+
+                            ${op['x-source-info']?.isRuntime ? `
+                            <div class="alert alert-warning" style="margin: 16px 0; padding: 12px; background: rgba(255, 152, 0, 0.1); border-left: 3px solid #ff9800; border-radius: 4px;">
+                                <strong style="color: #ff9800;">⚠️ Warning:</strong> This route's path could not be statically determined.
+                                <div style="margin-top: 4px; font-size: 0.9em; opacity: 0.8;">
+                                    The path depends on runtime variables (e.g., process.env). Static analysis features like type inference may be limited.
+                                </div>
+                            </div>
+                            ` : ''}
+
                             ${op['x-warning'] ? `
                             <div class="alert alert-warning" style="margin: 16px 0; padding: 12px; background: rgba(255, 152, 0, 0.1); border-left: 3px solid #ff9800; border-radius: 4px;">
                                 <strong style="color: #ff9800;">⚠️ Warning:</strong> ${op['x-warning-reason'] || 'This operation could not be fully analyzed statically'}
@@ -809,11 +818,12 @@ function initMonaco() {
                             const endLine = highlights[1] || startLine;
 
                             if (startLine > 0) {
+                                const highlightClass = sourceInfo.isRuntime ? 'closure-highlight-dynamic' : 'closure-highlight';
                                 decorations.push({
                                     range: new monaco.Range(startLine, 1, endLine, 1),
                                     options: {
                                         isWholeLine: true,
-                                        className: 'closure-highlight'
+                                        className: highlightClass
                                     }
                                 });
                                 currentEditors.source.revealLineInCenter(startLine);
@@ -828,6 +838,7 @@ function initMonaco() {
                                     if (h.type === 'emit') className = 'emit-highlight';
                                     else if (h.type === 'return-success') className = 'success-line-highlight';
                                     else if (h.type === 'return-warning') className = 'warning-line-highlight';
+                                    else if (h.type === 'dynamic-path') className = 'closure-highlight-dynamic';
                                     // Fallback for older 'return' type if any mixed
                                     else if (h.type === 'return') className = 'warning-line-highlight';
 
