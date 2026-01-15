@@ -2,6 +2,7 @@
 import type { ShokupanRouter } from '../../../router';
 import { $childRouters, $isApplication, $mountPath, $routes } from '../../../util/symbol';
 import type { AsyncAPIOptions } from '../../../util/types';
+import { getAstRoutes } from '../shared/ast-utils';
 
 /**
  * Regex patterns for detecting emit calls.
@@ -31,42 +32,6 @@ function hasUnknownFields(schema: any): boolean {
  * Gets deduped AST routes if available.
  * Duplicated from openapi.ts to avoid cross-module dependency issues.
  */
-async function getAstRoutes(applications: any[]) {
-    // ... (unchanged)
-    const astRoutes: any[] = [];
-
-    const getExpandedRoutes = (app: any, prefix: string = '', seen = new Set<string>()): any[] => {
-        if (seen.has(app.name)) return [];
-        const newSeen = new Set(seen);
-        newSeen.add(app.name);
-
-        const expanded: any[] = [];
-
-        for (const route of app.routes) {
-            expanded.push({
-                ...route,
-                // For events, path is the event name
-                path: route.path.startsWith('/') ? route.path.slice(1) : route.path
-            });
-        }
-
-        if (app.mounted) {
-            for (const mount of app.mounted) {
-                const targetApp = applications.find(a => a.name === mount.target || a.className === mount.target);
-                if (targetApp) {
-                    expanded.push(...getExpandedRoutes(targetApp, '', newSeen));
-                }
-            }
-        }
-        return expanded;
-    };
-
-    applications.forEach(app => {
-        astRoutes.push(...getExpandedRoutes(app));
-    });
-
-    return astRoutes;
-}
 
 export async function generateAsyncApi<T extends Record<string, any>>(rootRouter: ShokupanRouter<T>, options: AsyncAPIOptions = {}): Promise<any> {
     const channels: Record<string, any> = {};
@@ -81,7 +46,10 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
         const analyzer = new OpenAPIAnalyzer(process.cwd(), entrypoint);
         const analysisResult = await analyzer.analyze();
         applications = analysisResult.applications;
-        astRoutes = await getAstRoutes(applications);
+        astRoutes = await getAstRoutes(applications, {
+            includePrefix: false,
+            pathTransform: (p) => p.startsWith('/') ? p.slice(1) : p
+        });
 
         // Build middleware registry from AST-analyzed applications
         let middlewareId = 0;
@@ -175,23 +143,55 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                         highlightLines: astMatch?.sourceContext ? [astMatch.sourceContext.startLine, astMatch.sourceContext.endLine] : undefined
                     } : undefined;
 
-                    if (!channels[eventName]) {
-                        channels[eventName] = {
-                            publish: {
-                                operationId: `on${eventName.charAt(0).toUpperCase() + eventName.slice(1)}`,
-                                tags,
-                                message: {
-                                    payload: { type: 'object' },
-                                    ...(userSpec?.message ? userSpec.message : {})
-                                },
-                                ...(userSpec?.type === 'publish' ? userSpec : {}),
-                                "x-source-info": sourceInfo ? [sourceInfo] : [],
-                                "x-shokupan-source": sourceInfo // Simplified
+                    const message = {
+                        ...(userSpec?.message || {})
+                    };
+                    let inferenceFailed = false;
+
+                    if (!message.payload) {
+                        if (astMatch) {
+                            if (astMatch.requestTypes?.body) {
+                                message.payload = astMatch.requestTypes.body;
+                                // Check if generic object
+                                if (message.payload.type === 'object' &&
+                                    !message.payload.properties &&
+                                    !message.payload.additionalProperties &&
+                                    Object.keys(message.payload).length === 1) {
+                                    inferenceFailed = true;
+                                }
+                            } else {
+                                // Valid AST match but no body usage -> Payload is unused
                             }
+                        } else {
+                            // Default to object if no AST and no user spec
+                            message.payload = { type: 'object' };
+                            inferenceFailed = true;
+                        }
+                    }
+
+                    if (!channels[eventName]) {
+                        const publishOp = {
+                            operationId: `on${eventName.charAt(0).toUpperCase() + eventName.slice(1)}`,
+                            tags,
+                            message,
+                            ...(userSpec?.type === 'publish' ? userSpec : {}),
+                            "x-source-info": sourceInfo ? [sourceInfo] : [],
+                            "x-shokupan-source": sourceInfo // Simplified
                         };
 
-                        if (userSpec?.summary) channels[eventName].publish.summary = userSpec.summary;
-                        if (userSpec?.description) channels[eventName].publish.description = userSpec.description;
+                        if (inferenceFailed) {
+                            (publishOp as any)['x-warning'] = true;
+                            if (!publishOp.summary) publishOp.summary = "Payload Inference Failed";
+                            if (!publishOp.description) publishOp.description = "The payload format could not be statically inferred from the source code. Please add a type assertion or @Spec decorator.";
+                        }
+
+                        // Apply user-defined summary/description if not already set by inferenceFailed warning
+                        if (userSpec?.summary && !publishOp.summary) publishOp.summary = userSpec.summary;
+                        if (userSpec?.description && !publishOp.description) publishOp.description = userSpec.description;
+
+                        channels[eventName] = {
+                            publish: publishOp
+                        };
                     } else {
                         // Accumulate source info from additional handlers
                         if (sourceInfo) {

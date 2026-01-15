@@ -1,11 +1,11 @@
 export const $isApplication = Symbol.for("Shokupan.app");
 export const $appRoot = Symbol.for("Shokupan.app-root");
-export const $isMounted = Symbol("Shokupan.isMounted");
-export const $routeMethods = Symbol("Shokupan.routeMethods");
-export const $eventMethods = Symbol("Shokupan.eventMethods");
-export const $routeArgs = Symbol("Shokupan.routeArgs");
-export const $controllerPath = Symbol("Shokupan.controllerPath");
-export const $middleware = Symbol("Shokupan.middleware");
+export const $isMounted = Symbol.for("Shokupan.isMounted");
+export const $routeMethods = Symbol.for("Shokupan.routeMethods");
+export const $eventMethods = Symbol.for("Shokupan.eventMethods");
+export const $routeArgs = Symbol.for("Shokupan.routeArgs");
+export const $controllerPath = Symbol.for("Shokupan.controllerPath");
+export const $middleware = Symbol.for("Shokupan.middleware");
 export const $isRouter = Symbol.for("Shokupan.router");
 export const $parent = Symbol.for("Shokupan.parent");
 export const $childRouters = Symbol.for("Shokupan.child-routers");

@@ -477,7 +477,7 @@ async function selectEvent(name, el) {
             ${desc ? `<p style="line-height: 1.6; margin-bottom: 2rem;">${desc}</p>` : ''}
             
             <div class="section-title">Payload Schema</div>
-            ${payload ? renderSchemaToDOM(payload) : '<div class="empty-state-text" style="color:var(--text-muted); font-style:italic;">No payload definition.</div>'}
+            ${payload ? renderSchemaToDOM(payload) : '<div class="empty-state-text" style="color:var(--text-muted); font-style:italic;">Payload Unused</div>'}
             
             ${!state.disableSourceView && sourceInfos.length > 0 ? `
             <div class="section-title" style="margin-top: 24px;">Source Code</div>

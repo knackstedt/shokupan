@@ -36,6 +36,7 @@ export interface HandlerStackItem {
     name: string;
     file: string;
     line: number;
+    isBuiltin?: boolean;
     stateChanges?: Record<string, any>;
     startTime?: number;
     duration?: number;
@@ -487,7 +488,7 @@ export class ShokupanContext<
         }
 
         // Return cached body if already parsed
-        if (this[$bodyParsed] !== undefined) {
+        if (this[$bodyParsed] === true) {
             return this[$cachedBody] as T;
         }
 

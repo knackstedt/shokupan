@@ -1,7 +1,8 @@
 import type { ShokupanRouter } from '../../../router';
 import { deepMerge } from '../../../util/deep-merge';
-import { $childControllers, $childRouters, $mountPath, $routes } from '../../../util/symbol';
+import { $childControllers, $childRouters, $mountPath, $parent, $routes } from '../../../util/symbol';
 import type { OpenAPIOptions, ShokupanHandler } from '../../../util/types';
+import { getAstRoutes } from '../shared/ast-utils';
 
 /**
  * Regex patterns for analyzing handler source code to infer types.
@@ -182,94 +183,6 @@ function analyzeHandler(handler: ShokupanHandler): { inferredSpec?: any; } {
 /**
  * Gets deduped AST routes if available.
  */
-async function getAstRoutes(applications: any[]) {
-    const astRoutes: any[] = [];
-    const expandedApps = new Map<string, any[]>();
-
-    const getExpandedRoutes = (app: any, prefix: string = '', seen = new Set<string>(), sourceOverride?: any): any[] => {
-        if (seen.has(app.name)) return [];
-        const newSeen = new Set(seen);
-        newSeen.add(app.name);
-
-        const expanded: any[] = [];
-
-        let currentPrefix = prefix;
-        if (app.controllerPrefix) {
-            const cleanPrefix = currentPrefix.endsWith('/') ? currentPrefix.slice(0, -1) : currentPrefix;
-            const cleanCont = app.controllerPrefix.startsWith('/') ? app.controllerPrefix : '/' + app.controllerPrefix;
-            currentPrefix = cleanPrefix + cleanCont;
-        }
-
-        for (const route of app.routes) {
-            const cleanPrefix = currentPrefix.endsWith('/') ? currentPrefix.slice(0, -1) : currentPrefix;
-            const cleanPath = route.path.startsWith('/') ? route.path : '/' + route.path;
-            let joined = cleanPrefix + cleanPath;
-            if (joined.length > 1 && joined.endsWith('/')) {
-                joined = joined.slice(0, -1);
-            }
-
-            const expandedRoute = {
-                ...route,
-                path: joined || '/'
-            };
-
-            if (sourceOverride) {
-                expandedRoute.sourceContext = sourceOverride;
-            }
-
-            expanded.push(expandedRoute);
-        }
-
-        if (app.mounted) {
-            for (const mount of app.mounted) {
-                const targetApp = applications.find(a => a.name === mount.target || a.className === mount.target);
-                if (targetApp) {
-                    const cleanPrefix = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
-                    const mountPrefix = mount.prefix.startsWith('/') ? mount.prefix : '/' + mount.prefix;
-
-                    // Check for builtin/external dependency to override source
-                    let nextSourceOverride = sourceOverride;
-                    if (mount.dependency || (mount.targetFilePath && mount.targetFilePath.includes('node_modules'))) {
-                        if (mount.sourceContext) {
-                            nextSourceOverride = {
-                                ...mount.sourceContext,
-                                // Add highlight for the mount line to make it clear
-                                highlightLines: [mount.sourceContext.startLine, mount.sourceContext.endLine],
-                                highlights: [{
-                                    startLine: mount.sourceContext.startLine,
-                                    endLine: mount.sourceContext.endLine,
-                                    type: 'return-success' // Use the success color (cyan) for the mount point
-                                }]
-                            };
-                        }
-                    }
-
-                    expanded.push(...getExpandedRoutes(targetApp, cleanPrefix + mountPrefix, newSeen, nextSourceOverride));
-                }
-            }
-        }
-        return expanded;
-    };
-
-    applications.forEach(app => {
-        astRoutes.push(...getExpandedRoutes(app));
-    });
-
-    const dedupedRoutes = new Map<string, { route: any, score: number; }>();
-
-    for (const route of astRoutes) {
-        const key = `${route.method.toUpperCase()}:${route.path}`;
-        let score = 0;
-        if (route.responseSchema) score += 10;
-        if (route.handlerSource) score += 5;
-
-        if (!dedupedRoutes.has(key) || score > dedupedRoutes.get(key)!.score) {
-            dedupedRoutes.set(key, { route, score });
-        }
-    }
-
-    return Array.from(dedupedRoutes.values()).map(v => v.route);
-}
 
 /**
  * Statically generate an OpenAPI spec from a ShokupanRouter instance.
@@ -334,9 +247,10 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
         }
         else {
             const mountPath = router[$mountPath];
-            // Only create a new tag from mountPath if this is a root-level router
+            // Only create a new tag from mountPath if this is a root-level router (or direct child of root)
             // Otherwise, inherit the tag from the parent
-            if (isRootLevel && mountPath && mountPath !== "/") {
+            const isDirectChild = (router as any)[$parent] === rootRouter;
+            if ((isRootLevel || isDirectChild) && mountPath && mountPath !== "/") {
                 const segments = mountPath.split("/").filter(Boolean);
                 if (segments.length > 0) {
                     const lastSegment = segments[segments.length - 1];
@@ -681,6 +595,46 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
     }
 
 
+    // Add virtual middleware paths (if middleware tracking is active)
+    if (!options.compliant) {
+        for (const [id, mw] of Object.entries(astMiddlewareRegistry || {}) as any[]) {
+            const virtualPath = `/_middleware/${id}`;
+            paths[virtualPath] = {
+                get: {
+                    tags: ['System', 'Middleware'],
+                    summary: `Middleware: ${mw.name}`,
+                    description: `Virtual endpoint for middleware analysis.
+**File**: ${mw.file}
+**Line**: ${mw.startLine}`,
+                    operationId: `getMiddleware_${id}`,
+                    parameters: [],
+                    responses: {
+                        '200': {
+                            description: "Middleware Analysis",
+                            content: {
+                                'application/json': {
+                                    schema: { type: 'object' }
+                                }
+                            }
+                        }
+                    },
+                    'x-middleware-metadata': mw,
+                    'x-virtual': true,
+                    'x-middleware-detail': true,
+                    'x-source-info': {
+                        file: mw.file,
+                        line: mw.startLine,
+                        code: mw.snippet
+                    },
+                    "x-shokupan-source": {
+                        file: mw.file,
+                        line: mw.startLine,
+                        code: mw.snippet
+                    }
+                }
+            };
+        }
+    }
 
     const spec: any = {
         openapi: "3.1.0",

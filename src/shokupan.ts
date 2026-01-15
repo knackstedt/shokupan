@@ -15,6 +15,7 @@ import { ShokupanRouter } from './router';
 import { SystemCpuMonitor } from "./util/cpu-monitor";
 import { SurrealDatastore } from './util/datastore';
 import "./util/instrumentation";
+import { MiddlewareTracker } from './util/middleware-tracker';
 import { ShokupanRequest } from './util/request';
 import { getCallerInfo } from './util/stack';
 
@@ -156,56 +157,26 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     /**
      * Adds middleware to the application.
      */
+    /**
+     * Adds middleware to the application.
+     */
     public override use(middleware: Middleware) {
 
         // --- Middleware Tracking Logic ---
         const { file, line } = getCallerInfo();
 
-        // Store metadata on the original middleware function if possible
-        if (!(middleware as any).metadata) {
-            (middleware as any).metadata = {
-                file,
-                line,
-                name: middleware.name || 'middleware',
-                isBuiltin: (middleware as any).isBuiltin,
-                pluginName: (middleware as any).pluginName
-            };
-        }
+        const wrapped = MiddlewareTracker.wrap(middleware, {
+            file,
+            line,
+            name: middleware.name || 'middleware',
+            isBuiltin: (middleware as any).isBuiltin,
+            pluginName: (middleware as any).pluginName
+        });
 
         if (this.applicationConfig.enableMiddlewareTracking) {
-            // Wrap with tracking
-            // Create wrapper but preserve metadata for registry
-            const trackedMiddleware = async (ctx, next) => {
-                // Cast to any to access handlerStack if types are strict, but ShokupanContext should have it.
-                const c = ctx as any;
-                if (c.handlerStack && c.app?.applicationConfig.enableMiddlewareTracking) {
-                    const metadata = (middleware as any).metadata || {};
-                    const start = performance.now();
-                    const item = {
-                        name: metadata.pluginName ? `${metadata.pluginName} (${metadata.name})` : metadata.name || middleware.name || 'middleware',
-                        file: metadata.file || file,
-                        line: metadata.line || line,
-                        isBuiltin: metadata.isBuiltin,
-                        startTime: start,
-                        duration: -1
-                    };
-                    c.handlerStack.push(item);
-
-                    try {
-                        return await middleware(ctx, next);
-                    } finally {
-                        item.duration = performance.now() - start;
-                    }
-                }
-                return middleware(ctx, next);
-            };
-            trackedMiddleware.metadata = middleware.metadata;
-            Object.defineProperty(trackedMiddleware, 'name', { value: middleware.name || 'middleware' });
-
-            trackedMiddleware.order = this.middleware.length;
-            this.middleware.push(trackedMiddleware);
+            (wrapped as any).order = this.middleware.length;
+            this.middleware.push(wrapped);
         } else {
-            // Direct push without wrapper
             this.middleware.push(middleware);
         }
 
@@ -464,6 +435,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                                     {},
                                     this,
                                     null,
+                                    self.applicationConfig.enableMiddlewareTracking,
                                     payload.id
                                 );
                                 // Expose socket on context for reply
@@ -583,11 +555,17 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         }
 
         // Create Request to pass to fetch
+        const reqBody = options.body && typeof options.body === "object" ? JSON.stringify(options.body) : options.body;
+        const reqHeaders = new Headers(options.headers as any);
+        if (typeof options.body === "object" && !reqHeaders.has("content-type")) {
+            reqHeaders.set("content-type", "application/json");
+        }
+
         const req = new ShokupanRequest({
             method: (options.method || "GET") as Method,
             url,
-            headers: options.headers as any,
-            body: options.body && typeof options.body === "object" ? JSON.stringify(options.body) : options.body
+            headers: reqHeaders,
+            body: reqBody
         }) as unknown as ShokupanRequest<T>;
 
         const res = await this.fetch(req as unknown as Request);
@@ -778,7 +756,13 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 if (span) span.setStatus({ code: 2 }); // Error
 
                 // Extract status from error object (supports both .status and .statusCode)
-                const status = getErrorStatus(err);
+                let status = getErrorStatus(err);
+
+                // Handle JSON Parse errors specifically
+                if (err instanceof SyntaxError && err.message.includes('JSON')) {
+                    status = 400;
+                }
+
                 const body: any = { error: err.message || "Internal Server Error" };
                 if (err.errors) body.errors = err.errors;
 
