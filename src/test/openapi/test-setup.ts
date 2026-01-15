@@ -186,6 +186,12 @@ async function generateSharedSpec() {
     });
     app.mount('/inference/mount/api', inferenceApiRouter);
 
+    // Built-in Type Tests
+    app.get('/large-json', ctx => ctx.json(performance));
+    app.get('/large-json2', ctx => ctx.json(process.env));
+    app.get('/json3', ctx => ctx.json({ message: process.env['FOO'] || 'bar' }));
+    app.get('/json4', ctx => ctx.json({ message: process.env['FOO'] || 'bar' }));
+
 
     // --- Generation Tests ---
 
