@@ -91,6 +91,29 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     public [$childRouters]: ShokupanRouter<T>[] = [];
     public [$childControllers]: ShokupanController[] = [];
 
+    private _hasOnResponseEndHook: boolean;
+    private _hasOnRequestStartHook: boolean;
+    private _hasOnRequestEndHook: boolean;
+    private _hasOnResponseStartHook: boolean;
+    private _hasOnErrorHook: boolean;
+    private _hasOnRequestTimeoutHook: boolean;
+    private _hasOnReadTimeoutHook: boolean;
+    private _hasOnWriteTimeoutHook: boolean;
+    private _hasBeforeValidateHook: boolean;
+    private _hasAfterValidateHook: boolean;
+    get hasOnResponseEndHook() { return this._hasOnResponseEndHook; };
+    get hasOnRequestStartHook() { return this._hasOnRequestStartHook; };
+    get hasOnRequestEndHook() { return this._hasOnRequestEndHook; };
+    get hasOnResponseStartHook() { return this._hasOnResponseStartHook; };
+    get hasOnErrorHook() { return this._hasOnErrorHook; };
+    get hasOnRequestTimeoutHook() { return this._hasOnRequestTimeoutHook; };
+    get hasOnReadTimeoutHook() { return this._hasOnReadTimeoutHook; };
+    get hasOnWriteTimeoutHook() { return this._hasOnWriteTimeoutHook; };
+    get hasBeforeValidateHook() { return this._hasBeforeValidateHook; };
+    get hasAfterValidateHook() { return this._hasAfterValidateHook; };
+
+    public requestTimeout?: number;
+
     public get db(): SurrealDatastore | undefined {
         return this.root?.db;
     }
@@ -597,7 +620,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             // 1. Check for Decorator Metadata
             let methodSource: { file: string, line: number; } | undefined;
 
-            if (decoratedRoutes && decoratedRoutes.has(name)) {
+            if (decoratedRoutes?.has(name)) {
                 const config = decoratedRoutes.get(name);
                 method = config.method;
                 subPath = config.path;
@@ -915,10 +938,6 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             keys
         };
     }
-
-    // --- Functional Routing ---
-
-    public requestTimeout?: number;
 
     /**
      * Adds a route to the router.
@@ -1485,6 +1504,19 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                     if (h[type]) fns.push(h[type]!);
                 }
                 if (fns.length > 0) {
+
+                    // Set the has hooks flags for much faster check
+                    this._hasOnErrorHook ||= type === 'onError';
+                    this._hasOnRequestStartHook ||= type === 'onRequestStart';
+                    this._hasOnRequestEndHook ||= type === 'onRequestEnd';
+                    this._hasOnResponseStartHook ||= type === 'onResponseStart';
+                    this._hasOnResponseEndHook ||= type === 'onResponseEnd';
+                    this._hasOnRequestTimeoutHook ||= type === 'onRequestTimeout';
+                    this._hasOnReadTimeoutHook ||= type === 'onReadTimeout';
+                    this._hasOnWriteTimeoutHook ||= type === 'onWriteTimeout';
+                    this._hasBeforeValidateHook ||= type === 'beforeValidate';
+                    this._hasAfterValidateHook ||= type === 'afterValidate';
+
                     this.hookCache.set(type, fns);
                 }
             }
