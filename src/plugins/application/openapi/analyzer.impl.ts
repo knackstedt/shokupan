@@ -623,6 +623,8 @@ export class OpenAPIAnalyzer {
         emits?: { event: string; payload?: any; location?: { startLine: number; endLine: number; }; }[];
         highlights?: { startLine: number; endLine: number; type: 'emit' | 'return-success' | 'return-warning'; }[];
     } {
+        // Get TypeChecker for type resolution
+        const typeChecker = this.program?.getTypeChecker();
         const requestTypes: RouteInfo['requestTypes'] = {};
         let responseType: string | undefined;
         let responseSchemas: any[] = []; // Track multiple schemas from different code paths
@@ -675,7 +677,7 @@ export class OpenAPIAnalyzer {
                 if (callObj === 'ctx' || callObj.endsWith('.ctx')) {
                     if (callProp === 'json') {
                         if (node.arguments.length > 0) {
-                            const schema = this.convertExpressionToSchema(node.arguments[0], sourceFile, scope);
+                            const schema = this.convertExpressionToSchema(node.arguments[0], sourceFile, scope, typeChecker);
                             responseSchemas.push(schema);
                             responseType = 'object';
                         }
@@ -696,7 +698,7 @@ export class OpenAPIAnalyzer {
             // Only use this if we haven't found a better schema yet, or if it looks specific
             // And if we don't have an explicit return type
             if (!hasExplicitReturnType && responseSchemas.length === 0) {
-                const schema = this.convertExpressionToSchema(node, sourceFile, scope);
+                const schema = this.convertExpressionToSchema(node, sourceFile, scope, typeChecker);
                 if (schema && (schema.type !== 'object' || Object.keys(schema.properties || {}).length > 0)) {
                     responseSchemas.push(schema);
                     responseType = schema.type;
@@ -742,18 +744,18 @@ export class OpenAPIAnalyzer {
                                         scope.set(varName, schema);
                                     }
                                 } else {
-                                    const schema = this.convertExpressionToSchema(initializer, sourceFile, scope);
+                                    const schema = this.convertExpressionToSchema(initializer, sourceFile, scope, typeChecker);
                                     scope.set(varName, schema);
                                 }
                             } else {
-                                const schema = this.convertExpressionToSchema(initializer, sourceFile, scope);
+                                const schema = this.convertExpressionToSchema(initializer, sourceFile, scope, typeChecker);
                                 scope.set(varName, schema);
                             }
                         }
                         // Handle array destructuring: const [a, b] = ...
                         else if (ts.isArrayBindingPattern(node.name)) {
                             // Get the initializer schema
-                            const initializerSchema = this.convertExpressionToSchema(node.initializer, sourceFile, scope);
+                            const initializerSchema = this.convertExpressionToSchema(node.initializer, sourceFile, scope, typeChecker);
 
                             // If the initializer is an array, try to infer element types
                             if (initializerSchema?.type === 'array' && initializerSchema.items) {
@@ -778,7 +780,7 @@ export class OpenAPIAnalyzer {
                         }
                         // Handle object destructuring: const { a, b } = ...
                         else if (ts.isObjectBindingPattern(node.name)) {
-                            const initializerSchema = this.convertExpressionToSchema(node.initializer, sourceFile, scope);
+                            const initializerSchema = this.convertExpressionToSchema(node.initializer, sourceFile, scope, typeChecker);
 
                             // If the initializer is an object with properties, extract the types
                             if (initializerSchema?.type === 'object' && initializerSchema.properties) {
@@ -836,7 +838,7 @@ export class OpenAPIAnalyzer {
                             // Check if we can extract a schema for the argument
                             let isStatic = false;
                             if (node.arguments.length > 0) {
-                                const schema = this.convertExpressionToSchema(node.arguments[0], sourceFile, scope);
+                                const schema = this.convertExpressionToSchema(node.arguments[0], sourceFile, scope, typeChecker);
                                 // If schema is not just a bare object or any, it's static
                                 if (schema && (schema.type !== 'object' || (schema.properties && Object.keys(schema.properties).length > 0))) {
                                     isStatic = true;
@@ -927,7 +929,7 @@ export class OpenAPIAnalyzer {
                                         let payload = { type: 'object' };
 
                                         if (expr.arguments.length >= 2) {
-                                            payload = this.convertExpressionToSchema(expr.arguments[1], sourceFile, scope);
+                                            payload = this.convertExpressionToSchema(expr.arguments[1], sourceFile, scope, typeChecker);
                                         }
 
                                         const emitLoc = {
@@ -994,7 +996,7 @@ export class OpenAPIAnalyzer {
     /**
      * Convert an Expression node to an OpenAPI schema (best effort)
      */
-    private convertExpressionToSchema(node: ts.Expression, sourceFile: ts.SourceFile, scope: Map<string, any>): any {
+    private convertExpressionToSchema(node: ts.Expression, sourceFile: ts.SourceFile, scope: Map<string, any>, typeChecker?: ts.TypeChecker): any {
         // Object Literal: { a: 1, b: "text" }
         if (ts.isObjectLiteralExpression(node)) {
             const schema: any = {
@@ -1007,7 +1009,7 @@ export class OpenAPIAnalyzer {
                 const prop = node.properties[i];
                 if (ts.isPropertyAssignment(prop)) {
                     const name = prop.name.getText(sourceFile);
-                    const valueSchema = this.convertExpressionToSchema(prop.initializer, sourceFile, scope);
+                    const valueSchema = this.convertExpressionToSchema(prop.initializer, sourceFile, scope, typeChecker);
 
                     schema.properties[name] = valueSchema;
                     schema.required.push(name); // Properties in literal return are required
@@ -1031,7 +1033,7 @@ export class OpenAPIAnalyzer {
             const schema: any = { type: 'array' };
             if (node.elements.length > 0) {
                 // Infer item type from first element
-                schema.items = this.convertExpressionToSchema(node.elements[0], sourceFile, scope);
+                schema.items = this.convertExpressionToSchema(node.elements[0], sourceFile, scope, typeChecker);
             } else {
                 schema.items = {};
             }
@@ -1040,7 +1042,7 @@ export class OpenAPIAnalyzer {
 
         // Conditional (Ternary) Expression: cond ? trueVal : falseVal
         if (ts.isConditionalExpression(node)) {
-            const trueSchema = this.convertExpressionToSchema(node.whenTrue, sourceFile, scope);
+            const trueSchema = this.convertExpressionToSchema(node.whenTrue, sourceFile, scope, typeChecker);
             // const falseSchema = this.convertExpressionToSchema(node.whenFalse, sourceFile, scope);
 
             // Simplified: return true branch schema. Ideally we'd do oneOf
@@ -1055,7 +1057,7 @@ export class OpenAPIAnalyzer {
         // Await Expression: await somePromise
         if (ts.isAwaitExpression(node)) {
             // Unwrap the await and analyze the underlying expression
-            return this.convertExpressionToSchema(node.expression, sourceFile, scope);
+            return this.convertExpressionToSchema(node.expression, sourceFile, scope, typeChecker);
         }
 
         // Call Expression: Date.now(), Math.random(), etc.
@@ -1108,8 +1110,8 @@ export class OpenAPIAnalyzer {
 
                 // Special case: + with strings is concatenation
                 if (operator === ts.SyntaxKind.PlusToken) {
-                    const leftSchema = this.convertExpressionToSchema(node.left, sourceFile, scope);
-                    const rightSchema = this.convertExpressionToSchema(node.right, sourceFile, scope);
+                    const leftSchema = this.convertExpressionToSchema(node.left, sourceFile, scope, typeChecker);
+                    const rightSchema = this.convertExpressionToSchema(node.right, sourceFile, scope, typeChecker);
 
                     // If either operand is a string, result is string
                     if (leftSchema.type === 'string' || rightSchema.type === 'string') {
@@ -1135,8 +1137,13 @@ export class OpenAPIAnalyzer {
             // Logical operators - infer from operands
             if (operator === ts.SyntaxKind.AmpersandAmpersandToken ||
                 operator === ts.SyntaxKind.BarBarToken) {
-                const leftSchema = this.convertExpressionToSchema(node.left, sourceFile, scope);
-                const rightSchema = this.convertExpressionToSchema(node.right, sourceFile, scope);
+                const leftSchema = this.convertExpressionToSchema(node.left, sourceFile, scope, typeChecker);
+                const rightSchema = this.convertExpressionToSchema(node.right, sourceFile, scope, typeChecker);
+
+                // For ||, if right is a string literal (common fallback pattern), result is string
+                if (operator === ts.SyntaxKind.BarBarToken && rightSchema.type === 'string') {
+                    return { type: 'string' };
+                }
 
                 // Return the non-boolean schema if available, otherwise boolean
                 if (leftSchema.type && leftSchema.type !== 'boolean') {
@@ -1159,11 +1166,40 @@ export class OpenAPIAnalyzer {
             }
         }
 
+        // PropertyAccessExpression (e.g., process.env, performance.now)
+        if (ts.isPropertyAccessExpression(node) && typeChecker) {
+            try {
+                const type = typeChecker.getTypeAtLocation(node);
+                const schema = this.convertTypeToSchema(type, typeChecker);
+                // Only return if we got a meaningful schema
+                if (schema && (schema.type !== 'object' || schema.properties)) {
+                    return schema;
+                }
+            } catch (e) {
+                // Type resolution failed, fall through to default handling
+            }
+        }
+
         // Identifier (Variable reference)
         if (ts.isIdentifier(node)) {
             const name = node.getText(sourceFile);
             const scopedSchema = scope.get(name);
             if (scopedSchema) return scopedSchema;
+
+            // Try to resolve type using TypeChecker for built-ins and globals
+            if (typeChecker) {
+                try {
+                    const type = typeChecker.getTypeAtLocation(node);
+                    const schema = this.convertTypeToSchema(type, typeChecker);
+                    // Only return if we got a meaningful schema
+                    if (schema && (schema.type !== 'object' || schema.properties)) {
+                        return schema;
+                    }
+                } catch (e) {
+                    // Type resolution failed, fall through to unknown
+                }
+            }
+
             return { type: 'object', 'x-unknown': true }; // Unknown reference
         }
 
@@ -1309,6 +1345,115 @@ export class OpenAPIAnalyzer {
             default:
                 return { type: 'object' };
         }
+    }
+
+    /**
+     * Convert a TypeScript Type (from type checker) to an OpenAPI schema
+     */
+    private convertTypeToSchema(type: ts.Type, typeChecker: ts.TypeChecker, depth: number = 0): any {
+        // Prevent infinite recursion on circular types
+        if (depth > 5) {
+            return { type: 'object', description: 'Complex type (max depth reached)' };
+        }
+
+        // Handle primitive types
+        if (type.flags & ts.TypeFlags.String) return { type: 'string' };
+        if (type.flags & ts.TypeFlags.Number) return { type: 'number' };
+        if (type.flags & ts.TypeFlags.Boolean) return { type: 'boolean' };
+        if (type.flags & ts.TypeFlags.Null) return { type: 'null' };
+        if (type.flags & ts.TypeFlags.Undefined) return { type: 'object', nullable: true };
+        if (type.flags & ts.TypeFlags.Any || type.flags & ts.TypeFlags.Unknown) return {};
+
+        // Handle literal types
+        if (type.flags & ts.TypeFlags.StringLiteral) {
+            const literalType = type as ts.StringLiteralType;
+            return { type: 'string', enum: [literalType.value] };
+        }
+        if (type.flags & ts.TypeFlags.NumberLiteral) {
+            const literalType = type as ts.NumberLiteralType;
+            return { type: 'number', enum: [literalType.value] };
+        }
+        if (type.flags & ts.TypeFlags.BooleanLiteral) {
+            // TypeScript represents true/false as separate types
+            const intrinsicName = (type as any).intrinsicName;
+            return { type: 'boolean', enum: [intrinsicName === 'true'] };
+        }
+
+        // Handle union types
+        if (type.flags & ts.TypeFlags.Union) {
+            const unionType = type as ts.UnionType;
+            const schemas = unionType.types.map(t => this.convertTypeToSchema(t, typeChecker, depth + 1));
+
+            // If all schemas are the same primitive type, just use one
+            const uniqueTypes = new Set(schemas.map(s => s.type));
+            if (uniqueTypes.size === 1 && schemas[0].type !== 'object') {
+                return schemas[0];
+            }
+
+            return { oneOf: schemas };
+        }
+
+        // Handle array types
+        if (typeChecker.isArrayType(type)) {
+            const typeArgs = (type as any).typeArguments || (type as any).resolvedTypeArguments;
+            if (typeArgs && typeArgs.length > 0) {
+                return {
+                    type: 'array',
+                    items: this.convertTypeToSchema(typeArgs[0], typeChecker, depth + 1)
+                };
+            }
+            return { type: 'array', items: {} };
+        }
+
+        // Handle object types
+        if (type.flags & ts.TypeFlags.Object) {
+            const properties: Record<string, any> = {};
+            const required: string[] = [];
+
+            // Get properties from the type
+            const props = typeChecker.getPropertiesOfType(type);
+
+            // Limit number of properties to prevent huge schemas
+            const maxProps = 50;
+            const propsToProcess = props.slice(0, maxProps);
+
+            for (const prop of propsToProcess) {
+                const propName = prop.getName();
+                const propType = typeChecker.getTypeOfSymbol(prop);
+
+                // Skip function properties to keep schema clean
+                const signatures = propType.getCallSignatures();
+                if (signatures && signatures.length > 0) {
+                    continue;
+                }
+
+                properties[propName] = this.convertTypeToSchema(propType, typeChecker, depth + 1);
+
+                // Check if property is optional
+                if (!(prop.flags & ts.SymbolFlags.Optional)) {
+                    required.push(propName);
+                }
+            }
+
+            const schema: any = { type: 'object' };
+
+            if (Object.keys(properties).length > 0) {
+                schema.properties = properties;
+                if (required.length > 0) {
+                    schema.required = required;
+                }
+            }
+
+            // Add note if we truncated properties
+            if (props.length > maxProps) {
+                schema.description = `Type with ${props.length} properties (showing ${maxProps})`;
+            }
+
+            return schema;
+        }
+
+        // Fallback for unhandled types
+        return { type: 'object', description: 'Complex type' };
     }
 
     /**
