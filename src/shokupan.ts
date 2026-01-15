@@ -655,13 +655,14 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 const msg = "Too Many Requests (CPU Backpressure)";
                 const res = ctx.text(msg, 429);
                 // Trigger hooks so metrics are recorded
-                await this.runHooks('onResponseEnd', ctx, res);
+                if (this.hasHooks('onResponseEnd')) await this.runHooks('onResponseEnd', ctx, res);
                 return res;
             }
 
             try {
                 // Request Start Hook
-                await this.runHooks('onRequestStart', ctx);
+                // Request Start Hook
+                if (this.hasHooks('onRequestStart')) await this.runHooks('onRequestStart', ctx);
 
                 // Compose middleware + router dispatch
                 const fn = this.composedMiddleware ??= compose(this.middleware);
@@ -671,9 +672,11 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 // The "next" at the end of the middleware chain is the router dispatch
                 const result = await fn(ctx, async () => {
                     // Start body parsing early for applicable HTTP methods to overlap with route lookup
-                    const bodyParsing = (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method))
-                        ? ctx.parseBody()
-                        : Promise.resolve();
+                    let bodyParsing: Promise<void> | undefined;
+                    if (req.method !== 'GET' && req.method !== 'HEAD') {
+                        // For POST/PUT/PATCH/DELETE, start parsing
+                        bodyParsing = ctx.parseBody();
+                    }
 
                     const match = this.find(req.method, ctx.path);
 
@@ -683,7 +686,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                         ctx.params = match.params;
 
                         // Ensure body is parsed before handler executes
-                        await bodyParsing;
+                        if (bodyParsing) await bodyParsing;
 
                         return match.handler(ctx);
                     }
@@ -742,14 +745,14 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 }
 
                 // Request End Hook - Processing finished, response ready
-                await this.runHooks('onRequestEnd', ctx);
+                if (this.hasHooks('onRequestEnd')) await this.runHooks('onRequestEnd', ctx);
 
                 if (response instanceof Promise) {
                     response = await response;
                 }
 
                 // Response Start Hook - About to send response
-                await this.runHooks('onResponseStart', ctx, response);
+                if (this.hasHooks('onResponseStart')) await this.runHooks('onResponseStart', ctx, response);
 
                 return response;
 
@@ -764,7 +767,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 if (err.errors) body.errors = err.errors;
 
                 // Error Hook
-                await this.runHooks('onError', ctx, err);
+                if (this.hasHooks('onError')) await this.runHooks('onError', ctx, err);
 
                 return ctx.json(body, status);
             }
