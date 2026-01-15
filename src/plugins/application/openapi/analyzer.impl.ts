@@ -106,8 +106,9 @@ export class OpenAPIAnalyzer {
     private files: CollectedFile[] = [];
     private applications: ApplicationInstance[] = [];
     private program?: ts.Program;
-
     private entrypoint?: string;
+    // Track imports per file: filePath -> { importedName -> { modulePath, exportName } }
+    private imports: Map<string, Map<string, { modulePath: string; exportName?: string; }>> = new Map();
 
     constructor(private rootDir: string, entrypoint?: string) {
         if (entrypoint) {
@@ -130,13 +131,16 @@ export class OpenAPIAnalyzer {
         // Step 2: Process source maps if needed
         await this.processSourceMaps();
 
-        // Step 3: Find Shokupan applications
+        // Step 3: Collect imports from all files
+        await this.collectImports();
+
+        // Step 4: Find Shokupan applications
         await this.findApplications();
 
-        // Step 4: Extract route information
+        // Step 5: Extract route information
         await this.extractRoutes();
 
-        // Step 5: Prune unreachable GenericModules
+        // Step 6: Prune unreachable GenericModules
         this.pruneApplications();
 
         // Return the raw application data for further processing
@@ -237,6 +241,54 @@ export class OpenAPIAnalyzer {
                 // For now, we'll just parse the JS file directly
                 // Full source map reconstruction would require the 'source-map' library
                 console.log(`Note: Found ${jsFile.path} with source map but no .ts file. Will parse JS directly.`);
+            }
+        }
+    }
+
+    /**
+     * Collect all imports from source files for later resolution
+     */
+    private async collectImports(): Promise<void> {
+        if (!this.program) return;
+
+        for (const sourceFile of this.program.getSourceFiles()) {
+            if (sourceFile.fileName.includes('node_modules')) continue;
+            if (sourceFile.isDeclarationFile) continue;
+
+            const fileImports = new Map<string, { modulePath: string; exportName?: string; }>();
+
+            ts.forEachChild(sourceFile, (node) => {
+                if (ts.isImportDeclaration(node)) {
+                    const moduleSpecifier = node.moduleSpecifier;
+                    if (ts.isStringLiteral(moduleSpecifier)) {
+                        const modulePath = moduleSpecifier.text;
+
+                        // Handle default import: import Foo from './foo'
+                        if (node.importClause?.name) {
+                            const importedName = node.importClause.name.getText(sourceFile);
+                            fileImports.set(importedName, { modulePath, exportName: 'default' });
+                        }
+
+                        // Handle named imports: import { Foo, Bar } from './foo'
+                        if (node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)) {
+                            for (const element of node.importClause.namedBindings.elements) {
+                                const importedName = element.name.getText(sourceFile);
+                                const exportName = element.propertyName?.getText(sourceFile) || importedName;
+                                fileImports.set(importedName, { modulePath, exportName });
+                            }
+                        }
+
+                        // Handle namespace imports: import * as foo from './foo'
+                        if (node.importClause?.namedBindings && ts.isNamespaceImport(node.importClause.namedBindings)) {
+                            const importedName = node.importClause.namedBindings.name.getText(sourceFile);
+                            fileImports.set(importedName, { modulePath, exportName: '*' });
+                        }
+                    }
+                }
+            });
+
+            if (fileImports.size > 0) {
+                this.imports.set(sourceFile.fileName, fileImports);
             }
         }
     }
@@ -555,6 +607,10 @@ export class OpenAPIAnalyzer {
                                 // Extract middleware info
                                 const middleware = this.extractMiddlewareFromCall(node, sourceFile);
                                 if (middleware) {
+                                    // If attached to root application, mark as global
+                                    if (app.className === 'Shokupan') {
+                                        middleware.scope = 'global';
+                                    }
                                     app.middleware.push(middleware);
                                 }
                             }
@@ -1592,17 +1648,35 @@ export class OpenAPIAnalyzer {
 
         // Get middleware name from the function/identifier
         let middlewareName = 'anonymous';
+        let isImportedIdentifier = false;
+
         if (ts.isIdentifier(middlewareArg)) {
             middlewareName = middlewareArg.getText(sourceFile);
+            isImportedIdentifier = true;
         } else if (ts.isCallExpression(middlewareArg) && ts.isIdentifier(middlewareArg.expression)) {
             // Middleware factory pattern: app.use(RateLimitMiddleware({...}))
             middlewareName = middlewareArg.expression.getText(sourceFile);
+            isImportedIdentifier = true;
         } else if (ts.isFunctionExpression(middlewareArg) || ts.isArrowFunction(middlewareArg)) {
             middlewareName = 'inline-middleware';
         }
 
         // Analyze middleware for response types and headers
-        const analysis = this.analyzeMiddleware(middlewareArg, sourceFile);
+        let analysis = this.analyzeMiddleware(middlewareArg, sourceFile);
+
+        // If this is an imported identifier, try to resolve and analyze the definition
+        if (isImportedIdentifier) {
+            const resolvedAnalysis = this.resolveImportedMiddlewareDefinition(middlewareName, sourceFile);
+            // Merge resolved analysis with local analysis
+            if (resolvedAnalysis.responseTypes) {
+                analysis.responseTypes = { ...resolvedAnalysis.responseTypes, ...analysis.responseTypes };
+            }
+            if (resolvedAnalysis.headers) {
+                analysis.headers = [...(resolvedAnalysis.headers || []), ...(analysis.headers || [])];
+                // Deduplicate headers
+                analysis.headers = Array.from(new Set(analysis.headers));
+            }
+        }
 
         return {
             name: middlewareName,
@@ -1635,56 +1709,106 @@ export class OpenAPIAnalyzer {
         const headers: string[] = [];
         const highlights: { startLine: number; endLine: number; type: 'emit' | 'return-success' | 'return-warning'; }[] = [];
 
+        // Track variables and their values (simple tracking for numeric literals)
+        const variableValues = new Map<string, number | string>();
+
+        // Walk the AST to find variable declarations and response calls
+        const visit = (node: ts.Node) => {
+            // Track variable declarations: const statusCode = 429
+            if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+                const varName = node.name.getText(sourceFile);
+                if (node.initializer) {
+                    // Check if initializer is a numeric literal
+                    if (ts.isNumericLiteral(node.initializer)) {
+                        const value = parseInt(node.initializer.text);
+                        if (!isNaN(value)) {
+                            variableValues.set(varName, value);
+                        }
+                    }
+                    // Check for: const statusCode = options.statusCode || 429
+                    else if (ts.isBinaryExpression(node.initializer) && node.initializer.operatorToken.kind === ts.SyntaxKind.BarBarToken) {
+                        // Get the right side (default value)
+                        if (ts.isNumericLiteral(node.initializer.right)) {
+                            const value = parseInt(node.initializer.right.text);
+                            if (!isNaN(value)) {
+                                variableValues.set(varName, value);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Detect response calls: ctx.json(..., statusCode) or ctx.json(..., 429)
+            if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+                const obj = node.expression.expression.getText(sourceFile);
+                const prop = node.expression.name.getText(sourceFile);
+
+                if (obj === 'ctx' && ['json', 'text', 'html', 'jsx'].includes(prop)) {
+                    // Check if there's a second argument (status code)
+                    if (node.arguments.length >= 2) {
+                        const statusArg = node.arguments[1];
+                        let statusCode: number | undefined;
+
+                        // Case 1: Literal number: ctx.json(..., 429)
+                        if (ts.isNumericLiteral(statusArg)) {
+                            statusCode = parseInt(statusArg.text);
+                        }
+                        // Case 2: Variable reference: ctx.json(..., statusCode)
+                        else if (ts.isIdentifier(statusArg)) {
+                            const varName = statusArg.getText(sourceFile);
+                            const value = variableValues.get(varName);
+                            if (typeof value === 'number') {
+                                statusCode = value;
+                            }
+                        }
+
+                        if (statusCode && statusCode >= 100 && statusCode < 600) {
+                            const statusStr = String(statusCode);
+                            if (!responseTypes[statusStr]) {
+                                let description = `Error response (${statusCode})`;
+                                if (statusCode === 401) description = 'Unauthorized';
+                                else if (statusCode === 403) description = 'Forbidden';
+                                else if (statusCode === 429) description = 'Too Many Requests';
+                                else if (statusCode === 500) description = 'Internal Server Error';
+
+                                const content: Record<string, any> = {};
+                                if (prop === 'json') {
+                                    content['application/json'] = { schema: { type: 'object' } };
+                                } else if (prop === 'text') {
+                                    content['text/plain'] = { schema: { type: 'string' } };
+                                } else if (prop === 'html' || prop === 'jsx') {
+                                    content['text/html'] = { schema: { type: 'string' } };
+                                }
+
+                                responseTypes[statusStr] = {
+                                    description,
+                                    ...(Object.keys(content).length > 0 ? { content } : {})
+                                };
+                            }
+                        }
+                    }
+                }
+
+                // Detect header setting: ctx.set("Header-Name", ...), res.headers.set("Header-Name", ...)
+                if (['set', 'header'].includes(prop)) {
+                    if (node.arguments.length >= 1 && ts.isStringLiteral(node.arguments[0])) {
+                        const headerName = node.arguments[0].text;
+                        if (headerName && !headers.includes(headerName)) {
+                            headers.push(headerName);
+                        }
+                    }
+                }
+            }
+
+            // Recursively visit child nodes
+            ts.forEachChild(node, visit);
+        };
+
+        // Start traversal
+        visit(middleware);
+
+        // Detect common rate-limit specific headers (fallback regex check on source string)
         const middlewareSource = middleware.getText(sourceFile);
-
-        // Detect response status codes: ctx.json(..., 401), ctx.text(..., 403), etc.
-        const statusCodePattern = /ctx\.(json|text|html|jsx)\([^)]*,\s*(\d{3,})\)/g;
-        let match;
-        while ((match = statusCodePattern.exec(middlewareSource)) !== null) {
-            const statusCode = match[2];
-            const contentType = match[1];
-
-            if (!responseTypes[statusCode]) {
-                let description = `Error response (${statusCode})`;
-                if (statusCode === '401') description = 'Unauthorized';
-                else if (statusCode === '403') description = 'Forbidden';
-                else if (statusCode === '429') description = 'Too Many Requests';
-                else if (statusCode === '500') description = 'Internal Server Error';
-
-                const content: Record<string, any> = {};
-                if (contentType === 'json') {
-                    content['application/json'] = { schema: { type: 'object' } };
-                } else if (contentType === 'text') {
-                    content['text/plain'] = { schema: { type: 'string' } };
-                } else if (contentType === 'html' || contentType === 'jsx') {
-                    content['text/html'] = { schema: { type: 'string' } };
-                }
-
-                responseTypes[statusCode] = {
-                    description,
-                    ...(Object.keys(content).length > 0 ? { content } : {})
-                };
-            }
-        }
-
-        // Detect header modifications: ctx.set(...), res.headers.set(...), ctx.header(...)
-        const headerPatterns = [
-            /ctx\.set\(['"]([^'"]+)['"]/g,
-            /res\.headers\.set\(['"]([^'"]+)['"]/g,
-            /ctx\.header\(['"]([^'"]+)['"]/g,
-            /\.set\(['"]([^'"]+)['"],/g // Generic .set pattern
-        ];
-
-        for (const pattern of headerPatterns) {
-            while ((match = pattern.exec(middlewareSource)) !== null) {
-                const headerName = match[1];
-                if (headerName && !headers.includes(headerName)) {
-                    headers.push(headerName);
-                }
-            }
-        }
-
-        // Detect common rate-limit specific headers
         if (middlewareSource.includes('X-RateLimit')) {
             const rateLimitHeaders = ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'Retry-After'];
             for (const header of rateLimitHeaders) {
@@ -1702,6 +1826,92 @@ export class OpenAPIAnalyzer {
             headers: headers.length > 0 ? headers : undefined,
             highlights: highlights.length > 0 ? highlights : undefined
         };
+    }
+
+    /**
+     * Resolve an imported middleware identifier and analyze its definition
+     */
+    private resolveImportedMiddlewareDefinition(middlewareName: string, sourceFile: ts.SourceFile): {
+        responseTypes?: Record<string, any>;
+        headers?: string[];
+    } {
+        // Check if this middleware is imported
+        const fileImports = this.imports.get(sourceFile.fileName);
+        if (!fileImports || !fileImports.has(middlewareName)) {
+            return {};
+        }
+
+        const importInfo = fileImports.get(middlewareName)!;
+        const modulePath = importInfo.modulePath;
+
+        // Skip external/node_modules imports for now
+        if (!modulePath.startsWith('.')) {
+            return {};
+        }
+
+        // Resolve the absolute path
+        const dir = path.dirname(sourceFile.fileName);
+        let absolutePath = path.resolve(dir, modulePath);
+
+        // Try to find the file with different extensions
+        const extensions = ['.ts', '.js', '.tsx', '.jsx', '/index.ts', '/index.js'];
+        let resolvedPath: string | undefined;
+
+        for (const ext of extensions) {
+            const testPath = absolutePath + ext;
+            if (fs.existsSync(testPath)) {
+                resolvedPath = testPath;
+                break;
+            }
+        }
+
+        if (!resolvedPath && fs.existsSync(absolutePath)) {
+            resolvedPath = absolutePath;
+        }
+
+        if (!resolvedPath) {
+            return {};
+        }
+
+        // Get the source file for the imported module
+        const importedSourceFile = this.program?.getSourceFile(resolvedPath);
+        if (!importedSourceFile) {
+            return {};
+        }
+
+        // Find the exported function/variable that matches our import
+        let middlewareNode: ts.Node | undefined;
+
+        const exportName = importInfo.exportName || middlewareName;
+
+        ts.forEachChild(importedSourceFile, (node) => {
+            // Handle: export function RateLimitMiddleware(...) { ... }
+            if (ts.isFunctionDeclaration(node) && node.name?.getText(importedSourceFile) === exportName) {
+                const modifiers = node.modifiers;
+                if (modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)) {
+                    middlewareNode = node;
+                }
+            }
+
+            // Handle: export const RateLimitMiddleware = (...) => { ... }
+            if (ts.isVariableStatement(node)) {
+                const modifiers = node.modifiers;
+                if (modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)) {
+                    for (const declaration of node.declarationList.declarations) {
+                        if (ts.isIdentifier(declaration.name) && declaration.name.getText(importedSourceFile) === exportName) {
+                            middlewareNode = declaration.initializer;
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!middlewareNode) {
+            return {};
+        }
+
+        // Analyze the middleware definition
+        return this.analyzeMiddleware(middlewareNode, importedSourceFile);
     }
 
     /**

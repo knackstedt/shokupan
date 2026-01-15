@@ -40,6 +40,16 @@ function handleHashNavigation() {
         return;
     }
 
+    // Check if it's a middleware view
+    if (hash.startsWith('middleware-')) {
+        const middlewareId = hash.replace('middleware-', '');
+        const middleware = explorerData.middlewareRegistry?.[middlewareId];
+        if (middleware) {
+            renderMiddlewareView(middleware, container);
+            return;
+        }
+    }
+
     // Find route
     const route = explorerData.routes.find(r => r.op.operationId === hash);
     if (route) {
@@ -58,6 +68,158 @@ function renderInfoSection(info) {
             ${description ? `<div class="markdown-content" data-markdown="true">${parseMarkdown(description)}</div>` : ''}
         </div>
     `;
+}
+
+function renderMiddlewareView(middleware, container) {
+    const html = `
+        <div class="middleware-detail-view">
+            <div class="middleware-header">
+                <h1>${middleware.name}</h1>
+                <div class="middleware-meta">
+                    ${middleware.scope ? `<span class="badge">${middleware.scope}</span>` : ''}
+                    ${middleware.file ? `
+                        <a href="vscode://file/${middleware.file}:${middleware.startLine || 1}" class="doc-source-link">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="16 18 22 12 16 6"></polyline>
+                                <polyline points="8 6 2 12 8 18"></polyline>
+                            </svg>
+                            ${middleware.file.split('/').pop()}:${middleware.startLine || 1}
+                        </a>
+                    ` : ''}
+                </div>
+            </div>
+
+            ${middleware.responseTypes || middleware.headers ? `
+                <div class="middleware-capabilities">
+                    ${middleware.responseTypes ? `
+                        <div class="capability-section">
+                            <h3>Response Types</h3>
+                            <div class="response-list">
+                                ${Object.entries(middleware.responseTypes).map(([code, resp]) => `
+                                    <div class="response-item">
+                                        <code class="status-code">${code}</code>
+                                        <span>${resp.description || 'Response'}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                    ${middleware.headers && middleware.headers.length > 0 ? `
+                        <div class="capability-section">
+                            <h3>Headers</h3>
+                            <div class="header-list">
+                                ${middleware.headers.map(h => `<code class="header-name">${h}</code>`).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            ` : ''}
+
+            ${middleware.file ? `
+                <div class="source-section">
+                    <h3>Source Code</h3>
+                    <div id="monaco-middleware-source" class="monaco-container" style="height: 400px;"></div>
+                </div>
+            ` : ''}
+
+            ${middleware.usedBy && middleware.usedBy.length > 0 ? `
+                <div class="usage-section">
+                    <h3>Used By (${middleware.usedBy.length} routes)</h3>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Method</th>
+                                    <th>Path</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${middleware.usedBy.map(routePath => {
+        const route = explorerData.routes.find(r => r.path === routePath);
+        if (route) {
+            return `
+                                            <tr>
+                                                <td class="col-method"><span class="badge badge-${route.method.toUpperCase()}">${route.method.toUpperCase()}</span></td>
+                                                <td class="col-path"><a href="#${route.op.operationId}" class="route-link">${routePath}</a></td>
+                                                <td class="col-desc">${route.op.summary || route.op.description || '-'}</td>
+                                            </tr>
+                                        `;
+        }
+        return `
+                                        <tr>
+                                            <td colspan="3">${routePath} (Route definition not found)</td>
+                                        </tr>
+                                    `;
+    }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            ` : ''}
+        </div>
+    `;
+
+    container.innerHTML = html;
+
+    // Initialize Monaco for source code
+    if (middleware.file && typeof require !== 'undefined') {
+        require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+        require(['vs/editor/editor.main'], function () {
+            const monacoContainer = document.getElementById('monaco-middleware-source');
+            if (monacoContainer) {
+                if (currentEditors.source) currentEditors.source.dispose();
+
+                currentEditors.source = monaco.editor.create(monacoContainer, {
+                    value: '//  Loading source...',
+                    language: 'typescript',
+                    theme: 'vs-dark',
+                    minimap: { enabled: false },
+                    lineNumbers: 'on',
+                    readOnly: true,
+                    scrollBeyondLastLine: false,
+                    automaticLayout: true,
+                    glyphMargin: false,
+                    folding: false,
+                    lineNumbersMinChars: 3,
+                    fontSize: 13,
+                    fontFamily: 'JetBrains Mono',
+                    renderLineHighlight: 'none'
+                });
+
+                // Load source
+                fetch(`_source?file=${encodeURIComponent(middleware.file)}`)
+                    .then(res => {
+                        if (!res.ok) throw new Error(res.statusText);
+                        return res.text();
+                    })
+                    .then(text => {
+                        if (currentEditors.source) {
+                            currentEditors.source.setValue(text);
+
+                            // Highlight the middleware function
+                            if (middleware.startLine) {
+                                const endLine = middleware.endLine || middleware.startLine;
+                                const decorations = [{
+                                    range: new monaco.Range(middleware.startLine, 1, endLine, 1),
+                                    options: {
+                                        isWholeLine: true,
+                                        className: 'closure-highlight'
+                                    }
+                                }];
+                                currentEditors.source.deltaDecorations([], decorations);
+                                currentEditors.source.revealLineInCenter(middleware.startLine);
+                            }
+                        }
+                    })
+                    .catch(err => {
+                        if (currentEditors.source) {
+                            currentEditors.source.setValue(`// Failed to load source: ${err.message}`);
+                        }
+                    });
+            }
+        });
+    }
 }
 
 // Helper to recursively render schema properties

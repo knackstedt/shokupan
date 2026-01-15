@@ -812,3 +812,237 @@ body {
 .type-any {}
 
 .type-unknown {}
+
+/* Middleware Sidebar Section */
+.middleware-section {
+    margin-top: 16px;
+    border-top: 1px solid var(--border-color);
+    padding-top: 16px;
+}
+
+.middleware-header {
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.middleware-header h3 {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.middleware-count {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+.middleware-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.middleware-item {
+    padding: 6px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    text-decoration: none;
+    transition: all 0.1s;
+    border-left: 2px solid transparent;
+}
+
+.middleware-item:hover {
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-primary);
+}
+
+.middleware-item.active {
+    background: rgba(245, 158, 11, 0.1);
+    border-left-color: var(--primary);
+    color: var(--primary);
+}
+
+.middleware-name {
+    flex: 1;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.middleware-source-link {
+    opacity: 0;
+    padding: 4px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    transition: opacity 0.2s, color 0.2s;
+}
+
+.middleware-item:hover .middleware-source-link {
+    opacity: 1;
+}
+
+.middleware-source-link:hover {
+    color: var(--primary);
+}
+
+/* Middleware Detail View */
+.middleware-detail-view {
+    padding: 24px;
+}
+
+.middleware-detail-view .middleware-header {
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 16px;
+    margin-bottom: 24px;
+}
+
+.middleware-detail-view .middleware-header h1 {
+    margin: 0 0 8px 0;
+    font-size: 2rem;
+    color: var(--text-primary);
+}
+
+.middleware-meta {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.middleware-capabilities {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.capability-section h3 {
+    margin: 0 0 12px 0;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+}
+
+.response-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.response-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+}
+
+.status-code {
+    background: var(--bg-card);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: bold;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.header-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.header-name {
+    background: var(--bg-secondary);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.usage-section {
+    margin-top: 24px;
+}
+
+.usage-section h3 {
+    margin: 0 0 12px 0;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+}
+
+.route-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.route-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--text-secondary);
+    transition: all 0.1s;
+}
+
+.route-link:hover {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    transform: translateX(4px);
+}
+
+.route-item {
+    padding: 8px 12px;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    color: var(--text-secondary);
+}
+
+/* Middleware within nav groups */
+.group-middleware {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.middleware-nav-item {
+    color: var(--method-patch) !important;
+    font-style: italic;
+}
+
+.middleware-nav-item:hover {
+    color: var(--text-primary) !important;
+}
+
+.middleware-nav-item.active {
+    color: var(--primary) !important;
+}
+
+.middleware-icon {
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
+
+.middleware-nav-item .middleware-badge {
+    background: rgba(139, 92, 246, 0.15);
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 0.65rem;
+    min-width: 18px;
+    text-align: center;
+    color: var(--method-patch);
+}

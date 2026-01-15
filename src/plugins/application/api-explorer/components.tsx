@@ -230,18 +230,59 @@ export function ApiExplorerApp({ spec, asyncSpec, config }: any) {
             // Create subgroups recursively, stripping the common prefix
             const children = createSubgroups(routes, 0, commonPrefix.length);
 
+            // Find middleware for this group by matching router/controller names
+            const groupMiddleware: any[] = [];
+            if (spec['x-middleware-registry']) {
+                Object.entries(spec['x-middleware-registry']).forEach(([id, mw]: [string, any]) => {
+                    // Match middleware to this group based on file path
+                    const firstRoute = routes[0];
+                    const routeSource = firstRoute?.op?.['x-shokupan-source'];
+
+                    const mwFile = mw.file?.split('/').pop();
+                    const routeFile = routeSource?.file?.split('/').pop();
+
+                    // Include middleware if it comes from the same file as the routes in this group
+                    if (mwFile && routeFile && mwFile === routeFile && mw.scope !== 'global') {
+                        groupMiddleware.push({ ...mw, id, type: 'middleware' });
+                    }
+                });
+            }
+
             return {
                 name,
                 type: 'group' as const,
                 children,
+                middleware: groupMiddleware,
                 commonPrefixPath // Store for display stripping
             };
-        })
-        .sort((a, b) => {
-            if (a.name === 'Ungrouped') return 1;
-            if (b.name === 'Ungrouped') return -1;
-            return a.name.localeCompare(b.name);
         });
+
+    // Add Global Middleware group
+    if (spec['x-middleware-registry']) {
+        const allGroupMiddleware = hierarchicalGroups.flatMap((g: any) => g.middleware || []).map((m: any) => m.id);
+        const globalMiddleware = Object.entries(spec['x-middleware-registry'])
+            .filter(([id]) => !allGroupMiddleware.includes(id))
+            .map(([id, mw]) => ({ ...mw, id, type: 'middleware' }));
+
+        if (globalMiddleware.length > 0) {
+            hierarchicalGroups.push({
+                name: 'Global Middleware',
+                type: 'group' as const,
+                children: [],
+                middleware: globalMiddleware,
+                commonPrefixPath: ''
+            });
+        }
+    }
+
+    // Sort groups
+    hierarchicalGroups.sort((a, b) => {
+        if (a.name === 'Ungrouped') return 1;
+        if (b.name === 'Ungrouped') return -1;
+        if (a.name === 'Global Middleware') return 1;
+        if (b.name === 'Global Middleware') return -1;
+        return a.name.localeCompare(b.name);
+    });
 
     // Flatten for client-side data (keep all routes in flat structure for main content)
     const allRoutes = Array.from(hierarchy.values()).flat();
@@ -382,11 +423,47 @@ function Sidebar({ spec, hierarchicalGroups }: any) {
                             </span> {group.name}
                         </div>
                         <div class="nav-items">
+                            {/* Render middleware first if any */}
+                            {group.middleware && group.middleware.length > 0 && (
+                                <div class="group-middleware">
+                                    {group.middleware.map((mw: any) => (
+                                        <a
+                                            key={mw.id}
+                                            href={`#middleware-${mw.id}`}
+                                            class="nav-item middleware-nav-item"
+                                            data-middleware-id={mw.id}
+                                            title={mw.name}
+                                        >
+                                            <span class="middleware-icon">⚙</span>
+                                            <span class="nav-label">{mw.name}</span>
+                                            {mw.usedBy && mw.usedBy.length > 0 && (
+                                                <span class="middleware-badge" title={`Used by ${mw.usedBy.length} routes`}>{mw.usedBy.length}</span>
+                                            )}
+                                            {mw.file && (
+                                                <a
+                                                    href={`vscode://file/${mw.file}:${mw.startLine || 1}`}
+                                                    class="nav-source-link"
+                                                    title={`${mw.file}:${mw.startLine || 1}`}
+                                                    onclick="event.stopPropagation();"
+                                                >
+                                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <polyline points="16 18 22 12 16 6"></polyline>
+                                                        <polyline points="8 6 2 12 8 18"></polyline>
+                                                    </svg>
+                                                </a>
+                                            )}
+                                        </a>
+                                    ))}
+                                </div>
+                            )}
+                            {/* Then render routes */}
                             {group.children?.map((child: GroupNode) => renderNavNode(child, 0, group.commonPrefixPath || ''))}
                         </div>
                     </div>
                 ))}
             </nav>
+
+
         </aside>
     );
 }
@@ -396,7 +473,8 @@ function MainContent({ allRoutes, config, spec }: any) {
     const explorerData = JSON.stringify({
         routes: allRoutes,
         config,
-        info: spec.info
+        info: spec.info,
+        middlewareRegistry: spec['x-middleware-registry'] || {}
     });
 
     const safeJson = explorerData.replace(/<\/script>/g, '<\\/script>');

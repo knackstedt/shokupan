@@ -291,7 +291,9 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
     let applications: any[] = [];
     try {
         const { OpenAPIAnalyzer } = await import('./analyzer');
-        const analyzer = new OpenAPIAnalyzer(process.cwd());
+        // Use the application entrypoint if available to restrict analysis scope
+        const entrypoint = rootRouter.metadata?.file;
+        const analyzer = new OpenAPIAnalyzer(process.cwd(), entrypoint);
         const analysisResult = await analyzer.analyze();
         applications = analysisResult.applications;
         astRoutes = await getAstRoutes(applications);
@@ -653,28 +655,7 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
         xTagGroups.push({ name, tags: Array.from(tags).sort() });
     }
 
-    // Add virtual paths for middleware
-    for (const [mwId, mw] of Object.entries(astMiddlewareRegistry)) {
-        const virtualPath = `/_middleware/${mwId}`;
-        paths[virtualPath] = {
-            get: {
-                'x-virtual': true,
-                'x-middleware-detail': true,
-                summary: `Middleware: ${mw.name}`,
-                description: `Virtual endpoint representing middleware "${mw.name}"`,
-                responses: mw.responseTypes || {},
-                'x-source-info': mw.sourceContext,
-                'x-used-by': mw.usedBy,
-                'x-middleware-metadata': {
-                    name: mw.name,
-                    file: mw.file,
-                    headers: mw.headers,
-                    scope: mw.scope
-                },
-                tags: ['_Middleware']
-            }
-        };
-    }
+
 
     return {
         openapi: "3.1.0",

@@ -6,7 +6,6 @@ import { ShokupanRouter } from '../../../router';
 import type { Shokupan } from '../../../shokupan.ts';
 import type { ShokupanPlugin, ShokupanPluginOptions } from '../../../util/types.ts';
 import { ApiExplorerApp } from './components.tsx';
-
 export interface ApiExplorerOptions {
     baseDocument?: any;
     path?: string;
@@ -15,6 +14,7 @@ export interface ApiExplorerOptions {
 export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin {
 
     constructor(private readonly pluginOptions: ApiExplorerOptions = {}) {
+        console.log('ApiExplorerPlugin: CONSTRUCTOR CALLED');
         super({ renderer: renderToString });
         pluginOptions.path ??= '/explorer';
         this.init();
@@ -95,7 +95,18 @@ export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin 
             const asyncSpec = (ctx.app as any).asyncApiSpec;
 
             // We pass the STRIPPED spec to the UI payload
-            return ctx.jsx(ApiExplorerApp({ spec: stripSourceCode(spec), asyncSpec }));
+            console.log('Rendering ApiExplorerApp...');
+            try {
+                const element = ApiExplorerApp({ spec: stripSourceCode(spec), asyncSpec });
+                // console.log('Element:', JSON.stringify(element, null, 2));
+                const html = renderToString(element);
+                console.log('Rendered HTML Length:', html.length);
+                if (html.length === 0) console.error('RENDERED HTML IS EMPTY!');
+                return ctx.html(html);
+            } catch (err) {
+                console.error('Render Error:', err);
+                return ctx.text('Render Error: ' + String(err), 500);
+            }
         });
     }
 }

@@ -73,12 +73,30 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
 
     // Attempt to run AST Analysis
     let astRoutes: any[] = [];
+    let astMiddlewareRegistry: Record<string, any> = {};
+    let applications: any[] = [];
     try {
         const { OpenAPIAnalyzer } = await import('../openapi/analyzer');
         const entrypoint = (globalThis as any).Bun?.main || require.main?.filename || process.argv[1];
         const analyzer = new OpenAPIAnalyzer(process.cwd(), entrypoint);
-        const { applications } = await analyzer.analyze();
+        const analysisResult = await analyzer.analyze();
+        applications = analysisResult.applications;
         astRoutes = await getAstRoutes(applications);
+
+        // Build middleware registry from AST-analyzed applications
+        let middlewareId = 0;
+        for (const app of applications) {
+            if (app.middleware && app.middleware.length > 0) {
+                for (const mw of app.middleware) {
+                    const id = `middleware-${middlewareId++}`;
+                    astMiddlewareRegistry[id] = {
+                        ...mw,
+                        id,
+                        usedBy: [] // Will be populated when processing events
+                    };
+                }
+            }
+        }
     } catch (e) {
         // Silently fail if analysis cannot run
     }
@@ -411,6 +429,7 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
     return {
         asyncapi: "3.0.0",
         info: { title: "Shokupan AsyncAPI", version: "1.0.0", ...options.info },
-        channels
+        channels,
+        "x-middleware-registry": astMiddlewareRegistry
     };
 };
