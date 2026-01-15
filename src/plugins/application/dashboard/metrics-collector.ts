@@ -59,9 +59,12 @@ export class MetricsCollector {
     private eventLoopHistogram = monitorEventLoopDelay({ resolution: 10 });
     private timer: NodeJS.Timeout | null = null;
 
+    public db?: SurrealDatastore;
+
     constructor(
-        private readonly db: SurrealDatastore
+        db?: SurrealDatastore
     ) {
+        this.db = db;
         this.eventLoopHistogram.enable();
         // Initialize start times
         const now = Date.now();
@@ -73,7 +76,7 @@ export class MetricsCollector {
         // Start collection loop - tick every 10 seconds to process high-res intervals?
         // Actually, for 1m interval, we should tick at least every minute.
         // Let's tick every 10s to be safe and accurate enough.
-        // this.timer = setInterval(() => this.collect(), 10000);
+        this.timer = setInterval(() => this.collect(), 10000);
     }
 
     public recordRequest(duration: number, isError: boolean) {
@@ -176,8 +179,13 @@ export class MetricsCollector {
         };
 
         // console.log(`[MetricsCollector] Persisting ${label} metric at timestamp ${timestamp}`);
+        if (!this.db) {
+            // console.warn('[MetricsCollector] Skipping collection - No datastore connection');
+            return;
+        }
+
         try {
-            const recordId = new RecordId('metrics', timestamp);
+            const recordId = new RecordId('metrics', String(timestamp));
             await this.db.upsert(recordId, metric);
             // console.log(`[MetricsCollector] ✓ Successfully saved ${label} metric to datastore`);
 
