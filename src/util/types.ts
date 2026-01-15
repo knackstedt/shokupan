@@ -298,10 +298,24 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      */
     enableOpenApiGen: boolean;
     /**
+     * Whether to block server startup until OpenAPI generation completes.
+     * Only applies when enableOpenApiGen is true.
+     * When false, OpenAPI generation happens asynchronously in the background.
+     * @default true
+     */
+    blockOnOpenApiGen: boolean;
+    /**
      * Whether to enable AsyncAPI generation.
      * @default false
      */
     enableAsyncApiGen: boolean;
+    /**
+     * Whether to block server startup until AsyncAPI generation completes.
+     * Only applies when enableAsyncApiGen is true.
+     * When false, AsyncAPI generation happens asynchronously in the background.
+     * @default true
+     */
+    blockOnAsyncApiGen: boolean;
     /**
      * Whether to reuse the port.
      * @default false

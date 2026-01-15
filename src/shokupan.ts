@@ -98,6 +98,8 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     readonly applicationConfig: ShokupanConfig = {};
     public openApiSpec?: any;
     public asyncApiSpec?: any;
+    private openApiSpecPromise?: Promise<any>;
+    private asyncApiSpecPromise?: Promise<any>;
     private composedMiddleware?: Middleware;
     private cpuMonitor?: SystemCpuMonitor;
     private server?: Server<any>;
@@ -257,17 +259,31 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         await Promise.all(this.startupHooks.map(hook => hook()));
 
         if (this.applicationConfig.enableOpenApiGen) {
-            this.openApiSpec = await generateOpenApi(this);
+            // Create the generation promise
+            this.openApiSpecPromise = generateOpenApi(this).then(spec => {
+                this.openApiSpec = spec;
+                return spec;
+            });
+
+            // Decide whether to block or not
+            const shouldBlock = this.applicationConfig.blockOnOpenApiGen !== false;
+
+            if (shouldBlock) {
+                // Wait for generation to complete before proceeding
+                await this.openApiSpecPromise;
+            }
 
             // --- Well-Known Files Implementation ---
 
             // 1. .well-known/openapi.yaml
-            this.get("/.well-known/openapi.yaml", (ctx) => {
+            this.get("/.well-known/openapi.yaml", async (ctx) => {
                 try {
+                    // Wait for spec if not ready yet
+                    await this.openApiSpecPromise;
                     const yaml = dump(this.openApiSpec);
                     return ctx.send(yaml, { status: 200, headers: { 'content-type': 'application/yaml' } });
                 } catch (e) {
-                    this.logger.error("Failed to generate OpenAPI YAML", { error: e });
+                    this.logger?.error("Failed to generate OpenAPI YAML", { error: e });
                     return ctx.text("Internal Server Error", 500);
                 }
             });
@@ -275,6 +291,9 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             // 2. .well-known/ai-plugin.json
             if (this.applicationConfig.aiPlugin?.enabled !== false) {
                 this.get("/.well-known/ai-plugin.json", async (ctx) => {
+                    // Wait for spec if not ready yet
+                    await this.openApiSpecPromise;
+
                     const config = this.applicationConfig.aiPlugin || {};
                     let pkg: any = {};
                     try {
@@ -304,7 +323,10 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
             // 3. .well-known/api-catalog
             if (this.applicationConfig.apiCatalog?.enabled !== false) {
-                this.get("/.well-known/api-catalog", (ctx) => {
+                this.get("/.well-known/api-catalog", async (ctx) => {
+                    // Wait for spec if not ready yet
+                    await this.openApiSpecPromise;
+
                     const config = this.applicationConfig.apiCatalog || {};
                     const catalog = {
                         versions: config.versions || [
@@ -319,13 +341,34 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 });
             }
 
-            // Run spec available hooks
-            await Promise.all(this.specAvailableHooks.map(hook => hook(this.openApiSpec)));
+            // Run spec available hooks (either now after blocking, or later after async completion)
+            if (shouldBlock) {
+                await Promise.all(this.specAvailableHooks.map(hook => hook(this.openApiSpec)));
+            } else {
+                // Run hooks after async generation completes
+                this.openApiSpecPromise.then(spec => {
+                    return Promise.all(this.specAvailableHooks.map(hook => hook(spec)));
+                }).catch(err => {
+                    this.logger?.error("Error running spec available hooks", { error: err });
+                });
+            }
         }
 
         if (this.applicationConfig.enableAsyncApiGen) {
             const { generateAsyncApi } = await import("./plugins/application/asyncapi/generator");
-            this.asyncApiSpec = await generateAsyncApi(this);
+
+            // Create the generation promise
+            this.asyncApiSpecPromise = generateAsyncApi(this).then(spec => {
+                this.asyncApiSpec = spec;
+                return spec;
+            });
+
+            // Decide whether to block or not
+            const shouldBlock = this.applicationConfig.blockOnAsyncApiGen !== false;
+
+            if (shouldBlock) {
+                await this.asyncApiSpecPromise;
+            }
         }
 
         if (port === 0 && process.platform === "linux") {
