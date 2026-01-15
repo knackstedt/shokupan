@@ -294,7 +294,13 @@ function renderSchema(schema, depth = 0, isResponse = false) {
         `;
     }
 
-    return '';
+    return `
+        <div style="margin-left: ${indent}px; padding: 4px 0;">
+            <span class="property-detail-value" style="color: var(--text-secondary); font-family: monospace;">${type}</span>
+            ${schema.format ? `<span style="color: var(--text-secondary); font-size: 0.85rem; margin-left: 6px;">(${schema.format})</span>` : ''}
+            ${schema.description ? `<div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px;">${schema.description}</div>` : ''}
+        </div>
+    `;
 }
 
 // Helper to highlight path operators
