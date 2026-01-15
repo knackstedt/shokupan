@@ -195,9 +195,12 @@ export class ShokupanContext<
         state?: State,
         public readonly app?: Shokupan,
         public readonly signal?: AbortSignal, // Optional as it might not be provided in tests or simple creates
-        enableMiddlewareTracking: boolean = false
+        enableMiddlewareTracking: boolean = false,
+        requestId?: string
     ) {
         this.state = state || {} as State;
+        this[$requestId] = requestId;
+
         if (enableMiddlewareTracking) {
             const self = this;
             this.state = new Proxy(this.state, {
@@ -479,12 +482,12 @@ export class ShokupanContext<
      */
     async body<T = any>(): Promise<T> {
         // If there was an error during pre-parsing, throw it now
-        if (this[$bodyParseError]) {
+        if (this[$bodyParseError] !== undefined) {
             throw this[$bodyParseError];
         }
 
         // Return cached body if already parsed
-        if (this[$bodyParsed]) {
+        if (this[$bodyParsed] !== undefined) {
             return this[$cachedBody] as T;
         }
 
