@@ -27,7 +27,6 @@ const defaults: ShokupanConfig = {
     enableHttpBridge: false,
     reusePort: false,
 };
-const tracer = trace.getTracer("shokupan.application");
 
 
 /**
@@ -393,17 +392,29 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 open(ws: ServerWebSocket<{ handler; }>) {
                     ws.data?.handler?.open?.(ws);
                 },
-                async message(ws: ServerWebSocket<{ handler; }>, message: string) {
+                async message(ws: ServerWebSocket<{ handler; }>, message: string | Buffer<ArrayBuffer>) {
                     if (ws.data?.handler?.message) {
                         return ws.data.handler.message(ws, message);
                     }
+
+                    if (message instanceof Buffer) {
+                        message = message.toString();
+                    }
                     if (typeof message !== "string") return;
 
-                    try {
-                        const payload = JSON.parse(message);
+                    let payload: any;
+                    let isJSONPayload = false;
+                    if (message.startsWith('{')) {
+                        try {
+                            payload = JSON.parse(message);
+                            isJSONPayload = true;
+                        } catch { /* Ignore JSON parsing errors */ }
+                    }
 
+
+                    if (payload) {
                         // HTTP Bridge
-                        if (self.applicationConfig['enableHttpBridge'] && payload.type === 'HTTP') {
+                        if (isJSONPayload && self.applicationConfig['enableHttpBridge'] && payload.type === 'HTTP') {
                             const { id, method, path, headers, body } = payload;
                             const url = new URL(path, `http://${self.applicationConfig.hostname || 'localhost'}:${finalPort}`);
 
@@ -437,7 +448,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                             const handlers = self.findEvent(eventName);
                             const handler = handlers?.length == 1 ? handlers[0] : compose(handlers);
                             if (handler) {
-                                const data = payload.data || payload.payload;
+                                const data = payload.data || payload.body || payload.payload || payload;
 
                                 // Construct a Context that mocks a Request
                                 const req = new ShokupanRequest({
@@ -447,7 +458,14 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                                     body: JSON.stringify(data)
                                 });
 
-                                const ctx = new ShokupanContext(req as unknown as ShokupanRequest<T>, self.server);
+                                const ctx = new ShokupanContext(
+                                    req as unknown as ShokupanRequest<T>,
+                                    self.server,
+                                    {},
+                                    this,
+                                    null,
+                                    payload.id
+                                );
                                 // Expose socket on context for reply
                                 (ctx as any)[$ws] = ws;
 
@@ -468,10 +486,8 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                                     }
                                 }
                             }
+                            // Should we warn if a message is received that we don't have a handler for?
                         }
-
-                    } catch (e) {
-                        // ignore malformed
                     }
                 },
                 drain(ws: ServerWebSocket<{ handler; }>) {
@@ -655,14 +671,14 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 const msg = "Too Many Requests (CPU Backpressure)";
                 const res = ctx.text(msg, 429);
                 // Trigger hooks so metrics are recorded
-                if (this.hasHooks('onResponseEnd')) await this.runHooks('onResponseEnd', ctx, res);
+                if (this.hasOnResponseEndHook) await this.runHooks('onResponseEnd', ctx, res);
                 return res;
             }
 
             try {
                 // Request Start Hook
                 // Request Start Hook
-                if (this.hasHooks('onRequestStart')) await this.runHooks('onRequestStart', ctx);
+                if (this.hasOnRequestStartHook) await this.runHooks('onRequestStart', ctx);
 
                 // Compose middleware + router dispatch
                 const fn = this.composedMiddleware ??= compose(this.middleware);
@@ -745,14 +761,14 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 }
 
                 // Request End Hook - Processing finished, response ready
-                if (this.hasHooks('onRequestEnd')) await this.runHooks('onRequestEnd', ctx);
+                if (this.hasOnRequestEndHook) await this.runHooks('onRequestEnd', ctx);
 
                 if (response instanceof Promise) {
                     response = await response;
                 }
 
                 // Response Start Hook - About to send response
-                if (this.hasHooks('onResponseStart')) await this.runHooks('onResponseStart', ctx, response);
+                if (this.hasOnResponseStartHook) await this.runHooks('onResponseStart', ctx, response);
 
                 return response;
 
@@ -767,7 +783,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 if (err.errors) body.errors = err.errors;
 
                 // Error Hook
-                if (this.hasHooks('onError')) await this.runHooks('onError', ctx, err);
+                if (this.hasOnErrorHook) await this.runHooks('onError', ctx, err);
 
                 return ctx.json(body, status);
             }
