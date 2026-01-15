@@ -80,6 +80,15 @@ export interface OpenAPIOptions {
     externalDocs?: OpenAPI.Document['externalDocs'];
     defaultTagGroup?: string;
     defaultTag?: string;
+    /**
+     * Whether to generate a strictly compliant OpenAPI spec (stripping x- extensions).
+     * @default false
+     */
+    compliant?: boolean;
+    /**
+     * Array to collect warnings during generation.
+     */
+    warnings?: any[];
 }
 
 export interface AsyncAPIOptions {
@@ -89,6 +98,10 @@ export interface AsyncAPIOptions {
         description?: string;
     };
     defaultTag?: string;
+    /**
+     * Array to collect warnings during generation.
+     */
+    warnings?: any[];
 }
 
 export interface AsyncAPISpec {

@@ -3,7 +3,7 @@ import * as p from '@clack/prompts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { setTimeout } from 'node:timers/promises';
-import { analyzeDirectory } from '../plugins/application/openapi/analyzer';
+import { OpenAPIAnalyzer } from '../plugins/application/openapi/analyzer';
 
 const templates = {
     controller: (name: string) => `import { Controller, Get, Ctx } from 'shokupan';
@@ -151,26 +151,68 @@ Make sure to register it in your main application file if necessary.`;
 }
 
 async function analyze() {
-    console.clear();
-    p.intro(`Shokupan OpenAPI Analyzer`);
+    await generate(true);
+}
+
+async function generate(legacyAnalyzeMode = false) {
+    if (!legacyAnalyzeMode) {
+        console.clear();
+        p.intro(`Shokupan Spec Generator`);
+    } else {
+        console.clear();
+        p.intro(`Shokupan OpenAPI Analyzer (Legacy)`);
+    }
 
     const args = process.argv.slice(2);
     let directory = process.cwd();
-    let outputPath = 'openapi.json';
+    let openApiPath = 'openapi.json';
+    let httpApiPath = 'http-api.json';
+    let asyncApiPath = 'asyncapi.json';
+    let skipOpenApi = false;
+    let skipHttpApi = false;
+    let skipAsyncApi = false;
 
     // Parse command line arguments
-    // analyze [directory] [--output file.json]
-    const analyzeIndex = args.indexOf('analyze');
-    if (analyzeIndex !== -1 && args.length > analyzeIndex + 1) {
-        const nextArg = args[analyzeIndex + 1];
+    const cmdIndex = legacyAnalyzeMode ? args.indexOf('analyze') : args.indexOf('generate');
+
+    if (cmdIndex !== -1 && args.length > cmdIndex + 1) {
+        const nextArg = args[cmdIndex + 1];
         if (!nextArg.startsWith('--')) {
             directory = path.resolve(nextArg);
         }
     }
 
-    const outputIndex = args.indexOf('--output');
-    if (outputIndex !== -1 && args.length > outputIndex + 1) {
-        outputPath = args[outputIndex + 1];
+    // Helper to get arg value
+    const getArgValue = (flag: string) => {
+        const index = args.indexOf(flag);
+        if (index !== -1 && args.length > index + 1) {
+            return args[index + 1];
+        }
+        return null;
+    };
+
+    const dirArg = getArgValue('--dir');
+    if (dirArg) directory = path.resolve(dirArg);
+
+    const outArg = getArgValue('--output'); // Legacy support
+    if (outArg) openApiPath = outArg;
+
+    const openApiArg = getArgValue('--openapi');
+    if (openApiArg) openApiPath = openApiArg;
+
+    const httpApiArg = getArgValue('--http-api');
+    if (httpApiArg) httpApiPath = httpApiArg;
+
+    const asyncApiArg = getArgValue('--asyncapi');
+    if (asyncApiArg) asyncApiPath = asyncApiArg;
+
+    if (args.includes('--skip-openapi')) skipOpenApi = true;
+    if (args.includes('--skip-http-api')) skipHttpApi = true;
+    if (args.includes('--skip-asyncapi')) skipAsyncApi = true;
+
+    if (legacyAnalyzeMode) {
+        skipHttpApi = true;
+        skipAsyncApi = true;
     }
 
     // Verify directory exists
@@ -182,20 +224,203 @@ async function analyze() {
     const s = p.spinner();
     s.start(`Analyzing directory: ${directory}`);
 
+    const warnings: any[] = [];
+
     try {
-        const spec = await analyzeDirectory(directory);
+        const analyzer = new OpenAPIAnalyzer(directory);
+        const analysis = await analyzer.analyze();
 
-        s.stop('Analysis complete');
+        s.message('Generating specifications...');
 
-        // Write to file
-        const fullOutputPath = path.resolve(outputPath);
-        fs.writeFileSync(fullOutputPath, JSON.stringify(spec, null, 2));
+        // Collect Warnings from Analysis
+        const applications = analysis.applications || [];
 
-        p.note(`OpenAPI spec written to: ${fullOutputPath}`, 'Success');
+        let pathCount = 0;
+        let eventCount = 0;
 
-        // Show summary
-        const pathCount = Object.keys(spec.paths || {}).length;
-        p.note(`Found ${pathCount} unique paths`, 'Summary');
+        // Process Applications for Warnings and Counts
+        for (const app of applications) {
+            for (const route of app.routes) {
+                if (['EVENT', 'ON'].includes(route.method.toUpperCase())) {
+                    eventCount++;
+                } else {
+                    pathCount++;
+                }
+
+                if (route.path === '__DYNAMIC_EVENT__' || route.path.includes('__DYNAMIC_EVENT__')) {
+                    warnings.push({
+                        type: 'dynamic-path',
+                        message: 'Dynamic path/event detected',
+                        detail: `Method: ${route.method}`,
+                        location: route.sourceContext
+                    });
+                }
+
+                if (route.emits) {
+                    for (const emit of route.emits) {
+                        if (emit.event === '__DYNAMIC_EMIT__') {
+                            warnings.push({
+                                type: 'dynamic-emit',
+                                message: 'Dynamic emit detected',
+                                detail: `Handler: ${route.handlerName}`,
+                                location: { file: route.sourceContext?.file, line: emit.location?.startLine }
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        // 1. Generate Extended OpenAPI (HTTP API)
+        let httpApiSpec: any = null;
+        if (!skipHttpApi || !skipOpenApi) { // We need it for compliant spec too
+            // Use generating function from analyzer if available, or construct basic spec
+            // OpenAPIAnalyzer has generateOpenAPISpec
+            httpApiSpec = analyzer.generateOpenAPISpec();
+
+            // Enrich with middleware registry (manual match from AST)
+            const middlewareRegistry: Record<string, any> = {};
+            let mwId = 0;
+            for (const app of applications) {
+                if (app.middleware) {
+                    for (const mw of app.middleware) {
+                        const id = `middleware-${mwId++}`;
+                        middlewareRegistry[id] = { ...mw, id };
+                    }
+                }
+            }
+            if (Object.keys(middlewareRegistry).length > 0) {
+                httpApiSpec["x-middleware-registry"] = middlewareRegistry;
+            }
+
+            // Filter out EVENT methods from HTTP API spec if analyzer included them
+            if (httpApiSpec.paths) {
+                for (const pathKey of Object.keys(httpApiSpec.paths)) {
+                    for (const method of Object.keys(httpApiSpec.paths[pathKey])) {
+                        if (['event', 'on'].includes(method.toLowerCase())) {
+                            delete httpApiSpec.paths[pathKey][method];
+                        }
+                    }
+                    if (Object.keys(httpApiSpec.paths[pathKey]).length === 0) {
+                        delete httpApiSpec.paths[pathKey];
+                    }
+                }
+            }
+        }
+
+        // 2. Generate Compliant OpenAPI
+        if (!skipOpenApi && httpApiSpec) {
+            const compliantSpec = JSON.parse(JSON.stringify(httpApiSpec));
+
+            // Strip extensions
+            const stripExtensions = (obj: any) => {
+                if (!obj || typeof obj !== 'object') return;
+                if (Array.isArray(obj)) {
+                    obj.forEach(stripExtensions);
+                    return;
+                }
+                for (const key of Object.keys(obj)) {
+                    if (key.startsWith('x-')) {
+                        delete obj[key];
+                    } else {
+                        stripExtensions(obj[key]);
+                    }
+                }
+            };
+            stripExtensions(compliantSpec);
+
+            const fullOutputPath = path.resolve(openApiPath);
+            fs.writeFileSync(fullOutputPath, JSON.stringify(compliantSpec, null, 2));
+            if (!legacyAnalyzeMode) p.note(`OpenAPI spec written to: ${fullOutputPath}`, 'OpenAPI');
+            else p.note(`OpenAPI spec written to: ${fullOutputPath}`, 'Success');
+        }
+
+        // 3. Save HTTP API
+        if (!skipHttpApi && httpApiSpec) {
+            const fullOutputPath = path.resolve(httpApiPath);
+            fs.writeFileSync(fullOutputPath, JSON.stringify(httpApiSpec, null, 2));
+            if (!legacyAnalyzeMode) p.note(`HTTP API spec written to: ${fullOutputPath}`, 'HTTP API');
+        }
+
+        // 4. Generate AsyncAPI
+        if (!skipAsyncApi) {
+            const asyncApiSpec: any = {
+                asyncapi: "3.0.0",
+                info: { title: "Shokupan AsyncAPI", version: "1.0.0" },
+                channels: {}
+            };
+
+            for (const app of applications) {
+                for (const route of app.routes) {
+                    // 1. Subscribe (Event Handlers)
+                    if (['EVENT', 'ON'].includes(route.method.toUpperCase())) {
+                        const eventName = route.path;
+                        // Prevent overwriting
+                        if (!asyncApiSpec.channels[eventName]) {
+                            asyncApiSpec.channels[eventName] = {
+                                publish: { // Client publishes to server
+                                    operationId: `on${eventName.replace(/[^a-zA-Z0-9]/g, '_')}`,
+                                    message: { payload: { type: 'object' } },
+                                    "x-source-info": [route.sourceContext]
+                                }
+                            };
+                        } else {
+                            // Append source info if possible? AsyncAPI 3.0 allows multiple refs?
+                            // Simplified: just prefer first or merge info (not easy here)
+                        }
+                    }
+
+                    // 2. Publish (Emits)
+                    if (route.emits) {
+                        for (const emit of route.emits) {
+                            const eventName = emit.event;
+                            if (!asyncApiSpec.channels[eventName]) {
+                                asyncApiSpec.channels[eventName] = {
+                                    subscribe: { // Client subscribes to server
+                                        operationId: `emit${eventName.replace(/[^a-zA-Z0-9]/g, '_')}`,
+                                        message: { payload: emit.payload || { type: 'object' } }
+                                    }
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+
+            const fullOutputPath = path.resolve(asyncApiPath);
+            fs.writeFileSync(fullOutputPath, JSON.stringify(asyncApiSpec, null, 2));
+            if (!legacyAnalyzeMode) p.note(`AsyncAPI spec written to: ${fullOutputPath}`, 'AsyncAPI');
+        }
+
+        s.stop('Generation complete');
+
+        // Show Warnings
+        if (warnings.length > 0) {
+            p.note(`${warnings.length} warnings detected during generation.`, 'Warnings');
+            const groupedArgs = warnings.reduce((acc, w) => {
+                if (!acc[w.type]) acc[w.type] = [];
+                acc[w.type].push(w);
+                return acc;
+            }, {} as Record<string, any[]>);
+
+            for (const [type, items] of Object.entries(groupedArgs)) {
+                const count = (items as any[]).length;
+                console.log(`\n  ${type} (${count}):`);
+                (items as any[]).slice(0, 5).forEach(w => {
+                    console.log(`    - ${w.message} ${w.detail ? `(${w.detail})` : ''}`);
+                    if (w.location) console.log(`      at ${w.location.file}:${w.location.line}`);
+                });
+                if (count > 5) console.log(`      ... and ${count - 5} more`);
+            }
+        }
+
+        if (!legacyAnalyzeMode) {
+            p.note(`Found ${pathCount} paths and ${eventCount} events`, 'Summary');
+        } else {
+            // Legacy summary kept simple
+            // We can't easily get the count from 'spec' variable that was in old code b/c we generate differently now.
+            p.note(`Found ${pathCount} unique paths`, 'Summary');
+        }
 
         p.outro('Done!');
     } catch (error: any) {
@@ -212,6 +437,8 @@ async function main() {
 
     if (command === 'analyze') {
         await analyze();
+    } else if (command === 'generate') {
+        await generate(false);
     } else if (command === 'scaffold' || !command) {
         // Default to scaffold for backwards compatibility
         await scaffold();
@@ -220,10 +447,12 @@ async function main() {
         console.log('');
         console.log('Commands:');
         console.log('  scaffold (default) - Scaffold controllers, middleware, or plugins');
-        console.log('  analyze <directory> - Analyze a Shokupan application and generate OpenAPI spec');
+        console.log('  generate           - Generate compliant OpenAPI, HTTP API, and AsyncAPI specs');
+        console.log('  analyze <dir>      - Content analysis (Legacy/OpenAPI only)');
         console.log('');
         console.log('Usage:');
         console.log('  shokupan scaffold');
+        console.log('  shokupan generate [--dir <dir>] [--openapi <path>] [--http-api <path>] [--asyncapi <path>]');
         console.log('  shokupan analyze <directory> [--output openapi.json]');
         process.exit(0);
     }

@@ -99,6 +99,13 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
         }
     } catch (e) {
         // Silently fail if analysis cannot run
+        if (options.warnings) {
+            options.warnings.push({
+                type: 'ast-analysis-failed',
+                message: 'AST Analysis failed or skipped',
+                detail: e.message
+            });
+        }
     }
 
     const matchedAstRoutes = new Set<any>();
@@ -206,6 +213,14 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                     for (const emit of emits) {
                         if (emit.event === '__DYNAMIC_EMIT__') {
                             const warningKey = `${eventName}/Dynamic Emit`;
+                            if (options.warnings) {
+                                options.warnings.push({
+                                    type: 'dynamic-emit',
+                                    message: 'Dynamic emit detected',
+                                    detail: `Event: ${eventName}`,
+                                    location: { file: astMatch?.sourceContext?.file, line: emit.location?.startLine }
+                                });
+                            }
                             channels[warningKey] = {
                                 subscribe: {
                                     operationId: `dynamicEmitWarning${eventName}`,
@@ -402,6 +417,14 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
         }
 
         const key = `${prefix}.Dynamic Event ${i + 1}`;
+        if (options.warnings) {
+            options.warnings.push({
+                type: 'dynamic-event',
+                message: 'Dynamic event listener detected',
+                detail: `Event listener with dynamic name`,
+                location: { file: r.sourceContext?.file, line: r.sourceContext?.startLine }
+            });
+        }
 
         channels[key] = {
             publish: {

@@ -315,6 +315,13 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
     } catch (e) {
         // Silently fail if analysis cannot run (e.g. runtime environment issues)
         // console.warn("OpenAPI AST analysis skipped:", e);
+        if (options.warnings) {
+            options.warnings.push({
+                type: 'ast-analysis-failed',
+                message: 'AST Analysis failed or skipped',
+                detail: e.message
+            });
+        }
     }
 
     const collect = (router: ShokupanRouter<T>, prefix = "", currentGroup = defaultTagGroup, defaultTag = defaultTagName, inheritedMiddleware: any[] = [], isRootLevel = true) => {
@@ -507,6 +514,14 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
 
                     // Add warning if schema has unknown fields
                     if (astMatch.hasUnknownFields) {
+                        if (options.warnings) {
+                            options.warnings.push({
+                                type: 'unknown-fields',
+                                message: 'Response contains fields with unknown types',
+                                detail: `Route: ${fullPath} [${route.method}]`,
+                                location: { file: astMatch.sourceContext?.file, line: astMatch.sourceContext?.startLine }
+                            });
+                        }
                         operation['x-warning'] = true;
                         operation['x-warning-reason'] = 'Response contains fields with unknown types that could not be statically analyzed';
                     }
@@ -532,6 +547,14 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                 }
             } else {
                 // No static analysis match - Add Warning and Runtime Source
+                if (options.warnings) {
+                    options.warnings.push({
+                        type: 'route-not-found',
+                        message: 'Route could not be statically analyzed',
+                        detail: `Route: ${fullPath} [${route.method}]`,
+                        location: route.metadata ? { file: route.metadata.file, line: route.metadata.line } : undefined
+                    });
+                }
                 const runtimeSource = ((route.handler as any).originalHandler || route.handler).toString();
                 // Removed markdown source block and warning per request (or simplified)
                 // Minimal warning
@@ -657,7 +680,7 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
 
 
 
-    return {
+    const spec: any = {
         openapi: "3.1.0",
         info: { title: "Shokupan API", version: "1.0.0", ...options.info },
         paths,
@@ -668,5 +691,30 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
         "x-tagGroups": xTagGroups,
         "x-middleware-registry": astMiddlewareRegistry
     };
+
+    if (options.compliant) {
+        spec["x-tagGroups"] = undefined;
+        spec["x-middleware-registry"] = undefined;
+
+        // Recursive strip function
+        const stripExtensions = (obj: any) => {
+            if (!obj || typeof obj !== 'object') return;
+            if (Array.isArray(obj)) {
+                obj.forEach(stripExtensions);
+                return;
+            }
+            for (const key of Object.keys(obj)) {
+                if (key.startsWith('x-')) {
+                    delete obj[key];
+                } else {
+                    stripExtensions(obj[key]);
+                }
+            }
+        };
+
+        stripExtensions(spec);
+    }
+
+    return spec;
 }
 
