@@ -61,6 +61,7 @@ export interface ApplicationInstance {
     controllerPrefix?: string;
     routes: RouteInfo[];
     mounted: MountInfo[];
+    middleware: MiddlewareInfo[]; // Middleware registered on this app/router
 }
 
 interface MountInfo {
@@ -74,6 +75,29 @@ interface MountInfo {
         endLine: number;
     };
 }
+
+/**
+ * Middleware information extracted from AST
+ */
+export interface MiddlewareInfo {
+    name: string;
+    file: string;
+    startLine: number;
+    endLine: number;
+    handlerSource?: string;
+    responseTypes?: Record<string, any>; // e.g., { "401": { description: "...", content: {...} }, "403": {...} }
+    headers?: string[]; // Headers set/modified by middleware
+    scope: 'global' | 'router' | 'route';
+    sourceContext?: {
+        file: string;
+        startLine: number;
+        endLine: number;
+        snippet?: string;
+        snippetStartLine?: number;
+        highlights?: { startLine: number; endLine: number; type: 'emit' | 'return-success' | 'return-warning'; }[];
+    };
+}
+
 
 /**
  * Main analyzer class
@@ -358,7 +382,8 @@ export class OpenAPIAnalyzer {
                     className: 'Controller',
                     controllerPrefix,
                     routes: [],
-                    mounted: []
+                    mounted: [],
+                    middleware: []
                 });
             }
         }
@@ -377,7 +402,8 @@ export class OpenAPIAnalyzer {
                         filePath: sourceFile.fileName,
                         className: className as 'Shokupan' | 'ShokupanRouter',
                         routes: [],
-                        mounted: []
+                        mounted: [],
+                        middleware: []
                     });
                 }
             }
@@ -396,7 +422,8 @@ export class OpenAPIAnalyzer {
                             filePath: sourceFile.fileName,
                             className: 'Shokupan',
                             routes: [],
-                            mounted: []
+                            mounted: [],
+                            middleware: []
                         });
                     }
                 }
@@ -523,6 +550,12 @@ export class OpenAPIAnalyzer {
                                 const mount = this.extractMountFromCall(node, sourceFile);
                                 if (mount) {
                                     app.mounted.push(mount);
+                                }
+                            } else if (methodName === 'use') {
+                                // Extract middleware info
+                                const middleware = this.extractMiddlewareFromCall(node, sourceFile);
+                                if (middleware) {
+                                    app.middleware.push(middleware);
                                 }
                             }
                         }
@@ -1544,6 +1577,130 @@ export class OpenAPIAnalyzer {
                 startLine: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
                 endLine: sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line + 1
             }
+        };
+    }
+
+    /**
+     * Extract middleware information from .use() call
+     */
+    private extractMiddlewareFromCall(node: ts.CallExpression, sourceFile: ts.SourceFile): MiddlewareInfo | null {
+        const args = node.arguments;
+
+        if (args.length < 1) return null;
+
+        const middlewareArg = args[0];
+
+        // Get middleware name from the function/identifier
+        let middlewareName = 'anonymous';
+        if (ts.isIdentifier(middlewareArg)) {
+            middlewareName = middlewareArg.getText(sourceFile);
+        } else if (ts.isCallExpression(middlewareArg) && ts.isIdentifier(middlewareArg.expression)) {
+            // Middleware factory pattern: app.use(RateLimitMiddleware({...}))
+            middlewareName = middlewareArg.expression.getText(sourceFile);
+        } else if (ts.isFunctionExpression(middlewareArg) || ts.isArrowFunction(middlewareArg)) {
+            middlewareName = 'inline-middleware';
+        }
+
+        // Analyze middleware for response types and headers
+        const analysis = this.analyzeMiddleware(middlewareArg, sourceFile);
+
+        return {
+            name: middlewareName,
+            file: sourceFile.fileName,
+            startLine: sourceFile.getLineAndCharacterOfPosition(middlewareArg.getStart()).line + 1,
+            endLine: sourceFile.getLineAndCharacterOfPosition(middlewareArg.getEnd()).line + 1,
+            handlerSource: middlewareArg.getText(sourceFile),
+            responseTypes: analysis.responseTypes,
+            headers: analysis.headers,
+            scope: 'router', // Will be updated during collection based on context
+            sourceContext: {
+                file: sourceFile.fileName,
+                startLine: sourceFile.getLineAndCharacterOfPosition(middlewareArg.getStart()).line + 1,
+                endLine: sourceFile.getLineAndCharacterOfPosition(middlewareArg.getEnd()).line + 1,
+                snippet: middlewareArg.getText(sourceFile),
+                highlights: analysis.highlights
+            }
+        };
+    }
+
+    /**
+     * Analyze middleware function to extract response types and headers
+     */
+    private analyzeMiddleware(middleware: ts.Node, sourceFile: ts.SourceFile): {
+        responseTypes?: Record<string, any>;
+        headers?: string[];
+        highlights?: { startLine: number; endLine: number; type: 'emit' | 'return-success' | 'return-warning'; }[];
+    } {
+        const responseTypes: Record<string, any> = {};
+        const headers: string[] = [];
+        const highlights: { startLine: number; endLine: number; type: 'emit' | 'return-success' | 'return-warning'; }[] = [];
+
+        const middlewareSource = middleware.getText(sourceFile);
+
+        // Detect response status codes: ctx.json(..., 401), ctx.text(..., 403), etc.
+        const statusCodePattern = /ctx\.(json|text|html|jsx)\([^)]*,\s*(\d{3,})\)/g;
+        let match;
+        while ((match = statusCodePattern.exec(middlewareSource)) !== null) {
+            const statusCode = match[2];
+            const contentType = match[1];
+
+            if (!responseTypes[statusCode]) {
+                let description = `Error response (${statusCode})`;
+                if (statusCode === '401') description = 'Unauthorized';
+                else if (statusCode === '403') description = 'Forbidden';
+                else if (statusCode === '429') description = 'Too Many Requests';
+                else if (statusCode === '500') description = 'Internal Server Error';
+
+                const content: Record<string, any> = {};
+                if (contentType === 'json') {
+                    content['application/json'] = { schema: { type: 'object' } };
+                } else if (contentType === 'text') {
+                    content['text/plain'] = { schema: { type: 'string' } };
+                } else if (contentType === 'html' || contentType === 'jsx') {
+                    content['text/html'] = { schema: { type: 'string' } };
+                }
+
+                responseTypes[statusCode] = {
+                    description,
+                    ...(Object.keys(content).length > 0 ? { content } : {})
+                };
+            }
+        }
+
+        // Detect header modifications: ctx.set(...), res.headers.set(...), ctx.header(...)
+        const headerPatterns = [
+            /ctx\.set\(['"]([^'"]+)['"]/g,
+            /res\.headers\.set\(['"]([^'"]+)['"]/g,
+            /ctx\.header\(['"]([^'"]+)['"]/g,
+            /\.set\(['"]([^'"]+)['"],/g // Generic .set pattern
+        ];
+
+        for (const pattern of headerPatterns) {
+            while ((match = pattern.exec(middlewareSource)) !== null) {
+                const headerName = match[1];
+                if (headerName && !headers.includes(headerName)) {
+                    headers.push(headerName);
+                }
+            }
+        }
+
+        // Detect common rate-limit specific headers
+        if (middlewareSource.includes('X-RateLimit')) {
+            const rateLimitHeaders = ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'Retry-After'];
+            for (const header of rateLimitHeaders) {
+                if (middlewareSource.includes(header) && !headers.includes(header)) {
+                    headers.push(header);
+                }
+            }
+        }
+
+        // TODO: Add highlighting for response code locations in the future
+        // For now, we'll skip this to keep implementation simpler
+
+        return {
+            responseTypes: Object.keys(responseTypes).length > 0 ? responseTypes : undefined,
+            headers: headers.length > 0 ? headers : undefined,
+            highlights: highlights.length > 0 ? highlights : undefined
         };
     }
 

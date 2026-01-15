@@ -287,11 +287,29 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
 
     // Attempt to run AST Analysis
     let astRoutes: any[] = [];
+    let astMiddlewareRegistry: Record<string, any> = {};
+    let applications: any[] = [];
     try {
         const { OpenAPIAnalyzer } = await import('./analyzer');
         const analyzer = new OpenAPIAnalyzer(process.cwd());
-        const { applications } = await analyzer.analyze();
+        const analysisResult = await analyzer.analyze();
+        applications = analysisResult.applications;
         astRoutes = await getAstRoutes(applications);
+
+        // Build middleware registry from AST-analyzed applications
+        let middlewareId = 0;
+        for (const app of applications) {
+            if (app.middleware && app.middleware.length > 0) {
+                for (const mw of app.middleware) {
+                    const id = `middleware-${middlewareId++}`;
+                    astMiddlewareRegistry[id] = {
+                        ...mw,
+                        id,
+                        usedBy: [] // Will be populated when processing routes
+                    };
+                }
+            }
+        }
     } catch (e) {
         // Silently fail if analysis cannot run (e.g. runtime environment issues)
         // console.warn("OpenAPI AST analysis skipped:", e);
@@ -349,15 +367,58 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                 tags: [tag]
             };
 
-            // Collect Middleware
+            // Collect Middleware - both runtime and AST-analyzed
             const routeMiddleware = route.middleware || [];
             const allMiddleware = [...inheritedMiddleware, ...routerMiddleware, ...routeMiddleware];
 
-            if (allMiddleware.length > 0) {
-                operation['x-shokupan-middleware'] = allMiddleware.map(mw => ({
-                    name: mw.name || 'middleware',
-                    metadata: mw.metadata
-                }));
+            // Find matching AST middleware for this route's path and method
+            const astMiddlewareForRoute: any[] = [];
+            for (const [mwId, mw] of Object.entries(astMiddlewareRegistry)) {
+                // For now, associate all middleware from the same app with all routes from that app
+                // In a more sophisticated implementation, we'd track router-level vs global vs route-level scope
+                const appForRoute = applications.find((app: any) =>
+                    app.routes?.some((r: any) => r.path === fullPath && r.method === route.method.toUpperCase())
+                );
+                const appForMiddleware = applications.find((app: any) =>
+                    app.middleware?.some((m: any) => m.name === mw.name && m.file === mw.file)
+                );
+
+                if (appForRoute && appForMiddleware && appForRoute.filePath === appForMiddleware.filePath) {
+                    astMiddlewareForRoute.push({ ...mw, id: mwId });
+                    // Track which routes use this middleware
+                    if (!mw.usedBy.includes(fullPath)) {
+                        mw.usedBy.push(fullPath);
+                    }
+                }
+            }
+
+            // Merge middleware responses into operation
+            for (const astMw of astMiddlewareForRoute) {
+                if (astMw.responseTypes) {
+                    for (const [statusCode, responseSpec] of Object.entries(astMw.responseTypes)) {
+                        // Don't override existing responses, middleware responses have lower priority
+                        if (!operation.responses[statusCode]) {
+                            operation.responses[statusCode] = responseSpec;
+                        }
+                    }
+                }
+            }
+
+            if (allMiddleware.length > 0 || astMiddlewareForRoute.length > 0) {
+                operation['x-shokupan-middleware'] = [
+                    ...allMiddleware.map(mw => ({
+                        name: mw.name || 'middleware',
+                        metadata: mw.metadata
+                    })),
+                    ...astMiddlewareForRoute.map(mw => ({
+                        id: mw.id,
+                        name: mw.name,
+                        responses: mw.responseTypes,
+                        headers: mw.headers,
+                        file: mw.file,
+                        line: mw.startLine
+                    }))
+                ];
             }
 
             if (route.guards) {
@@ -592,6 +653,29 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
         xTagGroups.push({ name, tags: Array.from(tags).sort() });
     }
 
+    // Add virtual paths for middleware
+    for (const [mwId, mw] of Object.entries(astMiddlewareRegistry)) {
+        const virtualPath = `/_middleware/${mwId}`;
+        paths[virtualPath] = {
+            get: {
+                'x-virtual': true,
+                'x-middleware-detail': true,
+                summary: `Middleware: ${mw.name}`,
+                description: `Virtual endpoint representing middleware "${mw.name}"`,
+                responses: mw.responseTypes || {},
+                'x-source-info': mw.sourceContext,
+                'x-used-by': mw.usedBy,
+                'x-middleware-metadata': {
+                    name: mw.name,
+                    file: mw.file,
+                    headers: mw.headers,
+                    scope: mw.scope
+                },
+                tags: ['_Middleware']
+            }
+        };
+    }
+
     return {
         openapi: "3.1.0",
         info: { title: "Shokupan API", version: "1.0.0", ...options.info },
@@ -600,7 +684,8 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
         servers: options.servers,
         tags: options.tags,
         externalDocs: options.externalDocs,
-        "x-tagGroups": xTagGroups
+        "x-tagGroups": xTagGroups,
+        "x-middleware-registry": astMiddlewareRegistry
     };
 }
 
