@@ -56,13 +56,41 @@ The underlying WebSocket connection is available via `ctx.socket`.
 
 When running on Bun, Shokupan automatically hooks into `Bun.serve`'s WebSocket handling.
 
-To make this work, the client must follow a simple protocol for sending events:
+To make this work, the client must follow a specific envelope format. Shokupan supports a few variations to be flexible.
+
+### Event Name Resolution
+
+The event name is determined by one of the following fields:
+
 ```json
-{
-    "type": "EVENT",
-    "event": "eventName",
-    "data": { ...payload... }
-}
+{ "type": "EVENT", "name": "eventName" }
+// OR
+{ "event": "eventName" }
+```
+
+### Data Payload
+
+The data payload is determined by checks in the following order:
+
+1.  **Recognized Properties:** `data`, `body`, or `payload`.
+2.  **Fallback:** If none of the above are present, the entire message object is used as the data.
+
+**Examples:**
+
+```json
+// Uses "123" as data
+{ "event": "foo", "id": "123" }
+
+// Explicit data properties
+{ "event": "foo", "data": "123" }
+{ "event": "foo", "body": "123" }
+{ "event": "foo", "payload": "123" }
+
+// Object payloads
+{ "event": "foo", "data": { "prop": 123 } }
+
+// Fallback: Uses the entire object as data
+{ "event": "foo", "prop": 123 }
 ```
 
 The server will dispatch these messages to the corresponding `@Event("eventName")` handler.
@@ -149,14 +177,27 @@ const app = new Shokupan({
 **Request:**
 Send a message (or emit `shokupan:request` in Socket.IO) with the following structure:
 
+```typescript
+{
+    type: "HTTP",
+    id: string | number, // Unique Request ID
+    method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
+    path: string,        // e.g. "/api/users/123"
+    headers?: Record<string, string>,
+    body?: string | object
+}
+```
+
+**Example:**
+
 ```json
 {
     "type": "HTTP", 
-    "id": "unique-request-id",
-    "method": "GET",
-    "path": "/api/users/123",
-    "headers": { "Authorization": "Bearer ..." },
-    "body": null
+    "id": "req-1",
+    "method": "POST",
+    "path": "/api/users",
+    "headers": { "Content-Type": "application/json" },
+    "body": { "name": "Alice" }
 }
 ```
 
