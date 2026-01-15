@@ -236,8 +236,9 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      */
     public findEvent(name: string): ShokupanHandler<T>[] | null {
         // Check local
-        if (this.eventHandlers.has(name)) {
-            return this.eventHandlers.get(name)!;
+        const handlers = this.eventHandlers.get(name);
+        if (handlers !== undefined) {
+            return handlers;
         }
 
         // Check children
