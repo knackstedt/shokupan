@@ -370,14 +370,24 @@ async function selectEvent(name, el) {
 
                 if (code) {
                     const wrapper = document.createElement('div');
+                    wrapper.id = `snippet-group-${i}`;
+                    wrapper.classList.add('source-group');
                     wrapper.style.marginBottom = '16px';
+
                     wrapper.innerHTML = `
-                    <a href="vscode://file/${src.file}:${src.line}" class="doc-source-link" title="${src.file}:${src.line}">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px">
-                            <polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline>
-                        </svg>
-                        ${src.file.split('/').pop()}:${src.line}
-                    </a>
+                    <div class="source-header-actions" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                        <a href="vscode://file/${src.file}:${src.line}" class="doc-source-link" title="${src.file}:${src.line}">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px">
+                                <polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline>
+                            </svg>
+                            ${src.file.split('/').pop()}:${src.line}
+                        </a>
+                        <button class="btn-icon" title="Toggle Fullscreen" onclick="toggleFullscreen('snippet-group-${i}', 'snippet-editor-${i}')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path>
+                            </svg>
+                        </button>
+                    </div>
                     <div id="snippet-editor-${i}" style="height: 400px; border: 1px solid #333; border-radius: 6px; overflow: hidden;"></div>`;
                     container.appendChild(wrapper);
 
@@ -425,12 +435,6 @@ async function selectEvent(name, el) {
                     });
                 }
             }
-
-            container.innerHTML += `<button class="btn icon-btn" id="btn-source-fullscreen" title="Toggle Fullscreen">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
-                </svg>
-            </button>`;
 
         }
         return;
