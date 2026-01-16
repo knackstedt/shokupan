@@ -18,6 +18,12 @@ const app = new Shokupan({
     enableMiddlewareTracking: true,
 });
 
+app.use(RateLimitMiddleware({
+    windowMs: 60 * 1000, // 1 minute
+    max: 500, // 100 requests per minute
+    message: { error: 'Too many requests, please try again later.' },
+    headers: true
+}));
 
 app.event("trivial", (ctx) => {
     console.log("Trivial event received. We will now hug your face!");
@@ -45,25 +51,24 @@ app.event("simple/otherDomains", (ctx) => {
     ctx.emit("simple/otherDomainsResponse", { message: Date.now() });
 });
 
-app.event("complex/action1", (ctx) => {
+app.event("complex/action1", async (ctx) => {
+    console.log(await ctx.body());
     ctx.emit("complex/action1Result", { message: Date.now() });
 });
-app.event("complex/action2", (ctx) => {
+app.event("complex/action2", async (ctx) => {
+    console.log(await ctx.body());
     ctx.emit("complex/action2Result", { message: Date.now() });
 });
-
-
-
 
 app.mount("/nested", NestedRouter);
 
 
-app.use(RateLimitMiddleware({
-    windowMs: 60 * 1000, // 1 minute
-    max: 500, // 100 requests per minute
-    message: { error: 'Too many requests, please try again later.' },
-    headers: true
-}));
+
+
+// This will get flagged because this path is random. 
+app.get(Math.random().toString(), ctx => {
+    ctx.text(ctx.params.param);
+});
 
 app.get("/path/:param", ctx => {
     ctx.text(ctx.params.param);
