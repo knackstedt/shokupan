@@ -115,6 +115,19 @@ export class Dashboard implements ShokupanPlugin {
         this[$appRoot] = app;
         this.metricsCollector = new MetricsCollector(this.db);
 
+        if (app.onStart) {
+            app.onStart(async () => {
+                if (app.dbPromise) {
+                    await app.dbPromise;
+                    if (app.db) {
+                        this.metricsCollector.db = app.db;
+                        // console.log('[Dashboard] Attached datastore to MetricsCollector');
+                    }
+                }
+            });
+        }
+
+
         const mountPath = options?.path || this.dashboardConfig.path || '/dashboard';
 
         // Register hooks on the app to track all requests
@@ -240,6 +253,8 @@ export class Dashboard implements ShokupanPlugin {
                 } catch (error) {
                     console.error('[Dashboard] Query failed at plugin.ts:180-191', {
                         error,
+                        errorMessage: error.message,
+                        errorStack: error.stack,
                         interval,
                         startTime,
                         query: 'metrics interval stats',
@@ -253,9 +268,9 @@ export class Dashboard implements ShokupanPlugin {
 
                 return ctx.json({
                     metrics: {
-                        totalRequests: s.total || 0,
-                        successfulRequests: s.success || 0,
-                        failedRequests: s.failed || 0,
+                        totalRequests: this.metrics.totalRequests,
+                        successfulRequests: this.metrics.successfulRequests,
+                        failedRequests: this.metrics.failedRequests,
                         activeRequests: this.metrics.activeRequests,
                         averageTotalTime_ms: s.avg_latency || 0,
                         recentTimings: this.metrics.recentTimings,

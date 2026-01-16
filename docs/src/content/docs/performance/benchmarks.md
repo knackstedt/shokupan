@@ -8,7 +8,7 @@ head:
     content: ":root { --sl-content-width: 100% !important; }"
 ---
 
-Shokupan is built with performance as a top priority. This page contains comprehensive benchmark results comparing Shokupan against other popular Node.js web frameworks across both **Bun** and **Node.js** runtimes.
+Shokupan is built with performance as a top priority. This page contains comprehensive benchmark results comparing Shokupan against other popular Node.js web frameworks across **Bun**, **Node.js**, and **Deno** runtimes.
 
 ## Overview
 
@@ -153,7 +153,7 @@ iframe2.onload = function() {
 ```bash
 cd src/benchmarking
 bun install
-bun run test
+bun run bench
 ```
 
 Filter by framework:
@@ -183,6 +183,11 @@ Combine filters:
 bun advanced-runner.ts --filter fastify --scenario large-payload-response
 ```
 
+Filter by runtime:
+```bash
+bun advanced-runner.ts --runtime deno
+```
+
 ### Reports and History
 
 Both benchmark suites automatically generate interactive HTML reports that:
@@ -197,7 +202,7 @@ For optimal Shokupan performance in production:
 
 1. **Enable Compression** - Use `Compression()` plugin with zstd for large payloads
 2. **Disable Logging** - Set `NODE_ENV=production` to disable development logs
-3. **Use Bun Runtime** - Shokupan is optimized for Bun's performance characteristics
+3. **Use Bun or Deno Runtime** - Shokupan is optimized for Bun's and Deno's performance characteristics
 4. **Minimize Middleware** - Each middleware adds overhead; use only what you need
 5. **Enable Caching** - Cache responses where appropriate using `ShokupanContext.set()` headers
 

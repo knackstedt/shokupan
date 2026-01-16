@@ -55,7 +55,8 @@ select {
     flex: 1;
     flex-direction: column;
     align-items: center;
-    overflow: hidden;
+    overflow: auto;
+    width: 100%;
 }
 
 .metrics-grid {
@@ -156,10 +157,6 @@ select {
     display: none;
     flex-direction: column;
     flex: 1;
-    overflow: auto;
-    width: -webkit-fill-available;
-    /* width: 1200px; */
-    max-width: 1200px;
     margin: 0 2rem;
 }
 
