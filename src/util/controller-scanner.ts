@@ -266,7 +266,7 @@ export class ControllerScanner {
             }
 
             // 3. Check for Event Decorator
-            const eventConfig = decoratedEvents.get(name);
+            const eventConfig = decoratedEvents?.get(name);
             if (eventConfig !== undefined) {
                 routesAttached++;
                 const routeArgs = decoratedArgs?.get(name);

@@ -174,7 +174,12 @@ export class ShokupanContext<
         return this[$requestId] ??= (this.app?.applicationConfig?.idGenerator?.() ?? nanoid());
     }
 
-    [Symbol.for("nodejs.util.inspect.custom")]() {
+    [
+        // Only apply a custom inspect symbol in Node.js, Deno, or Bun.
+        globalThis.navigator?.userAgent?.match(/Node\.js|Deno|Bun/)
+            ? Symbol.for("nodejs.util.inspect.custom")
+            : Symbol.for("no-op")
+    ]() {
         const innerString = inspect({
             method: this.request.method,
             url: this.request.url,

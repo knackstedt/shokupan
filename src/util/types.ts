@@ -465,8 +465,20 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
     /**
      * Factory function to create the server instance.
      * Defaults to Bun.serve.
+     * @deprecated Use `adapter` instead.
      */
     serverFactory: ServerFactory;
+
+    /**
+     * The server adapter to use.
+     * overrides `serverFactory`.
+     */
+    adapter?: 'bun' | 'node' | 'wintercg' | import('./adapter/adapters').ServerAdapter;
+
+    /**
+     * The file system adapter to use for `ctx.file`.
+     */
+    fileSystem?: import('./adapter/filesystem').FileSystemAdapter;
 
     /**
      * Lifecycle hooks.

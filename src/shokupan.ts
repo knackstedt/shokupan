@@ -6,12 +6,14 @@ import { generateOpenApi } from "./plugins/application/openapi/openapi";
 import { asyncContext, RequestContextStore } from "./util/async-hooks";
 import { getErrorStatus } from "./util/http-error";
 import { HTTP_STATUS } from "./util/http-status";
-import { $appRoot, $dispatch, $finalResponse, $isApplication, $routeMatched, $ws } from './util/symbol';
+import { $appRoot, $dispatch, $finalResponse, $isApplication, $routeMatched } from './util/symbol';
 import type { Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig, ShokupanPlugin } from './util/types';
 
-import type { Server, ServerWebSocket } from 'bun';
+import type { Server } from 'bun';
 import { Surreal } from 'surrealdb';
 import { ShokupanRouter } from './router';
+import { BunAdapter, NodeAdapter } from './util/adapter/adapters';
+import { DefaultFileSystemAdapter } from './util/adapter/filesystem';
 import { SystemCpuMonitor } from "./util/cpu-monitor";
 import { SurrealDatastore } from './util/datastore';
 import "./util/instrumentation";
@@ -119,6 +121,10 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         applicationConfig: ShokupanConfig = {}
     ) {
         const config = Object.assign({}, defaults, applicationConfig);
+
+        // Initialize Default FileSystem Adapter if not provided
+        config.fileSystem ??= new DefaultFileSystemAdapter();
+
         // Exclude hooks from the router config passed to super() to avoid double execution
         // The application handles app-level hooks in handleRequest()
         const { hooks, ...routerConfig } = config;
@@ -136,7 +142,12 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             name: 'ShokupanApplication'
         };
 
-        this.dbPromise = this.initDatastore();
+        if (this.applicationConfig.adapter !== 'wintercg') {
+            this.dbPromise = this.initDatastore().catch(err => {
+                // Log but don't crash if optional datastore init fails
+                this.logger?.debug("Failed to initialize default datastore", { error: err });
+            });
+        }
     }
 
     private async initDatastore() {
@@ -350,152 +361,34 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             this.cpuMonitor.start();
         }
 
-        const self = this;
 
-        const serveOptions = {
-            port: finalPort,
-            hostname: this.applicationConfig.hostname,
-            development: this.applicationConfig.development,
-            fetch: this.fetch.bind(this),
-            reusePort: this.applicationConfig.reusePort,
-            idleTimeout: this.applicationConfig.readTimeout ? this.applicationConfig.readTimeout / 1000 : undefined,
-            websocket: {
-                open(ws: ServerWebSocket<{ handler; }>) {
-                    ws.data?.handler?.open?.(ws);
-                },
-                async message(ws: ServerWebSocket<{ handler; }>, message: string | Buffer<ArrayBuffer>) {
-                    if (ws.data?.handler?.message) {
-                        return ws.data.handler.message(ws, message);
-                    }
-
-                    if (message instanceof Buffer) {
-                        message = message.toString();
-                    }
-                    if (typeof message !== "string") return;
-
-                    let payload: any;
-                    let isJSONPayload = false;
-                    if (message.startsWith('{')) {
-                        try {
-                            payload = JSON.parse(message);
-                            isJSONPayload = true;
-                        } catch { /* Ignore JSON parsing errors */ }
-                    }
-
-
-                    if (payload) {
-                        // HTTP Bridge
-                        if (isJSONPayload && self.applicationConfig['enableHttpBridge'] && payload.type === 'HTTP') {
-                            const { id, method, path, headers, body } = payload;
-                            const url = new URL(path, `http://${self.applicationConfig.hostname || 'localhost'}:${finalPort}`);
-
-                            const req = new Request(url.toString(), {
-                                method,
-                                headers,
-                                body: typeof body === 'object' ? JSON.stringify(body) : body
-                            });
-
-                            const res = await self.fetch(req);
-
-                            const resBody: any = await res.json()
-                                .catch(err => res.text());
-
-                            const resHeaders: Record<string, string> = {};
-                            res.headers.forEach((v, k) => resHeaders[k] = v);
-
-                            ws.send(JSON.stringify({
-                                type: 'RESPONSE',
-                                id,
-                                status: res.status,
-                                headers: resHeaders,
-                                body: resBody
-                            }));
-                            return;
-                        }
-
-                        // Event Handling
-                        const eventName = payload.event || (payload.type === 'EVENT' ? payload.name : undefined);
-                        if (eventName) {
-                            const handlers = self.findEvent(eventName);
-                            const handler = handlers?.length == 1 ? handlers[0] : compose(handlers);
-                            if (handler) {
-                                const data = payload.data || payload.body || payload.payload || payload;
-
-                                // Construct a Context that mocks a Request
-                                const req = new ShokupanRequest({
-                                    url: `http://${self.applicationConfig.hostname || 'localhost'}/event/${eventName}`,
-                                    method: 'POST',
-                                    headers: new Headers({ 'content-type': 'application/json' }),
-                                    body: JSON.stringify(data)
-                                });
-
-                                const ctx = new ShokupanContext(
-                                    req as unknown as ShokupanRequest<T>,
-                                    self.server,
-                                    {},
-                                    this,
-                                    null,
-                                    self.applicationConfig.enableMiddlewareTracking,
-                                    payload.id
-                                );
-                                // Expose socket on context for reply
-                                (ctx as any)[$ws] = ws;
-
-                                // Link context to socket for disconnect hooks
-                                // Note: This simplistic approach overwrites the context on each event.
-                                // Ideal: Maintain a set of contexts or checking if we need a persistent context per socket.
-                                // For now, we attach it so disconnect hooks work for at least the last active context or shared session.
-                                ws.data ??= {} as any;
-                                ws.data['ctx'] = ctx;
-
-                                try {
-                                    await handler(ctx as any);
-                                } catch (err) {
-                                    if (self.applicationConfig['websocketErrorHandler']) {
-                                        await self.applicationConfig['websocketErrorHandler'](err, ctx as any);
-                                    } else {
-                                        console.error(`Error in event ${eventName}:`, err);
-                                    }
-                                }
-                            }
-                            // Should we warn if a message is received that we don't have a handler for?
-                        }
-                    }
-                },
-                drain(ws: ServerWebSocket<{ handler; }>) {
-                    ws.data?.handler?.drain?.(ws);
-                },
-                close(ws: ServerWebSocket<{ handler; }>, code: number, reason: string) {
-                    ws.data?.handler?.close?.(ws, code, reason);
-                    // Shokupan Disconnect Hooks
-                    const ctx: any = ws.data?.['ctx'];
-                    if (ctx && typeof ctx.getDisconnectCallbacks === 'function') {
-                        const callbacks = ctx.getDisconnectCallbacks();
-                        if (Array.isArray(callbacks) && callbacks.length > 0) {
-                            Promise.all(callbacks.map(cb => cb())).catch(err => {
-                                console.error("Error executing socket disconnect hook:", err);
-                            });
-                        }
-                    }
-                },
+        // Use Adapter
+        let adapter = this.applicationConfig.adapter;
+        if (!adapter) {
+            // Auto-detect if adapter not specified
+            // @ts-ignore
+            if (typeof Bun !== "undefined") {
+                this.applicationConfig.adapter = 'bun';
+                adapter = new BunAdapter();
+            } else {
+                this.applicationConfig.adapter = 'node';
+                adapter = new NodeAdapter();
             }
-        };
-
-        let factory = this.applicationConfig.serverFactory;
-
-        // Detect if we are not running on Bun
-        // @ts-ignore
-        if (!factory && typeof Bun === "undefined") {
-            const { createHttpServer } = await import("./plugins/application/http-server");
-            factory = createHttpServer();
+        } else if (adapter === 'bun') {
+            adapter = new BunAdapter();
+        } else if (adapter === 'node') {
+            adapter = new NodeAdapter();
+        } else if (adapter === 'wintercg') {
+            // WinterCG adapter doesn't listen
+            console.warn("WinterCG adapter does not support listen(). Use fetch directly.");
+            return;
         }
 
-        this.server = factory
-            ? await factory(serveOptions) as Server<any>
-            : Bun.serve(serveOptions);
-
+        // @ts-ignore
+        this.server = await adapter.listen(finalPort, this);
         return this.server;
     }
+
 
     /**
      * Stops the application server.
