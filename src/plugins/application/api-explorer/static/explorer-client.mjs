@@ -368,6 +368,18 @@ function renderRequestView(route, container) {
                             <div class="info-header">
                                 <h2 class="info-title">${summary}</h2>
                                 <div class="info-meta">
+                                    ${op['x-shokupan-builtin'] ? `
+                                        <div class="meta-row">
+                                            <span class="builtin-badge" title="This endpoint is provided by a built-in plugin">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                                                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                                                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                                                </svg>
+                                                Built-in Plugin ${op['x-shokupan-plugin-name'] ? `(${op['x-shokupan-plugin-name']})` : ''}
+                                            </span>
+                                        </div>
+                                    ` : ''}
                                     ${op.tags ? `<div class="meta-row"><strong>Tags:</strong> ${op.tags.map(t => `<span class="badge">${t}</span>`).join('')}</div>` : ''}
                                 </div>
                             </div>

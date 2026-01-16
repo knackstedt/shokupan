@@ -13,6 +13,7 @@ interface GroupNode {
     routes?: Route[];
     children?: GroupNode[];
     path?: string;
+    isBuiltin?: boolean;
 }
 
 export function ApiExplorerApp({ spec, asyncSpec, config }: any) {
@@ -248,12 +249,15 @@ export function ApiExplorerApp({ spec, asyncSpec, config }: any) {
                 });
             }
 
+            const isBuiltin = routes.some(r => r.op['x-shokupan-builtin'] === true);
+
             return {
                 name,
                 type: 'group' as const,
                 children,
                 middleware: groupMiddleware,
-                commonPrefixPath // Store for display stripping
+                commonPrefixPath, // Store for display stripping
+                isBuiltin
             };
         });
 
@@ -414,13 +418,23 @@ function Sidebar({ spec, hierarchicalGroups }: any) {
             <div class="sidebar-collapse-trigger">➔</div>
             <nav class="nav-groups">
                 {hierarchicalGroups.map((group: any) => (
-                    <div class="nav-group collapsed" key={group.name}>
+                    <div class={`nav-group collapsed ${group.isBuiltin ? 'builtin-group' : ''}`} key={group.name}>
                         <div class="nav-group-title">
                             <span class="chevron">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="9 18 15 12 9 6"></polyline>
                                 </svg>
-                            </span> {group.name}
+                            </span>
+                            {group.isBuiltin && (
+                                <span class="builtin-icon" title="Built-in Plugin">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                                        <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                                        <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                                    </svg>
+                                </span>
+                            )}
+                            {group.name}
                         </div>
                         <div class="nav-items">
                             {/* Render middleware first if any */}

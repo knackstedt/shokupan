@@ -259,6 +259,24 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
             }
         }
 
+        let isBuiltinPlugin = false;
+        let pluginName = '';
+
+        // Detect builtin plugins
+        if (router.metadata?.file && router.metadata.file.includes('plugins/application/')) {
+            isBuiltinPlugin = true;
+            // Extract plugin name from path .../plugins/application/<name>/...
+            const match = router.metadata.file.match(/plugins\/application\/([^/]+)/);
+            if (match) {
+                pluginName = match[1].replace(/\.(ts|js|mjs|mts|cjs)$/, '');
+                // Override tag for builtin plugins to group them properly
+                tag = pluginName.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                // Force group to be "Built-in Plugins" or similar if we want them separated top-level
+                // But for now, let's just properly tag them so they group together
+                // group = "System"; 
+            }
+        }
+
         if (!tagGroups.has(group)) tagGroups.set(group, new Set());
 
         const routerMiddleware = router.middleware || [];
@@ -416,6 +434,8 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                     // Removed markdown source block per request
                 }
 
+
+
                 if (astMatch.requestTypes?.body) {
                     operation.requestBody = {
                         content: { 'application/json': { schema: astMatch.requestTypes.body } }
@@ -500,6 +520,13 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                         line: line || 1,
                         code: runtimeSource
                     };
+                }
+            }
+
+            if (isBuiltinPlugin) {
+                operation["x-shokupan-builtin"] = true;
+                if (pluginName) {
+                    operation["x-shokupan-plugin-name"] = pluginName;
                 }
             }
 
