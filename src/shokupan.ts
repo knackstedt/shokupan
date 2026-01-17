@@ -240,20 +240,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         await Promise.all(this.startupHooks.map(hook => hook()));
 
         if (this.applicationConfig.enableOpenApiGen) {
-            // Create the generation promise
-            this.openApiSpecPromise = generateOpenApi(this).then(spec => {
-                this.openApiSpec = spec;
-                return spec;
-            });
-
-            // Decide whether to block or not
-            const shouldBlock = this.applicationConfig.blockOnOpenApiGen !== false;
-
-            if (shouldBlock) {
-                // Wait for generation to complete before proceeding
-                await this.openApiSpecPromise;
-            }
-
             // --- Well-Known Files Implementation ---
 
             // 1. .well-known/openapi.yaml
@@ -320,6 +306,20 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                     };
                     return ctx.json(catalog);
                 });
+            }
+
+            // Create the generation promise
+            this.openApiSpecPromise = generateOpenApi(this).then(spec => {
+                this.openApiSpec = spec;
+                return spec;
+            });
+
+            // Decide whether to block or not
+            const shouldBlock = this.applicationConfig.blockOnOpenApiGen !== false;
+
+            if (shouldBlock) {
+                // Wait for generation to complete before proceeding
+                await this.openApiSpecPromise;
             }
 
             // Run spec available hooks (either now after blocking, or later after async completion)

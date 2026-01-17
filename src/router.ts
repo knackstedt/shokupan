@@ -163,7 +163,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             const r = this[$routes][i];
             const entry = {
                 type: 'route' as 'route',
-                path: r.path,
+                path: r.path.startsWith('/') ? r.path : '/' + r.path,
                 method: r.method,
                 metadata: r.metadata,
                 handlerName: r.handler.name,
@@ -194,7 +194,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         // Collect child routers
         const routers = this[$childRouters].map((r: ShokupanRouter<T>) => ({
             type: 'router' as 'router',
-            path: r[$mountPath],
+            path: r[$mountPath].startsWith('/') ? r[$mountPath] : '/' + r[$mountPath],
             metadata: r.metadata,
             children: r.getComponentRegistry()
         }));
