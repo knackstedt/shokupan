@@ -151,18 +151,31 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     }
 
     private async initDatastore() {
-        const db = new Surreal({ engines: this.applicationConfig.surreal?.engines ?? (await import('@surrealdb/node')).createNodeEngines() });
+        let engines = this.applicationConfig.surreal?.engines;
+
+        if (!engines && !this.applicationConfig.surreal?.url?.match(/^(?:wss?|https?):\/\//)) {
+            engines = (await import('@surrealdb/node')).createNodeEngines();
+        }
+
+        const db = new Surreal({ engines });
         this.datastore = new SurrealDatastore(db);
 
         await db.connect(
             this.applicationConfig.surreal?.url ?? (process.env.NODE_ENV === 'test' ? 'mem://' : 'surrealkv://database'),
             this.applicationConfig.surreal?.connectOptions
-        );
+        ).catch(err => {
+            this.logger?.error("Failed to connect to SurrealDB", { error: err });
+        });
 
         await db.use({
             namespace: this.applicationConfig.surreal?.namespace ?? "vendor",
             database: this.applicationConfig.surreal?.database ?? "shokupan"
         });
+
+        await db.query("DEFINE TABLE OVERWRITE request;");
+        await db.query("DEFINE TABLE OVERWRITE failed_request;");
+        await db.query("DEFINE TABLE OVERWRITE metric;");
+
     }
 
     /**
