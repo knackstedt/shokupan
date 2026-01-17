@@ -22,14 +22,44 @@ function switchTab(tabId) {
             switchApplicationView('graph');
         }
     }
-    else if (tabId === 'requests') {
+    else if (tabId === 'traffic') {
+        const activeView = document.querySelector('.traffic-view.active');
+        if (!activeView || activeView.id === 'traffic-view-requests') {
+            switchTrafficView('requests');
+        } else {
+            switchTrafficView('failures');
+        }
+    }
+}
+
+function switchTrafficView(viewId) {
+    console.log('Switching traffic view to:', viewId);
+
+    // Update buttons
+    const container = document.getElementById('tab-traffic');
+    if (!container) return;
+
+    container.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));
+    // Find button
+    const btn = Array.from(container.querySelectorAll('.view-btn')).find(b => b.getAttribute('onclick') === `switchTrafficView('${viewId}')`);
+    if (btn) btn.classList.add('active');
+
+    // Update content
+    container.querySelectorAll('.traffic-view').forEach(view => {
+        view.classList.remove('active');
+        view.style.display = 'none';
+    });
+
+    const activeView = document.getElementById('traffic-view-' + viewId);
+    if (activeView) {
+        activeView.classList.add('active');
+        activeView.style.display = 'block';
+    }
+
+    if (viewId === 'requests') {
         if (typeof fetchRequests === 'function') fetchRequests();
-    }
-    else if (tabId === 'failures') {
+    } else if (viewId === 'failures') {
         fetchFailures();
-    }
-    else if (tabId === 'middleware') {
-        fetchMiddleware();
     }
 }
 

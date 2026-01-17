@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import renderToString from 'preact-render-to-string';
+import { RecordId } from 'surrealdb';
 import type { DebugCollector } from "../../../context";
 import { ShokupanRouter } from "../../../router";
 import type { Shokupan } from '../../../shokupan';
@@ -56,6 +57,18 @@ export interface DashboardConfig {
         asyncapi?: boolean | { path?: string; };
         apiExplorer?: boolean | { path?: string; };
     };
+    /**
+     * Strategy for pushing request updates to the dashboard.
+     * 'immediate' - pushes every request as soon as it completes.
+     * 'batched' - buffers requests and pushes them at the interval specified by updateInterval.
+     * @default 'immediate'
+     */
+    updateStrategy?: 'immediate' | 'batched';
+    /**
+     * Interval in milliseconds for pushing batched updates.
+     * @default 10_000
+     */
+    updateInterval?: number;
 }
 
 class Collector implements DebugCollector {
@@ -102,6 +115,8 @@ export class Dashboard implements ShokupanPlugin {
 
     private clients = new Set<ServerWebSocket<any>>();
     private broadcastTimer: any;
+    private requestPushTimer: any;
+    private requestsBuffer: any[] = [];
 
     private startTime = Date.now();
     private instrumented = false;
@@ -173,6 +188,12 @@ export class Dashboard implements ShokupanPlugin {
 
         // Set up all routes on the internal router
         this.setupRoutes();
+
+        // Start request push timer if batched
+        const strategy = this.dashboardConfig.updateStrategy || 'immediate';
+        if (strategy === 'batched') {
+            this.startRequestPushTimer();
+        }
     }
 
     private detectIntegrations() {
@@ -243,25 +264,23 @@ export class Dashboard implements ShokupanPlugin {
             const success = ctx.upgrade({
                 data: {
                     handler: {
-                        handler: {
-                            open: (ws: ServerWebSocket<any>) => {
-                                this.clients.add(ws);
-                                console.log(`[Dashboard] Client connected. Total clients: ${this.clients.size}`);
-                                // Send default 1m history
-                                this.sendHistory(ws, '1m');
-                            },
-                            close: (ws: ServerWebSocket<any>) => {
-                                this.clients.delete(ws);
-                                console.log(`[Dashboard] Client disconnected. Total clients: ${this.clients.size}`);
-                            },
-                            message: (ws: ServerWebSocket<any>, message: string) => {
-                                try {
-                                    const msg = JSON.parse(message);
-                                    if (msg.type === 'get-history') {
-                                        this.sendHistory(ws, msg.interval || '1m');
-                                    }
-                                } catch (e) { }
-                            }
+                        open: (ws: ServerWebSocket<any>) => {
+                            this.clients.add(ws);
+                            console.log(`[Dashboard] Client connected. Total clients: ${this.clients.size}`);
+                            // Send default 1m history
+                            this.sendHistory(ws, '1m');
+                        },
+                        close: (ws: ServerWebSocket<any>) => {
+                            this.clients.delete(ws);
+                            console.log(`[Dashboard] Client disconnected. Total clients: ${this.clients.size}`);
+                        },
+                        message: (ws: ServerWebSocket<any>, message: string) => {
+                            try {
+                                const msg = JSON.parse(message);
+                                if (msg.type === 'get-history') {
+                                    this.sendHistory(ws, msg.interval || '1m');
+                                }
+                            } catch (e) { }
                         }
                     }
                 }
@@ -602,7 +621,7 @@ export class Dashboard implements ShokupanPlugin {
 
         let history: any[] = [];
         try {
-            const result = await this.db.query(
+            const result = await this.db.query<[any[]]>(
                 "SELECT * FROM metrics WHERE timestamp >= $start AND timestamp <= $end AND interval = $interval ORDER BY timestamp ASC",
                 { start: startTime, end: endTime, interval }
             );
@@ -785,7 +804,7 @@ export class Dashboard implements ShokupanPlugin {
                             });
                         }
 
-                        await this.db.upsert(`failed_requests:${ctx.requestId}`, {
+                        await this.db.upsert(new RecordId(`failed_requests`, ctx.requestId), {
                             method: ctx.method,
                             url: ctx.url.toString(),
                             headers: headers,
@@ -828,8 +847,64 @@ export class Dashboard implements ShokupanPlugin {
                 if (this.metrics.logs.length > 0 && this.metrics.logs[0].timestamp < cutoff) {
                     this.metrics.logs = this.metrics.logs.filter(log => log.timestamp >= cutoff);
                 }
+
+                const requestData = {
+                    id: ctx.requestId,
+                    method: ctx.method,
+                    url: ctx.url.toString(),
+                    status: response.status,
+                    duration,
+                    timestamp: Date.now()
+                };
+
+                const strategy = this.dashboardConfig.updateStrategy || 'immediate';
+
+                if (strategy === 'immediate') {
+                    this.broadcastRequestUpdates([requestData]);
+                } else {
+                    // Buffer request for WS push
+                    this.requestsBuffer.push(requestData);
+                }
             }
         };
+    }
+
+    private startRequestPushTimer() {
+        const interval = this.dashboardConfig.updateInterval || 10000;
+        this.requestPushTimer = setInterval(() => {
+            if (this.requestsBuffer.length > 0) {
+                this.broadcastRequestUpdates();
+            }
+        }, interval);
+    }
+
+    private broadcastRequestUpdates(requestsOverride?: any[]) {
+        if (this.clients.size === 0) {
+            if (!requestsOverride) this.requestsBuffer = [];
+            return;
+        }
+
+        let requests;
+        if (requestsOverride) {
+            requests = requestsOverride;
+        } else {
+            requests = [...this.requestsBuffer];
+            this.requestsBuffer = []; // Clear buffer
+        }
+
+        if (requests.length === 0) return;
+
+        // Debug log
+        console.log(`[Dashboard] Broadcasting ${requests.length} requests. Sample ID: ${requests[0].id}`);
+
+        const data = JSON.stringify({
+            type: 'requests-update',
+            requests
+        });
+
+        for (const client of this.clients) {
+            client.send(data);
+        }
     }
 
     private updateTiming(duration: number) {

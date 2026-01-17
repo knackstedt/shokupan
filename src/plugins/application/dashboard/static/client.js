@@ -92,6 +92,11 @@
                     if (window.pushChartData && msg.metric) {
                         window.pushChartData(msg.metric);
                     }
+                } else if (msg.type === 'requests-update') {
+                    console.log('[Dashboard Client] Received requests update', msg.requests);
+                    if (window.updateRequestsList && msg.requests) {
+                        window.updateRequestsList(msg.requests);
+                    }
                 } else if (msg.type === 'metrics') {
                     // Standard live update (text metrics)
                     updateDOM(msg);

@@ -34,8 +34,7 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                         <div class="tabs">
                             <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
                             <button class="tab-btn" onclick="switchTab('application')">Application</button>
-                            <button class="tab-btn" onclick="switchTab('requests')">Requests</button>
-                            <button class="tab-btn" onclick="switchTab('failures')">Failures</button>
+                            <button class="tab-btn" onclick="switchTab('traffic')">Traffic</button>
                             {integrations.scalar && (
                                 <button class="tab-btn" onclick="switchTab('scalar')">Scalar</button>
                             )}
@@ -122,36 +121,46 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                             </div>
                         </div>
 
-                        {/* Requests Tab */}
-                        <div id="tab-requests" class="tab-content">
-                            <div style="margin: 2rem;">
-                                <div class="card" style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-direction: row">
-                                    <div class="card-title">Recent Requests (Last 100)</div>
-                                    <button onclick="fetchRequests()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px 10px; border-radius: 6px; cursor: pointer; margin-right: 2rem">Refresh</button>
+                        {/* Traffic Tab */}
+                        <div id="tab-traffic" class="tab-content">
+                            <div style="margin: 2rem 2rem 0 2rem; display: flex; gap: 1rem; align-items: center;">
+                                <div class="button-group">
+                                    <button class="view-btn active" onclick="switchTrafficView('requests')">All Requests</button>
+                                    <button class="view-btn" onclick="switchTrafficView('failures')">Failures</button>
                                 </div>
-                                <div id="requests-list-container" style="height: calc(100vh - 300px); margin-bottom: 2rem;"></div>
-
-                                <div id="request-details-container" class="card" style="display: none;">
-                                    <div class="card-title">Request Details</div>
-                                    <div id="request-details-content"></div>
-                                    <div class="card-title" style="margin-top: 1rem;">Middleware Trace</div>
-                                    <div id="middleware-trace-container"></div>
-                                </div>
-                                <div style="height: 2rem"></div>
                             </div>
-                        </div>
 
-                        {/* Failures Tab */}
-                        <div id="tab-failures" class="tab-content">
-                            <div style="margin: 2rem;">
-                                <div class="card" style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center;">
-                                    <div class="card-title">Failed Requests (Last 50)</div>
-                                    <div>
-                                        <button onclick="importFailure()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-right: 8px;">Import</button>
-                                        <button onclick="fetchFailures()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px 10px; border-radius: 4px; cursor: pointer;">Refresh</button>
+                            {/* Requests Sub-View */}
+                            <div id="traffic-view-requests" class="traffic-view active">
+                                <div style="margin: 2rem;">
+                                    <div class="card" style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-direction: row">
+                                        <div class="card-title">Recent Requests (Last 100)</div>
+                                        <button onclick="fetchRequests()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px 10px; border-radius: 6px; cursor: pointer; margin-right: 2rem">Refresh</button>
                                     </div>
+                                    <div id="requests-list-container" style="height: calc(100vh - 300px); margin-bottom: 2rem;"></div>
+
+                                    <div id="request-details-container" class="card" style="display: none;">
+                                        <div class="card-title">Request Details</div>
+                                        <div id="request-details-content"></div>
+                                        <div class="card-title" style="margin-top: 1rem;">Middleware Trace</div>
+                                        <div id="middleware-trace-container"></div>
+                                    </div>
+                                    <div style="height: 2rem"></div>
                                 </div>
-                                <div id="failures-table-container"></div>
+                            </div>
+
+                            {/* Failures Sub-View */}
+                            <div id="traffic-view-failures" class="traffic-view">
+                                <div style="margin: 2rem;">
+                                    <div class="card" style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center;">
+                                        <div class="card-title">Failed Requests (Last 50)</div>
+                                        <div>
+                                            <button onclick="importFailure()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-right: 8px;">Import</button>
+                                            <button onclick="fetchFailures()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px 10px; border-radius: 4px; cursor: pointer;">Refresh</button>
+                                        </div>
+                                    </div>
+                                    <div id="failures-table-container"></div>
+                                </div>
                             </div>
                         </div>
 

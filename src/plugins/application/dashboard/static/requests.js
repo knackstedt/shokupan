@@ -116,3 +116,27 @@ function showRequestDetails(request) {
     // Scroll to details
     container.scrollIntoView({ behavior: 'smooth' });
 }
+
+window.updateRequestsList = function (newRequests) {
+    console.log('updateRequestsList called with', newRequests ? newRequests.length : 0, 'requests');
+    if (!requestsTable || !newRequests || newRequests.length === 0) return;
+
+    // Prepend new requests
+    const currentData = requestsTable.getData();
+    // Use a Set for existing IDs to avoid duplicates if any overlap occurs
+    const existingIds = new Set(currentData.map(r => r.id));
+
+    const uniqueNew = newRequests.filter(r => !existingIds.has(r.id));
+
+    if (uniqueNew.length > 0) {
+        // Add to top
+        requestsTable.addData(uniqueNew, true);
+
+        // Limit total rows to 100 to prevent performance issues
+        const totalRows = requestsTable.getDataCount();
+        if (totalRows > 100) {
+            const rowsToDelete = requestsTable.getRows().slice(100);
+            rowsToDelete.forEach(row => row.delete());
+        }
+    }
+};

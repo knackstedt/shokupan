@@ -55,7 +55,7 @@ select {
     flex: 1;
     flex-direction: column;
     align-items: center;
-    overflow: auto;
+    overflow: hidden;
     width: 100%;
 }
 
@@ -163,6 +163,7 @@ select {
     display: none;
     flex: 1;
     flex-direction: column;
+    width: 100%
 }
 
 .tab-content.active {
@@ -230,6 +231,17 @@ select {
 }
 
 .app-view.active {
+    display: flex;
+    flex-direction: column;
+}
+
+.traffic-view {
+    display: none;
+    flex: 1;
+    width: 100%;
+}
+
+.traffic-view.active {
     display: flex;
     flex-direction: column;
 }

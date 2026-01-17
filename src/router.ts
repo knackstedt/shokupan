@@ -154,6 +154,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         routes: { type: 'route', path: string, method: Method, metadata: RouteMetadata, handlerName: string, tags: string[], order: number, _fn: ShokupanHandler<T>; }[],
         routers: { type: 'router', path: string, metadata: RouteMetadata, children: { routes: any[]; }; }[],
         controllers: { type: 'controller', path: string, name: string, metadata: RouteMetadata; children: { routes: any[]; }; }[];
+        events: { type: 'event', name: string, handlerName: string, metadata: RouteMetadata; _fn: ShokupanHandler<T>; }[];
     } {
         // Separation logic: Group routes by controller instance
         const controllerRoutesMap = new Map<any, any[]>();
@@ -211,12 +212,27 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             };
         });
 
+        // Collect event handlers
+        const events: any[] = [];
+        this.eventHandlers.forEach((handlers, name) => {
+            handlers.forEach(h => {
+                events.push({
+                    type: 'event',
+                    name,
+                    handlerName: h.name,
+                    metadata: (h as any).source ? { file: (h as any).source.file, line: (h as any).source.line } : undefined,
+                    _fn: h
+                });
+            });
+        });
+
         return {
             metadata: this.metadata,
             middleware,
             routes: localRoutes,
             routers,
-            controllers
+            controllers,
+            events
         };
     }
 
