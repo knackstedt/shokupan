@@ -1,18 +1,80 @@
 
 window.renderRegistry = function renderRegistry(node, container) {
-    const rootPath = "<%~ it.rootPath %>";
-    const linkPattern = "<%~ it.linkPattern %>";
+    const config = window.SHOKUPAN_CONFIG || {};
+    const rootPath = config.rootPath || "";
+    const linkPattern = config.linkPattern || "vscode://file/{{absolute}}:{{line}}";
 
     if (!node) {
         container.innerHTML = '<div style="color: var(--text-secondary)">No registry data available</div>';
         return;
     }
 
+    // 0. Pre-process paths for shortening
+    // Collect all paths
+    const allFilePaths = new Set();
+    const collectPaths = (n) => {
+        if (!n) return;
+        if (n.metadata && n.metadata.file) allFilePaths.add(n.metadata.file);
+        if (n.middleware) n.middleware.forEach(collectPaths);
+        if (n.routers) n.routers.forEach(collectPaths);
+        if (n.controllers) n.controllers.forEach(collectPaths);
+        if (n.routes) n.routes.forEach(collectPaths);
+        if (n.children) collectPaths(n.children); // recursive for routers
+    };
+    collectPaths(node);
+
+    // Compute Shortest Unique Paths
+    const shortPathMap = {};
+    const pathsByFilename = {};
+
+    allFilePaths.forEach(p => {
+        const parts = p.split('/');
+        const filename = parts.pop();
+        if (!pathsByFilename[filename]) pathsByFilename[filename] = [];
+        pathsByFilename[filename].push({ full: p, parts: parts });
+    });
+
+    Object.keys(pathsByFilename).forEach(filename => {
+        const group = pathsByFilename[filename];
+        if (group.length === 1) {
+            shortPathMap[group[0].full] = filename;
+        } else {
+            // Collision handling
+            group.forEach(item => {
+                let suffix = filename;
+                let depth = 0;
+                // Add parent dirs until unique within this group
+                // Note: This is a simple approach. Strictly we need to check uniqueness against ALL other paths in group.
+                while (true) {
+                    if (depth >= item.parts.length) break; // Should not happen if they are different files
+
+                    // Check if current suffix is unique in group
+                    const conflicts = group.filter(g => {
+                        if (g.full === item.full) return false;
+                        // Construct suffix for g with same depth
+                        const gParts = g.full.split('/');
+                        const gSuffix = gParts.slice(gParts.length - 1 - depth).join('/');
+                        return gSuffix === suffix;
+                    });
+
+                    if (conflicts.length === 0) break;
+
+                    // prepend parent
+                    const parent = item.parts[item.parts.length - 1 - depth];
+                    suffix = parent + '/' + suffix;
+                    depth++;
+                }
+                shortPathMap[item.full] = suffix;
+            });
+        }
+    });
+
     const wrapper = document.createElement('div');
 
     // Helper to clean paths
     const cleanPath = (p) => {
         if (!p) return '';
+        if (shortPathMap[p]) return shortPathMap[p];
         if (p.startsWith(rootPath)) return p.slice(rootPath.length + 1);
         return p;
     };
@@ -42,7 +104,13 @@ window.renderRegistry = function renderRegistry(node, container) {
             const builtin = metadata.isBuiltin ? `<span class="badge" style="background: #059669; margin-left:10px;">BUILTIN</span>` : '';
             const pluginName = metadata.pluginName ? `<span style="color: #6ee7b7; margin-left: 5px;">[${metadata.pluginName}]</span>` : '';
 
-            return `<a href="${link}" target="_blank" style="text-decoration: none; color: inherit;"><span class="tree-meta" style="cursor: pointer; text-decoration: underline;">${relative}:${line}</span></a>${displayNameStr} ${builtin} ${pluginName}`;
+            // Use relative (short) path for display
+            return `<a href="${link}" target="_blank" style="text-decoration: none; color: inherit;">
+                <span class="tree-meta" style="cursor: pointer; text-decoration: underline;">
+                ${relative}:${line}</span>
+                </a>
+                ${!metadata.pluginName ? displayNameStr : ''} ${builtin} ${pluginName}
+            `;
         }
         return '';
     };
@@ -113,6 +181,10 @@ window.renderRegistry = function renderRegistry(node, container) {
 
         let out = '';
         parts.forEach((part, index) => {
+            if (part === '.well-known') {
+                out += `/<span class="path-segment" style="color: #8b5cf6; font-weight: bold;">${part}</span>`;
+                return;
+            }
             if (part.startsWith(":")) {
                 out += `/<span class="path-segment path-param">${part}</span>`;
                 return;
@@ -152,8 +224,18 @@ window.renderRegistry = function renderRegistry(node, container) {
             header.className = 'tree-item tooltip'; // Add tooltip class
             const meta = createFileMeta(item.metadata, 'Router');
             const tooltipHtml = getTooltipHtml(item.id);
+            const isPlugin = item.metadata && item.metadata.pluginName;
+            const badgeLabel = isPlugin ? 'PLUGIN' : 'ROUTER';
+            const badgeClass = isPlugin ? 'badge-PLUGIN' : 'badge-ROUTER';
+
+            // Add custom style for PLUGIN badge if needed, or rely on generic badge class + modifier
+            // For now, let's inject a style for badge-PLUGIN if it doesn't exist, or just inline it.
+            // Actually, let's just use inline style for the distinctive color if it's a plugin 
+            // to ensure it stands out without editing CSS file.
+            const badgeStyle = isPlugin ? 'background: #f59e0b; color: #000;' : '';
+
             header.innerHTML = `
-                <span class="badge badge-ROUTER">ROUTER</span>
+                <span class="badge ${badgeClass}" style="${badgeStyle}">${badgeLabel}</span>
                 <span class="tree-label">${renderPath(item.path)}</span>
                 ${meta}
                 ${tooltipHtml}

@@ -5,7 +5,7 @@
  * @jsxFrag Fragment
  */
 
-export function DashboardApp({ metrics, uptime, integrations, base, getRequestHeadersSource }: any) {
+export function DashboardApp({ metrics, uptime, integrations, base, getRequestHeadersSource, rootPath, linkPattern }: any) {
     return (
         <html lang="en">
             <head>
@@ -172,6 +172,10 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                     __html: `
                     // Injected function from server config
                     const getRequestHeaders = ${getRequestHeadersSource};
+                    window.SHOKUPAN_CONFIG = {
+                        rootPath: "${rootPath || ""}",
+                        linkPattern: "${linkPattern || ""}"
+                    };
                 `}} />
 
                 <script src={`${base}/poll.js`}></script>

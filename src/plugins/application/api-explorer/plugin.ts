@@ -17,6 +17,15 @@ export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin 
         console.log('ApiExplorerPlugin: CONSTRUCTOR CALLED');
         super({ renderer: renderToString });
         pluginOptions.path ??= '/explorer';
+
+        // Metadata
+        this.metadata = {
+            file: import.meta.file,
+            line: 1,
+            name: 'ApiExplorerPlugin',
+            pluginName: 'ApiExplorer'
+        };
+
         this.init();
     }
 

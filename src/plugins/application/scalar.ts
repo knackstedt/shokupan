@@ -49,6 +49,15 @@ export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin 
     ) {
         pluginOptions.config ??= {};
         super();
+
+        // Metadata
+        this.metadata = {
+            file: import.meta.file,
+            line: 1,
+            name: 'ScalarPlugin',
+            pluginName: 'Scalar'
+        };
+
         // Initialize routes immediately so the plugin works when mounted directly
         this.initRoutes();
     }

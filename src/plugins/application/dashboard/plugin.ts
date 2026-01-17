@@ -159,6 +159,14 @@ export class Dashboard implements ShokupanPlugin {
         // Mount the dashboard router
         app.mount(mountPath, this.router);
 
+        // Metadata for registry
+        this.router.metadata = {
+            file: import.meta.file,
+            line: 1,
+            name: 'DashboardPlugin',
+            pluginName: 'Dashboard'
+        };
+
         // Set up all routes on the internal router
         this.setupRoutes();
     }

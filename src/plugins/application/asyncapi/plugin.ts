@@ -30,6 +30,15 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
     constructor(private pluginOptions: AsyncApiPluginOptions = {}) {
         super({ renderer: renderToString });
         this.pluginOptions.path ??= '/asyncapi';
+
+        // Metadata
+        this.metadata = {
+            file: import.meta.file,
+            line: 1,
+            name: 'AsyncApiPlugin',
+            pluginName: 'AsyncAPI'
+        };
+
         this.init();
     }
 
