@@ -65,6 +65,7 @@ export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin 
                         delete op['x-source-info'].snippet;
                     }
                     if (op['x-shokupan-source']?.code) {
+                        console.log('Deleting x-shokupan-source.code');
                         delete op['x-shokupan-source'].code;
                     }
                 });
@@ -103,19 +104,10 @@ export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin 
                 : await (this.root || this).generateApiSpec();
             const asyncSpec = (ctx.app as any).asyncApiSpec;
 
-            // We pass the STRIPPED spec to the UI payload
-            console.log('Rendering ApiExplorerApp...');
-            try {
-                const element = ApiExplorerApp({ spec: stripSourceCode(spec), asyncSpec });
-                // console.log('Element:', JSON.stringify(element, null, 2));
-                const html = renderToString(element);
-                console.log('Rendered HTML Length:', html.length);
-                if (html.length === 0) console.error('RENDERED HTML IS EMPTY!');
-                return ctx.html(html);
-            } catch (err) {
-                console.error('Render Error:', err);
-                return ctx.text('Render Error: ' + String(err), 500);
-            }
+            const element = ApiExplorerApp({ spec: stripSourceCode(spec), asyncSpec });
+            const html = renderToString(element);
+            if (html.length === 0) throw new Error('ApiExplorerPlugin: rendered page is blank.');
+            return ctx.html(html);
         });
     }
 }

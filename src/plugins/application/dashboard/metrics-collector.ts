@@ -62,7 +62,8 @@ export class MetricsCollector {
     public db?: SurrealDatastore;
 
     constructor(
-        db?: SurrealDatastore
+        db?: SurrealDatastore,
+        private onCollect?: (metric: AggregatedMetric) => void
     ) {
         this.db = db;
         this.eventLoopHistogram.enable();
@@ -185,19 +186,14 @@ export class MetricsCollector {
         }
 
         try {
-            const recordId = new RecordId('metrics', String(timestamp));
-            await this.db.upsert(recordId, metric);
-            // console.log(`[MetricsCollector] ✓ Successfully saved ${label} metric to datastore`);
-
-            // DEBUG: Verify we can retrieve it immediately
-            const test = await this.db.select(recordId);
-            // console.log(`[MetricsCollector] DEBUG: Immediate .get() returned:`, test ? 'DATA' : 'NULL');
-
-            // DEBUG: Try querying for it  
-            const queryTest = await this.db.query("SELECT * FROM metrics WHERE id = $id", { id: recordId });
-            // console.log(`[MetricsCollector] DEBUG: Query by id returned ${queryTest[0]?.length || 0} records`);
+            await this.db.upsert(new RecordId("metrics", timestamp), metric);
         } catch (e) {
             console.error(`[MetricsCollector] ✗ Failed to save metrics for ${label}:`, e);
+        }
+
+        // Notify Listeners
+        if (this.onCollect) {
+            this.onCollect(metric);
         }
     }
 

@@ -681,9 +681,9 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             // Check for WebSocket upgrade before executing handler logic
             // This allows the router to handle the request (running middleware/guards)
             // but upgrading to WebSocket instead of running the HTTP handler.
-            if (ctx.upgrade()) {
-                return undefined;
-            }
+            // if (ctx.upgrade()) {
+            //    return undefined;
+            // }
             return handler(ctx);
         };
         (wrappedHandler as any).originalHandler = (handler as any).originalHandler || handler;

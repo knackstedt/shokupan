@@ -84,12 +84,25 @@ export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin 
     private initRoutes() {
         const bootId = Date.now().toString();
 
-        this.get("/_lifecycle", ctx => ctx.json({ boot: bootId }));
+        this.get("/_lifecycle", (ctx) => {
+            const success = ctx.upgrade({
+                data: {
+                    bootId,
+                    handler: {
+                        open: (ws: any) => {
+                            ws.send(JSON.stringify({ type: 'hello', bootId }));
+                        }
+                    }
+                }
+            });
+            if (success) return undefined;
+            return ctx.json({ boot: bootId });
+        });
 
         this.get("/", async (ctx) => {
             await this.ensureEta();
 
-            let path = ctx.url.toString();
+            let path = ctx.path;
             if (!path.endsWith("/")) path += "/";
 
             // Auto-reload script for development mode
@@ -97,25 +110,51 @@ export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin 
                 <script>
                     (function() {
                         const bootId = "${bootId}";
-                        let isDown = false;
+                        let ws;
+                        let reconnectTimer;
                         
-                        setInterval(async () => {
-                            try {
-                                const res = await fetch('${path}_lifecycle');
-                                if (!res.ok) throw new Error('Down');
-                                const data = await res.json();
-                                if (data.boot !== bootId) {
-                                    console.log('Server restarted, reloading...');
-                                    window.location.reload();
+                        function connect() {
+                            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                            const wsUrl = protocol + '//' + window.location.host + '${path}_lifecycle';
+                            
+                            ws = new WebSocket(wsUrl);
+                            
+                            ws.onopen = () => {
+                                console.log('[Scalar] Connected to lifecycle monitor');
+                                if (reconnectTimer) {
+                                    clearTimeout(reconnectTimer);
+                                    reconnectTimer = undefined;
                                 }
-                                else if (isDown) {
-                                    isDown = false;
-                                }
-                            } catch (e) {
-                                isDown = true;
-                                console.log('Connection lost...');
-                            }
-                        }, 2000);
+                            };
+                            
+                            ws.onmessage = (event) => {
+                                try {
+                                    const data = JSON.parse(event.data);
+                                    if (data.type === 'hello') {
+                                        if (data.bootId !== bootId) {
+                                            console.log('[Scalar] Server restarted (timestamp change), reloading...');
+                                            window.location.reload();
+                                        }
+                                    }
+                                } catch (e) {}
+                            };
+                            
+                            ws.onclose = () => {
+                                console.log('[Scalar] Lifecycle connection lost');
+                                ws = undefined;
+                                scheduleReconnect();
+                            };
+                        }
+                        
+                        function scheduleReconnect() {
+                            if (reconnectTimer) return;
+                            reconnectTimer = setTimeout(() => {
+                                reconnectTimer = undefined;
+                                connect();
+                            }, 2000);
+                        }
+                        
+                        connect();
                     })();
                 </script>
             ` : '';

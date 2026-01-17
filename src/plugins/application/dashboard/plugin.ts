@@ -1,9 +1,8 @@
-import type { HeadersInit } from 'bun';
+import type { ServerWebSocket } from 'bun';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import renderToString from 'preact-render-to-string';
-import { RecordId } from 'surrealdb';
 import type { DebugCollector } from "../../../context";
 import { ShokupanRouter } from "../../../router";
 import type { Shokupan } from '../../../shokupan';
@@ -101,6 +100,8 @@ export class Dashboard implements ShokupanPlugin {
         edgeMetrics: {}
     };
 
+    private clients = new Set<ServerWebSocket<any>>();
+    private broadcastTimer: any;
 
     private startTime = Date.now();
     private instrumented = false;
@@ -114,7 +115,12 @@ export class Dashboard implements ShokupanPlugin {
     // ShokupanPlugin interface implementation
     public onInit(app: any, options?: { path?: string; }) {
         this[$appRoot] = app;
-        this.metricsCollector = new MetricsCollector(this.db);
+        // Subscribe to MetricsCollector updates
+        const onCollect = (metric: any) => {
+            this.broadcastMetricUpdate(metric);
+        };
+
+        this.metricsCollector = new MetricsCollector(this.db, onCollect);
 
         if (app.onStart) {
             app.onStart(async () => {
@@ -122,13 +128,11 @@ export class Dashboard implements ShokupanPlugin {
                     await app.dbPromise;
                     if (app.db) {
                         this.metricsCollector.db = app.db;
-                        // console.log('[Dashboard] Attached datastore to MetricsCollector');
+                        console.log('[Dashboard] Attached datastore to MetricsCollector');
                     }
                 }
             });
         }
-
-
         const mountPath = options?.path || this.dashboardConfig.path || '/dashboard';
 
         // Register hooks on the app to track all requests
@@ -235,10 +239,42 @@ export class Dashboard implements ShokupanPlugin {
     }
 
     private setupRoutes() {
-        this.router.get("/metrics", async (ctx) => {
-            const uptimeSeconds = Math.floor((Date.now() - this.startTime) / 1000);
-            const uptime = `${Math.floor(uptimeSeconds / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m ${uptimeSeconds % 60}s`;
+        this.router.get("/ws", (ctx) => {
+            const success = ctx.upgrade({
+                data: {
+                    handler: {
+                        handler: {
+                            open: (ws: ServerWebSocket<any>) => {
+                                this.clients.add(ws);
+                                console.log(`[Dashboard] Client connected. Total clients: ${this.clients.size}`);
+                                // Send default 1m history
+                                this.sendHistory(ws, '1m');
+                            },
+                            close: (ws: ServerWebSocket<any>) => {
+                                this.clients.delete(ws);
+                                console.log(`[Dashboard] Client disconnected. Total clients: ${this.clients.size}`);
+                            },
+                            message: (ws: ServerWebSocket<any>, message: string) => {
+                                try {
+                                    const msg = JSON.parse(message);
+                                    if (msg.type === 'get-history') {
+                                        this.sendHistory(ws, msg.interval || '1m');
+                                    }
+                                } catch (e) { }
+                            }
+                        }
+                    }
+                }
+            });
 
+            if (success) return undefined;
+            return ctx.text("WebSocket upgrade failed", 400);
+        });
+
+        this.router.get("/metrics", async (ctx) => {
+            // ... (rest of the file)
+
+            const uptime = this.getUptime();
             const interval = ctx.query['interval'];
             if (interval) {
                 const intervalMap: Record<string, number> = {
@@ -285,7 +321,6 @@ export class Dashboard implements ShokupanPlugin {
                 }
 
                 const s = stats[0] || { total: 0, success: 0, failed: 0, avg_latency: 0 };
-                // console.log("INTERVAL STATS:", interval, s);
 
                 return ctx.json({
                     metrics: {
@@ -477,7 +512,7 @@ export class Dashboard implements ShokupanPlugin {
 
             // Serve static files if they match known extensions/files
             const staticFiles = [
-                'charts.js', 'failures.js', 'graph.mjs', 'poll.js',
+                'charts.js', 'failures.js', 'graph.mjs', 'client.js',
                 'reactflow.css', 'registry.css', 'registry.js', 'requests.js',
                 'styles.css', 'tables.js', 'tabs.js', 'tabulator.css', 'theme.css'
             ];
@@ -490,8 +525,7 @@ export class Dashboard implements ShokupanPlugin {
             }
 
             // Otherwise serve Dashboard
-            const uptimeSeconds = Math.floor((Date.now() - this.startTime) / 1000);
-            const uptime = `${Math.floor(uptimeSeconds / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m ${uptimeSeconds % 60}s`;
+            const uptime = this.getUptime();
 
             const linkPattern = this.getLinkPattern();
             const integrations = this.detectIntegrations();
@@ -509,6 +543,95 @@ export class Dashboard implements ShokupanPlugin {
             }));
             return ctx.html(`<!DOCTYPE html>${html}`);
         });
+    }
+
+    private getUptime() {
+        const uptimeSeconds = Math.floor((Date.now() - this.startTime) / 1000);
+        return `${Math.floor(uptimeSeconds / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m ${uptimeSeconds % 60}s`;
+    }
+
+    private getPublicMetrics() {
+        return {
+            totalRequests: this.metrics.totalRequests,
+            successfulRequests: this.metrics.successfulRequests,
+            failedRequests: this.metrics.failedRequests,
+            activeRequests: this.metrics.activeRequests,
+            averageTotalTime_ms: this.metrics.averageTotalTime_ms,
+            recentTimings: this.metrics.recentTimings,
+            logs: [], // Don't broadcast logs for now to save bandwidth
+            rateLimitedCounts: this.metrics.rateLimitedCounts,
+            nodeMetrics: this.metrics.nodeMetrics,
+            edgeMetrics: this.metrics.edgeMetrics
+        };
+    }
+
+    private broadcastMetricUpdate(metric: any) {
+        if (this.clients.size === 0) return;
+        // console.log(`[Dashboard] Broadcasting metric update to ${this.clients.size} clients`);
+
+        const data = JSON.stringify({
+            type: 'metric-update',
+            metric
+        });
+
+        for (const client of this.clients) {
+            client.send(data);
+        }
+    }
+
+    private async sendHistory(ws: ServerWebSocket<any>, interval: string) {
+        // Map interval to milliseconds
+        const intervalMap: Record<string, number> = {
+            '10s': 10 * 1000,
+            '1m': 60 * 1000,
+            '5m': 5 * 60 * 1000,
+            '30m': 30 * 60 * 1000,
+            '1h': 60 * 60 * 1000,
+            '2h': 2 * 60 * 60 * 1000,
+            '6h': 6 * 60 * 60 * 1000,
+            '12h': 12 * 60 * 60 * 1000,
+            '1d': 24 * 60 * 60 * 1000,
+            '3d': 3 * 24 * 60 * 60 * 1000,
+            '7d': 7 * 24 * 60 * 60 * 1000,
+            '30d': 30 * 24 * 60 * 60 * 1000,
+        };
+
+        const periodMs = intervalMap[interval] || 60 * 1000;
+        const startTime = Date.now() - (periodMs * 30); // Get 30 points of history
+        const endTime = Date.now();
+
+        let history: any[] = [];
+        try {
+            const result = await this.db.query(
+                "SELECT * FROM metrics WHERE timestamp >= $start AND timestamp <= $end AND interval = $interval ORDER BY timestamp ASC",
+                { start: startTime, end: endTime, interval }
+            );
+            history = result[0] || [];
+        } catch (e) {
+            console.error('[Dashboard] Failed to fetch history for WS', e);
+        }
+
+        ws.send(JSON.stringify({
+            type: 'init',
+            metrics: { ...this.metrics, logs: [] },
+            uptime: this.getUptime(),
+            history
+        }));
+    }
+
+    private broadcastMetrics() {
+        if (this.clients.size === 0) return;
+        console.log(`[Dashboard] Broadcasting metrics to ${this.clients.size} clients`);
+
+        const data = JSON.stringify({
+            type: 'metrics',
+            metrics: this.getPublicMetrics(),
+            uptime: this.getUptime()
+        });
+
+        for (const client of this.clients) {
+            client.send(data);
+        }
     }
 
     private instrumentApp(app: any) {
@@ -588,7 +711,8 @@ export class Dashboard implements ShokupanPlugin {
         if (['vscode', 'cursor', 'antigravity'].some(t => term.includes(t))) {
             return 'vscode://file/{{absolute}}:{{line}}';
         }
-        return 'file:///{{absolute}}:{{line}}';
+
+        return 'vscode://file/{{absolute}}:{{line}}';
     }
 
     public getHooks(): ShokupanHooks {
@@ -605,6 +729,16 @@ export class Dashboard implements ShokupanPlugin {
 
                 // Attach Collector
                 ctx[$debug] = new Collector(this);
+
+                // Broadcast immediate update for active requests? 
+                // Maybe throttle this if high load, but for now direct update is fine for lower loads.
+                // Throttling:
+                if (!this.broadcastTimer) {
+                    this.broadcastTimer = setTimeout(() => {
+                        this.broadcastMetrics();
+                        this.broadcastTimer = undefined;
+                    }, 100);
+                }
             },
 
             onResponseEnd: async (ctx, response) => {
@@ -619,6 +753,14 @@ export class Dashboard implements ShokupanPlugin {
                 // Record in MetricsCollector
                 const isError = response.status >= 400;
                 this.metricsCollector.recordRequest(duration, isError);
+
+                // Broadcast updates immediately
+                if (!this.broadcastTimer) {
+                    this.broadcastTimer = setTimeout(() => {
+                        this.broadcastMetrics();
+                        this.broadcastTimer = undefined;
+                    }, 100);
+                }
 
                 if (response.status >= 400) {
                     this.metrics.failedRequests++;
@@ -636,7 +778,7 @@ export class Dashboard implements ShokupanPlugin {
                             });
                         }
 
-                        await this.db.upsert(new RecordId('failed_requests', ctx.requestId), {
+                        await this.db.upsert(`failed_requests:${ctx.requestId}`, {
                             method: ctx.method,
                             url: ctx.url.toString(),
                             headers: headers,
@@ -659,18 +801,21 @@ export class Dashboard implements ShokupanPlugin {
                     status: response.status,
                     duration,
                     timestamp: Date.now(),
-                    handlerStack: (ctx as any).handlerStack
+                    // handlerStack: (ctx as any).handlerStack // Temporarily removed to prevent serialization issues
                 };
 
                 this.metrics.logs.push(logEntry);
 
                 // Persist to datastore for detailed view
                 try {
-                    await this.db.upsert(new RecordId('requests', ctx.requestId), logEntry);
+                    // Use query explicitly to avoid driver/RecordId issues
+                    await this.db.query('UPSERT type::thing("requests", $id) CONTENT $data', {
+                        id: ctx.requestId,
+                        data: logEntry
+                    });
                 } catch (e) {
                     console.error("Failed to record request log", e);
                 }
-
                 const retention = this.dashboardConfig.retentionMs ?? 7200000;
                 const cutoff = Date.now() - retention;
                 if (this.metrics.logs.length > 0 && this.metrics.logs[0].timestamp < cutoff) {

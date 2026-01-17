@@ -64,6 +64,7 @@ select {
     display: flex;
     height: 100%;
     overflow-y: auto;
+    justify-content: center;
 }
 
 .metrics-grid {

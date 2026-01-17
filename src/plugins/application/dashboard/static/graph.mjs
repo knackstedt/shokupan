@@ -475,7 +475,7 @@ const GraphComponent = () => {
             backgroundColor: '#1e293b' // Match theme
         } : {
             width: '100%',
-            height: '600px', // Ensure explicit height if container doesn't provide it, though normally #cy does.
+            height: '100%',
             position: 'relative'
         }
     },

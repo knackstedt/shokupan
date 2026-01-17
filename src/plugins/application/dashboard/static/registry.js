@@ -105,7 +105,7 @@ window.renderRegistry = function renderRegistry(node, container) {
             const pluginName = metadata.pluginName ? `<span style="color: #6ee7b7; margin-left: 5px;">[${metadata.pluginName}]</span>` : '';
 
             // Use relative (short) path for display
-            return `<a href="${link}" target="_blank" style="text-decoration: none; color: inherit;">
+            return `<a href="${link}" style="text-decoration: none; color: inherit;">
                 <span class="tree-meta" style="cursor: pointer; text-decoration: underline;">
                 ${relative}:${line}</span>
                 </a>

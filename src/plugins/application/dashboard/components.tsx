@@ -96,7 +96,7 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                         </div>
 
                         {/* Registry Tab */}
-                        <div id="tab-registry" class="tab-content">
+                        <div id="tab-registry" class="tab-content" style="max-width: 1200px;">
                             <div id="registry-container" class="card" style="margin: 2rem;">
                                 <div class="card-title">Component Registry</div>
                                 <div id="registry-tree" style="padding: 0 1rem 1rem 1rem; font-family: monospace; font-size: 0.9rem;"></div>
@@ -111,8 +111,7 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                                     <input type="text" id="graph-search" placeholder="Search routes or middleware..." aria-label="Search routes or middleware" style="flex:1; padding: 0.5rem; border-radius: 0.5rem; background: var(--bg-primary); border: 1px solid var(--card-border); color: var(--text-primary);" />
                                 </div>
                             </div>
-                            <div id="cy" style="margin: 0 2rem"></div>
-                            <div style="height: 2rem"></div>
+                            <div id="cy" style="margin: 0 2rem; height: calc(100% - 6rem - 35px);"></div>
                         </div>
 
                         {/* Requests Tab */}
@@ -178,7 +177,7 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                     };
                 `}} />
 
-                <script src={`${base}/poll.js`}></script>
+                <script src={`${base}/client.js`}></script>
                 <script src={`${base}/graph.mjs`} type="module"></script>
                 <script src={`${base}/charts.js`}></script>
                 <script src={`${base}/tables.js`}></script>
