@@ -43,6 +43,8 @@ export interface RequestLog {
     duration: number;
     timestamp: number;
     handlerStack?: any[];
+    body?: any;
+    contentType?: string;
 }
 
 export interface DashboardConfig {
@@ -130,6 +132,7 @@ export class Dashboard implements ShokupanPlugin {
     // ShokupanPlugin interface implementation
     public onInit(app: any, options?: { path?: string; }) {
         this[$appRoot] = app;
+
         // Subscribe to MetricsCollector updates
         const onCollect = (metric: any) => {
             this.broadcastMetricUpdate(metric);
@@ -319,7 +322,7 @@ export class Dashboard implements ShokupanPlugin {
                             count(IF status < 400 THEN 1 END) as success,
                             count(IF status >= 400 THEN 1 END) as failed,
                             math::mean(duration) as avg_latency
-                        FROM requests 
+                        FROM request 
                         WHERE timestamp >= $start
                         GROUP ALL
                     `, { start: startTime });
@@ -418,7 +421,7 @@ export class Dashboard implements ShokupanPlugin {
         this.router.get("/requests/top", async (ctx) => {
             const startTime = getIntervalStartTime(ctx.query['interval']);
             const result = await this.db.query(
-                "SELECT method, url, count() as count FROM requests WHERE timestamp >= $start GROUP BY method, url ORDER BY count DESC LIMIT 10",
+                "SELECT method, url, count() as count FROM request WHERE timestamp >= $start GROUP BY method, url ORDER BY count DESC LIMIT 10",
                 { start: startTime }
             );
             return ctx.json({ top: result[0] || [] });
@@ -428,7 +431,7 @@ export class Dashboard implements ShokupanPlugin {
         this.router.get("/errors/top", async (ctx) => {
             const startTime = getIntervalStartTime(ctx.query['interval']);
             const result = await this.db.query(
-                "SELECT status, count() as count FROM failed_requests WHERE timestamp >= $start GROUP BY status ORDER BY count DESC LIMIT 10",
+                "SELECT status, count() as count FROM failed_request WHERE timestamp >= $start GROUP BY status ORDER BY count DESC LIMIT 10",
                 { start: startTime }
             );
             return ctx.json({ top: result[0] || [] });
@@ -438,7 +441,7 @@ export class Dashboard implements ShokupanPlugin {
         this.router.get("/requests/failing", async (ctx) => {
             const startTime = getIntervalStartTime(ctx.query['interval']);
             const result = await this.db.query(
-                "SELECT method, url, count() as count FROM failed_requests WHERE timestamp >= $start GROUP BY method, url ORDER BY count DESC LIMIT 10",
+                "SELECT method, url, count() as count FROM failed_request WHERE timestamp >= $start GROUP BY method, url ORDER BY count DESC LIMIT 10",
                 { start: startTime }
             );
             return ctx.json({ top: result[0] || [] });
@@ -448,7 +451,7 @@ export class Dashboard implements ShokupanPlugin {
         this.router.get("/requests/slowest", async (ctx) => {
             const startTime = getIntervalStartTime(ctx.query['interval']);
             const result = await this.db.query(
-                "SELECT method, url, duration, status, timestamp FROM requests WHERE timestamp >= $start ORDER BY duration DESC LIMIT 10",
+                "SELECT method, url, duration, status, timestamp FROM request WHERE timestamp >= $start ORDER BY duration DESC LIMIT 10",
                 { start: startTime }
             );
             return ctx.json({ slowest: result[0] || [] });
@@ -468,19 +471,19 @@ export class Dashboard implements ShokupanPlugin {
 
         // Requests Listing Endpoint
         this.router.get("/requests", async (ctx) => {
-            const result = await this.db.query("SELECT * FROM requests ORDER BY timestamp DESC LIMIT 100");
+            const result = await this.db.query("SELECT * FROM request ORDER BY timestamp DESC LIMIT 100");
             return ctx.json({ requests: result[0] || [] });
         });
 
         // Request Details Endpoint
         this.router.get("/requests/:id", async (ctx) => {
-            const result = await this.db.query("SELECT * FROM requests WHERE id = $id", { id: ctx.params['id'] });
+            const result = await this.db.query("SELECT * FROM request WHERE id = $id", { id: ctx.params['id'] });
             return ctx.json({ request: result[0]?.[0] });
         });
 
         // Replay/Failed Requests Endpoints
         this.router.get("/failures", async (ctx) => {
-            const result = await this.db.query("SELECT * FROM failed_requests ORDER BY timestamp DESC LIMIT 50");
+            const result = await this.db.query("SELECT * FROM failed_request ORDER BY timestamp DESC LIMIT 50");
             return ctx.json({ failures: result[0] });
         });
 
@@ -619,7 +622,7 @@ export class Dashboard implements ShokupanPlugin {
         let history: any[] = [];
         try {
             const result = await this.db.query<[any[]]>(
-                "SELECT * FROM metrics WHERE timestamp >= $start AND timestamp <= $end AND interval = $interval ORDER BY timestamp ASC",
+                "SELECT * FROM metric WHERE timestamp >= $start AND timestamp <= $end AND interval = $interval ORDER BY timestamp ASC",
                 { start: startTime, end: endTime, interval }
             );
             history = result[0] || [];
@@ -796,7 +799,7 @@ export class Dashboard implements ShokupanPlugin {
                             });
                         }
 
-                        await this.db.upsert(new RecordId(`failed_requests`, ctx.requestId), {
+                        await this.db.upsert(new RecordId(`failed_request`, ctx.requestId), {
                             method: ctx.method,
                             url: ctx.url.toString(),
                             headers: headers,
@@ -819,7 +822,9 @@ export class Dashboard implements ShokupanPlugin {
                     status: response.status,
                     duration,
                     timestamp: Date.now(),
-                    handlerStack: this.serializeHandlerStack((ctx as any).handlerStack)
+                    handlerStack: this.serializeHandlerStack((ctx as any).handlerStack),
+                    body: this.serializeBody((ctx as any).responseBody),
+                    contentType: response.headers['content-type'] || response.headers['Content-Type']
                 };
                 // console.log(`[Dashboard Debug] Captured ${ctx.method} ${ctx.path} -> Status: ${response.status}`); // Removed debug log
 
@@ -828,7 +833,7 @@ export class Dashboard implements ShokupanPlugin {
                 // Persist to datastore for detailed view
                 try {
                     // Use query explicitly to avoid driver/RecordId issues
-                    await this.db.query('UPSERT type::thing("requests", $id) CONTENT $data', {
+                    await this.db.query('UPSERT type::thing("request", $id) CONTENT $data', {
                         id: ctx.requestId,
                         data: logEntry
                     });
@@ -848,7 +853,9 @@ export class Dashboard implements ShokupanPlugin {
                     status: response.status,
                     duration,
                     timestamp: Date.now(),
-                    handlerStack: this.serializeHandlerStack((ctx as any).handlerStack)
+                    handlerStack: this.serializeHandlerStack((ctx as any).handlerStack),
+                    body: this.serializeBody((ctx as any).responseBody),
+                    contentType: response.headers['content-type'] || response.headers['Content-Type']
                 };
 
                 const strategy = this.dashboardConfig.updateStrategy || 'immediate';
@@ -924,6 +931,39 @@ export class Dashboard implements ShokupanPlugin {
             isBuiltin: item.isBuiltin,
             // stateChanges: item.stateChanges // Exclude complex objects for now
         }));
+    }
+
+    private serializeBody(body: any): any {
+        if (!body) return undefined;
+
+        // Handle strings
+        if (typeof body === 'string') {
+            if (body.length > 524288) {
+                return body.substring(0, 524288) + '... (truncated)';
+            }
+            return body;
+        }
+
+        // Handle objects (JSON)
+        // If it's already an object, we can return it directly if it's JSON-safe
+        // But for safety and to avoid circular deps in logs, let's try to stringify if needed
+        // Or better yet, we can store it as object and let the JSON serializer handle it when sending over WS
+        // But for DB, we might want it as object too (surrealdb handles json)
+        // Let's truncate if too big
+        if (typeof body === 'object') {
+            try {
+                // Check size roughly
+                const str = JSON.stringify(body);
+                if (str.length > 524288) {
+                    return str.substring(0, 524288) + '... (truncated)';
+                }
+                return body;
+            } catch (e) {
+                return '[Circular or Non-Serializable Body]';
+            }
+        }
+
+        return '[Binary or Unreadable Body]';
     }
 }
 function unknownError(ctx: any): any {

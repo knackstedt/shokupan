@@ -266,7 +266,7 @@ export function ApiExplorerApp({ spec, asyncSpec, config }: any) {
         const allGroupMiddleware = hierarchicalGroups.flatMap((g: any) => g.middleware || []).map((m: any) => m.id);
         const globalMiddleware = Object.entries(spec['x-middleware-registry'])
             .filter(([id]) => !allGroupMiddleware.includes(id))
-            .map(([id, mw]) => ({ ...mw, id, type: 'middleware' }));
+            .map(([id, mw]: [string, any]) => ({ ...mw, id, type: 'middleware' }));
 
         if (globalMiddleware.length > 0) {
             hierarchicalGroups.push({
@@ -459,7 +459,6 @@ function Sidebar({ spec, hierarchicalGroups }: any) {
                                                     href={`vscode://file/${mw.file}:${mw.startLine || 1}`}
                                                     class="nav-source-link"
                                                     title={`${mw.file}:${mw.startLine || 1}`}
-                                                    onclick="event.stopPropagation();"
                                                 >
                                                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                         <polyline points="16 18 22 12 16 6"></polyline>

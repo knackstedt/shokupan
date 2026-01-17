@@ -362,6 +362,11 @@ export class ShokupanContext<
     get res() { return this.response; }
 
     /**
+     * Get the raw response body content (if available)
+     */
+    get responseBody() { return this[$rawBody]; }
+
+    /**
      * Raw WebSocket connection
      */
     get ws() { return this[$ws]; }

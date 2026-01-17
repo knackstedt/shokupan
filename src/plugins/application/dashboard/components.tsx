@@ -23,6 +23,8 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
 
                 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
                 <script type="text/javascript" src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
+                {/* Monaco Editor Loader */}
+                <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
             </head>
             <body>
                 <div class="container">

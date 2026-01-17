@@ -57,6 +57,7 @@ function switchTrafficView(viewId) {
     }
 
     if (viewId === 'requests') {
+        if (window.requestsTable) window.requestsTable.redraw();
         if (typeof fetchRequests === 'function') fetchRequests();
     } else if (viewId === 'failures') {
         fetchFailures();

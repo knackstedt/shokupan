@@ -186,7 +186,7 @@ export class MetricsCollector {
         }
 
         try {
-            await this.db.upsert(new RecordId("metrics", timestamp), metric);
+            await this.db.upsert(new RecordId("metric", timestamp), metric);
         } catch (e) {
             console.error(`[MetricsCollector] ✗ Failed to save metrics for ${label}:`, e);
         }

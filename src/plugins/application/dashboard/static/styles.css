@@ -245,3 +245,22 @@ select {
     display: flex;
     flex-direction: column;
 }
+
+.btn-action {
+    background: var(--bg-primary);
+    border: 1px solid var(--card-border);
+    color: var(--text-primary);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-action:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent);
+}
