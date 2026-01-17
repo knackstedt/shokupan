@@ -55,6 +55,7 @@ export interface DashboardConfig {
     integrations?: {
         scalar?: boolean | { path?: string; };
         asyncapi?: boolean | { path?: string; };
+        apiExplorer?: boolean | { path?: string; };
     };
 }
 
@@ -166,7 +167,7 @@ export class Dashboard implements ShokupanPlugin {
         const integrations: Record<string, string | undefined> = {};
         const routers = this[$appRoot]?.[$childRouters] || [];
         // Helper to check config
-        const checkConfig = (key: 'scalar' | 'asyncapi') => {
+        const checkConfig = (key: 'scalar' | 'asyncapi' | 'apiExplorer') => {
             const conf = this.dashboardConfig.integrations?.[key];
             if (conf === false) return { enabled: false };
             if (typeof conf === 'object' && conf.path) return { enabled: true, path: conf.path };
@@ -195,6 +196,18 @@ export class Dashboard implements ShokupanPlugin {
                 const plugin = routers.find(r => r.constructor.name === 'AsyncApiPlugin');
                 if (plugin) {
                     integrations['asyncapi'] = (plugin as any)[$mountPath];
+                }
+            }
+        }
+
+        const apiExplorerConf = checkConfig('apiExplorer');
+        if (apiExplorerConf.enabled) {
+            if (apiExplorerConf.path) {
+                integrations['apiExplorer'] = apiExplorerConf.path;
+            } else {
+                const plugin = routers.find(r => r.constructor.name === 'ApiExplorerPlugin');
+                if (plugin) {
+                    integrations['apiExplorer'] = (plugin as any)[$mountPath];
                 }
             }
         }

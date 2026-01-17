@@ -38,118 +38,134 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                             <button class="tab-btn" onclick="switchTab('requests')">Requests</button>
                             <button class="tab-btn" onclick="switchTab('failures')">Failures</button>
                             {integrations.scalar && (
-                                <button class="tab-btn" onclick="switchTab('scalar')">API Reference</button>
+                                <button class="tab-btn" onclick="switchTab('scalar')">Scalar</button>
+                            )}
+                            {integrations.apiExplorer && (
+                                <button class="tab-btn" onclick="switchTab('api-explorer')">REST API</button>
                             )}
                             {integrations.asyncapi && (
-                                <button class="tab-btn" onclick="switchTab('asyncapi')">AsyncAPI</button>
+                                <button class="tab-btn" onclick="switchTab('asyncapi')">WS API</button>
                             )}
                         </div>
                     </header>
+                    <div class="contents">
+                        {/* Overview Tab */}
+                        <div id="tab-overview" class="tab-content active">
+                            <MetricsGrid metrics={metrics} />
 
-                    {/* Overview Tab */}
-                    <div id="tab-overview" class="tab-content active">
-                        <MetricsGrid metrics={metrics} />
+                            <div id="chart-container" style="display: flex; flex-direction: column; gap: 1rem;">
+                                <div style="display: flex; justify-content: flex-end;">
+                                    <select id="time-range-selector" onchange="updateCharts(); updateDashboard(); fetchTopStats();" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px; border-radius: 4px;">
+                                        <option value="1m">1 Minute</option>
+                                        <option value="5m">5 Minutes</option>
+                                        <option value="30m">30 Minutes</option>
+                                        <option value="1h">1 Hour</option>
+                                        <option value="2h">2 Hours</option>
+                                        <option value="6h">6 Hours</option>
+                                        <option value="12h">12 Hours</option>
+                                        <option value="1d">1 Day</option>
+                                        <option value="3d">3 Days</option>
+                                        <option value="7d">7 Days</option>
+                                        <option value="30d">30 Days</option>
+                                    </select>
+                                </div>
 
-                        <div id="chart-container" style="display: flex; flex-direction: column; gap: 1rem;">
-                            <div style="display: flex; justify-content: flex-end;">
-                                <select id="time-range-selector" onchange="updateCharts(); updateDashboard(); fetchTopStats();" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px; border-radius: 4px;">
-                                    <option value="1m">1 Minute</option>
-                                    <option value="5m">5 Minutes</option>
-                                    <option value="30m">30 Minutes</option>
-                                    <option value="1h">1 Hour</option>
-                                    <option value="2h">2 Hours</option>
-                                    <option value="6h">6 Hours</option>
-                                    <option value="12h">12 Hours</option>
-                                    <option value="1d">1 Day</option>
-                                    <option value="3d">3 Days</option>
-                                    <option value="7d">7 Days</option>
-                                    <option value="30d">30 Days</option>
-                                </select>
+                                <div class="card-container">
+                                    <ChartCard title="Response Time" id="latencyChart" />
+                                    <ChartCard title="Requests / Second" id="rpsChart" />
+                                    <ChartCard title="CPU & Load" id="cpuChart" />
+                                    <ChartCard title="Memory" id="memoryChart" />
+                                    <ChartCard title="Heap Usage" id="heapChart" />
+                                    <ChartCard title="Event Loop Latency" id="eventLoopChart" />
+                                    <ChartCard title="Error Rate" id="errorRateChart" />
+                                </div>
+
+                                <div class="card-title" style="margin-top: 1rem;">Top Statistics</div>
+                                <div class="card-container">
+                                    <Card title="Top Requests" contentId="top-requests-table" />
+                                    <Card title="Top Errors" contentId="top-errors-table" />
+                                    <Card title="Most Frequent Failures" contentId="failing-requests-table" />
+                                    <Card title="Slowest Requests" contentId="slowest-requests-table" />
+                                </div>
+
+                                <div id="table-container" style="padding: 0; margin-top: 1rem;">
+                                    <div id="requests-table" class="table-dark"></div>
+                                </div>
                             </div>
+                            <div style="height: 2rem"></div>
+                        </div>
 
-                            <div class="card-container">
-                                <ChartCard title="Response Time" id="latencyChart" />
-                                <ChartCard title="Requests / Second" id="rpsChart" />
-                                <ChartCard title="CPU & Load" id="cpuChart" />
-                                <ChartCard title="Memory" id="memoryChart" />
-                                <ChartCard title="Heap Usage" id="heapChart" />
-                                <ChartCard title="Event Loop Latency" id="eventLoopChart" />
-                                <ChartCard title="Error Rate" id="errorRateChart" />
+                        {/* Registry Tab */}
+                        <div id="tab-registry" class="tab-content">
+                            <div id="registry-container" class="card" style="margin: 2rem;">
+                                <div class="card-title">Component Registry</div>
+                                <div id="registry-tree" style="padding: 0 1rem 1rem 1rem; font-family: monospace; font-size: 0.9rem;"></div>
                             </div>
+                            <div style="height: 0rem"></div>
+                        </div>
 
-                            <div class="card-title" style="margin-top: 1rem;">Top Statistics</div>
-                            <div class="card-container">
-                                <Card title="Top Requests" contentId="top-requests-table" />
-                                <Card title="Top Errors" contentId="top-errors-table" />
-                                <Card title="Most Frequent Failures" contentId="failing-requests-table" />
-                                <Card title="Slowest Requests" contentId="slowest-requests-table" />
+                        {/* Graph Tab */}
+                        <div id="tab-graph" class="tab-content">
+                            <div class="card" style="margin: 2rem;">
+                                <div style="display: flex; gap: 1rem;">
+                                    <input type="text" id="graph-search" placeholder="Search routes or middleware..." aria-label="Search routes or middleware" style="flex:1; padding: 0.5rem; border-radius: 0.5rem; background: var(--bg-primary); border: 1px solid var(--card-border); color: var(--text-primary);" />
+                                </div>
                             </div>
+                            <div id="cy" style="margin: 0 2rem"></div>
+                            <div style="height: 2rem"></div>
+                        </div>
 
-                            <div id="table-container" style="padding: 0; margin-top: 1rem;">
-                                <div id="requests-table" class="table-dark"></div>
+                        {/* Requests Tab */}
+                        <div id="tab-requests" class="tab-content">
+                            <div style="margin: 2rem;">
+                                <div class="card" style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-direction: row">
+                                    <div class="card-title">Recent Requests (Last 100)</div>
+                                    <button onclick="fetchRequests()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px 10px; border-radius: 6px; cursor: pointer; margin-right: 2rem">Refresh</button>
+                                </div>
+                                <div id="requests-list-container" style="height: calc(100vh - 300px); margin-bottom: 2rem;"></div>
+
+                                <div id="request-details-container" class="card" style="display: none;">
+                                    <div class="card-title">Request Details</div>
+                                    <div id="request-details-content"></div>
+                                    <div class="card-title" style="margin-top: 1rem;">Middleware Trace</div>
+                                    <div id="middleware-trace-container"></div>
+                                </div>
+                                <div style="height: 2rem"></div>
                             </div>
                         </div>
+
+                        {/* Failures Tab */}
+                        <div id="tab-failures" class="tab-content">
+                            <div style="margin: 2rem;">
+                                <div class="card" style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center;">
+                                    <div class="card-title">Failed Requests (Last 50)</div>
+                                    <div>
+                                        <button onclick="importFailure()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-right: 8px;">Import</button>
+                                        <button onclick="fetchFailures()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px 10px; border-radius: 4px; cursor: pointer;">Refresh</button>
+                                    </div>
+                                </div>
+                                <div id="failures-table-container"></div>
+                            </div>
+                        </div>
+
+                        {integrations.scalar && (
+                            <div id="tab-scalar" class="tab-content" style="overflow: hidden; height: 100%; width: 100%">
+                                <iframe src={integrations.scalar} style="width: 100%; height: 100%; border: none;"></iframe>
+                            </div>
+                        )}
+
+                        {integrations.apiExplorer && (
+                            <div id="tab-api-explorer" class="tab-content" style="overflow: hidden; height: 100%; width: 100%">
+                                <iframe src={integrations.apiExplorer} style="width: 100%; height: 100%; border: none;"></iframe>
+                            </div>
+                        )}
+
+                        {integrations.asyncapi && (
+                            <div id="tab-asyncapi" class="tab-content" style="overflow: hidden; height: 100%; width: 100%">
+                                <iframe src={integrations.asyncapi} style="width: 100%; height: 100%; border: none;"></iframe>
+                            </div>
+                        )}
                     </div>
-
-                    {/* Registry Tab */}
-                    <div id="tab-registry" class="tab-content">
-                        <div id="registry-container" class="card" style="margin-top: 2rem;">
-                            <div class="card-title">Component Registry</div>
-                            <div id="registry-tree" style="padding: 0 1rem 1rem 1rem; font-family: monospace; font-size: 0.9rem;"></div>
-                        </div>
-                    </div>
-
-                    {/* Graph Tab */}
-                    <div id="tab-graph" class="tab-content">
-                        <div class="card" style="margin-bottom: 1rem;">
-                            <div style="display: flex; gap: 1rem;">
-                                <input type="text" id="graph-search" placeholder="Search routes or middleware..." aria-label="Search routes or middleware" style="flex:1; padding: 0.5rem; border-radius: 0.5rem; background: var(--bg-primary); border: 1px solid var(--card-border); color: var(--text-primary);" />
-                            </div>
-                        </div>
-                        <div id="cy"></div>
-                    </div>
-
-                    {/* Requests Tab */}
-                    <div id="tab-requests" class="tab-content">
-                        <div class="card" style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
-                            <div class="card-title">Recent Requests (Last 100)</div>
-                            <div>
-                                <button onclick="fetchRequests()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px 10px; border-radius: 4px; cursor: pointer;">Refresh</button>
-                            </div>
-                        </div>
-                        <div id="requests-list-container" style="height: calc(100vh - 300px); margin-bottom: 2rem;"></div>
-
-                        <div id="request-details-container" class="card" style="display: none;">
-                            <div class="card-title">Request Details</div>
-                            <div id="request-details-content"></div>
-                            <div class="card-title" style="margin-top: 1rem;">Middleware Trace</div>
-                            <div id="middleware-trace-container"></div>
-                        </div>
-                    </div>
-
-                    {/* Failures Tab */}
-                    <div id="tab-failures" class="tab-content">
-                        <div class="card" style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
-                            <div class="card-title">Failed Requests (Last 50)</div>
-                            <div>
-                                <button onclick="importFailure()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-right: 8px;">Import</button>
-                                <button onclick="fetchFailures()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px 10px; border-radius: 4px; cursor: pointer;">Refresh</button>
-                            </div>
-                        </div>
-                        <div id="failures-table-container"></div>
-                    </div>
-
-                    {integrations.scalar && (
-                        <div id="tab-scalar" class="tab-content" style="margin: 0; overflow: hidden; height: 100%; max-width: unset">
-                            <iframe src={integrations.scalar} style="width: 100%; height: 100%; border: none;"></iframe>
-                        </div>
-                    )}
-
-                    {integrations.asyncapi && (
-                        <div id="tab-asyncapi" class="tab-content" style="margin: 0; overflow: hidden; height: 100%; max-width: unset">
-                            <iframe src={integrations.asyncapi} style="width: 100%; height: 100%; border: none;"></iframe>
-                        </div>
-                    )}
                 </div>
 
                 <script dangerouslySetInnerHTML={{
