@@ -18,6 +18,10 @@ function renderPath(path) {
 
     let out = '';
     parts.forEach((part, index) => {
+        if (part === '.well-known') {
+            out += `/<span class="path-segment" style="color: #8b5cf6; font-weight: bold;">${part}</span>`;
+            return;
+        }
         if (part.startsWith(":")) {
             out += `/<span class="path-segment path-param">${part}</span>`;
             return;
@@ -35,7 +39,7 @@ function renderPath(path) {
 const GroupNode = ({ data }) => {
     return React.createElement('div', { style: { padding: '10px', height: '100%' } },
         React.createElement('div', { style: { fontWeight: 'bold', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '5px', marginBottom: '5px' } },
-            data.type === "controller" ? data.label : "Router: " + data.label
+            data.type === "controller" ? data.label : (data.data.metadata?.pluginName ? data.label : "Router: " + data.label)
         ),
         data.data?.children?.routes?.map((r, i) =>
             React.createElement('div', { key: i, style: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', margin: '2px 0' } },
@@ -208,7 +212,7 @@ const GraphComponent = () => {
                 // Label logic matches GroupNode
                 header.textContent = container.type === "controller"
                     ? (container.name + (container.metadata?.pluginName ? `\n[${container.metadata.pluginName}]` : ''))
-                    : "Router: " + container.path;
+                    : (container.metadata?.pluginName ? `[${container.metadata.pluginName}]` : "Router: " + container.path);
                 nodeEl.appendChild(header);
 
                 // Mimic Routes
@@ -269,15 +273,31 @@ const GraphComponent = () => {
                         restChildrenNodes.push(...nodes);
                         restChildrenEdges.push(...edges);
 
+                        const isPlugin = r.metadata?.pluginName;
+                        const label = isPlugin
+                            ? `[${r.metadata.pluginName}]`
+                            : r.path;
+
+                        const baseStyle = getNodeStyle(id);
+                        const routerStyle = isPlugin
+                            ? {
+                                ...baseStyle,
+                                background: '#f59e0b10',
+                                color: '#f59e0b',
+                                border: '1px solid #f59e0b'
+                            }
+                            : {
+                                ...baseStyle
+                                // Use default router style from NODE_STYLES via class/type mapping later?
+                                // Actually NODE_STYLES handles 'router'. We should NOT override it with 'red' here.
+                            };
+
                         return {
                             id,
-                            label: r.path,
+                            label: label,
                             ...calculateNodeBounds(r),
                             type: "router",
-                            style: {
-                                ...getNodeStyle(id),
-                                backgroundColor: 'red'
-                            },
+                            style: routerStyle,
                             data: r
                         };
                     }),
@@ -394,6 +414,7 @@ const GraphComponent = () => {
                 }
 
                 const style = NODE_STYLES[node.type] || {};
+                const customStyle = node.style || {};
                 const isGroup = node.children && node.children.length > 0;
 
                 flowNodes.push({
@@ -402,6 +423,7 @@ const GraphComponent = () => {
                     data: node,
                     style: {
                         ...style,
+                        ...customStyle,
                         width: node.width,
                         height: node.height,
                         zIndex: isGroup ? -1 : 1
