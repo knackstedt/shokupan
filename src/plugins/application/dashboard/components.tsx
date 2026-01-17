@@ -33,8 +33,7 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                         </div>
                         <div class="tabs">
                             <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
-                            <button class="tab-btn" onclick="switchTab('registry')">Registry</button>
-                            <button class="tab-btn" onclick="switchTab('graph')">Graph</button>
+                            <button class="tab-btn" onclick="switchTab('application')">Application</button>
                             <button class="tab-btn" onclick="switchTab('requests')">Requests</button>
                             <button class="tab-btn" onclick="switchTab('failures')">Failures</button>
                             {integrations.scalar && (
@@ -95,23 +94,32 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                             <div style="height: 2rem"></div>
                         </div>
 
-                        {/* Registry Tab */}
-                        <div id="tab-registry" class="tab-content" style="max-width: 1200px;">
-                            <div id="registry-container" class="card" style="margin: 2rem;">
-                                <div class="card-title">Component Registry</div>
-                                <div id="registry-tree" style="padding: 0 1rem 1rem 1rem; font-family: monospace; font-size: 0.9rem;"></div>
-                            </div>
-                            <div style="height: 0rem"></div>
-                        </div>
-
-                        {/* Graph Tab */}
-                        <div id="tab-graph" class="tab-content">
-                            <div class="card" style="margin: 2rem;">
-                                <div style="display: flex; gap: 1rem;">
-                                    <input type="text" id="graph-search" placeholder="Search routes or middleware..." aria-label="Search routes or middleware" style="flex:1; padding: 0.5rem; border-radius: 0.5rem; background: var(--bg-primary); border: 1px solid var(--card-border); color: var(--text-primary);" />
+                        {/* Application Tab */}
+                        <div id="tab-application" class="tab-content">
+                            <div style="margin: 2rem 2rem 0 2rem; display: flex; gap: 1rem; align-items: center;">
+                                <div class="button-group">
+                                    <button class="view-btn active" onclick="switchApplicationView('registry')">Registry</button>
+                                    <button class="view-btn" onclick="switchApplicationView('graph')">Graph</button>
                                 </div>
                             </div>
-                            <div id="cy" style="margin: 0 2rem; height: calc(100% - 6rem - 35px);"></div>
+                            {/* Registry Sub-View */}
+                            <div id="app-view-registry" class="app-view active" style="max-width: 1200px; align-self: center; margin: 0 auto">
+                                <div id="registry-container" class="card" style="margin: 2rem; margin-top: 1rem;">
+                                    <div class="card-title">Component Registry</div>
+                                    <div id="registry-tree" style="padding: 0 1rem 1rem 1rem; font-family: monospace; font-size: 0.9rem;"></div>
+                                </div>
+                                <div style="height: .1px"></div>
+                            </div>
+
+                            {/* Graph Sub-View */}
+                            <div id="app-view-graph" class="app-view" style="height: 100%;">
+                                <div class="card" style="margin: 1rem 2rem;">
+                                    <div style="display: flex; gap: 1rem;">
+                                        <input type="text" id="graph-search" placeholder="Search routes or middleware..." aria-label="Search routes or middleware" style="flex:1; padding: 0.5rem; border-radius: 0.5rem; background: var(--bg-primary); border: 1px solid var(--card-border); color: var(--text-primary);" />
+                                    </div>
+                                </div>
+                                <div id="cy" style="margin: 0 2rem; height: calc(100% - 10rem);"></div>
+                            </div>
                         </div>
 
                         {/* Requests Tab */}

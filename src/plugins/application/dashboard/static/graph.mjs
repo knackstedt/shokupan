@@ -561,7 +561,7 @@ const GraphComponent = () => {
             width: '100vw',
             height: '100vh',
             zIndex: 9999,
-            backgroundColor: '#1e293b' // Match theme
+            backgroundColor: 'var(--bg-primary)' // Match theme
         } : {
             width: '100%',
             height: '100%',

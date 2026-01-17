@@ -14,8 +14,13 @@ function switchTab(tabId) {
     if (tabId === 'overview') {
         if (typeof fetchTopStats === 'function') fetchTopStats();
     }
-    else if (tabId === 'graph') {
-        initGraph();
+    else if (tabId === 'application') {
+        const activeView = document.querySelector('.app-view.active');
+        if (!activeView || activeView.id === 'app-view-registry') {
+            switchApplicationView('registry');
+        } else {
+            switchApplicationView('graph');
+        }
     }
     else if (tabId === 'requests') {
         if (typeof fetchRequests === 'function') fetchRequests();
@@ -26,8 +31,39 @@ function switchTab(tabId) {
     else if (tabId === 'middleware') {
         fetchMiddleware();
     }
-    else if (tabId === 'registry') {
+}
+
+function switchApplicationView(viewId) {
+    console.log('Switching application view to:', viewId);
+
+    // Update buttons
+    const container = document.getElementById('tab-application');
+    if (!container) return;
+
+    container.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));
+    // Find button
+    const btn = Array.from(container.querySelectorAll('.view-btn')).find(b => b.getAttribute('onclick') === `switchApplicationView('${viewId}')`);
+    if (btn) btn.classList.add('active');
+
+    // Update content
+    container.querySelectorAll('.app-view').forEach(view => {
+        view.classList.remove('active');
+        view.style.display = 'none';
+    });
+
+    const activeView = document.getElementById('app-view-' + viewId);
+    if (activeView) {
+        activeView.classList.add('active');
+        activeView.style.display = 'block';
+    }
+
+    if (viewId === 'registry') {
         if (typeof fetchRegistry === 'function') fetchRegistry();
+    } else if (viewId === 'graph') {
+        // Build graph if needed
+        setTimeout(() => {
+            if (typeof initGraph === 'function') initGraph();
+        }, 50);
     }
 }
 
