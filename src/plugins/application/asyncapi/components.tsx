@@ -148,9 +148,20 @@ function LeafNode({ item, label, disableSourceView }: any) {
         );
     } else {
         const badgeText = item.data.type === 'publish' ? 'SEND' : 'RECV';
+        const isPlugin = item.data.op?.['x-shokupan-plugin-name'] || sourceInfo?.pluginName;
+
         content = (
             <>
                 <span class={`badge badge-${badgeText}`}>{badgeText}</span>
+                {isPlugin && (
+                    <span class="builtin-icon" title="Built-in Plugin">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                            <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                        </svg>
+                    </span>
+                )}
                 <span class="tree-label">{label}</span>
             </>
         );

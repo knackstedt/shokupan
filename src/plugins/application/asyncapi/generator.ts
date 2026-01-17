@@ -176,7 +176,10 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                             message,
                             ...(userSpec?.type === 'publish' ? userSpec : {}),
                             "x-source-info": sourceInfo ? [sourceInfo] : [],
-                            "x-shokupan-source": sourceInfo // Simplified
+                            "x-shokupan-source": {
+                                ...sourceInfo,
+                                pluginName: (handler as any).pluginName
+                            }
                         };
 
                         if (inferenceFailed) {
@@ -276,6 +279,7 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                                     "x-shokupan-source": (sourceInfo && emitStart) ? {
                                         file: sourceInfo.file,
                                         line: emitStart,
+                                        pluginName: (handler as any).pluginName
                                     } : undefined
                                 }
                             };

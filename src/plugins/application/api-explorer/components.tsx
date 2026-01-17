@@ -274,7 +274,8 @@ export function ApiExplorerApp({ spec, asyncSpec, config }: any) {
                 type: 'group' as const,
                 children: [],
                 middleware: globalMiddleware,
-                commonPrefixPath: ''
+                commonPrefixPath: '',
+                isBuiltin: false
             });
         }
     }

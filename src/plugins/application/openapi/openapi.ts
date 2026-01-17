@@ -263,7 +263,12 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
         let pluginName = '';
 
         // Detect builtin plugins
-        if (router.metadata?.file && router.metadata.file.includes('plugins/application/')) {
+        if ((router.metadata as any)?.pluginName) {
+            isBuiltinPlugin = true;
+            pluginName = (router.metadata as any).pluginName;
+            tag = pluginName.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        }
+        else if (router.metadata?.file && router.metadata.file.includes('plugins/application/')) {
             isBuiltinPlugin = true;
             // Extract plugin name from path .../plugins/application/<name>/...
             const match = router.metadata.file.match(/plugins\/application\/([^/]+)/);
@@ -271,9 +276,6 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                 pluginName = match[1].replace(/\.(ts|js|mjs|mts|cjs)$/, '');
                 // Override tag for builtin plugins to group them properly
                 tag = pluginName.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                // Force group to be "Built-in Plugins" or similar if we want them separated top-level
-                // But for now, let's just properly tag them so they group together
-                // group = "System"; 
             }
         }
 
@@ -518,16 +520,24 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                     operation["x-shokupan-source"] = {
                         file,
                         line: line || 1,
-                        code: runtimeSource
+                        code: runtimeSource,
+                        pluginName: (route.handler as any).pluginName // Inject pluginName from handler
                     };
                 }
             }
 
             if (isBuiltinPlugin) {
                 operation["x-shokupan-builtin"] = true;
-                if (pluginName) {
-                    operation["x-shokupan-plugin-name"] = pluginName;
-                }
+            }
+
+            // Explicitly set plugin name if available on handler (even if not builtin, or overriding builtin guess)
+            if ((route.handler as any).pluginName) {
+                operation["x-shokupan-plugin-name"] = (route.handler as any).pluginName;
+                if (!operation["x-shokupan-source"]) operation["x-shokupan-source"] = {};
+                operation["x-shokupan-source"].pluginName = (route.handler as any).pluginName;
+            } else if (pluginName) {
+                // Fallback to inferred plugin name
+                operation["x-shokupan-plugin-name"] = pluginName;
             }
 
             // Path pattern params
