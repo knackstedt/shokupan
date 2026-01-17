@@ -84,33 +84,69 @@ function showRequestDetails(request) {
 
     // Render Trace
     if (request.handlerStack && request.handlerStack.length > 0) {
-        let html = '<div style="display: flex; flex-direction: column; gap: 4px;">';
+        const totalDuration = request.duration || 1; // avoid divide by zero
+        let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
 
         request.handlerStack.forEach((item, index) => {
-            const duration = item.duration || 0;
-
-            if (index !== 0) {
-                html += `<div style="align-self: center">⬇︎</div>`;
-            }
+            const duration = item.duration > 0 ? item.duration : 0.01;
+            const percent = Math.min(100, Math.max(1, (duration / totalDuration) * 100));
+            const isSlow = percent > 15; // Highlight if takes > 15% of total time
 
             html += `
-                <div style="padding: 8px; border-radius: 4px; background: var(--bg-secondary);">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span style="font-weight: bold;">${item.name}</span>
-                        <span>${printDuration(duration)}</span>
+                <div style="
+                    padding: 12px; 
+                    border-radius: 6px; 
+                    background: var(--bg-secondary); 
+                    border-left: 4px solid ${isSlow ? 'var(--color-warning)' : 'var(--color-success)'};
+                    position: relative;
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-weight: 600; font-size: 1rem;">${item.name}</span>
+                            ${item.isBuiltin ? '<span style="font-size: 0.7rem; background: var(--bg-primary); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border-color);">Built-in</span>' : ''}
+                        </div>
+                        <span style="font-family: monospace; font-weight: bold; ${isSlow ? 'color: var(--color-warning);' : ''}">${printDuration(duration)}</span>
                     </div>
-                    <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                    
+                    <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 8px; font-family: monospace;">
                         ${item.file}:${item.line}
                     </div>
-                    ${item.stateChanges ? `<div style="font-size: 0.8rem; margin-top: 4px; color: #aaa;">State Changes: ${Object.keys(item.stateChanges).join(', ')}</div>` : ''}
+
+                    <!-- Duration Bar -->
+                    <div style="
+                        height: 4px; 
+                        background: var(--bg-primary); 
+                        border-radius: 2px; 
+                        overflow: hidden; 
+                        width: 100%;
+                    ">
+                        <div style="
+                            height: 100%; 
+                            width: ${percent}%; 
+                            background: ${isSlow ? 'var(--color-warning)' : 'var(--color-success)'};
+                            opacity: 0.8;
+                        "></div>
+                    </div>
                 </div>
             `;
+
+            if (index < request.handlerStack.length - 1) {
+                html += `
+                    <div style="display: flex; justify-content: center; height: 16px; align-items: center;">
+                        <div style="width: 2px; height: 100%; background: var(--border-color); opacity: 0.3;"></div>
+                    </div>
+                `;
+            }
         });
 
         html += '</div>';
         traceContainer.innerHTML = html;
     } else {
-        traceContainer.innerHTML = '<div style="color: var(--text-secondary);">No middleware trace available.</div>';
+        traceContainer.innerHTML = `
+            <div style="padding: 2rem; text-align: center; color: var(--text-secondary); background: var(--bg-secondary); border-radius: 8px; border: 1px dashed var(--border-color);">
+                No middleware trace captured for this request.
+            </div>
+        `;
     }
 
     // Scroll to details

@@ -819,7 +819,7 @@ export class Dashboard implements ShokupanPlugin {
                     status: response.status,
                     duration,
                     timestamp: Date.now(),
-                    // handlerStack: (ctx as any).handlerStack // Temporarily removed to prevent serialization issues
+                    handlerStack: this.serializeHandlerStack((ctx as any).handlerStack)
                 };
                 // console.log(`[Dashboard Debug] Captured ${ctx.method} ${ctx.path} -> Status: ${response.status}`); // Removed debug log
 
@@ -847,7 +847,8 @@ export class Dashboard implements ShokupanPlugin {
                     url: ctx.url.toString(),
                     status: response.status,
                     duration,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
+                    handlerStack: this.serializeHandlerStack((ctx as any).handlerStack)
                 };
 
                 const strategy = this.dashboardConfig.updateStrategy || 'immediate';
@@ -911,6 +912,18 @@ export class Dashboard implements ShokupanPlugin {
         if (this.metrics.recentTimings.length > 50) {
             this.metrics.recentTimings.shift();
         }
+    }
+    private serializeHandlerStack(stack: any[]): any[] {
+        if (!stack || !Array.isArray(stack)) return [];
+        return stack.map(item => ({
+            name: item.name,
+            file: item.file,
+            line: item.line,
+            duration: item.duration,
+            startTime: item.startTime,
+            isBuiltin: item.isBuiltin,
+            // stateChanges: item.stateChanges // Exclude complex objects for now
+        }));
     }
 }
 function unknownError(ctx: any): any {
