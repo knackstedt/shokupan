@@ -362,7 +362,7 @@ async function selectEvent(name, el) {
                 let code = null;
                 if (src.file) {
                     try {
-                        const res = await fetch(`./_code?file=${encodeURIComponent(src.file)}`);
+                        const res = await fetch(`${window.BASE_PATH}/_code?file=${encodeURIComponent(src.file)}`);
                         if (res.ok) code = await res.text();
                         else code = `// Failed to load source: ${res.statusText}`;
                     } catch (e) { code = `// Error loading source: ${e.message}`; }
@@ -563,7 +563,7 @@ async function selectEvent(name, el) {
             (async () => {
                 let code = null;
                 try {
-                    const res = await fetch(`./_code?file=${encodeURIComponent(fileName)}`);
+                    const res = await fetch(`${window.BASE_PATH}/_code?file=${encodeURIComponent(fileName)}`);
                     if (res.ok) code = await res.text();
                     else code = `// Failed to load source: ${res.statusText}`;
                 } catch (e) { code = `// Error loading source: ${e.message}`; }

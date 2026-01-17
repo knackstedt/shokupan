@@ -22,6 +22,7 @@ export function AsyncApiApp({ spec, serverUrl, base, disableSourceView, navTree 
                     window.INITIAL_SPEC = ${JSON.stringify(spec)};
                     window.INITIAL_SERVER_URL = "${serverUrl}";
                     window.DISABLE_SOURCE_VIEW = ${JSON.stringify(disableSourceView)};
+                    window.BASE_PATH = "${base}";
                 `}} />
             </head>
             <body>
