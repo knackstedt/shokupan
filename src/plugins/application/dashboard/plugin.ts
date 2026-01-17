@@ -682,6 +682,13 @@ export class Dashboard implements ShokupanPlugin {
             // Routers are containers mainly.
             this.assignIdsToRegistry(r.children, id);
         });
+
+        // Events
+        node.events?.forEach((e: any, idx: number) => {
+            const id = makeId('event', parentId, idx, e.name);
+            e.id = id;
+            if (e._fn) (e._fn as any)._debugId = id;
+        });
     }
 
     public recordNodeMetric(id: string, type: string, duration: number, isError: boolean) {

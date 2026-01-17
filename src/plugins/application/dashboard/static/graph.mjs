@@ -41,6 +41,42 @@ const GroupNode = ({ data }) => {
         React.createElement('div', { style: { fontWeight: 'bold', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '5px', marginBottom: '5px' } },
             data.type === "controller" ? data.label : (data.data.metadata?.pluginName ? data.label : "Router: " + data.label)
         ),
+        /* Middleware Rendering */
+        (data.data?.children?.middleware || [])?.map((mw, i) =>
+            React.createElement('div', {
+                key: 'mw-' + i, style: {
+                    background: '#7e22ce20', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', margin: '2px 0 4px 0', border: '1px solid #6b21a8',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                }
+            },
+                React.createElement('span', { style: { fontWeight: 'bold' } }, "MW"),
+                React.createElement('span', { style: { fontFamily: 'monospace' } }, mw.name || "Middleware")
+            )
+        ),
+
+
+        /* Event Rendering */
+        (data.data?.children?.events || [])?.map((ev, i) =>
+            React.createElement('div', { key: 'ev-' + i, style: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', margin: '2px 0' } },
+                React.createElement('span', {
+                    style: {
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        background: '#60a5fa20',
+                        border: '1px solid #60a5fa',
+                        color: 'white',
+                        fontWeight: 'bold',
+                        fontSize: '10px',
+                        minWidth: '40px',
+                        textAlign: 'center'
+                    }
+                }, "WS"),
+                React.createElement('span', {
+                    style: { fontFamily: 'monospace', color: '#cbd5e1' }
+                }, ev.name)
+            )
+        ),
+
         data.data?.children?.routes?.map((r, i) =>
             React.createElement('div', { key: i, style: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', margin: '2px 0' } },
                 React.createElement('span', {
@@ -215,6 +251,56 @@ const GraphComponent = () => {
                     : (container.metadata?.pluginName ? `[${container.metadata.pluginName}]` : "Router: " + container.path);
                 nodeEl.appendChild(header);
 
+                // Mimic Middleware
+                const middleware = container.children?.middleware || [];
+                for (const mw of middleware) {
+                    const mwEl = document.createElement("div");
+                    mwEl.style.display = "flex";
+                    mwEl.style.alignItems = "center";
+                    mwEl.style.justifyContent = "space-between";
+                    mwEl.style.padding = "2px 6px";
+                    mwEl.style.fontSize = "10px";
+                    mwEl.style.margin = "2px 0 4px 0";
+                    mwEl.style.border = "1px solid transparent"; // Match border in component
+
+                    const label = document.createElement("span");
+                    label.textContent = "MW";
+                    label.style.fontWeight = "bold";
+                    mwEl.appendChild(label);
+
+                    const val = document.createElement("span");
+                    val.textContent = mw.name || "Middleware";
+                    val.style.fontFamily = "monospace";
+                    mwEl.appendChild(val);
+
+                    nodeEl.appendChild(mwEl);
+                    nodeEl.appendChild(mwEl);
+                }
+
+                // Mimic Events
+                const events = container.children?.events || [];
+                for (const ev of events) {
+                    const row = document.createElement("div");
+                    row.style.display = "flex";
+                    row.style.alignItems = "center";
+                    row.style.gap = "8px";
+                    row.style.margin = "2px 0";
+
+                    const badge = document.createElement("span");
+                    badge.textContent = "WS";
+                    badge.style.padding = "2px 6px";
+                    badge.style.fontSize = "10px";
+                    badge.style.fontWeight = "bold";
+                    row.appendChild(badge);
+
+                    const name = document.createElement("span");
+                    name.textContent = ev.name;
+                    name.style.fontFamily = "monospace";
+                    row.appendChild(name);
+
+                    nodeEl.appendChild(row);
+                }
+
                 // Mimic Routes
                 for (const route of routes) {
                     const row = document.createElement("div");
@@ -254,19 +340,7 @@ const GraphComponent = () => {
 
                 const elkEdges = [];
                 const elkNodes = [
-                    ...(middleware || []).map((mw, idx) => {
-                        const id = makeId("middleware", parentId, idx, mw.name);
-                        return {
-                            id,
-                            label: mw.metadata?.pluginName || mw.name || "Unknown Middleware",
-                            ...calculateNodeBounds(mw),
-                            // width: 140,
-                            // height: 40,
-                            type: "middleware",
-                            style: getNodeStyle(id),
-                            data: mw
-                        };
-                    }),
+                    // Middleware nodes removed
                     ...(routers || []).map((r, idx) => {
                         const id = makeId("router", parentId, idx, r.path);
                         const { nodes, edges } = addRecursedLevel(r.children, id);
@@ -288,8 +362,6 @@ const GraphComponent = () => {
                             }
                             : {
                                 ...baseStyle
-                                // Use default router style from NODE_STYLES via class/type mapping later?
-                                // Actually NODE_STYLES handles 'router'. We should NOT override it with 'red' here.
                             };
 
                         return {
@@ -325,33 +397,12 @@ const GraphComponent = () => {
                     };
                 });
 
-                let lastMiddlewareId = "";
-                // Create middleware edges
-                middleware?.forEach((mw, idx) => {
-                    const id = makeId("middleware", parentId, idx, mw.name);
-
-                    let sourceId = idx === 0 ?
-                        parentId ? parentId : "entrypoint-http"
-                        : makeId("middleware", parentId, idx - 1, middleware[idx - 1].name);
-
-                    elkEdges.push({
-                        id,
-                        sources: [sourceId],
-                        targets: [id],
-                        type: "straight",
-                        style: {
-                            ...getEdgeStyle(mw),
-                            backgroundColor: 'blue'
-                        }
-                    });
-                    lastMiddlewareId = id;
-                });
-
+                // Simplified Edge Creation - Direct connections
                 routers?.forEach((r, idx) => {
                     const id = makeId("router", parentId, idx, r.path);
                     elkEdges.push({
-                        id,
-                        sources: [lastMiddlewareId || parentId],
+                        id: `edge_${parentId}_${id}`,
+                        sources: [parentId],
                         targets: [id],
                         style: {
                             ...getEdgeStyle(r),
@@ -361,10 +412,9 @@ const GraphComponent = () => {
                 });
                 controllers?.forEach((ctrl, idx) => {
                     const id = makeId("controller", parentId, idx, ctrl.path);
-                    console.log({ id, lastMiddlewareId });
                     elkEdges.push({
-                        id,
-                        sources: [lastMiddlewareId || parentId],
+                        id: `edge_${parentId}_${id}`,
+                        sources: [parentId],
                         targets: [id],
                         style: {
                             ...getEdgeStyle(ctrl),
@@ -379,10 +429,48 @@ const GraphComponent = () => {
                 return { nodes, edges };
             }
 
-            const { nodes: elkNodes, edges: elkEdges } = addRecursedLevel(registryData);
-            elkNodes.push({
-                id: "entrypoint-http", width: 64, height: 64, type: "entrypoint"
-            });
+            const rootNodeId = "router_root";
+            const rootNodeData = {
+                type: 'router',
+                metadata: { name: 'Root Application' },
+                path: '/',
+                children: {
+                    routes: registryData.routes,
+                    middleware: registryData.middleware,
+                    events: registryData.events
+                }
+            };
+
+            // Pass rootNodeId as parent to children
+            const { nodes: childrenNodes, edges: childrenEdges } = addRecursedLevel(registryData, rootNodeId);
+
+            // Create explicit Root Node
+            const rootNode = {
+                id: rootNodeId,
+                label: "Root Application",
+                ...calculateNodeBounds(rootNodeData),
+                type: "router",
+                style: getNodeStyle(rootNodeId),
+                data: rootNodeData
+            };
+
+            // Combine all nodes
+            const elkNodes = [
+                rootNode,
+                ...childrenNodes,
+                { id: "entrypoint-http", width: 64, height: 64, type: "entrypoint" }
+            ];
+
+            // Connect Entrypoint -> Root
+            const entrypointEdge = {
+                id: 'edge_entrypoint_root',
+                sources: ['entrypoint-http'],
+                targets: [rootNodeId],
+                type: "straight",
+                style: { stroke: '#3b82f6' }
+            };
+
+            const elkEdges = [entrypointEdge, ...childrenEdges];
 
             const nodeNodeGap = '20';
             const nodeEdgeGap = '20';
@@ -398,6 +486,7 @@ const GraphComponent = () => {
                     'elk.layered.spacing.edgeNodeBetweenLayers': nodeEdgeGap,
                     'elk.layered.wrapping.additionalEdgeSpacing': nodeEdgeGap,
                     'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
+                    'elk.layered.nodePlacement.bk.fixedAlignment': 'LEFTUP',
                 },
                 children: elkNodes,
                 edges: elkEdges

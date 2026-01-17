@@ -19,6 +19,7 @@ window.renderRegistry = function renderRegistry(node, container) {
         if (n.routers) n.routers.forEach(collectPaths);
         if (n.controllers) n.controllers.forEach(collectPaths);
         if (n.routes) n.routes.forEach(collectPaths);
+        if (n.events) n.events.forEach(collectPaths);
         if (n.children) collectPaths(n.children); // recursive for routers
     };
     collectPaths(node);
@@ -121,9 +122,10 @@ window.renderRegistry = function renderRegistry(node, container) {
     if (node.routes) node.routes.forEach(i => allItems.push({ ...i, kind: 'route' }));
     if (node.routers) node.routers.forEach(i => allItems.push({ ...i, kind: 'router' }));
     if (node.controllers) node.controllers.forEach(i => allItems.push({ ...i, kind: 'controller' }));
+    if (node.events) node.events.forEach(i => allItems.push({ ...i, kind: 'event' }));
 
     // 2. Sort by Order
-    const kindPriority = { 'middleware': 0, 'router': 1, 'controller': 2, 'route': 3 };
+    const kindPriority = { 'middleware': 0, 'router': 1, 'controller': 2, 'route': 3, 'event': 4 };
     allItems.sort((a, b) => {
         const pA = kindPriority[a.kind] !== undefined ? kindPriority[a.kind] : 99;
         const pB = kindPriority[b.kind] !== undefined ? kindPriority[b.kind] : 99;
@@ -320,6 +322,26 @@ window.renderRegistry = function renderRegistry(node, container) {
             div.innerHTML = `
                 <span class="badge ${badgeClass}" style="width: 50px; text-align: center; display: inline-block;">${method}</span>
                 <span class="tree-label">${renderPath(item.path)}</span>
+                ${meta}
+                ${tHtml}
+            `;
+            wrapper.appendChild(div);
+        }
+
+        // Event
+        else if (item.kind === 'event') {
+            const div = document.createElement('div');
+            div.className = 'tree-item tooltip'; // Add tooltip class
+
+            // Event Badge style
+            const badgeStyle = "width: 50px; text-align: center; display: inline-block;";
+
+            const meta = createFileMeta(item.metadata, item.handlerName);
+            const tHtml = getTooltipHtml(item.id);
+
+            div.innerHTML = `
+                <span class="badge badge-SEND" style="${badgeStyle}">WS</span>
+                <span class="tree-label">${item.name}</span>
                 ${meta}
                 ${tHtml}
             `;
