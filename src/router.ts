@@ -273,6 +273,35 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     }
 
     /**
+     * Registers a lifecycle hook dynamically.
+     */
+    public hook(name: keyof ShokupanHooks, handler: Function) {
+        if (!this.hooksInitialized) {
+            this.ensureHooksInitialized();
+        }
+
+        let handlers = this.hookCache.get(name);
+        if (!handlers) {
+            handlers = [];
+            this.hookCache.set(name, handlers);
+
+            // Set the has hooks flags
+            this._hasOnErrorHook ||= name === 'onError';
+            this._hasOnRequestStartHook ||= name === 'onRequestStart';
+            this._hasOnRequestEndHook ||= name === 'onRequestEnd';
+            this._hasOnResponseStartHook ||= name === 'onResponseStart';
+            this._hasOnResponseEndHook ||= name === 'onResponseEnd';
+            this._hasOnRequestTimeoutHook ||= name === 'onRequestTimeout';
+            this._hasOnReadTimeoutHook ||= name === 'onReadTimeout';
+            this._hasOnWriteTimeoutHook ||= name === 'onWriteTimeout';
+            this._hasBeforeValidateHook ||= name === 'beforeValidate';
+            this._hasAfterValidateHook ||= name === 'afterValidate';
+        }
+        handlers.push(handler);
+        return this;
+    }
+
+    /**
      * Finds an event handler(s) by name.
      */
     public findEvent(name: string): ShokupanHandler<T>[] | null {

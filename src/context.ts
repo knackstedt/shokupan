@@ -650,6 +650,7 @@ export class ShokupanContext<
         if (!VALID_HTTP_STATUSES.has(finalStatus)) {
             throw new Error(`Invalid HTTP status code: ${finalStatus}`);
         }
+        this.response.status = finalStatus;
 
         const jsonString = JSON.stringify(data instanceof Promise ? await data : data);
 
@@ -682,6 +683,7 @@ export class ShokupanContext<
         if (this.app.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(finalStatus)) {
             throw new Error(`Invalid HTTP status code: ${finalStatus}`);
         }
+        this.response.status = finalStatus;
 
         // Store raw body for compression middleware
         this[$rawBody] = data instanceof Promise ? await data : data;
@@ -712,6 +714,7 @@ export class ShokupanContext<
         if (this.app.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(finalStatus)) {
             throw new Error(`Invalid HTTP status code: ${finalStatus}`);
         }
+        this.response.status = finalStatus;
 
         const finalHeaders = this.mergeHeaders(headers);
         finalHeaders.set("content-type", "text/html; charset=utf-8");
@@ -731,6 +734,7 @@ export class ShokupanContext<
         if (this.app.applicationConfig.validateStatusCodes && !VALID_REDIRECT_STATUSES.has(status)) {
             throw new Error(`Invalid redirect status code: ${status}`);
         }
+        this.response.status = status;
 
         const finalHeaders = this.mergeHeaders();
         finalHeaders.set('Location', url instanceof Promise ? await url : url);
@@ -749,6 +753,7 @@ export class ShokupanContext<
         if (this.app.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(status)) {
             throw new Error(`Invalid HTTP status code: ${status}`);
         }
+        this.response.status = status;
 
         const finalHeaders = this.mergeHeaders();
         this[$finalResponse] = new Response(null, { status, headers: finalHeaders });
@@ -766,6 +771,8 @@ export class ShokupanContext<
         if (this.app.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(status)) {
             throw new Error(`Invalid HTTP status code: ${status}`);
         }
+        // status is optional in file responseOptions, so only update if defined, otherwise keep existing
+        if (status) this.response.status = status;
 
         if (typeof Bun !== "undefined") {
             this[$finalResponse] = new Response(Bun.file(path, fileOptions), { status, headers: finalHeaders });

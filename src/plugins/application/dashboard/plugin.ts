@@ -162,18 +162,17 @@ export class Dashboard implements ShokupanPlugin {
                 await hooks.onRequestStart(ctx);
             }
 
-            const startTime = Date.now();
-            await next();
-            const duration = Date.now() - startTime;
+            // Track start time for duration calculation
+            (ctx as any)._startTime = performance.now();
 
-            if (hooks.onResponseEnd) {
-                // Use _finalResponse if available to get the actual status code sent to the client
-                const effectiveResponse = (ctx as any)._finalResponse || ctx.response || {};
-                await hooks.onResponseEnd(ctx, effectiveResponse);
-            }
+            await next();
         };
 
         app.use(hooksMiddleware);
+
+        if (hooks.onResponseEnd) {
+            app.hook('onResponseEnd', hooks.onResponseEnd);
+        }
 
         // Mount the dashboard router
         app.mount(mountPath, this.router);
@@ -291,8 +290,6 @@ export class Dashboard implements ShokupanPlugin {
         });
 
         this.router.get("/metrics", async (ctx) => {
-            // ... (rest of the file)
-
             const uptime = this.getUptime();
             const interval = ctx.query['interval'];
             if (interval) {
@@ -751,7 +748,7 @@ export class Dashboard implements ShokupanPlugin {
 
                 this.metrics.totalRequests++;
                 this.metrics.activeRequests++;
-                (ctx as any)._debugStartTime = performance.now();
+                // (ctx as any)._debugStartTime = performance.now(); // Removed, now handled by middleware
 
                 // Attach Collector
                 ctx[$debug] = new Collector(this);
@@ -767,14 +764,9 @@ export class Dashboard implements ShokupanPlugin {
                 }
             },
 
-            onResponseEnd: async (ctx, response) => {
+            onResponseEnd: async (ctx: any, response: any) => {
                 this.metrics.activeRequests = Math.max(0, this.metrics.activeRequests - 1);
-                const start = (ctx as any)._debugStartTime;
-                let duration = 0;
-                if (start) {
-                    duration = performance.now() - start;
-                    this.updateTiming(duration);
-                }
+                const duration = (performance.now() - (ctx as any)._startTime) || 0;
 
                 // Record in MetricsCollector
                 const isError = response.status >= 400;
@@ -829,6 +821,7 @@ export class Dashboard implements ShokupanPlugin {
                     timestamp: Date.now(),
                     // handlerStack: (ctx as any).handlerStack // Temporarily removed to prevent serialization issues
                 };
+                // console.log(`[Dashboard Debug] Captured ${ctx.method} ${ctx.path} -> Status: ${response.status}`); // Removed debug log
 
                 this.metrics.logs.push(logEntry);
 
