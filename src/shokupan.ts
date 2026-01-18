@@ -392,8 +392,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             adapter = new NodeAdapter();
         } else if (adapter === 'wintercg') {
             // WinterCG adapter doesn't listen
-            console.warn("WinterCG adapter does not support listen(). Use fetch directly.");
-            return;
+            throw new Error("WinterCG adapter does not support listen(). Use fetch directly.");
         }
 
         // @ts-ignore

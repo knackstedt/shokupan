@@ -1,3 +1,4 @@
+import type { IncomingMessage } from 'node:http';
 import { createRequire } from 'node:module';
 import { URL } from 'node:url';
 
@@ -58,6 +59,9 @@ export interface OutboundRequestLog {
      * The protocol scheme (http/https) or version (1.1, 2.0).
      */
     protocol?: string;
+    /**
+     * The protocol scheme (http/https).
+     */
     scheme?: string;
     /**
      * The remote IP address (if available).
@@ -234,7 +238,7 @@ export class FetchInterceptor {
                 };
 
                 // Intercept response
-                req.on('response', (res: http.IncomingMessage) => {
+                req.on('response', (res: IncomingMessage) => {
                     const duration = performance.now() - startTime;
 
                     // Normalize response headers

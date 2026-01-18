@@ -555,7 +555,7 @@ export class Dashboard implements ShokupanPlugin {
         this.router.get("/requests", async (ctx) => {
             console.log(`[Dashboard] Handling /requests from ${ctx.ip} ${ctx.get('User-Agent')}`);
             const result = await this.db.query("SELECT * FROM request ORDER BY timestamp DESC LIMIT 100");
-            const items = result[0] || [];
+            const items: any[] = result[0] as any[] || [];
             console.log(`[Dashboard] /requests returning ${items.length} items`);
             return ctx.json({ requests: items });
         });
