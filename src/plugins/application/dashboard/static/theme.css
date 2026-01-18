@@ -24,6 +24,7 @@
 
     --text-primary: #F0F0F0;
     --text-secondary: var(--palette-dark-accent);
+    --text-flavor: #ffcc80;
     --text-muted: rgba(214, 211, 209, 0.5);
 
     --primary: var(--palette-dark-primary);

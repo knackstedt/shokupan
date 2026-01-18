@@ -55,11 +55,31 @@ function initRequests() {
         return;
     }
 
+    // Load saved column state
+    let savedColumns = {};
+    try {
+        const stored = localStorage.getItem('shokupan_dashboard_columns');
+        if (stored) savedColumns = JSON.parse(stored);
+    } catch (e) {
+        console.error("Failed to load column state", e);
+    }
+
+    function saveColumnState() {
+        if (!window.requestsTable) return;
+        const cols = window.requestsTable.getColumns();
+        const state = {};
+        cols.forEach(c => {
+            state[c.getField()] = c.isVisible();
+        });
+        localStorage.setItem('shokupan_dashboard_columns', JSON.stringify(state));
+    }
+
     const headerMenu = [
         {
             label: "Hide Column",
             action: function (e, column) {
                 column.hide();
+                saveColumnState();
             }
         },
         {
@@ -76,7 +96,7 @@ function initRequests() {
             title: "Status",
             field: "status",
             width: 80,
-            visible: true,
+            visible: savedColumns['status'] !== undefined ? savedColumns['status'] : true,
             formatter: function (cell) {
                 const status = cell.getValue();
                 if (!status) return '<span style="color: var(--text-secondary)">Pending</span>';
@@ -89,14 +109,15 @@ function initRequests() {
             title: "Method",
             field: "method",
             width: 80,
-            visible: true,
+            headerSort: false,
+            visible: savedColumns['method'] !== undefined ? savedColumns['method'] : true,
             headerContextMenu: headerMenu
         },
         {
             title: "Name",
             field: "url",
             widthGrow: 2, // Take up more space
-            visible: true,
+            visible: savedColumns['url'] !== undefined ? savedColumns['url'] : true,
             formatter: function (cell) {
                 const url = cell.getValue();
                 // Extract name from URL
@@ -120,28 +141,28 @@ function initRequests() {
             title: "Domain",
             field: "domain",
             width: 80,
-            visible: false,
+            visible: savedColumns['domain'] !== undefined ? savedColumns['domain'] : false,
             headerContextMenu: headerMenu
         },
         {
             title: "Path",
             field: "path",
             width: 80,
-            visible: true,
+            visible: savedColumns['path'] !== undefined ? savedColumns['path'] : true,
             headerContextMenu: headerMenu
         },
         {
             title: "URL",
             field: "url",
             width: 80,
-            visible: false,
+            visible: savedColumns['url'] !== undefined ? savedColumns['url'] : false,
             headerContextMenu: headerMenu
         },
         {
             title: "Protocol",
             field: "protocol",
             width: 80,
-            visible: false,
+            visible: savedColumns['protocol'] !== undefined ? savedColumns['protocol'] : false,
             formatter: function (cell) {
                 const row = cell.getData();
                 // Prefer explicit protocol version (e.g. 1.1, h2) if available
@@ -154,21 +175,21 @@ function initRequests() {
             title: "Scheme",
             field: "scheme",
             width: 80,
-            visible: false,
+            visible: savedColumns['scheme'] !== undefined ? savedColumns['scheme'] : false,
             headerContextMenu: headerMenu
         },
         {
             title: "Remote IP",
             field: "remoteIP",
             width: 80,
-            visible: true,
+            visible: savedColumns['remoteIP'] !== undefined ? savedColumns['remoteIP'] : true,
             headerContextMenu: headerMenu
         },
         {
             title: "Initiator",
             field: "direction",
             width: 80,
-            visible: false,
+            visible: savedColumns['direction'] !== undefined ? savedColumns['direction'] : false,
             formatter: (cell) => {
                 const dir = cell.getValue();
                 return dir === 'outbound' ? 'Server' : 'Client';
@@ -179,7 +200,7 @@ function initRequests() {
             title: "Type",
             field: "type",
             width: 80,
-            visible: false,
+            visible: savedColumns['type'] !== undefined ? savedColumns['type'] : false,
             formatter: (cell) => {
                 const r = cell.getData();
                 if (r.type === 'fetch') return 'fetch';
@@ -193,21 +214,21 @@ function initRequests() {
             title: "Cookies",
             field: "cookies",
             width: 80,
-            visible: false,
+            visible: savedColumns['cookies'] !== undefined ? savedColumns['cookies'] : false,
             headerContextMenu: headerMenu
         },
         {
             title: "Transferred",
             field: "transferred",
             width: 80,
-            visible: false,
+            visible: savedColumns['transferred'] !== undefined ? savedColumns['transferred'] : false,
             headerContextMenu: headerMenu
         },
         {
             title: "Size",
             field: "size",
             width: 80,
-            visible: true,
+            visible: savedColumns['size'] !== undefined ? savedColumns['size'] : true,
             formatter: (cell) => formatBytes(cell.getValue()),
             headerContextMenu: headerMenu
         },
@@ -215,7 +236,7 @@ function initRequests() {
             title: "Time",
             field: "duration",
             width: 80,
-            visible: true,
+            visible: savedColumns['duration'] !== undefined ? savedColumns['duration'] : true,
             formatter: (cell) => cell.getValue() ? Math.round(cell.getValue()) + ' ms' : 'Pending',
             headerContextMenu: headerMenu
         },
@@ -223,7 +244,7 @@ function initRequests() {
             title: "Waterfall",
             field: "timestamp",
             widthGrow: 1,
-            visible: true,
+            visible: savedColumns['timestamp'] !== undefined ? savedColumns['timestamp'] : true,
             formatter: waterfallFormatter,
             headerSort: false,
             headerContextMenu: headerMenu
@@ -247,6 +268,7 @@ function initRequests() {
                 if (window.requestsTable) {
                     window.requestsTable.redraw();
                     window.requestsTable.setColumns(columns);
+                    saveColumnState();
                 };
             }
         });
@@ -267,6 +289,50 @@ function initRequests() {
         columns: columns,
         data: [],
         rowContextMenu: [
+            {
+                label: "Replay Request",
+                action: function (e, row) {
+                    const data = row.getData();
+                    const basePath = window.location.pathname.endsWith('/') ? window.location.pathname.slice(0, -1) : window.location.pathname;
+
+                    // Determine direction if not explicit
+                    const direction = data.direction || 'inbound';
+
+                    fetch(basePath + '/replay', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            method: data.method,
+                            url: data.url,
+                            headers: data.requestHeaders,
+                            body: data.requestBody,
+                            direction: direction
+                        })
+                    })
+                        .then(res => res.json())
+                        .then(result => {
+                            if (result.error) {
+                                alert('Replay Failed: ' + result.error);
+                            } else {
+                                // Show result in a simplified details view or just alert success?
+                                // User requirement: "presents the response data to the user"
+                                // Let's create a temporary object mimicking a request log and show it in details view
+                                const replayLog = {
+                                    ...data,
+                                    id: 'replay-' + Date.now(),
+                                    status: result.status,
+                                    duration: result.duration || 0,
+                                    timestamp: Date.now(),
+                                    responseHeaders: result.headers,
+                                    responseBody: result.data,
+                                    size: result.data ? result.data.length : 0
+                                };
+                                showRequestDetails(replayLog);
+                            }
+                        })
+                        .catch(err => console.error("Replay fetch failed", err));
+                }
+            },
             {
                 label: "Copy as fetch",
                 action: function (e, row) {
@@ -580,6 +646,12 @@ function showRequestDetails(request) {
             if (newTab !== activeTab) {
                 activeTab = newTab;
                 content.innerHTML = renderTabs();
+
+                if (activeTab === "headers") {
+                    const traceContainer = document.getElementById('middleware-trace-container');
+                    renderTrace(request, traceContainer);
+                }
+
                 // Re-initialize editors if needed
                 if (activeTab === 'response') initResponseEditor(request);
                 if (activeTab === 'request') initRequestEditor(request);
@@ -587,6 +659,10 @@ function showRequestDetails(request) {
         }
     };
 
+    if (activeTab === "headers") {
+        const traceContainer = document.getElementById('middleware-trace-container');
+        renderTrace(request, traceContainer);
+    }
     // Initial Editor Load
     if (activeTab === 'response') initResponseEditor(request);
 }
@@ -615,7 +691,7 @@ function renderHeadersTab(request) {
         if (!headers || Object.keys(headers).length === 0) return '';
         const rows = Object.entries(headers).map(([k, v]) => `
             <tr>
-                <td style="font-weight: 500; color: var(--text-secondary); padding: 4px 8px; vertical-align: top;">${k}:</td>
+                <td style="font-weight: 500; color: var(--text-flavor); padding: 4px 8px; vertical-align: top;">${k}:</td>
                 <td style="word-break: break-all; padding: 4px 8px;">${v}</td>
             </tr>
         `).join('');
@@ -634,16 +710,18 @@ function renderHeadersTab(request) {
             <details open style="margin-bottom: 1rem;">
                 <summary style="font-weight: bold; padding: 4px 0; cursor: pointer; color: var(--text-primary);">General</summary>
                 <div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 0.9em; padding-left: 8px;">
-                     <div style="color: var(--text-secondary);">Request URL:</div><div style="word-break: break-all;">${request.url}</div>
-                     <div style="color: var(--text-secondary);">Request Method:</div><div>${request.method}</div>
-                     <div style="color: var(--text-secondary);">Status Code:</div><div>${request.status}</div>
-                     <div style="color: var(--text-secondary);">Remote Address:</div><div>${request.remoteIP || '-'}</div>
-                     <div style="color: var(--text-secondary);">Referrer Policy:</div><div>${request.requestHeaders?.['referrer-policy'] || 'strict-origin-when-cross-origin'}</div>
+                     <div style="color: var(--text-flavor);">Request URL:</div><div style="word-break: break-all;">${request.url}</div>
+                     <div style="color: var(--text-flavor);">Request Method:</div><div>${request.method}</div>
+                     <div style="color: var(--text-flavor);">Status Code:</div><div>${request.status}</div>
+                     <div style="color: var(--text-flavor);">Remote Address:</div><div>${request.remoteIP || '-'}</div>
+                     <div style="color: var(--text-flavor);">Referrer Policy:</div><div>${request.requestHeaders?.['referrer-policy'] || 'strict-origin-when-cross-origin'}</div>
                 </div>
             </details>
             ${formatHeaderSection('Response Headers', request.responseHeaders)}
             ${formatHeaderSection('Request Headers', request.requestHeaders)}
         </div>
+        <div class="card-title" style="margin-top: 1rem;">Middleware Trace</div>
+        <div id="middleware-trace-container"></div>
     `;
 }
 
@@ -756,8 +834,8 @@ function renderSecurityTab(request) {
         <div style="padding: 1rem;">
             <div style="margin-bottom: 1rem; font-weight: bold;">Connection</div>
             <div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 0.9em;">
-                <div style="color: var(--text-secondary);">Protocol:</div><div>${request.protocol || request.scheme || 'tls'}</div>
-                <div style="color: var(--text-secondary);">Remote Address:</div><div>${request.remoteIP || 'Unknown'}</div>
+                <div style="color: var(--text-flavor);">Protocol:</div><div>${request.protocol || request.scheme || 'tls'}</div>
+                <div style="color: var(--text-flavor);">Remote Address:</div><div>${request.remoteIP || 'Unknown'}</div>
             </div>
              <div style="margin-top: 1rem; color: var(--text-secondary); font-style: italic;">
                 Detailed certificate information is not currently captured by the interceptor.

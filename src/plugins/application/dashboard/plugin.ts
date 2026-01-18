@@ -157,6 +157,10 @@ export class Dashboard implements ShokupanPlugin {
 
         this.metricsCollector = new MetricsCollector(this.db, onCollect);
 
+        if (app.applicationConfig) {
+            app.applicationConfig.enableMiddlewareTracking = true;
+        }
+
         // Initialize Fetch Interceptor
         const fetchInterceptor = new FetchInterceptor();
         fetchInterceptor.patch();
@@ -595,27 +599,60 @@ export class Dashboard implements ShokupanPlugin {
         this.router.post("/replay", async (ctx) => {
             const body = await ctx.body();
             // Logic to replay request:
-            // We can't easily replay against the running server instance from inside without a loopback fetch.
-            // We can use Shokupan.processRequest if we have access to app.
-            const app = (this as any)[$appRoot];
-            if (!app) return unknownError(ctx);
+            // If direction is outbound, we fetch from the server.
+            // If inbound, we process via app.processRequest.
 
-            // Construct request
-            try {
-                // body should contain method, url, headers, body
-                const result = await app.processRequest({
-                    method: body.method,
-                    path: body.url, // or path
-                    headers: body.headers,
-                    body: body.body
-                });
-                return ctx.json({
-                    status: result.status,
-                    headers: result.headers,
-                    data: result.data
-                });
-            } catch (e) {
-                return ctx.json({ error: String(e) }, 500);
+            const direction = body.direction || 'inbound';
+
+            if (direction === 'outbound') {
+                // Replay outbound request
+                const start = performance.now();
+                try {
+                    const res = await fetch(body.url, {
+                        method: body.method,
+                        headers: body.headers,
+                        body: body.body ? (typeof body.body === 'object' ? JSON.stringify(body.body) : body.body) : undefined
+                    });
+
+                    // Read response text
+                    const text = await res.text();
+                    const duration = performance.now() - start;
+
+                    const resHeaders: Record<string, string> = {};
+                    res.headers.forEach((v, k) => resHeaders[k] = v);
+
+                    return ctx.json({
+                        status: res.status,
+                        statusText: res.statusText,
+                        headers: resHeaders,
+                        data: text,
+                        duration
+                    });
+                } catch (e) {
+                    return ctx.json({ error: String(e) }, 500);
+                }
+            } else {
+                // Replay inbound request against the app
+                const app = (this as any)[$appRoot];
+                if (!app) return unknownError(ctx);
+
+                // Construct request
+                try {
+                    // body should contain method, url, headers, body
+                    const result = await app.processRequest({
+                        method: body.method,
+                        path: body.url, // or path
+                        headers: body.headers,
+                        body: body.body
+                    });
+                    return ctx.json({
+                        status: result.status,
+                        headers: result.headers,
+                        data: result.data
+                    });
+                } catch (e) {
+                    return ctx.json({ error: String(e) }, 500);
+                }
             }
         });
 

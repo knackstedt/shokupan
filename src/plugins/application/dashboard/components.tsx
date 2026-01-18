@@ -161,10 +161,8 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                                             <div class="card-title" style="margin: 0;">Request Details</div>
                                             <button onclick="closeRequestDetails()" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.2rem;">×</button>
                                         </div>
-                                        <div style="padding: 1rem;">
-                                            <div id="request-details-content"></div>
-                                            <div class="card-title" style="margin-top: 1rem;">Middleware Trace</div>
-                                            <div id="middleware-trace-container"></div>
+                                        <div style="display: flex; flex-direction: column">
+                                            <div id="request-details-content" style="flex: 1; height: 100%; overflow: hidden"></div>
                                         </div>
                                     </div>
                                 </div>
