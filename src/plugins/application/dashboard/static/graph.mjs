@@ -50,7 +50,7 @@ const GroupNode = ({ data }) => {
                 }
             },
                 React.createElement('span', { style: { fontWeight: 'bold' } }, "MW"),
-                React.createElement('span', { style: { fontFamily: 'monospace' } }, mw.name || "Middleware")
+                React.createElement('span', { style: { font: 'var(--shokupan-font-mono)' } }, mw.name || "Middleware")
             )
         ),
 
@@ -72,7 +72,7 @@ const GroupNode = ({ data }) => {
                     }
                 }, "WS"),
                 React.createElement('span', {
-                    style: { fontFamily: 'monospace', color: '#cbd5e1' }
+                    style: { font: 'var(--shokupan-font-mono)', color: '#cbd5e1' }
                 }, ev.name)
             )
         ),
@@ -100,7 +100,7 @@ const GroupNode = ({ data }) => {
                     }
                 }, r.method),
                 React.createElement('span', {
-                    style: { fontFamily: 'monospace', color: r.isFailed ? '#ef4444' : '#cbd5e1', fontWeight: r.isFailed ? 'bold' : 'normal' },
+                    style: { font: 'var(--shokupan-font-mono)', color: r.isFailed ? '#ef4444' : '#cbd5e1', fontWeight: r.isFailed ? 'bold' : 'normal' },
                     dangerouslySetInnerHTML: { __html: renderPath(r.path) }
                 })
             )
@@ -270,7 +270,7 @@ const GraphComponent = () => {
 
                     const val = document.createElement("span");
                     val.textContent = mw.name || "Middleware";
-                    val.style.fontFamily = "monospace";
+                    val.style.font = "var(--shokupan-font-mono)";
                     mwEl.appendChild(val);
 
                     nodeEl.appendChild(mwEl);
@@ -295,7 +295,7 @@ const GraphComponent = () => {
 
                     const name = document.createElement("span");
                     name.textContent = ev.name;
-                    name.style.fontFamily = "monospace";
+                    name.style.font = "var(--shokupan-font-mono)";
                     row.appendChild(name);
 
                     nodeEl.appendChild(row);
@@ -318,7 +318,7 @@ const GraphComponent = () => {
 
                     const path = document.createElement("span");
                     path.textContent = route.path;
-                    path.style.fontFamily = "monospace";
+                    path.style.font = "var(--shokupan-font-mono)";
                     // path.style.color... doesn't affect size
                     row.appendChild(path);
 
@@ -598,8 +598,8 @@ const GraphComponent = () => {
                         color: 'white',
                         padding: '6px 12px',
                         borderRadius: '6px',
+                        font: 'var(--shokupan-font-mono)',
                         fontSize: '12px',
-                        fontFamily: 'monospace',
                         border: '1px solid #475569'
                     }
                 }, `${Math.round(zoom * 100)}%`),

@@ -128,7 +128,13 @@ function initRequests() {
                 title: "Protocol",
                 field: "protocol",
                 width: 80,
-                visible: true
+                visible: true,
+                formatter: function (cell) {
+                    const row = cell.getData();
+                    // Prefer explicit protocol version (e.g. 1.1, h2) if available
+                    if (row.protocol && row.protocol !== 'http' && row.protocol !== 'https') return row.protocol;
+                    return row.scheme || row.protocol || '-';
+                }
             },
             {
                 title: "Scheme",
@@ -195,7 +201,33 @@ function initRequests() {
                 headerSort: false
             }
         ],
-        data: []
+        data: [],
+        rowContextMenu: [
+            {
+                label: "Copy as fetch",
+                action: function (e, row) {
+                    const data = row.getData();
+                    const fetchCode = generateFetchCode(data);
+                    copyToClipboard(fetchCode);
+                }
+            },
+            {
+                label: "Export as HAR",
+                action: function (e, row) {
+                    const data = row.getData();
+                    const har = generateHAR([data]);
+                    downloadString(JSON.stringify(har, null, 2), `request-${data.id}.har`);
+                }
+            },
+            {
+                label: "Export All as HAR",
+                action: function (e, row) {
+                    const allData = window.requestsTable.getData("active"); // get filtered data
+                    const har = generateHAR(allData);
+                    downloadString(JSON.stringify(har, null, 2), `requests-export.har`);
+                }
+            }
+        ]
     });
 
     // Row selection handler
@@ -203,8 +235,137 @@ function initRequests() {
         showRequestDetails(row.getData());
     });
 
-    // Auto-fetch on load if tab is active (or just fetch initially)
+    // Auto-fetch on load
     fetchRequests();
+
+    // Resize Logic
+    initResizeHandle();
+}
+
+function initResizeHandle() {
+    const handle = document.getElementById('details-drag-handle');
+    const container = document.getElementById('request-details-container');
+    const listContainer = document.getElementById('requests-list-container');
+    if (!handle || !container) return;
+
+    let isResizing = false;
+    let startX, startWidth;
+
+    handle.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = container.offsetWidth;
+        document.body.style.cursor = 'col-resize';
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        // Calculate new width: It's expanding to the left, so moving mouse left increases width
+        const dx = startX - e.clientX;
+        const newWidth = Math.max(300, Math.min(window.innerWidth - 100, startWidth + dx));
+        container.style.width = `${newWidth}px`;
+
+        // Optional: trigger tabulator redraw if list container size changed significantly (it flexes)
+        if (window.requestsTable) window.requestsTable.redraw();
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isResizing) {
+            isResizing = false;
+            document.body.style.cursor = '';
+            // Save width preference?
+            if (window.requestsTable) window.requestsTable.redraw();
+        }
+    });
+
+}
+
+function generateFetchCode(req) {
+    const headers = req.requestHeaders || {};
+    let code = `fetch("${req.url}", {\n`;
+    code += `  "method": "${req.method}",\n`;
+    code += `  "headers": ${JSON.stringify(headers, null, 2).replace(/\n/g, '\n  ')},\n`;
+
+    if (req.requestBody) {
+        if (typeof req.requestBody === 'object') {
+            code += `  "body": JSON.stringify(${JSON.stringify(req.requestBody)}),\n`;
+        } else {
+            code += `  "body": ${JSON.stringify(req.requestBody)},\n`;
+        }
+    }
+    code += `});`;
+    return code;
+}
+
+function generateHAR(requests) {
+    return {
+        log: {
+            version: "1.2",
+            creator: { name: "Shokupan Dashboard", version: "1.0" },
+            entries: requests.map(req => ({
+                startedDateTime: new Date(req.timestamp).toISOString(),
+                time: req.duration,
+                request: {
+                    method: req.method,
+                    url: req.url,
+                    httpVersion: req.protocol || "HTTP/1.1",
+                    cookies: [], // Todo parse
+                    headers: Object.entries(req.requestHeaders || {}).map(([name, value]) => ({ name, value })),
+                    queryString: [], // Todo parse from url
+                    postData: req.requestBody ? { mimeType: req.contentType || "application/json", text: JSON.stringify(req.requestBody) } : undefined,
+                    headersSize: -1,
+                    bodySize: -1
+                },
+                response: {
+                    status: req.status,
+                    statusText: "",
+                    httpVersion: req.protocol || "HTTP/1.1",
+                    cookies: [],
+                    headers: Object.entries(req.responseHeaders || {}).map(([name, value]) => ({ name, value })),
+                    content: {
+                        size: req.size || 0,
+                        mimeType: req.contentType || "",
+                        text: typeof req.body === 'string' ? req.body : JSON.stringify(req.body)
+                    },
+                    redirectURL: "",
+                    headersSize: -1,
+                    bodySize: -1
+                },
+                cache: {},
+                timings: {
+                    send: 0,
+                    wait: req.duration,
+                    receive: 0
+                }
+            }))
+        }
+    };
+}
+
+function purgeRequests() {
+    if (!confirm("Are you sure you want to purge all captured requests?")) return;
+
+    const headers = typeof getRequestHeaders !== 'undefined' ? getRequestHeaders() : {};
+    const basePath = window.location.pathname.endsWith('/') ? window.location.pathname.slice(0, -1) : window.location.pathname;
+    // Need to handle if we are mounted at /dashboard vs /dashboard/ so stripping slice(-1) might be wrong if it wasn't there
+    // Safer:
+    let base = window.location.pathname;
+    if (base.endsWith('/')) base = base.slice(0, -1);
+
+    fetch(base + '/requests', {
+        method: 'DELETE',
+        headers
+    })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                console.log("Purge successful");
+                if (window.requestsTable) window.requestsTable.clearData();
+                closeRequestDetails();
+            }
+        })
+        .catch(console.error);
 }
 
 // Robust initialization

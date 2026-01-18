@@ -72,6 +72,12 @@
 
         ws.onopen = () => {
             console.log("Connected to Dashboard WebSocket");
+            const statusEl = document.getElementById('ws-status');
+            if (statusEl) {
+                statusEl.style.background = '#10b981'; // green
+                statusEl.title = 'WebSocket: Connected';
+            }
+
             if (reconnectTimer) {
                 clearTimeout(reconnectTimer);
                 reconnectTimer = null;
@@ -108,6 +114,11 @@
 
         ws.onclose = () => {
             console.log("Dashboard WebSocket disconnected");
+            const statusEl = document.getElementById('ws-status');
+            if (statusEl) {
+                statusEl.style.background = '#ef4444'; // red
+                statusEl.title = 'WebSocket: Disconnected';
+            }
             ws = null;
             scheduleReconnect();
         };

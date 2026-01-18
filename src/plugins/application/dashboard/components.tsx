@@ -12,6 +12,9 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                 <meta charSet="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>Shokupan Debug Dashboard</title>
+                <link rel="preconnect" href="https://fonts.googleapis.com" />
+                <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+                <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&family=Vend+Sans:ital,wght@0,300..700;1,300..700&display=swap" rel="stylesheet" />
                 <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator_bootstrap5.min.css" rel="stylesheet" />
                 <link rel="stylesheet" href="https://esm.sh/@xyflow/react@12.3.6/dist/style.css" />
 
@@ -30,9 +33,13 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                 <div class="container">
                     <header>
                         <div>
-                            <h1>Dashboard</h1>
-                            <div style="color: var(--text-secondary)">Uptime: <span id="uptime">{uptime}</span></div>
+                            <h1>Shokupan</h1>
                         </div>
+                        <div style="margin-left: 8px">
+                            <span style="color: var(--text-secondary)">Uptime: <span id="uptime">{uptime}</span></span>
+                            <span id="ws-status" title="WebSocket: Disconnected" style="width: 10px; height: 10px; border-radius: 50%; background: #6b7280; display: inline-block; margin-left: 10px;"></span>
+                        </div>
+                        <div style="flex: 1;"></div>
                         <div class="tabs">
                             <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
                             <button class="tab-btn" onclick="switchTab('application')">Application</button>
@@ -127,7 +134,7 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                         <div id="tab-network" class="tab-content">
                             <div style="margin: 1rem 2rem 0 2rem;">
                                 {/* Filter Bar will be injected by requests.js */}
-                                <div id="network-filter-bar" class="card" style="margin-bottom: 1rem; padding: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <div id="network-filter-bar" class="card" style="margin-bottom: 1rem; padding: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap; flex-direction: row">
                                     {/* Placeholder for filters */}
                                     <div style="display: flex; background: var(--bg-secondary); border: 1px solid var(--card-border); border-radius: 4px; overflow: hidden;">
                                         <button class="filter-direction active" data-value="all" style="padding: 4px 12px; border: none; background: var(--bg-primary); color: var(--text-primary); cursor: pointer; border-right: 1px solid var(--card-border);">All</button>
@@ -143,6 +150,7 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                                         <option value="other">Other</option>
                                     </select>
                                     <button onclick="fetchRequests()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 4px 8px; border-radius: 4px; cursor: pointer;">Refresh</button>
+                                    <button onclick="purgeRequests()" style="background: var(--bg-primary); color: var(--color-error, #ef4444); border: 1px solid var(--card-border); padding: 4px 8px; border-radius: 4px; cursor: pointer;">Purge</button>
                                 </div>
                             </div>
 
@@ -150,7 +158,8 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                                 <div style="margin: 0 2rem; display: flex; gap: 1rem; height: 100%;">
                                     <div id="requests-list-container" style="flex: 1; height: 100%; border-radius: 6px; overflow: hidden; border: 1px solid var(--card-border);"></div>
 
-                                    <div id="request-details-container" class="card" style="display: none; width: 500px; height: 100%; overflow-y: auto; flex-shrink: 0; background: var(--bg-secondary); border: 1px solid var(--card-border);">
+                                    <div id="request-details-container" class="card" style="display: none; width: 500px; height: 100%; overflow-y: auto; flex-shrink: 0; background: var(--bg-secondary); border: 1px solid var(--card-border); position: relative;">
+                                        <div id="details-drag-handle" style="position: absolute; left: 0; top: 0; bottom: 0; width: 5px; cursor: col-resize; z-index: 11; background: transparent;"></div>
                                         <div style="display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: var(--bg-secondary); padding: 0.5rem 1rem; border-bottom: 1px solid var(--border-color); z-index: 10;">
                                             <div class="card-title" style="margin: 0;">Request Details</div>
                                             <button onclick="closeRequestDetails()" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.2rem;">×</button>

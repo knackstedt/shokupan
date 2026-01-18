@@ -151,7 +151,7 @@ a {
     font-weight: 700;
     padding: 2px 6px;
     border-radius: 4px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--shokupan-font-mono);
     text-transform: uppercase;
     min-width: 38px;
     text-align: center;
@@ -215,7 +215,7 @@ a {
 
 /* Structured Schema View */
 .schema-root {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--shokupan-font-mono);
     font-size: 0.9rem;
     background: var(--bg-card);
     border-radius: 8px;
@@ -290,7 +290,7 @@ a {
     border: none;
     color: var(--text-secondary);
     flex: 1;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--shokupan-font-mono);
     font-size: 0.8rem;
 }
 
@@ -362,7 +362,7 @@ a {
 .logs-container {
     flex: 1;
     overflow-y: auto;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--shokupan-font-mono);
     font-size: 0.8rem;
     position: relative;
 }

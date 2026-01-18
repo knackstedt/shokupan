@@ -129,7 +129,7 @@ body {
     background: rgba(255, 255, 255, 0.05);
     padding: 2px 6px;
     border-radius: 4px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--shokupan-font-mono);
 }
 
 /* Nav Tree */
@@ -217,7 +217,7 @@ body {
     min-width: 45px;
     text-align: center;
     text-transform: uppercase;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--shokupan-font-mono);
 }
 
 .nav-label {
@@ -225,7 +225,7 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     flex: 1;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--shokupan-font-mono);
 }
 
 .nav-label .param-highlight {
@@ -493,7 +493,7 @@ body {
     background: transparent;
     border: none;
     color: var(--text-primary);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--shokupan-font-mono);
     font-size: 0.9rem;
     outline: none;
 }
@@ -855,7 +855,7 @@ body {
 }
 
 .property-name {
-    font-family: monospace;
+    font-family: var(--shokupan-font-mono);
     font-weight: 500;
     color: var(--text-primary);
 }
@@ -937,7 +937,7 @@ body {
 
 .middleware-name {
     flex: 1;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--shokupan-font-mono);
 }
 
 .middleware-source-link {
@@ -1014,7 +1014,7 @@ body {
     padding: 4px 8px;
     border-radius: 4px;
     font-weight: bold;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--shokupan-font-mono);
 }
 
 .header-list {
@@ -1028,7 +1028,7 @@ body {
     padding: 4px 8px;
     border-radius: 4px;
     font-size: 0.85rem;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--shokupan-font-mono);
 }
 
 .usage-section {

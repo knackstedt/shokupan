@@ -13,8 +13,8 @@
     --palette-dark-header: rgb(39, 27, 19);
     /* Proofing Drawer */
 
-    /* Universal defaults (tokens) */
-    --shokupan-font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    --shokupan-font: "Vend Sans", 'Open Sans', 'Helvetica Neue', sans-serif;
+    --shokupan-font-mono: "Google Sans Code", monospace;
 
     /* Theme Variables - Enforced Dark Mode */
     --bg-primary: var(--palette-dark-bg);
@@ -40,6 +40,11 @@
 
     --button-bg: var(--palette-dark-primary);
     --button-text: #1A1614;
+}
+
+* {
+    box-sizing: border-box;
+    font-optical-sizing: auto;
 }
 
 ::-webkit-scrollbar {

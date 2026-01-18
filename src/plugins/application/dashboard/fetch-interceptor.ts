@@ -55,8 +55,9 @@ export interface OutboundRequestLog {
      */
     path?: string;
     /**
-     * The protocol scheme (http/https).
+     * The protocol scheme (http/https) or version (1.1, 2.0).
      */
+    protocol?: string;
     scheme?: string;
     /**
      * The remote IP address (if available).
@@ -162,7 +163,8 @@ export class FetchInterceptor {
                     status: response.status,
                     startTime: timestamp,
                     duration,
-                    ...self.extractRequestMeta(url, requestHeaders)
+                    ...self.extractRequestMeta(url, requestHeaders),
+                    protocol: '1.1' // native fetch doesn't expose this easily, assume 1.1/2
                 });
 
                 return response;
@@ -252,7 +254,8 @@ export class FetchInterceptor {
                         responseHeaders: resHeaders,
                         startTime: timestamp,
                         duration,
-                        ...self.extractRequestMeta(url, getReqHeaders())
+                        ...self.extractRequestMeta(url, getReqHeaders()),
+                        protocol: req.httpVersion
                     });
                 });
 

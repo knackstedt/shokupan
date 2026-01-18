@@ -138,6 +138,7 @@ export class Dashboard implements ShokupanPlugin {
 
     private startTime = Date.now();
     private instrumented = false;
+    private mountPath = '/dashboard';
     private metricsCollector: MetricsCollector;
     get db() {
         return this[$appRoot].db;
@@ -163,6 +164,10 @@ export class Dashboard implements ShokupanPlugin {
             // Prevent infinite loop by ignoring DB requests
             // SurrealDB driver uses /rpc endpoint
             if (log.url.includes('/rpc')) return;
+            try {
+                const u = new URL(log.url);
+                if (u.pathname.startsWith(this.mountPath)) return;
+            } catch (e) { }
 
             // Store outbound request
             const requestData: RequestLog = {
@@ -180,6 +185,7 @@ export class Dashboard implements ShokupanPlugin {
                 domain: log.domain,
                 path: log.path,
                 scheme: log.scheme,
+                protocol: log.protocol,
                 remoteIP: log.remoteIP,
                 cookies: log.cookies,
                 transferred: log.transferred,
@@ -227,7 +233,7 @@ export class Dashboard implements ShokupanPlugin {
                 }
             });
         }
-        const mountPath = options?.path || this.dashboardConfig.path || '/dashboard';
+        this.mountPath = options?.path || this.dashboardConfig.path || '/dashboard';
 
         // Register hooks on the app to track all requests
         const hooks = this.getHooks();
@@ -254,7 +260,7 @@ export class Dashboard implements ShokupanPlugin {
         }
 
         // Mount the dashboard router
-        app.mount(mountPath, this.router);
+        app.mount(this.mountPath, this.router);
 
         // Metadata for registry
         this.router.metadata = {
@@ -554,6 +560,26 @@ export class Dashboard implements ShokupanPlugin {
             return ctx.json({ requests: items });
         });
 
+        this.router.delete("/requests", async (ctx) => {
+            console.log(`[Dashboard] Purging all requests`);
+            await this.db.query("DELETE request; DELETE failed_request;");
+            this.metrics.logs = [];
+            this.metrics.totalRequests = 0;
+            this.metrics.activeRequests = 0;
+            this.metrics.successfulRequests = 0;
+            this.metrics.failedRequests = 0;
+            this.metrics.recentTimings = [];
+            this.metrics.rateLimitedCounts = {};
+            this.metrics.nodeMetrics = {};
+            this.metrics.edgeMetrics = {};
+            // Broadcast clear event? Or just let next update handle it?
+            // Sending an empty list via requests-update might work if client handles it.
+            // But we should probably send a specific "purge" event or just rely on client refresh.
+            // Let's send a requests-update with empty list if validation shows it helps.
+            // For now just return success.
+            return ctx.json({ success: true });
+        });
+
         // Request Details Endpoint
         this.router.get("/requests/:id", async (ctx) => {
             const result = await this.db.query("SELECT * FROM request WHERE id = $id", { id: ctx.params['id'] });
@@ -847,6 +873,9 @@ export class Dashboard implements ShokupanPlugin {
             },
 
             onResponseEnd: async (ctx: any, response: any) => {
+                // Ignore dashboard requests to prevent noise and loops
+                if (ctx.path.startsWith(this.mountPath)) return;
+
                 this.metrics.activeRequests = Math.max(0, this.metrics.activeRequests - 1);
                 const duration = (performance.now() - (ctx as any)._startTime) || 0;
 

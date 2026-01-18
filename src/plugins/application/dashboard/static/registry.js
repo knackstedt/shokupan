@@ -171,9 +171,9 @@ window.renderRegistry = function renderRegistry(node, container) {
         return `
             <div class="tooltip-text">
                 <div style="font-weight:bold; margin-bottom:4px; border-bottom:1px solid var(--text-secondary); padding-bottom:2px;">Metrics</div>
-                <div style="display:flex; justify-content:space-between;"><span>Requests:</span> <span style="font-family:monospace">${m.requests}</span></div>
-                <div style="display:flex; justify-content:space-between;"><span>Traffic:</span> <span style="font-family:monospace">${percent}%</span></div>
-                <div style="display:flex; justify-content:space-between;"><span>Failures:</span> <span style="font-family:monospace; color:${m.failures > 0 ? '#ef4444' : 'inherit'}">${m.failures} (${failRate}%)</span></div>
+                <div style="display:flex; justify-content:space-between;"><span>Requests:</span> <span style="font: var(--shokupan-font-mono)">${m.requests}</span></div>
+                <div style="display:flex; justify-content:space-between;"><span>Traffic:</span> <span style="font: var(--shokupan-font-mono)">${percent}%</span></div>
+                <div style="display:flex; justify-content:space-between;"><span>Failures:</span> <span style="font: var(--shokupan-font-mono); color:${m.failures > 0 ? '#ef4444' : 'inherit'}">${m.failures} (${failRate}%)</span></div>
             </div>
         `;
     }

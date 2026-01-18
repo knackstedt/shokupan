@@ -14,7 +14,7 @@ html {
 body {
     display: flex;
     flex-direction: column;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: var(--shokupan-font);
     background-color: var(--bg-primary);
     color: var(--text-primary);
     height: 100vh;
@@ -26,7 +26,6 @@ header {
     background-color: var(--bg-header);
     padding: 0 1rem;
     display: flex;
-    justify-content: space-between;
     align-items: center;
 }
 
