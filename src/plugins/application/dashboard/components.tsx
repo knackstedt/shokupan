@@ -1,9 +1,6 @@
 // @ts-nocheck
 
-/**
- * @jsx h
- * @jsxFrag Fragment
- */
+
 
 export function DashboardApp({ metrics, uptime, integrations, base, getRequestHeadersSource, rootPath, linkPattern }: any) {
     return (

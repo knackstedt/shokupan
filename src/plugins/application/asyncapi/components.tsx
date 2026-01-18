@@ -1,8 +1,5 @@
 
-/**
- * @jsx h
- * @jsxFrag Fragment
- */
+
 
 
 export function AsyncApiApp({ spec, serverUrl, base, disableSourceView, navTree }: any) {

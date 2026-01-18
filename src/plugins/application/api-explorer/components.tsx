@@ -1,4 +1,4 @@
-/** @jsx h */
+
 
 // Type definitions for better clarity
 interface Route {

@@ -118,7 +118,8 @@ export class FetchInterceptor {
 
     private patchGlobalFetch() {
         const self = this;
-        global.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+        global.fetch = (async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+
             const startTime = performance.now();
             const timestamp = Date.now();
             let method = 'GET';
@@ -187,7 +188,7 @@ export class FetchInterceptor {
                 });
                 throw error;
             }
-        };
+        } as any);
     }
 
     private patchNodeRequests() {
