@@ -375,7 +375,7 @@ function initRequests() {
 function initResizeHandle() {
     const handle = document.getElementById('details-drag-handle');
     const container = document.getElementById('request-details-container');
-    const listContainer = document.getElementById('requests-list-container');
+
     if (!handle || !container) return;
 
     let isResizing = false;
@@ -600,7 +600,7 @@ function showRequestDetails(request) {
     const container = document.getElementById('request-details-container');
     const content = document.getElementById('request-details-content');
 
-    container.style.display = 'block';
+    container.style.display = 'flex';
     if (window.requestsTable) window.requestsTable.redraw();
 
     // Tab Headers
@@ -621,7 +621,7 @@ function showRequestDetails(request) {
 
     function renderTabs() {
         return `
-            <div class="tabs-header" style="display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 1rem;">
+            <div class="tabs-header" style="display: flex; border-bottom: 1px solid var(--border-color)">
                 ${tabs.map(tab => `
                     <div class="tab-item ${tab.id === activeTab ? 'active' : ''}" 
                          data-tab="${tab.id}"
@@ -630,7 +630,7 @@ function showRequestDetails(request) {
                     </div>
                 `).join('')}
             </div>
-            <div id="tab-content" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column;">
+            <div id="tab-content" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; padding: 1rem">
                 ${renderTabContent(activeTab, request)}
             </div>
         `;

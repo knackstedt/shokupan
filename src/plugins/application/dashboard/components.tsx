@@ -155,14 +155,14 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                                 <div style="margin: 0 2rem; display: flex; gap: 1rem; height: 100%;">
                                     <div id="requests-list-container" style="flex: 1; height: 100%; border-radius: 6px; overflow: hidden; border: 1px solid var(--card-border);"></div>
 
-                                    <div id="request-details-container" class="card" style="display: none; width: 500px; height: 100%; overflow-y: auto; flex-shrink: 0; background: var(--bg-secondary); border: 1px solid var(--card-border); position: relative;">
+                                    <div id="request-details-container" class="card" style="display: none; width: 500px; height: 100%; overflow: hidden; flex-shrink: 0; background: var(--bg-secondary); border: 1px solid var(--card-border); position: relative;">
                                         <div id="details-drag-handle" style="position: absolute; left: 0; top: 0; bottom: 0; width: 5px; cursor: col-resize; z-index: 11; background: transparent;"></div>
                                         <div style="display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: var(--bg-secondary); padding: 0.5rem 1rem; border-bottom: 1px solid var(--border-color); z-index: 10;">
                                             <div class="card-title" style="margin: 0;">Request Details</div>
                                             <button onclick="closeRequestDetails()" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.2rem;">×</button>
                                         </div>
-                                        <div style="display: flex; flex-direction: column">
-                                            <div id="request-details-content" style="flex: 1; height: 100%; overflow: hidden"></div>
+                                        <div style="display: flex; flex-direction: column; overflow: hidden">
+                                            <div id="request-details-content" style="flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden"></div>
                                         </div>
                                     </div>
                                 </div>
