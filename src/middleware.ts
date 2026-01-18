@@ -28,6 +28,13 @@ export const compose = (middleware: Middleware[]) => {
 
             const fn = middleware[i];
 
+            if (typeof fn !== 'function') {
+                const name = (fn as any)?.constructor?.name;
+                console.error(`[Middleware Error] Item at index ${i} is not a function! It is: ${typeof fn} (${name})`, fn);
+                // Skip it or throw better error
+                throw new TypeError(`Middleware at index ${i} must be a function, got ${name}`);
+            }
+
             // Fast path: No debug tracking
             if (!context[$debug]) {
                 return fn(context, () => runner(i + 1));

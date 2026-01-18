@@ -16,6 +16,21 @@
     font-weight: bold;
 }
 
+.tabulator-menu .tabulator-menu-separator {
+    border-color: var(--card-border);
+}
+
+.tabulator-popup-container {
+    background-color: var(--bg-card);
+    border: 1px solid var(--card-border);
+    border-radius: 4px;
+    color: var(--text-primary);
+}
+
+.tabulator-menu .tabulator-menu-item:not(.tabulator-menu-item-disabled):hover {
+    background-color: var(--bg-primary);
+}
+
 .tabulator .tabulator-header .tabulator-col {
     background-color: var(--bg-card);
     border-right: 1px solid var(--card-border);

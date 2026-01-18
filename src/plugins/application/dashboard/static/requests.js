@@ -55,6 +55,204 @@ function initRequests() {
         return;
     }
 
+    const headerMenu = [
+        {
+            label: "Hide Column",
+            action: function (e, column) {
+                column.hide();
+            }
+        },
+        {
+            separator: true,
+        },
+        {
+            label: "Select Columns",
+            menu: []
+        }
+    ];
+
+    const columns = [
+        {
+            title: "Status",
+            field: "status",
+            width: 80,
+            visible: true,
+            formatter: function (cell) {
+                const status = cell.getValue();
+                if (!status) return '<span style="color: var(--text-secondary)">Pending</span>';
+                const color = status >= 500 ? '#ef4444' : status >= 400 ? '#f59e0b' : '#10b981';
+                return `<span style="display: inline-block; width: 10px; height: 10px; background: ${color}; border-radius: 50%; margin-right: 6px;"></span>${status}`;
+            },
+            headerContextMenu: headerMenu
+        },
+        {
+            title: "Method",
+            field: "method",
+            width: 80,
+            visible: true,
+            headerContextMenu: headerMenu
+        },
+        {
+            title: "Name",
+            field: "url",
+            widthGrow: 2, // Take up more space
+            visible: true,
+            formatter: function (cell) {
+                const url = cell.getValue();
+                // Extract name from URL
+                let name = url;
+                try {
+                    const u = new URL(url, 'http://localhost');
+                    name = u.pathname;
+                    if (name === '/') name = 'localhost';
+                    const parts = name.split('/');
+                    const last = parts[parts.length - 1];
+                    if (last) name = last;
+                } catch (e) { }
+
+                return `<div style="display: flex; flex-direction: column; line-height: 1.2;">
+                        <span style="color: var(--text-secondary);">${name}</span>
+                    </div>`;
+            },
+            headerContextMenu: headerMenu
+        },
+        {
+            title: "Domain",
+            field: "domain",
+            width: 80,
+            visible: false,
+            headerContextMenu: headerMenu
+        },
+        {
+            title: "Path",
+            field: "path",
+            width: 80,
+            visible: true,
+            headerContextMenu: headerMenu
+        },
+        {
+            title: "URL",
+            field: "url",
+            width: 80,
+            visible: false,
+            headerContextMenu: headerMenu
+        },
+        {
+            title: "Protocol",
+            field: "protocol",
+            width: 80,
+            visible: false,
+            formatter: function (cell) {
+                const row = cell.getData();
+                // Prefer explicit protocol version (e.g. 1.1, h2) if available
+                if (row.protocol && row.protocol !== 'http' && row.protocol !== 'https') return row.protocol;
+                return row.scheme || row.protocol || '-';
+            },
+            headerContextMenu: headerMenu
+        },
+        {
+            title: "Scheme",
+            field: "scheme",
+            width: 80,
+            visible: false,
+            headerContextMenu: headerMenu
+        },
+        {
+            title: "Remote IP",
+            field: "remoteIP",
+            width: 80,
+            visible: true,
+            headerContextMenu: headerMenu
+        },
+        {
+            title: "Initiator",
+            field: "direction",
+            width: 80,
+            visible: false,
+            formatter: (cell) => {
+                const dir = cell.getValue();
+                return dir === 'outbound' ? 'Server' : 'Client';
+            },
+            headerContextMenu: headerMenu
+        },
+        {
+            title: "Type",
+            field: "type",
+            width: 80,
+            visible: false,
+            formatter: (cell) => {
+                const r = cell.getData();
+                if (r.type === 'fetch') return 'fetch';
+                if (r.type === 'xhr') return 'xhr';
+                if (r.type === 'ws') return 'ws';
+                return r.contentType || 'document';
+            },
+            headerContextMenu: headerMenu
+        },
+        {
+            title: "Cookies",
+            field: "cookies",
+            width: 80,
+            visible: false,
+            headerContextMenu: headerMenu
+        },
+        {
+            title: "Transferred",
+            field: "transferred",
+            width: 80,
+            visible: false,
+            headerContextMenu: headerMenu
+        },
+        {
+            title: "Size",
+            field: "size",
+            width: 80,
+            visible: true,
+            formatter: (cell) => formatBytes(cell.getValue()),
+            headerContextMenu: headerMenu
+        },
+        {
+            title: "Time",
+            field: "duration",
+            width: 80,
+            visible: true,
+            formatter: (cell) => cell.getValue() ? Math.round(cell.getValue()) + ' ms' : 'Pending',
+            headerContextMenu: headerMenu
+        },
+        {
+            title: "Waterfall",
+            field: "timestamp",
+            widthGrow: 1,
+            visible: true,
+            formatter: waterfallFormatter,
+            headerSort: false,
+            headerContextMenu: headerMenu
+        }
+    ];
+
+    const checkMark = `<svg fill="currentColor" width="16px" height="16px" style="padding: 2px; margin-right: 2px" viewBox="0 0 1024 1024"><path d="M351.605 663.268l481.761-481.761c28.677-28.677 75.171-28.677 103.847 0s28.677 75.171 0 103.847L455.452 767.115l.539.539-58.592 58.592c-24.994 24.994-65.516 24.994-90.51 0L85.507 604.864c-28.677-28.677-28.677-75.171 0-103.847s75.171-28.677 103.847 0l162.25 162.25z"/></svg>`;
+    const uncheckMark = `<span style="width: 18px; display: inline-block"></span>`;
+
+    const subMenu = [];
+    columns.forEach((col, idx) => {
+        subMenu.push({
+            label: (col.visible ? checkMark : uncheckMark) + " " + col.title,
+            action: function (e) {
+                // const cols = window.requestsTable.getColumns();
+                // cols.forEach((c, i) => {
+                //     if (idx === i) c.toggle();
+                // });
+                columns[idx].visible = !columns[idx].visible;
+                subMenu[idx].label = (columns[idx].visible ? checkMark : uncheckMark) + " " + columns[idx].title;
+                if (window.requestsTable) {
+                    window.requestsTable.redraw();
+                    window.requestsTable.setColumns(columns);
+                };
+            }
+        });
+    });
+    headerMenu[2].menu = subMenu;
+
     window.requestsTable = new Tabulator("#requests-list-container", {
         layout: "fitColumns",
         placeholder: "No requests found",
@@ -66,141 +264,7 @@ function initRequests() {
         initialSort: [
             { column: "timestamp", dir: "desc" }
         ],
-        columns: [
-            {
-                title: "Status",
-                field: "status",
-                width: 80,
-                formatter: function (cell) {
-                    const status = cell.getValue();
-                    if (!status) return '<span style="color: var(--text-secondary)">Pending</span>';
-                    const color = status >= 500 ? '#ef4444' : status >= 400 ? '#f59e0b' : '#10b981';
-                    return `<span style="display: inline-block; width: 10px; height: 10px; background: ${color}; border-radius: 50%; margin-right: 6px;"></span>${status}`;
-                }
-            },
-            {
-                title: "Method",
-                field: "method",
-                width: 80,
-                visible: true
-            },
-            {
-                title: "Name",
-                field: "url",
-                widthGrow: 2, // Take up more space
-                formatter: function (cell) {
-                    const url = cell.getValue();
-                    // Extract name from URL
-                    let name = url;
-                    try {
-                        const u = new URL(url, 'http://localhost');
-                        name = u.pathname;
-                        if (name === '/') name = 'localhost';
-                        const parts = name.split('/');
-                        const last = parts[parts.length - 1];
-                        if (last) name = last;
-                    } catch (e) { }
-
-                    return `<div style="display: flex; flex-direction: column; line-height: 1.2;">
-                        <span style="color: var(--text-secondary);">${name}</span>
-                    </div>`;
-                }
-            },
-            {
-                title: "Domain",
-                field: "domain",
-                width: 80,
-                visible: true
-            },
-            {
-                title: "Path",
-                field: "path",
-                width: 80,
-                visible: true
-            },
-            {
-                title: "URL",
-                field: "url",
-                width: 80,
-                visible: true
-            },
-            {
-                title: "Protocol",
-                field: "protocol",
-                width: 80,
-                visible: true,
-                formatter: function (cell) {
-                    const row = cell.getData();
-                    // Prefer explicit protocol version (e.g. 1.1, h2) if available
-                    if (row.protocol && row.protocol !== 'http' && row.protocol !== 'https') return row.protocol;
-                    return row.scheme || row.protocol || '-';
-                }
-            },
-            {
-                title: "Scheme",
-                field: "scheme",
-                width: 80,
-                visible: true
-            },
-            {
-                title: "Remote IP",
-                field: "remoteIP",
-                width: 80,
-                visible: true
-            },
-            {
-                title: "Initiator",
-                field: "direction",
-                width: 80,
-                formatter: (cell) => {
-                    const dir = cell.getValue();
-                    return dir === 'outbound' ? 'Server' : 'Client';
-                }
-            },
-            {
-                title: "Type",
-                field: "type",
-                width: 80,
-                formatter: (cell) => {
-                    const r = cell.getData();
-                    if (r.type === 'fetch') return 'fetch';
-                    if (r.type === 'xhr') return 'xhr';
-                    if (r.type === 'ws') return 'ws';
-                    return r.contentType || 'document';
-                }
-            },
-            {
-                title: "Cookies",
-                field: "cookies",
-                width: 80,
-                visible: true
-            },
-            {
-                title: "Transferred",
-                field: "transferred",
-                width: 80,
-                visible: true
-            },
-            {
-                title: "Size",
-                field: "size",
-                width: 80,
-                formatter: (cell) => formatBytes(cell.getValue())
-            },
-            {
-                title: "Time",
-                field: "duration",
-                width: 80,
-                formatter: (cell) => cell.getValue() ? Math.round(cell.getValue()) + ' ms' : 'Pending'
-            },
-            {
-                title: "Waterfall",
-                field: "timestamp",
-                widthGrow: 1,
-                formatter: waterfallFormatter,
-                headerSort: false
-            }
-        ],
+        columns: columns,
         data: [],
         rowContextMenu: [
             {

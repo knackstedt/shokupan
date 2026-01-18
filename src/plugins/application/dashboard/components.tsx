@@ -206,7 +206,6 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                 <script src={`${base}/charts.js`}></script>
                 <script src={`${base}/tables.js`}></script>
                 <script src={`${base}/registry.js`}></script>
-                <script src={`${base}/failures.js`}></script>
                 <script src={`${base}/requests.js`}></script>
                 <script src={`${base}/tabs.js`}></script>
             </body>
