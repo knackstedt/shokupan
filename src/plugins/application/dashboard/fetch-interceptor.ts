@@ -118,7 +118,7 @@ export class FetchInterceptor {
 
     private patchGlobalFetch() {
         const self = this;
-        global.fetch = (async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+        const newFetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
 
             const startTime = performance.now();
             const timestamp = Date.now();
@@ -188,7 +188,12 @@ export class FetchInterceptor {
                 });
                 throw error;
             }
-        } as any);
+        };
+
+        // Copy static methods like preconnect
+        Object.assign(newFetch, this.originalFetch);
+
+        global.fetch = newFetch as typeof global.fetch;
     }
 
     private patchNodeRequests() {
