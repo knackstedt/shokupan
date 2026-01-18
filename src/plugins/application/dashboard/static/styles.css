@@ -264,3 +264,94 @@ select {
     background: var(--bg-secondary);
     border-color: var(--accent);
 }
+
+/* Network Tab Styles */
+
+/* Tabulator Overrides for DevTools look */
+.tabulator {
+    border: none !important;
+    background-color: var(--bg-secondary) !important;
+}
+
+.tabulator-header {
+    background-color: var(--bg-header) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    color: var(--text-secondary) !important;
+    font-weight: 500 !important;
+}
+
+.tabulator-col {
+    background-color: transparent !important;
+    border-right: 1px solid var(--border-color) !important;
+}
+
+.tabulator-row {
+    background-color: var(--bg-secondary) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.tabulator-row:hover {
+    background-color: var(--bg-primary) !important;
+    cursor: pointer;
+}
+
+.tabulator-row.tabulator-selected {
+    background-color: #2e3440 !important;
+    color: #fff !important;
+}
+
+/* Tabs */
+.tab-item {
+    transition: all 0.2s;
+}
+
+.tab-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.tab-item.active {
+    background-color: rgba(59, 130, 246, 0.1);
+}
+
+/* Details Panel */
+details>summary {
+    list-style: none;
+}
+
+details>summary::-webkit-details-marker {
+    display: none;
+}
+
+details>summary::before {
+    content: '▶';
+    font-size: 0.8em;
+    margin-right: 6px;
+    display: inline-block;
+    transition: transform 0.2s;
+}
+
+details[open]>summary::before {
+    transform: rotate(90deg);
+}
+
+/* Slightly lighter than bg-secondary */
+/* border-left: 2px solid var(--accent) !important; */
+/* Slightly lighter than bg-secondary */
+
+/* Filter Bar */
+#network-filter-bar input:focus,
+#network-filter-bar select:focus {
+    border-color: var(--accent);
+    outline: none;
+}
+
+#tab-network {
+    height: 100%;
+    overflow: hidden;
+    flex-direction: column;
+}
+
+#tab-network.active {
+    display: flex !important;
+}

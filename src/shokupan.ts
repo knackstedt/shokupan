@@ -1,25 +1,24 @@
 import { context, trace } from '@opentelemetry/api';
+import type { Server } from 'bun';
 import { dump } from 'js-yaml';
+import { Surreal } from 'surrealdb';
 import { ShokupanContext } from "./context";
 import { compose } from "./middleware";
 import { generateOpenApi } from "./plugins/application/openapi/openapi";
-import { asyncContext, RequestContextStore } from "./util/async-hooks";
-import { getErrorStatus } from "./util/http-error";
-import { HTTP_STATUS } from "./util/http-status";
-import { $appRoot, $dispatch, $finalResponse, $isApplication, $routeMatched } from './util/symbol';
-import type { Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig, ShokupanPlugin } from './util/types';
-
-import type { Server } from 'bun';
-import { Surreal } from 'surrealdb';
 import { ShokupanRouter } from './router';
 import { BunAdapter, NodeAdapter } from './util/adapter/adapters';
 import { DefaultFileSystemAdapter } from './util/adapter/filesystem';
+import { asyncContext, RequestContextStore } from "./util/async-hooks";
 import { SystemCpuMonitor } from "./util/cpu-monitor";
 import { SurrealDatastore } from './util/datastore';
+import { getErrorStatus } from "./util/http-error";
+import { HTTP_STATUS } from "./util/http-status";
 import "./util/instrumentation";
 import { MiddlewareTracker } from './util/middleware-tracker';
 import { ShokupanRequest } from './util/request';
 import { getCallerInfo } from './util/stack';
+import { $appRoot, $dispatch, $finalResponse, $isApplication, $routeMatched } from './util/symbol';
+import type { Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig, ShokupanPlugin } from './util/types';
 
 
 const defaults: ShokupanConfig = {

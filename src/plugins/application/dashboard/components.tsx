@@ -36,7 +36,7 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                         <div class="tabs">
                             <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
                             <button class="tab-btn" onclick="switchTab('application')">Application</button>
-                            <button class="tab-btn" onclick="switchTab('traffic')">Traffic</button>
+                            <button class="tab-btn" onclick="switchTab('network')">Network</button>
                             {integrations.scalar && (
                                 <button class="tab-btn" onclick="switchTab('scalar')">Scalar</button>
                             )}
@@ -123,45 +123,44 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                             </div>
                         </div>
 
-                        {/* Traffic Tab */}
-                        <div id="tab-traffic" class="tab-content">
-                            <div style="margin: 2rem 2rem 0 2rem; display: flex; gap: 1rem; align-items: center;">
-                                <div class="button-group">
-                                    <button class="view-btn active" onclick="switchTrafficView('requests')">All Requests</button>
-                                    <button class="view-btn" onclick="switchTrafficView('failures')">Failures</button>
+                        {/* Network Tab */}
+                        <div id="tab-network" class="tab-content">
+                            <div style="margin: 1rem 2rem 0 2rem;">
+                                {/* Filter Bar will be injected by requests.js */}
+                                <div id="network-filter-bar" class="card" style="margin-bottom: 1rem; padding: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                    {/* Placeholder for filters */}
+                                    <div style="display: flex; background: var(--bg-secondary); border: 1px solid var(--card-border); border-radius: 4px; overflow: hidden;">
+                                        <button class="filter-direction active" data-value="all" style="padding: 4px 12px; border: none; background: var(--bg-primary); color: var(--text-primary); cursor: pointer; border-right: 1px solid var(--card-border);">All</button>
+                                        <button class="filter-direction" data-value="inbound" style="padding: 4px 12px; border: none; background: transparent; color: var(--text-secondary); cursor: pointer; border-right: 1px solid var(--card-border);">Inbound</button>
+                                        <button class="filter-direction" data-value="outbound" style="padding: 4px 12px; border: none; background: transparent; color: var(--text-secondary); cursor: pointer;">Outbound</button>
+                                    </div>
+                                    <input type="text" id="network-filter-text" placeholder="Filter..." style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 4px 8px; border-radius: 4px; flex: 1;" />
+                                    <select id="network-filter-type" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); borderRadius: 4px;">
+                                        <option value="all">All Types</option>
+                                        <option value="xhr">XHR/Fetch</option>
+                                        <option value="fetch">Outbound</option>
+                                        <option value="ws">WS</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                    <button onclick="fetchRequests()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 4px 8px; border-radius: 4px; cursor: pointer;">Refresh</button>
                                 </div>
                             </div>
 
-                            {/* Requests Sub-View */}
-                            <div id="traffic-view-requests" class="traffic-view active">
-                                <div style="margin: 2rem;">
-                                    <div class="card" style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-direction: row">
-                                        <div class="card-title">Recent Requests (Last 100)</div>
-                                        <button onclick="fetchRequests()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px 10px; border-radius: 6px; cursor: pointer; margin-right: 2rem">Refresh</button>
-                                    </div>
-                                    <div id="requests-list-container" style="height: calc(100vh - 300px); margin-bottom: 2rem;"></div>
+                            <div id="network-view" class="active" style="display: block; height: calc(100vh - 170px);">
+                                <div style="margin: 0 2rem; display: flex; gap: 1rem; height: 100%;">
+                                    <div id="requests-list-container" style="flex: 1; height: 100%; border-radius: 6px; overflow: hidden; border: 1px solid var(--card-border);"></div>
 
-                                    <div id="request-details-container" class="card" style="display: none;">
-                                        <div class="card-title">Request Details</div>
-                                        <div id="request-details-content"></div>
-                                        <div class="card-title" style="margin-top: 1rem;">Middleware Trace</div>
-                                        <div id="middleware-trace-container"></div>
-                                    </div>
-                                    <div style="height: 2rem"></div>
-                                </div>
-                            </div>
-
-                            {/* Failures Sub-View */}
-                            <div id="traffic-view-failures" class="traffic-view">
-                                <div style="margin: 2rem;">
-                                    <div class="card" style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center;">
-                                        <div class="card-title">Failed Requests (Last 50)</div>
-                                        <div>
-                                            <button onclick="importFailure()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-right: 8px;">Import</button>
-                                            <button onclick="fetchFailures()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px 10px; border-radius: 4px; cursor: pointer;">Refresh</button>
+                                    <div id="request-details-container" class="card" style="display: none; width: 500px; height: 100%; overflow-y: auto; flex-shrink: 0; background: var(--bg-secondary); border: 1px solid var(--card-border);">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: var(--bg-secondary); padding: 0.5rem 1rem; border-bottom: 1px solid var(--border-color); z-index: 10;">
+                                            <div class="card-title" style="margin: 0;">Request Details</div>
+                                            <button onclick="closeRequestDetails()" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.2rem;">×</button>
+                                        </div>
+                                        <div style="padding: 1rem;">
+                                            <div id="request-details-content"></div>
+                                            <div class="card-title" style="margin-top: 1rem;">Middleware Trace</div>
+                                            <div id="middleware-trace-container"></div>
                                         </div>
                                     </div>
-                                    <div id="failures-table-container"></div>
                                 </div>
                             </div>
                         </div>

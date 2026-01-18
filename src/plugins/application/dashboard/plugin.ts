@@ -1,4 +1,5 @@
 import type { ServerWebSocket } from 'bun';
+import { nanoid } from 'nanoid';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +11,7 @@ import type { Shokupan } from '../../../shokupan';
 import { $appRoot, $childRouters, $debug, $mountPath } from "../../../util/symbol";
 import type { ShokupanHooks, ShokupanPlugin } from "../../../util/types";
 import { DashboardApp } from './components';
+import { FetchInterceptor, type OutboundRequestLog } from './fetch-interceptor';
 import { MetricsCollector } from './metrics-collector';
 
 interface RequestMetrics {
@@ -45,6 +47,20 @@ export interface RequestLog {
     handlerStack?: any[];
     body?: any;
     contentType?: string;
+    // New fields
+    type: 'xhr' | 'fetch' | 'ws';
+    direction: 'inbound' | 'outbound';
+    size?: number;
+    protocol?: string;
+    domain?: string;
+    path?: string;
+    scheme?: string;
+    remoteIP?: string;
+    cookies?: number;
+    transferred?: number;
+    requestHeaders?: Record<string, string>;
+    responseHeaders?: Record<string, string>;
+    requestBody?: any;
 }
 
 export interface DashboardConfig {
@@ -139,6 +155,66 @@ export class Dashboard implements ShokupanPlugin {
         };
 
         this.metricsCollector = new MetricsCollector(this.db, onCollect);
+
+        // Initialize Fetch Interceptor
+        const fetchInterceptor = new FetchInterceptor();
+        fetchInterceptor.patch();
+        fetchInterceptor.on((log: OutboundRequestLog) => {
+            // Prevent infinite loop by ignoring DB requests
+            // SurrealDB driver uses /rpc endpoint
+            if (log.url.includes('/rpc')) return;
+
+            // Store outbound request
+            const requestData: RequestLog = {
+                method: log.method,
+                url: log.url,
+                status: log.status,
+                duration: log.duration,
+                timestamp: log.startTime, // Use startTime as timestamp
+                type: 'fetch',
+                direction: 'outbound',
+                size: log.responseBody ? String(log.responseBody).length : 0,
+                contentType: log.responseHeaders['content-type'] || log.responseHeaders['Content-Type'],
+                body: log.responseBody,
+                requestBody: log.requestBody,
+                domain: log.domain,
+                path: log.path,
+                scheme: log.scheme,
+                remoteIP: log.remoteIP,
+                cookies: log.cookies,
+                transferred: log.transferred,
+                requestHeaders: log.requestHeaders,
+                responseHeaders: log.responseHeaders,
+                // No handler stack for outbound
+            };
+
+            this.metrics.logs.push(requestData);
+
+            // Persist
+            // We use 'request' table for both inbound and outbound.
+            // ID generation: 'req_out_<timestamp>_<random>'
+
+            // Persist
+            // We use 'request' table for both inbound and outbound.
+            // ID generation: 'req_out_<timestamp>_<random>'
+
+            const recordId = new RecordId("request", nanoid());
+            const idString = recordId.toString();
+
+            // Fire and forget save
+            this.db.query('UPSERT $id CONTENT $data', {
+                id: recordId,
+                data: requestData
+            }).catch(e => console.error("Failed to save outbound request", e));
+
+            // Broadcast
+            const strategy = this.dashboardConfig.updateStrategy || 'immediate';
+            if (strategy === 'immediate') {
+                this.broadcastRequestUpdates([{ ...requestData, id: idString }]);
+            } else {
+                this.requestsBuffer.push({ ...requestData, id: idString });
+            }
+        });
 
         if (app.onStart) {
             app.onStart(async () => {
@@ -471,8 +547,11 @@ export class Dashboard implements ShokupanPlugin {
 
         // Requests Listing Endpoint
         this.router.get("/requests", async (ctx) => {
+            console.log(`[Dashboard] Handling /requests from ${ctx.ip} ${ctx.get('User-Agent')}`);
             const result = await this.db.query("SELECT * FROM request ORDER BY timestamp DESC LIMIT 100");
-            return ctx.json({ requests: result[0] || [] });
+            const items = result[0] || [];
+            console.log(`[Dashboard] /requests returning ${items.length} items`);
+            return ctx.json({ requests: items });
         });
 
         // Request Details Endpoint
@@ -771,6 +850,21 @@ export class Dashboard implements ShokupanPlugin {
                 this.metrics.activeRequests = Math.max(0, this.metrics.activeRequests - 1);
                 const duration = (performance.now() - (ctx as any)._startTime) || 0;
 
+                // Handle WebSocket upgrade or missing response
+                if (!response) {
+                    if (ctx.isUpgraded) {
+                        // WebSocket upgrade success, we can log it as 101 or skip
+                        // Let's create a dummy response object for logging purposes
+                        response = {
+                            status: 101,
+                            headers: {}
+                        };
+                    } else {
+                        // Unknown case, skip
+                        return;
+                    }
+                }
+
                 // Record in MetricsCollector
                 const isError = response.status >= 400;
                 this.metricsCollector.recordRequest(duration, isError);
@@ -798,6 +892,12 @@ export class Dashboard implements ShokupanPlugin {
                                 headers[k] = v;
                             });
                         }
+                        const resHeaders: Record<string, string> = {};
+                        if (response.headers && typeof response.headers.forEach === 'function') {
+                            response.headers.forEach((v: string, k: string) => {
+                                resHeaders[k] = v;
+                            });
+                        }
 
                         await this.db.upsert(new RecordId(`failed_request`, ctx.requestId), {
                             method: ctx.method,
@@ -806,7 +906,9 @@ export class Dashboard implements ShokupanPlugin {
                             status: response.status,
                             timestamp: Date.now(),
                             state: ctx.state,
-                            // body?
+                            body: this.serializeBody((ctx as any).bodyData || (ctx as any).requestBody),
+                            responseHeaders: resHeaders,
+                            responseBody: this.serializeBody((ctx as any).responseBody)
                         });
                     } catch (e) {
                         console.error("Failed to record failed request", e);
@@ -816,6 +918,30 @@ export class Dashboard implements ShokupanPlugin {
                     this.metrics.successfulRequests++;
                 }
 
+                // Calculate metadata
+                const urlObj = new URL(ctx.url.toString());
+                const cookieHeader = ctx.request.headers.get('cookie') || '';
+                const cookiesCount = cookieHeader ? cookieHeader.split(';').length : 0;
+
+                const headers: Record<string, string> = {};
+                if (ctx.request.headers && typeof ctx.request.headers.forEach === 'function') {
+                    ctx.request.headers.forEach((v: string, k: string) => {
+                        headers[k] = v;
+                    });
+                }
+                const resHeaders: Record<string, string> = {};
+                if (response.headers && typeof response.headers.forEach === 'function') {
+                    response.headers.forEach((v: string, k: string) => {
+                        resHeaders[k] = v;
+                    });
+                }
+
+                const responseHeadersSize = Object.entries(response.headers || {}).reduce((acc, [k, v]) => acc + k.length + String(v).length + 2, 0);
+                const responseSize = (ctx as any).responseBody ? String((ctx as any).responseBody).length : 0;
+
+                // Try to get remote IP from various headers or socket
+                const remoteIP = ctx.request.headers.get('x-forwarded-for') || (ctx.req as any)?.socket?.remoteAddress;
+
                 const logEntry: RequestLog = {
                     method: ctx.method,
                     url: ctx.url.toString(),
@@ -824,7 +950,20 @@ export class Dashboard implements ShokupanPlugin {
                     timestamp: Date.now(),
                     handlerStack: this.serializeHandlerStack((ctx as any).handlerStack),
                     body: this.serializeBody((ctx as any).responseBody),
-                    contentType: response.headers['content-type'] || response.headers['Content-Type']
+                    requestBody: (ctx as any).bodyData || (ctx as any).requestBody, // ShokupanContext usually stores parsed body here if parsed
+                    contentType: response.headers['content-type'] || response.headers['Content-Type'],
+                    type: 'xhr',
+                    direction: 'inbound',
+                    size: responseSize,
+                    protocol: (ctx.req as any)?.httpVersion, // Try to get protocol from raw request if available, Bun might expose it
+                    domain: urlObj.hostname,
+                    path: urlObj.pathname,
+                    scheme: urlObj.protocol.replace(':', ''),
+                    cookies: cookiesCount,
+                    transferred: responseSize + responseHeadersSize,
+                    remoteIP,
+                    requestHeaders: headers,
+                    responseHeaders: resHeaders
                 };
                 // console.log(`[Dashboard Debug] Captured ${ctx.method} ${ctx.path} -> Status: ${response.status}`); // Removed debug log
 
@@ -833,9 +972,12 @@ export class Dashboard implements ShokupanPlugin {
                 // Persist to datastore for detailed view
                 try {
                     // Use query explicitly to avoid driver/RecordId issues
-                    await this.db.query('UPSERT type::thing("request", $id) CONTENT $data', {
-                        id: ctx.requestId,
-                        data: logEntry
+                    await this.db.query('UPSERT $id CONTENT $data', {
+                        id: new RecordId("request", ctx.requestId),
+                        data: {
+                            ...logEntry,
+                            direction: "inbound"
+                        }
                     });
                 } catch (e) {
                     console.error("Failed to record request log", e);
@@ -848,14 +990,7 @@ export class Dashboard implements ShokupanPlugin {
 
                 const requestData = {
                     id: ctx.requestId,
-                    method: ctx.method,
-                    url: ctx.url.toString(),
-                    status: response.status,
-                    duration,
-                    timestamp: Date.now(),
-                    handlerStack: this.serializeHandlerStack((ctx as any).handlerStack),
-                    body: this.serializeBody((ctx as any).responseBody),
-                    contentType: response.headers['content-type'] || response.headers['Content-Type']
+                    ...logEntry
                 };
 
                 const strategy = this.dashboardConfig.updateStrategy || 'immediate';
