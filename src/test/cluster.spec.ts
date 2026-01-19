@@ -82,19 +82,28 @@ describe('Cluster Plugin', () => {
                 }, 10000);
             });
 
-            // Allow workers time to spin up
-            await new Promise(r => setTimeout(r, 1000));
-
-            // 4. Make concurrent requests
+            // 4. Make concurrent requests with retry logic
             const pids = new Set<number>();
             const totalRequests = 20;
+
+            const fetchWithRetry = async (retries = 5, delay = 100) => {
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        const res = await fetch('http://localhost:45678/');
+                        if (!res.ok) throw new Error('Status not ok');
+                        return await res.json();
+                    } catch (e) {
+                        if (i === retries - 1) throw e;
+                        await new Promise(r => setTimeout(r, delay));
+                    }
+                }
+            };
 
             // Fire off requests in parallel to encourage hitting different workers
             const promises = [];
             for (let i = 0; i < totalRequests; i++) {
                 promises.push(
-                    fetch('http://localhost:45678/')
-                        .then(res => res.json())
+                    fetchWithRetry()
                         .then((data: any) => pids.add(data.pid))
                 );
             }

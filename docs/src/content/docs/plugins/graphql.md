@@ -1,21 +1,21 @@
 ---
-title: GraphQL (Apollo)
-description: Create GraphQL APIs using the Apollo Server plugin.
+title: GraphQL
+description: Create GraphQL APIs using Apollo Server or GraphQL Yoga.
 ---
 
-The **GraphQL Apollo Plugin** integrates [Apollo Server 4](https://www.apollographql.com/docs/apollo-server/) into Shokupan, allowing you to easily serve GraphQL APIs.
+Shokupan provides first-class support for GraphQL through two powerful plugins: **Apollo Server** and **GraphQL Yoga**. Choose the one that best fits your needs.
 
-## Installation
+## Apollo Server
 
-You must install `@apollo/server` and `graphql` as dependencies:
+The **GraphQL Apollo Plugin** integrates [Apollo Server 4](https://www.apollographql.com/docs/apollo-server/) into Shokupan.
+
+### Installation
 
 ```bash
 bun add @apollo/server graphql
 ```
 
-## Usage
-
-Register the plugin with your `typeDefs` and `resolvers`.
+### Usage
 
 ```typescript
 import { Shokupan, GraphQLApolloPlugin } from 'shokupan';
@@ -34,20 +34,16 @@ const resolvers = {
   },
 };
 
-app.register(new GraphQLPlugin({
+app.register(new GraphQLApolloPlugin({
     typeDefs,
     resolvers,
-    path: '/graphql' // Optional: default is '/graphql'
+    path: '/graphql' // Optional
 }));
 
 await app.listen(3000);
 ```
 
-Visit `http://localhost:3000/graphql` in your browser to access the Apollo Sandbox (Playground).
-
-## Configuration
-
-The `GraphQLPlugin` accepts the following options:
+### Configuration (Apollo)
 
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
@@ -56,18 +52,76 @@ The `GraphQLPlugin` accepts the following options:
 | `path` | `string` | `'/graphql'` | URL path to mount the GraphQL endpoint |
 | `apolloConfig` | `ApolloServerOptions` | `{}` | Additional configuration passed to `ApolloServer` constructor |
 
-### Accessing Context
+---
 
-The Shokupan [Context](/core/context) is passed to your resolvers throughout the `context` argument. You can access it via the `shokupan` property, or simply merge it if you prefer (the default implementation passes `{ ...ctx, shokupan: ctx }`).
+## GraphQL Yoga
+
+The **GraphQL Yoga Plugin** integrates [GraphQL Yoga](https://the-guild.dev/graphql/yoga-server), offering a lightweight and feature-rich GraphQL server.
+
+### Installation
+
+```bash
+bun add graphql-yoga graphql
+```
+
+### Usage
 
 ```typescript
+import { Shokupan, GraphQLYogaPlugin } from 'shokupan';
+
+const app = new Shokupan();
+
+app.register(new GraphQLYogaPlugin({
+    path: '/graphql',
+    yogaConfig: {
+        schema: {
+            typeDefs: /* GraphQL */ `
+                type Query {
+                    hello: String
+                }
+            `,
+            resolvers: {
+                Query: {
+                    hello: () => 'Hello from Yoga!',
+                },
+            },
+        },
+    }
+}));
+
+await app.listen(3000);
+```
+
+### Configuration (Yoga)
+
+| Option | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `path` | `string` | `'/graphql'` | URL path to mount the GraphQL endpoint |
+| `yogaConfig` | `YogaServerOptions` | Required | Configuration passed to `createYoga`. Must include schemas/resolvers. |
+
+## Accessing Context
+
+In both plugins, the Shokupan [Context](/core/context) is passed to your resolvers.
+
+```typescript
+// Apollo
 const resolvers = {
   Query: {
     currentUser: (parent, args, context) => {
       // Access Shokupan Context
-      const ctx = context.shokupan;
+      const ctx = context.shokupan; 
       return ctx.state.user;
     },
   },
 };
+
+// Yoga
+const resolvers = {
+    Query: {
+        currentUser: (parent, args, context) => {
+            // Context is merged directly
+            return context.state.user;
+        }
+    }
+}
 ```
