@@ -158,11 +158,13 @@ export class Dashboard implements ShokupanPlugin {
         this.metricsCollector = new MetricsCollector(this.db, onCollect);
 
         if (app.applicationConfig) {
+            // TODO: if instability comment out line below?
             app.applicationConfig.enableMiddlewareTracking = true;
         }
 
         // Initialize Fetch Interceptor
         const fetchInterceptor = new FetchInterceptor();
+        // TODO: if instability comment out line below?
         fetchInterceptor.patch();
         fetchInterceptor.on((log: OutboundRequestLog) => {
             // Prevent infinite loop by ignoring DB requests
@@ -241,23 +243,10 @@ export class Dashboard implements ShokupanPlugin {
 
         // Register hooks on the app to track all requests
         const hooks = this.getHooks();
-        if (!app.middleware) {
-            app.middleware = [];
+
+        if (hooks.onRequestStart) {
+            app.hook('onRequestStart', hooks.onRequestStart);
         }
-
-        // Create middleware that wraps the hooks
-        const hooksMiddleware = async (ctx: any, next: any) => {
-            if (hooks.onRequestStart) {
-                await hooks.onRequestStart(ctx);
-            }
-
-            // Track start time for duration calculation
-            (ctx as any)._startTime = performance.now();
-
-            await next();
-        };
-
-        app.use(hooksMiddleware);
 
         if (hooks.onResponseEnd) {
             app.hook('onResponseEnd', hooks.onResponseEnd);
@@ -886,14 +875,17 @@ export class Dashboard implements ShokupanPlugin {
     public getHooks(): ShokupanHooks {
         return {
             onRequestStart: (ctx) => {
+                if (ctx.path.startsWith(this.mountPath)) return;
+
                 const app = (this as any)[$appRoot];
                 if (!this.instrumented && app) {
                     this.instrumentApp(app);
                 }
 
-                this.metrics.totalRequests++;
-                this.metrics.activeRequests++;
-                // (ctx as any)._debugStartTime = performance.now(); // Removed, now handled by middleware
+                this.metrics.totalRequests++; // Starts at 0
+                this.metrics.activeRequests++; // INCREMENTS
+                (ctx as any)._startTime = performance.now();
+                (ctx as any)._reqStartTime = Date.now();
 
                 // Attach Collector
                 ctx[$debug] = new Collector(this);
@@ -1013,7 +1005,7 @@ export class Dashboard implements ShokupanPlugin {
                     url: ctx.url.toString(),
                     status: response.status,
                     duration,
-                    timestamp: Date.now(),
+                    timestamp: (ctx as any)._reqStartTime || (Date.now() - duration),
                     handlerStack: this.serializeHandlerStack((ctx as any).handlerStack),
                     body: this.serializeBody((ctx as any).responseBody),
                     requestBody: (ctx as any).bodyData || (ctx as any).requestBody, // ShokupanContext usually stores parsed body here if parsed
@@ -1036,18 +1028,13 @@ export class Dashboard implements ShokupanPlugin {
                 this.metrics.logs.push(logEntry);
 
                 // Persist to datastore for detailed view
-                try {
-                    // Use query explicitly to avoid driver/RecordId issues
-                    await this.db.query('UPSERT $id CONTENT $data', {
-                        id: new RecordId("request", ctx.requestId),
-                        data: {
-                            ...logEntry,
-                            direction: "inbound"
-                        }
-                    });
-                } catch (e) {
+                // Use query explicitly to avoid driver/RecordId issues
+                this.db.create(new RecordId("request", ctx.requestId), {
+                    ...logEntry,
+                    direction: "inbound"
+                }).catch(e => {
                     console.error("Failed to record request log", e);
-                }
+                });
                 const retention = this.dashboardConfig.retentionMs ?? 7200000;
                 const cutoff = Date.now() - retention;
                 if (this.metrics.logs.length > 0 && this.metrics.logs[0].timestamp < cutoff) {

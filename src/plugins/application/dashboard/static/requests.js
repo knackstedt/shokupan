@@ -8,6 +8,10 @@ let filterText = '';
 let filterType = 'all';
 let filterDirection = 'all';
 
+// Waterfall State
+let minRequestTime = Infinity;
+let maxRequestTime = 0;
+
 function initRequests() {
     console.log('[requests.js] Initializing...');
 
@@ -553,26 +557,95 @@ function customFilter(data) {
 
 function waterfallFormatter(cell) {
     const data = cell.getData();
-    // We need a reference start time for the waterfall.
-    // For now, let's use the oldest timestamp in the current page/view or relative to 10 seconds ago?
-    // A better approach for "live" view is to just show bar width proportional to duration? 
-    // Or relative to the start of the trace session. 
-
-    // Simpler: Show duration bar relative to a fixed max (e.g. 1s or 5s).
-    // Or just a simple bar representing execution time.
-
-    // Let's do a "Time/Duration" visual.
+    // Default to duration bar if no range yet
     const duration = data.duration || 0;
-    const maxDuration = 2000; // 2s baseline for full width
-    const pct = Math.min(100, (duration / maxDuration) * 100);
 
-    // Color based on duration
+    // Safety check
+    if (minRequestTime === Infinity || maxRequestTime === 0) {
+        // Just show a simple bar based on some 2s default
+        const pct = Math.min(100, (duration / 2000) * 100);
+        const color = duration > 1000 ? '#ef4444' : duration > 500 ? '#f59e0b' : '#3b82f6';
+        return `<div style="width: 100%; height: 100%; display: flex; align-items: center;">
+            <div style="height: 6px; width: ${pct}%; background: ${color}; border-radius: 3px; min-width: 2px;"></div>
+        </div>`;
+    }
+
+    const totalRange = maxRequestTime - minRequestTime;
+    // Prevent divide by zero
+    const safeRange = totalRange <= 0 ? 1 : totalRange;
+
+    // Calculate start offset relative to minRequestTime
+    // We treat minRequestTime as 0%
+    // If a request started before minRequestTime (unlikely given logic), clamp to 0
+    const startTimeResult = data.timestamp - minRequestTime;
+    const startPct = Math.max(0, (startTimeResult / safeRange) * 100);
+
+    // Calculate width relative to totalRange
+    // Use a min width of 0.5% so it's visible
+    const widthPct = Math.max(0.5, (duration / safeRange) * 100);
+
+    // Color
     const color = duration > 1000 ? '#ef4444' : duration > 500 ? '#f59e0b' : '#3b82f6';
 
-    return `<div style="width: 100%; height: 100%; display: flex; align-items: center;">
-        <div style="height: 6px; width: ${pct}%; background: ${color}; border-radius: 3px; min-width: 2px;"></div>
+    return `<div style="width: 100%; height: 100%; display: flex; align-items: center; position: relative;">
+        <div style="
+            position: absolute;
+            right: ${startPct}%;
+            width: ${widthPct}%;
+            height: 6px; 
+            background: ${color}; 
+            border-radius: 3px; 
+            min-width: 2px;
+        " title="Start: +${Math.round(startTimeResult)}ms, Duration: ${Math.round(duration)}ms"></div>
     </div>`;
 }
+
+// Utility to track time range
+function updateTimestamps(requests) {
+    if (!requests || !requests.length) return;
+    let changed = false;
+    requests.forEach(r => {
+        const start = r.timestamp;
+        const end = start + (r.duration || 0);
+        if (start < minRequestTime) {
+            minRequestTime = start;
+            changed = true;
+        }
+        // Also extend max if needed, but generally max is max(end)
+        // However, waterfall usually shows relative to session start.
+        // If we want "waterfall of current view", we care about min/max of visible.
+        // But for simplicity, we track global session range.
+        if (end > maxRequestTime) {
+            maxRequestTime = end;
+            changed = true;
+        }
+        // Also handle if start > maxRequestTime (e.g. first request)
+        if (start > maxRequestTime) {
+            maxRequestTime = end; // start + duration
+            changed = true;
+        }
+    });
+    return changed;
+}
+
+// Global handler for Client.js
+window.updateRequestsList = function (newRequests) {
+    if (!window.requestsTable || !newRequests || !newRequests.length) return;
+
+    // Update Timestamps
+    const changed = updateTimestamps(newRequests);
+
+    // Add or Update data (true = add to top if new)
+    // using updateOrAddData to be safe if IDs exist
+    window.requestsTable.updateOrAddData(newRequests)
+        .then(() => {
+            // If range expanded significantly, or just always for safety to update relative bars
+            if (changed) {
+                // redraw(true) forces full re-render of rows
+                window.requestsTable.redraw(true);
+            }
+        });
+};
 
 
 
@@ -585,7 +658,13 @@ function fetchRequests() {
         .then(res => res.json())
         .then(data => {
             if (window.requestsTable) {
-                window.requestsTable.setData(data.requests || []);
+                const reqs = data.requests || [];
+                // Reset timestamps on full load/reload
+                minRequestTime = Infinity;
+                maxRequestTime = 0;
+                updateTimestamps(reqs);
+
+                window.requestsTable.setData(reqs);
                 window.requestsTable.setFilter(customFilter);
             }
         })
@@ -646,20 +725,27 @@ function showRequestDetails(request) {
             if (newTab !== activeTab) {
                 activeTab = newTab;
                 content.innerHTML = renderTabs();
+                document.querySelector("#tab-content").style.padding = "1rem";
 
-                if (activeTab === "headers") {
+                if (activeTab === "timings") {
                     const traceContainer = document.getElementById('middleware-trace-container');
                     renderTrace(request, traceContainer);
                 }
 
                 // Re-initialize editors if needed
-                if (activeTab === 'response') initResponseEditor(request);
-                if (activeTab === 'request') initRequestEditor(request);
+                if (activeTab === 'response') {
+                    document.querySelector("#tab-content").style.padding = "0";
+                    initResponseEditor(request);
+                };
+                if (activeTab === 'request') {
+                    document.querySelector("#tab-content").style.padding = "0";
+                    initRequestEditor(request);
+                };
             }
         }
     };
 
-    if (activeTab === "headers") {
+    if (activeTab === "timings") {
         const traceContainer = document.getElementById('middleware-trace-container');
         renderTrace(request, traceContainer);
     }
@@ -684,6 +770,28 @@ function renderTabContent(tabId, request) {
         default:
             return '';
     }
+}
+
+function renderNameValueTable(items, emptyMessage = 'No items found') {
+    if (!items || !items.length) return `<div style="padding: 8px; color: var(--text-secondary);">${emptyMessage}</div>`;
+    return `
+        <table style="width: 100%; text-align: left; border-collapse: collapse; font-size: 0.9em;">
+            <thead>
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                    <th style="padding: 4px 8px;">Name</th>
+                    <th style="padding: 4px 8px;">Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${items.map(c => `
+                    <tr style="border-bottom: 1px solid var(--border-color-dim, #33333333);">
+                        <td style="padding: 4px 8px; font-weight: 500;">${c.name}</td>
+                        <td style="padding: 4px 8px; word-break: break-all;">${c.value}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
 }
 
 function renderHeadersTab(request) {
@@ -720,8 +828,6 @@ function renderHeadersTab(request) {
             ${formatHeaderSection('Response Headers', request.responseHeaders)}
             ${formatHeaderSection('Request Headers', request.requestHeaders)}
         </div>
-        <div class="card-title" style="margin-top: 1rem;">Middleware Trace</div>
-        <div id="middleware-trace-container"></div>
     `;
 }
 
@@ -746,48 +852,51 @@ function renderCookiesTab(request) {
         resCookies = [{ name: 'Set-Cookie', value: request.responseHeaders['set-cookie'] }];
     }
 
-    const renderTable = (cookies) => {
-        if (!cookies.length) return '<div style="padding: 8px; color: var(--text-secondary);">No cookies found</div>';
-        return `
-            <table style="width: 100%; text-align: left; border-collapse: collapse; font-size: 0.9em;">
-                <thead>
-                    <tr style="border-bottom: 1px solid var(--border-color);">
-                        <th style="padding: 4px 8px;">Name</th>
-                        <th style="padding: 4px 8px;">Value</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${cookies.map(c => `
-                        <tr style="border-bottom: 1px solid var(--border-color-dim, #33333333);">
-                            <td style="padding: 4px 8px; font-weight: 500;">${c.name}</td>
-                            <td style="padding: 4px 8px; word-break: break-all;">${c.value}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        `;
-    };
-
     return `
         <div style="padding: 0 0.5rem; display: flex; flex-direction: column; gap: 1rem;">
             <div>
                 <div style="font-weight: bold; margin-bottom: 0.5rem;">Request Cookies</div>
-                ${renderTable(reqCookies)}
+                ${renderNameValueTable(reqCookies, 'No cookies found')}
             </div>
             <div>
                 <div style="font-weight: bold; margin-bottom: 0.5rem;">Response Cookies</div>
-                ${renderTable(resCookies)}
+                ${renderNameValueTable(resCookies, 'No cookies found')}
             </div>
         </div>
     `;
 }
 
 function renderRequestTab(request) {
-    if (!request.requestBody && !request.body) return '<div style="padding: 1rem; color: var(--text-secondary);">No payload</div>';
+    let queryParamsHtml = '';
+    try {
+        const url = new URL(request.url.startsWith('http') ? request.url : `http://${request.domain || 'localhost'}${request.url}`);
+        const params = [];
+        for (const [key, value] of url.searchParams) {
+            params.push({ name: key, value: value });
+        }
+
+        if (params.length > 0) {
+            queryParamsHtml = `
+                <div style="margin-bottom: 1rem;">
+                    <div style="font-weight: bold; margin-bottom: 0.5rem; color: var(--text-primary);">Query Parameters</div>
+                    ${renderNameValueTable(params)}
+                </div>
+            `;
+        }
+    } catch (e) {
+        console.error("Failed to parse URL for query params", e);
+    }
+
+    const hasBody = request.requestBody || request.body || (typeof request.requestBody === 'string' && request.requestBody.length > 0);
+
+    if (!hasBody && !queryParamsHtml) return '<div style="padding: 1rem; color: var(--text-secondary);">No payload or query parameters</div>';
+
     return `
         <div style="display: flex; flex-direction: column; height: 100%;">
-             <div style="display: flex; justify-content: flex-end; padding: 4px;">
-                <button class="btn-action" onclick="copyToClipboard(currentRequestBody)">Copy</button>
+            ${queryParamsHtml}
+             <div style="display: flex; justify-content: flex-end; padding: 4px; gap: 8px;">
+                <div style="font-size: 0.8em; color: var(--text-secondary); display: flex; align-items: center;">${request.requestBody ? formatBytes(request.requestBody.length || 0) : ''}</div>
+                <button class="btn-action" id="btn-copy-req-body">Copy</button>
             </div>
             <div id="request-body-editor" style="flex: 1; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; min-height: 200px;"></div>
         </div>
@@ -798,7 +907,7 @@ function renderResponseTab(request) {
     if (!request.responseBody && !request.body) return '<div style="padding: 1rem; color: var(--text-secondary);">No content</div>';
 
     return `
-        <div style="display: flex; flex-direction: column; height: 100%;">
+        <div style="display: flex; flex-direction: column; height: 100%">
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px; border-bottom: 1px solid var(--border-color);">
                 <div style="font-size: 0.8em; color: var(--text-secondary);">${formatBytes(request.size || 0)}</div>
                 <div style="display: flex; gap: 8px; align-items: center;">
@@ -824,7 +933,8 @@ function renderTimingsTab(request) {
                 <div>Duration:</div><div>${request.duration.toFixed(2)} ms</div>
                 <div style="border-top: 1px solid var(--border-color); margin-top:8px; padding-top:8px; font-weight:bold;">Total Transferred:</div><div style="border-top: 1px solid var(--border-color); margin-top:8px; padding-top:8px; font-weight:bold;">${formatBytes(request.transferred || request.size || 0)}</div>
              </div>
-             <!-- Future: detailed breakdown -->
+             <div class="card-title" style="margin-top: 1rem; padding: 0">Middleware Trace</div>
+             <div id="middleware-trace-container"></div>
         </div>
     `;
 }
@@ -843,14 +953,6 @@ function renderSecurityTab(request) {
         </div>
     `;
 }
-
-
-// Attach event listeners
-// document.getElementById('auto-format-check').onchange = (e) => {
-//     window.autoFormatEnabled = e.target.checked;
-//     renderMonacoEditor(request);
-// };
-
 
 function closeRequestDetails() {
     document.getElementById('request-details-container').style.display = 'none';
@@ -895,13 +997,26 @@ function getExtension(contentType) {
     if (contentType.includes('json')) return 'json';
     if (contentType.includes('html')) return 'html';
     if (contentType.includes('xml')) return 'xml';
-    if (contentType.includes('javascript')) return 'js';
+    if (contentType.includes('javascript')) return 'javascript';
     if (contentType.includes('css')) return 'css';
+    if (contentType.includes('image/png')) return 'png';
+    if (contentType.includes('image/jpeg')) return 'jpeg';
+    if (contentType.includes('image/gif')) return 'gif';
+    if (contentType.includes('image/svg+xml')) return 'svg';
+    if (contentType.includes('application/pdf')) return 'pdf';
+    if (contentType.includes('application/zip')) return 'zip';
+    if (contentType.includes('application/octet-stream')) return 'bin';
     return 'txt';
 }
 
-function getRequestBody(request) {
-    let value = request.body || '';
+function getContentType(headers) {
+    if (!headers) return '';
+    const output = headers['content-type'] || headers['Content-Type'] || '';
+    return output.toLowerCase();
+}
+
+function getBodyContent(body) {
+    let value = body || '';
     if (typeof value === 'object') {
         try {
             value = JSON.stringify(value, null, 2);
@@ -914,25 +1029,13 @@ function getRequestBody(request) {
     return value;
 }
 
-let currentRequestBody = ''; // Global/Module scope tracking for request body
-
 function initRequestEditor(request) {
     const el = document.getElementById('request-body-editor');
     if (!el) return;
 
-    let content = request.requestBody || request.body || '';
-    let language = 'plaintext';
-    const contentType = (request.requestHeaders?.['content-type'] || '').toLowerCase();
-
-    if (contentType.includes('json')) language = 'json';
-    else if (contentType.includes('html')) language = 'html';
-    else if (contentType.includes('xml')) language = 'xml';
-    else if (contentType.includes('javascript') || contentType.includes('application/x-javascript')) language = 'javascript';
-    else if (contentType.includes('css')) language = 'css';
-    else if (contentType.includes('typescript')) language = 'typescript';
-    else if (contentType.includes('markdown')) language = 'markdown';
-    else if (contentType.includes('sql')) language = 'sql';
-    else if (contentType.includes('yaml')) language = 'yaml';
+    let content = request.requestBody || '';
+    const contentType = getContentType(request.requestHeaders);
+    let language = getExtension(contentType);
 
     if (typeof content === 'object') {
         content = JSON.stringify(content, null, 2);
@@ -947,31 +1050,27 @@ function initRequestEditor(request) {
         }
     }
 
-    currentRequestBody = content; // store for copy
+    // Handle binary
+    if (content === '[Binary or Unreadable Body]') {
+        el.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary);">Binary Content</div>';
+        return;
+    }
 
-    renderMonacoEditor(el, content, language, false); // Request body usually not auto-formatted
+    renderMonacoEditor(el, content, language, false);
+
+    const btnCopy = document.getElementById('btn-copy-req-body');
+    if (btnCopy) btnCopy.onclick = () => copyToClipboard(getBodyContent(request.requestBody));
 }
 
 function initResponseEditor(request) {
     const el = document.getElementById('response-body-editor');
     if (!el) return;
 
-    let content = request.body || request.responseBody;
-    let contentType = request.contentType || '';
-
+    let content = request.body || request.responseBody; // fallback to responseBody property if mapped
     if (!content) content = '';
 
-    // Auto-Format Logic
-    let language = 'plaintext';
-    if (contentType.includes('json')) language = 'json';
-    else if (contentType.includes('html')) language = 'html';
-    else if (contentType.includes('xml')) language = 'xml';
-    else if (contentType.includes('javascript') || contentType.includes('application/x-javascript')) language = 'javascript';
-    else if (contentType.includes('css')) language = 'css';
-    else if (contentType.includes('typescript')) language = 'typescript';
-    else if (contentType.includes('markdown')) language = 'markdown';
-    else if (contentType.includes('sql')) language = 'sql';
-    else if (contentType.includes('yaml')) language = 'yaml';
+    const contentType = getContentType(request.responseHeaders);
+    let language = getExtension(contentType);
 
     if (typeof content === 'object') {
         content = JSON.stringify(content, null, 2);
@@ -987,16 +1086,27 @@ function initResponseEditor(request) {
         }
     }
 
+    // Handle binary
+    if (content === '[Binary or Unreadable Body]') {
+        el.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary);">Binary Content</div>';
+        // Ensure download button works
+        const btnDownload = document.getElementById('btn-download-body');
+        // We can't easily download the *actual* binary if we didn't store it.
+        // But if we have it in memory or if backend serving it via separate endpoint...
+        // For now, download the text placeholder is all we can do unless we fetch raw.
+        if (btnDownload) btnDownload.onclick = () => alert("Original binary content not stored in dashboard history.");
+        return;
+    }
+
     renderMonacoEditor(el, content, language, window.autoFormatEnabled !== false);
 
     // Attach button listeners
     const btnCopy = document.getElementById('btn-copy-body');
     const btnDownload = document.getElementById('btn-download-body');
-    if (btnCopy) btnCopy.onclick = () => copyToClipboard(getRequestBody(request));
-    if (btnDownload) btnDownload.onclick = () => downloadString(getRequestBody(request), `body-${request.timestamp}.${getExtension(request.contentType)}`);
+    if (btnCopy) btnCopy.onclick = () => copyToClipboard(getBodyContent(content));
+    // TODO: replace with filename
+    if (btnDownload) btnDownload.onclick = () => downloadString(getBodyContent(content), `body-${request.timestamp}.${getExtension(request.contentType)}`);
 }
-
-let currentMonacoEditor = null; // To manage the active editor instance
 
 function renderMonacoEditor(containerElement, value, language, shouldFormat = false) {
     if (!window.monaco) {
@@ -1005,6 +1115,8 @@ function renderMonacoEditor(containerElement, value, language, shouldFormat = fa
         return;
     }
 
+    console.log({ language });
+    window.currentEditor?.dispose();
     window.currentEditor = monaco.editor.create(containerElement, {
         value: value,
         language: language,
@@ -1055,16 +1167,4 @@ function formatBytes(bytes, decimals = 2) {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
 
-window.updateRequestsList = function (newRequests) {
-    if (!window.requestsTable || !newRequests || newRequests.length === 0) return;
 
-    // console.log('[requests.js] Adding/Updating', newRequests.length, 'rows');
-    window.requestsTable.updateOrAddData(newRequests)
-        .then(() => {
-            // Force redraw/filter application
-            window.requestsTable.recalc();
-            window.requestsTable.redraw();
-            // console.log('[requests.js] Table updated');
-        })
-        .catch(err => console.error("Failed to update table data", err));
-};
