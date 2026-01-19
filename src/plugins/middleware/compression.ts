@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream';
 import * as zlib from "node:zlib";
 import type { ShokupanContext } from "../../context";
 import { $finalResponse, $rawBody } from '../../util/symbol';
@@ -5,13 +6,40 @@ import type { Middleware, NextFn } from "../../util/types";
 
 export interface CompressionOptions {
     /**
-     * Minimum byte size to compress
+     * Minimum byte size to compress responses
      */
     threshold?: number;
     /**
-     * Allowed algorithms
+     * Allowed algorithms for response compression
      */
     allowedAlgorithms?: string[];
+    /**
+     * Enable request decompression
+     * @default true
+     */
+    decompress?: boolean;
+    /**
+     * Maximum size of decompressed request body in bytes to prevent zipbomb style attacks
+     * @default 10485760 (10MB)
+     */
+    maxDecompressedSize?: number;
+}
+
+/**
+ * Create a transform stream that enforces a size limit
+ */
+function createLimitStream(maxSize: number) {
+    let size = 0;
+    return new TransformStream({
+        transform(chunk, controller) {
+            size += (chunk.byteLength || chunk.length);
+            if (size > maxSize) {
+                controller.error(new Error(`Decompressed body size exceeded limit of ${maxSize} bytes`));
+            } else {
+                controller.enqueue(chunk);
+            }
+        }
+    });
 }
 
 /**
@@ -22,8 +50,80 @@ export interface CompressionOptions {
 export function Compression(options: CompressionOptions = {}): Middleware {
     const threshold = options.threshold ?? 512; // 512 bytes default
     const allowedAlgorithms = new Set(options.allowedAlgorithms ?? ['br', 'gzip', 'zstd', 'deflate']);
+    const decompress = options.decompress ?? true;
+    const maxDecompressedSize = options.maxDecompressedSize ?? 10 * 1024 * 1024; // 10MB default
 
     const compressionMiddleware: Middleware = async function CompressionMiddleware(ctx: ShokupanContext, next: NextFn) {
+        // --- Request Decompression Logic ---
+        const requestEncoding = ctx.headers.get("content-encoding");
+        if (decompress && requestEncoding && !ctx.headers.get("content-encoding")?.includes("identity") && ctx.req.body) {
+            let stream: ReadableStream | null = null;
+
+            // Determine decompression method
+            if (requestEncoding.includes("br")) {
+                const decompressor = zlib.createBrotliDecompress();
+                const nodeStream = Readable.fromWeb(ctx.req.body as any);
+                stream = Readable.toWeb(nodeStream.pipe(decompressor)) as ReadableStream;
+            } else if (requestEncoding.includes("gzip")) {
+                if (typeof DecompressionStream !== 'undefined') {
+                    stream = ctx.req.body.pipeThrough(new DecompressionStream("gzip"));
+                } else {
+                    const decompressor = zlib.createGunzip();
+                    const nodeStream = Readable.fromWeb(ctx.req.body as any);
+                    stream = Readable.toWeb(nodeStream.pipe(decompressor)) as ReadableStream;
+                }
+            } else if (requestEncoding.includes("deflate")) {
+                if (typeof DecompressionStream !== 'undefined') {
+                    stream = ctx.req.body.pipeThrough(new DecompressionStream("deflate"));
+                } else {
+                    const decompressor = zlib.createInflate();
+                    const nodeStream = Readable.fromWeb(ctx.req.body as any);
+                    stream = Readable.toWeb(nodeStream.pipe(decompressor)) as ReadableStream;
+                }
+            }
+
+            if (stream) {
+                // Apply zipbomb protection
+                const outputStream = stream.pipeThrough(createLimitStream(maxDecompressedSize));
+
+                // Cache IP before swapping request, as requestIP might rely on the original native request identity
+                const originalIp = ctx.ip;
+                const originalReq = ctx.req;
+
+                const newHeaders = new Headers(originalReq.headers);
+                newHeaders.delete("content-encoding");
+                newHeaders.delete("content-length");
+
+                const newReq = new Proxy(originalReq, {
+                    get(target, prop, receiver) {
+                        if (prop === 'body') return outputStream;
+                        if (prop === 'headers') return newHeaders;
+                        if (prop === 'json') return async () => JSON.parse(await new Response(outputStream).text());
+                        if (prop === 'text') return async () => await new Response(outputStream).text();
+                        if (prop === 'arrayBuffer') return async () => await new Response(outputStream).arrayBuffer();
+                        if (prop === 'blob') return async () => await new Response(outputStream).blob();
+                        if (prop === 'formData') return async () => await new Response(outputStream).formData();
+
+                        // Use target as receiver to ensure native getters work (they check 'this')
+                        return Reflect.get(target, prop, target);
+                    }
+                });
+
+                // Force update request on context
+                (ctx as any).request = newReq;
+
+                // Restore IP via property override
+                if (originalIp) {
+                    Object.defineProperty(ctx, 'ip', {
+                        configurable: true,
+                        get: () => originalIp
+                    });
+                }
+            }
+        }
+
+        // --- Response Compression Logic ---
+
         const acceptEncoding = ctx.headers.get("accept-encoding") || "";
 
         // Check if compression is supported
