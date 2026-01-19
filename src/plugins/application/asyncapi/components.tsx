@@ -45,7 +45,7 @@ export function AsyncApiApp({ spec, serverUrl, base, disableSourceView, navTree 
 
 function Sidebar({ navTree, disableSourceView }: any) {
     return (
-        <div class="sidebar scroller" id="sidebar">
+        <div class="sidebar" id="sidebar">
             <div class="sidebar-header" style="display:flex; justify-content:space-between; align-items:center;">
                 <h2>AsyncAPI</h2>
                 <button id="btn-collapse-nav" class="btn-icon" title="Collapse Sidebar">
@@ -54,7 +54,7 @@ function Sidebar({ navTree, disableSourceView }: any) {
                     </svg>
                 </button>
             </div>
-            <div class="nav-list" id="nav-list">
+            <div class="nav-list scroller" id="nav-list">
                 <NavNode node={navTree} level={0} disableSourceView={disableSourceView} />
             </div>
         </div>
