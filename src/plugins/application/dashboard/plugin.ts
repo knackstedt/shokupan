@@ -67,6 +67,10 @@ export interface DashboardConfig {
     getRequestHeaders?: () => HeadersInit;
     path?: string;
     /**
+     * Glob patterns to ignore in the request list
+     */
+    ignorePaths?: string[];
+    /**
      * Retention time in milliseconds
      */
     retentionMs?: number;
@@ -682,6 +686,15 @@ export class Dashboard implements ShokupanPlugin {
 
             const getRequestHeadersSource = this.dashboardConfig.getRequestHeaders ? this.dashboardConfig.getRequestHeaders.toString() : "undefined";
 
+            const ignorePaths = [
+                ...(this.dashboardConfig.ignorePaths || []),
+                // Add default ignores for integrations
+                ...Object.values(integrations).filter(p => !!p).flatMap(p => {
+                    const clean = p!.endsWith('/') ? p!.slice(0, -1) : p!;
+                    return [clean, `${clean}/**`];
+                })
+            ];
+
             const html = renderToString(DashboardApp({
                 metrics: this.metrics,
                 uptime,
@@ -689,7 +702,8 @@ export class Dashboard implements ShokupanPlugin {
                 linkPattern,
                 integrations,
                 base: mountPath,
-                getRequestHeadersSource
+                getRequestHeadersSource,
+                ignorePaths
             }));
             return ctx.html(`<!DOCTYPE html>${html}`);
         });

@@ -2,7 +2,7 @@
 
 
 
-export function DashboardApp({ metrics, uptime, integrations, base, getRequestHeadersSource, rootPath, linkPattern }: any) {
+export function DashboardApp({ metrics, uptime, integrations, base, getRequestHeadersSource, rootPath, linkPattern, ignorePaths }: any) {
     return (
         <html lang="en">
             <head>
@@ -146,6 +146,10 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                                         <option value="ws">WS</option>
                                         <option value="other">Other</option>
                                     </select>
+                                    <div style="display: flex; align-items: center; gap: 4px; background: var(--bg-primary); padding: 0 8px; border: 1px solid var(--card-border); border-radius: 4px; color: var(--text-primary);">
+                                        <input type="checkbox" id="network-filter-ignore" checked />
+                                        <label for="network-filter-ignore" style="cursor: pointer; font-size: 0.9em; user-select: none;">Excl. Ignored</label>
+                                    </div>
                                     <button onclick="fetchRequests()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 4px 8px; border-radius: 4px; cursor: pointer;">Refresh</button>
                                     <button onclick="purgeRequests()" style="background: var(--bg-primary); color: var(--color-error, #ef4444); border: 1px solid var(--card-border); padding: 4px 8px; border-radius: 4px; cursor: pointer;">Purge</button>
                                 </div>
@@ -195,7 +199,8 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                     const getRequestHeaders = ${getRequestHeadersSource};
                     window.SHOKUPAN_CONFIG = {
                         rootPath: "${rootPath || ""}",
-                        linkPattern: "${linkPattern || ""}"
+                        linkPattern: "${linkPattern || ""}",
+                        ignorePaths: ${JSON.stringify(ignorePaths || [])}
                     };
                 `}} />
 

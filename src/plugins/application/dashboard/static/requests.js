@@ -7,6 +7,19 @@ window.requestsTable = null;
 let filterText = '';
 let filterType = 'all';
 let filterDirection = 'all';
+let filterIgnore = true;
+let ignoreRegexes = [];
+
+function globToRegex(pattern) {
+    // Escape special regex chars except *
+    let escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+    // Convert * to .*
+    // For ** support, we can just treat * as .* for now, or distinguish.
+    // Simple approach: replace * with .*
+    // Note: This is a loose approximation of glob
+    const re = escaped.replace(/\*/g, '.*');
+    return new RegExp(`^${re}$`);
+}
 
 // Waterfall State
 let minRequestTime = Infinity;
@@ -18,7 +31,13 @@ function initRequests() {
     // Initialize Filter Listeners
     const txtFilter = document.getElementById('network-filter-text');
     const typeFilter = document.getElementById('network-filter-type');
+    const ignoreFilter = document.getElementById('network-filter-ignore');
     const directionButtons = document.querySelectorAll('.filter-direction');
+
+    // Compile regexes
+    if (window.SHOKUPAN_CONFIG && window.SHOKUPAN_CONFIG.ignorePaths) {
+        ignoreRegexes = window.SHOKUPAN_CONFIG.ignorePaths.map(globToRegex);
+    }
 
     if (directionButtons) {
         directionButtons.forEach(btn => {
@@ -51,6 +70,15 @@ function initRequests() {
             filterType = e.target.value;
             window.requestsTable.setFilter(customFilter);
         });
+    }
+
+    if (ignoreFilter) {
+        // specific listener
+        ignoreFilter.addEventListener('change', (e) => {
+            filterIgnore = e.target.checked;
+            window.requestsTable.setFilter(customFilter);
+        });
+        filterIgnore = ignoreFilter.checked;
     }
 
     // specific check for Tabulator
@@ -548,6 +576,20 @@ function customFilter(data) {
         if (filterDirection !== dir) return false;
     }
 
+    // Ignore Filter
+    if (filterIgnore && ignoreRegexes.length > 0) {
+        // check against regexes
+        // We match against URL or Path?
+        // Usually path.
+        // data.url might be full URL. data.path is path.
+        const path = data.path || data.url; // Fallback
+        // Also check full URL just in case glob is absolute?
+        // Let's assume glob matches against path.
+        for (const re of ignoreRegexes) {
+            if (re.test(path)) return false;
+        }
+    }
+
     // Text Filter (Regex-ish)
     if (filterText) {
         const text = (data.url + ' ' + data.method).toLowerCase();
@@ -592,7 +634,7 @@ function waterfallFormatter(cell) {
     return `<div style="width: 100%; height: 100%; display: flex; align-items: center; position: relative;">
         <div style="
             position: absolute;
-            right: min(${startPct}%, calc(100% - 2px));
+            left: min(${startPct}%, calc(100% - 2px));
             width: ${widthPct}%;
             height: calc(100% - 4px); 
             background: ${color}; 
