@@ -590,7 +590,7 @@ function waterfallFormatter(cell) {
     return `<div style="width: 100%; height: 100%; display: flex; align-items: center; position: relative;">
         <div style="
             position: absolute;
-            right: ${startPct}%;
+            right: min(${startPct}%, calc(100% - 2px));
             width: ${widthPct}%;
             height: 6px; 
             background: ${color}; 
