@@ -155,7 +155,7 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                                 </div>
                             </div>
 
-                            <div id="network-view" class="active" style="display: block; height: calc(100vh - 170px);">
+                            <div id="network-view" class="active" style="display: block; height: 100%; margin-bottom: 2rem; overflow: hidden;">
                                 <div style="margin: 0 2rem; display: flex; gap: 1rem; height: 100%;">
                                     <div id="requests-list-container" style="flex: 1; height: 100%; border-radius: 6px; overflow: hidden; border: 1px solid var(--card-border);"></div>
 

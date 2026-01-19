@@ -278,7 +278,7 @@ function initRequests() {
             widthGrow: 1,
             visible: savedColumns['timestamp'] !== undefined ? savedColumns['timestamp'] : true,
             formatter: waterfallFormatter,
-            headerSort: false,
+            headerSort: true,
             headerContextMenu: headerMenu
         }
     ];
