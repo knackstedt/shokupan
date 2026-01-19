@@ -122,7 +122,16 @@ export class OpenAPIAnalyzer {
     /**
      * Main analysis entry point
      */
+    private cachedResult?: { applications: ApplicationInstance[]; };
+
+    /**
+     * Main analysis entry point
+     */
     public async analyze(): Promise<{ applications: ApplicationInstance[]; }> {
+        if (this.cachedResult) {
+            return this.cachedResult;
+        }
+
         // console.log(`Analyzing directory: ${this.rootDir}`);
 
         // Step 1: Parse TypeScript files (which might involve scanning or using entrypoint)
@@ -143,8 +152,10 @@ export class OpenAPIAnalyzer {
         // Step 6: Prune unreachable GenericModules
         this.pruneApplications();
 
+        this.cachedResult = { applications: this.applications };
+
         // Return the raw application data for further processing
-        return { applications: this.applications };
+        return this.cachedResult;
     }
 
     /**
@@ -205,7 +216,7 @@ export class OpenAPIAnalyzer {
 
                 // Skip node_modules for source files (we'll handle deps separately)
                 if (entry.isDirectory()) {
-                    if (["node_modules", ".git", "dist"].includes(entry.name)) {
+                    if (["node_modules", ".git", "dist", ".gemini", ".vscode", ".agent", "artifacts"].includes(entry.name)) {
                         continue;
                     }
                     await this.scanDirectory(fullPath);

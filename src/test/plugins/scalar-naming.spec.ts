@@ -1,7 +1,7 @@
 
 import { describe, expect, it } from 'bun:test';
-import { ScalarPlugin } from '../src/plugins/application/scalar';
-import { Shokupan } from '../src/shokupan';
+import { ScalarPlugin } from '../../plugins/application/scalar';
+import { Shokupan } from '../../shokupan';
 
 describe('Scalar Plugin Warning Fix', () => {
     it('should name scalar plugin "Scalar" not "Scalar.Ts"', async () => {
@@ -22,7 +22,7 @@ describe('Scalar Plugin Warning Fix', () => {
 
         // Verify builtin tagging
         expect(route.get['x-shokupan-builtin']).toBe(true);
-        expect(route.get['x-shokupan-plugin-name']).toBe('scalar');
+        expect(route.get['x-shokupan-plugin-name']).toBe('Scalar');
 
         // Verify tag (which drives the group name sidebar)
         const tags = route.get.tags;

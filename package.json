@@ -23,6 +23,7 @@
     "type": "module",
     "scripts": {
         "dev": "bun --watch --inspect examples/full/main.ts",
+        "mcp:inspector": "npx @modelcontextprotocol/inspector http://localhost:8372/mcp",
         "debug:otel": "sh scripts/debug-otel.sh",
         "docs": "cd docs && bun run dev",
         "build": "vite build",
@@ -58,6 +59,7 @@
     },
     "dependencies": {
         "@clack/prompts": "^0.11.0",
+        "@modelcontextprotocol/sdk": "^1.25.2",
         "@opentelemetry/api": "^1.9.0",
         "@opentelemetry/exporter-trace-otlp-proto": "^0.208.0",
         "@opentelemetry/resources": "^2.3.0",

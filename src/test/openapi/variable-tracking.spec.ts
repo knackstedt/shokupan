@@ -10,20 +10,20 @@ describe("Middleware Variable Tracking", () => {
 
         const { applications } = await analyzer.analyze();
 
-        console.log(`Found ${applications.length} applications`);
+        // console.log(`Found ${applications.length} applications`);
 
         // Find an application with middleware
         const appWithMiddleware = applications.find(app => app.middleware && app.middleware.length > 0);
 
         if (appWithMiddleware) {
-            console.log(`\nApplication: ${appWithMiddleware.name}`);
-            console.log(`Middleware count: ${appWithMiddleware.middleware.length}`);
+            // console.log(`\nApplication: ${appWithMiddleware.name}`);
+            // console.log(`Middleware count: ${appWithMiddleware.middleware.length}`);
 
             for (const mw of appWithMiddleware.middleware) {
-                console.log(`\nMiddleware: ${mw.name}`);
-                console.log(`  File: ${mw.file}`);
-                console.log(`  Response Types:`, mw.responseTypes);
-                console.log(`  Headers:`, mw.headers);
+                // console.log(`\nMiddleware: ${mw.name}`);
+                // console.log(`  File: ${mw.file}`);
+                // console.log(`  Response Types:`, mw.responseTypes);
+                // console.log(`  Headers:`, mw.headers);
 
                 // Check if RateLimitMiddleware has 429 response
                 if (mw.name === 'RateLimitMiddleware') {
@@ -37,7 +37,7 @@ describe("Middleware Variable Tracking", () => {
                 }
             }
         } else {
-            console.log("No applications with middleware found");
+            // console.log("No applications with middleware found");
         }
     });
 });

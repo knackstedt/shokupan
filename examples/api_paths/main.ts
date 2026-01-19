@@ -1,11 +1,20 @@
 import { ApiExplorerPlugin } from '../../src/plugins/application/api-explorer/plugin';
 import { AsyncApiPlugin } from '../../src/plugins/application/asyncapi/plugin';
 import { Dashboard } from '../../src/plugins/application/dashboard/plugin';
+import { MCPServerPlugin } from '../../src/plugins/application/mcp-server/plugin';
 import { ScalarPlugin } from '../../src/plugins/application/scalar';
+import { Cors } from '../../src/plugins/middleware/cors';
 import { RateLimitMiddleware } from '../../src/plugins/middleware/rate-limit';
 import { Shokupan } from '../../src/shokupan';
 import { NestedRouter } from '../full/routes/nested_router';
+import { ServiceFetchRouter } from '../full/routes/service_fetch';
 
+process.on("uncaughtException", (err) => {
+    console.error("Uncaught Exception:", err);
+});
+process.on("unhandledRejection", (reason) => {
+    console.error("Unhandled Rejection:", reason);
+});
 
 const port = parseInt(process.env['PORT'] || '3000');
 
@@ -16,6 +25,15 @@ const app = new Shokupan({
     enableAsyncLocalStorage: true,
     enableAsyncApiGen: true,
     enableMiddlewareTracking: true,
+    surreal: {
+        connectOptions: {
+            authentication: {
+                username: "root",
+                password: "root",
+            }
+        },
+        url: "ws://127.0.0.1:8000"
+    }
 });
 
 app.use(RateLimitMiddleware({
@@ -61,9 +79,7 @@ app.event("complex/action2", async (ctx) => {
 });
 
 app.mount("/nested", NestedRouter);
-
-
-
+app.mount("/service", ServiceFetchRouter);
 
 // This will get flagged because this path is random. 
 app.get(Math.random().toString(), ctx => {
@@ -118,11 +134,14 @@ app.get("multipleResponsesAtOnce", (ctx) => {
     ctx.json({ message: "[Chuckles] I'm in danger." });
 });
 
+app.use(Cors({ origin: "*" }));
 app.register(new Dashboard({ path: "/admin" }));
 app.register(new ApiExplorerPlugin({ path: "/openapi" }));
 app.register(new AsyncApiPlugin({ path: "/asyncapi" }));
 app.register(new ScalarPlugin({ path: "/scalar" }));
-
+app.register(new MCPServerPlugin({
+    rootDir: './examples/api_paths'
+}));
 
 console.log(`
 ╔═══════════════════════════════════════════════════════════════╗

@@ -26,14 +26,14 @@ describe("OpenAPI Middleware Response Tracking", () => {
         const spec = await generateOpenApi(app);
 
         // Log middleware registry for inspection
-        console.log("Middleware Registry:", JSON.stringify(spec['x-middleware-registry'], null, 2));
+        // console.log("Middleware Registry:", JSON.stringify(spec['x-middleware-registry'], null, 2));
 
         // The spec should include a middleware registry
         expect(spec['x-middleware-registry']).toBeDefined();
 
         // Check if virtual middleware paths were created
         const middlewarePaths = Object.keys(spec.paths).filter(p => p.startsWith('/_middleware/'));
-        console.log("Virtual Middleware Paths:", middlewarePaths);
+        // console.log("Virtual Middleware Paths:", middlewarePaths);
         expect(middlewarePaths.length).toBeGreaterThan(0);
 
         // Check if our test route exists
@@ -42,10 +42,10 @@ describe("OpenAPI Middleware Response Tracking", () => {
 
         // The route should have x-shokupan-middleware metadata
         const operation = spec.paths['/test-route'].get;
-        console.log("Test Route Middleware Info:", JSON.stringify(operation['x-shokupan-middleware'], null, 2));
+        // console.log("Test Route Middleware Info:", JSON.stringify(operation['x-shokupan-middleware'], null, 2));
 
         // Check if middleware responses were merged
-        console.log("Test Route Responses:", JSON.stringify(operation.responses, null, 2));
+        // console.log("Test Route Responses:", JSON.stringify(operation.responses, null, 2));
 
         // Note: Middleware response merging depends on AST analysis detecting the RateLimitMiddleware
         // In a runtime-only scenario, we might not get the 429 response automatically

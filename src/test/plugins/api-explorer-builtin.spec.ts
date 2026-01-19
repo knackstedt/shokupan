@@ -1,7 +1,7 @@
 
 import { describe, expect, it } from 'bun:test';
-import { ApiExplorerPlugin } from '../src/plugins/application/api-explorer/plugin';
-import { Shokupan } from '../src/shokupan';
+import { ApiExplorerPlugin } from '../../plugins/application/api-explorer/plugin';
+import { Shokupan } from '../../shokupan';
 
 describe('ApiExplorer Builtin Plugin Support', () => {
     it('should tag api-explorer routes as builtin', async () => {
@@ -26,6 +26,6 @@ describe('ApiExplorer Builtin Plugin Support', () => {
 
         // Verify builtin tagging
         expect(route.get['x-shokupan-builtin']).toBe(true);
-        expect(route.get['x-shokupan-plugin-name']).toBe('api-explorer');
+        expect(route.get['x-shokupan-plugin-name']).toBe('ApiExplorer');
     });
 });

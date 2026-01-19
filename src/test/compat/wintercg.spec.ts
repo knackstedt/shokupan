@@ -1,5 +1,5 @@
 
-import { describe, expect, spyOn, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { Shokupan } from "../../shokupan";
 
 describe("WinterCG Adapter", () => {
@@ -12,11 +12,7 @@ describe("WinterCG Adapter", () => {
         expect(app).toBeDefined();
 
         // Listen should log warning and return nothing/undefined
-        const consoleSpy = spyOn(console, 'warn');
-        await app.listen(3000);
-
-        expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("WinterCG adapter does not support listen()"));
-        consoleSpy.mockRestore();
+        await expect(app.listen(3000)).rejects.toThrow('WinterCG adapter does not support listen');
     });
 
     test("should use fetch directly", async () => {
