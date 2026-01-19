@@ -99,7 +99,7 @@ function initRequests() {
         {
             title: "Status",
             field: "status",
-            width: 80,
+            width: 100,
             visible: savedColumns['status'] !== undefined ? savedColumns['status'] : true,
             formatter: function (cell) {
                 const status = cell.getValue();
@@ -112,7 +112,7 @@ function initRequests() {
         {
             title: "Method",
             field: "method",
-            width: 80,
+            width: 90,
             headerSort: false,
             visible: savedColumns['method'] !== undefined ? savedColumns['method'] : true,
             headerContextMenu: headerMenu
@@ -231,7 +231,7 @@ function initRequests() {
         {
             title: "Size",
             field: "size",
-            width: 80,
+            width: 110,
             visible: savedColumns['size'] !== undefined ? savedColumns['size'] : true,
             formatter: (cell) => formatBytes(cell.getValue()),
             headerContextMenu: headerMenu
@@ -239,7 +239,7 @@ function initRequests() {
         {
             title: "Time",
             field: "duration",
-            width: 80,
+            width: 90,
             visible: savedColumns['duration'] !== undefined ? savedColumns['duration'] : true,
             formatter: (cell) => cell.getValue() ? Math.round(cell.getValue()) + ' ms' : 'Pending',
             headerContextMenu: headerMenu
