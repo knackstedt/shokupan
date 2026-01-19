@@ -281,9 +281,11 @@ function initRequests() {
 
     window.requestsTable = new Tabulator("#requests-list-container", {
         layout: "fitColumns",
-        placeholder: "No requests found",
-        selectable: 1,
+        responsiveLayout: true,
+        resizableColumnGuide: true,
         resizableColumnFit: true,
+        placeholder: "No requests found",
+        selectableRows: 1,
         height: "100%", // Fill container
         index: "id",
         rowHeight: 32, // Dense rows
@@ -566,7 +568,7 @@ function waterfallFormatter(cell) {
         const pct = Math.min(100, (duration / 2000) * 100);
         const color = duration > 1000 ? '#ef4444' : duration > 500 ? '#f59e0b' : '#3b82f6';
         return `<div style="width: 100%; height: 100%; display: flex; align-items: center;">
-            <div style="height: 6px; width: ${pct}%; background: ${color}; border-radius: 3px; min-width: 2px;"></div>
+            <div style="height: calc(100% - 4px); width: ${pct}%; background: ${color}; border-radius: 3px; min-width: 2px;"></div>
         </div>`;
     }
 
@@ -592,7 +594,7 @@ function waterfallFormatter(cell) {
             position: absolute;
             right: min(${startPct}%, calc(100% - 2px));
             width: ${widthPct}%;
-            height: 6px; 
+            height: calc(100% - 4px); 
             background: ${color}; 
             border-radius: 3px; 
             min-width: 2px;

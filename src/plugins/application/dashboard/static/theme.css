@@ -35,12 +35,15 @@
     --card-border: rgba(214, 211, 209, 0.2);
 
     --table-header-border-color: rgba(214, 211, 209, 0.2);
+    --table-row-hover-color: #382818;
+    --table-row-selected-color: #48331e;
 
     --link-color: var(--palette-dark-primary);
     --link-hover: #FFCBA0;
 
     --button-bg: var(--palette-dark-primary);
     --button-text: #1A1614;
+
 }
 
 * {

@@ -88,12 +88,12 @@
 }
 
 .tabulator .tabulator-row.tabulator-selected {
-    background-color: var(--bg-primary) !important;
+    background-color: var(--table-row-selected-color) !important;
     color: var(--text-primary);
 }
 
 .tabulator .tabulator-row:hover {
-    background-color: var(--bg-primary) !important;
+    background-color: var(--table-row-hover-color) !important;
     color: var(--text-primary);
     cursor: pointer;
 }
