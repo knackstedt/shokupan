@@ -103,8 +103,8 @@ export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin 
                 ? structuredClone((this.root as any).openApiSpec)
                 : await (this.root || this).generateApiSpec();
             const asyncSpec = (ctx.app as any).asyncApiSpec;
-
-            const element = ApiExplorerApp({ spec: stripSourceCode(spec), asyncSpec });
+            const base = this.pluginOptions.path!;
+            const element = ApiExplorerApp({ spec: stripSourceCode(spec), base, asyncSpec });
             const html = renderToString(element);
             if (html.length === 0) throw new Error('ApiExplorerPlugin: rendered page is blank.');
             return ctx.html(html);

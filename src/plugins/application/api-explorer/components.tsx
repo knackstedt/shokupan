@@ -16,7 +16,7 @@ interface GroupNode {
     isBuiltin?: boolean;
 }
 
-export function ApiExplorerApp({ spec, asyncSpec, config }: any) {
+export function ApiExplorerApp({ spec, base, asyncSpec, config }: any) {
     // Build hierarchy: router -> controller -> routes
     const hierarchy = new Map<string, Route[]>();
 
@@ -301,8 +301,8 @@ export function ApiExplorerApp({ spec, asyncSpec, config }: any) {
                 <link rel="preconnect" href="https://fonts.googleapis.com" />
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
                 <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&family=Vend+Sans:ital,wght@0,300..700;1,300..700&display=swap" rel="stylesheet" />
-                <link rel="stylesheet" href="style.css" />
-                <link rel="stylesheet" href="theme.css" />
+                <link rel="stylesheet" href={`${base}/style.css`} />
+                <link rel="stylesheet" href={`${base}/theme.css`} />
                 <script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
                 <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
                 <script dangerouslySetInnerHTML={{
@@ -321,7 +321,7 @@ export function ApiExplorerApp({ spec, asyncSpec, config }: any) {
                     <Sidebar spec={spec} hierarchicalGroups={hierarchicalGroups} />
                     <MainContent allRoutes={allRoutes} config={config} spec={spec} />
                 </div>
-                <script src="explorer-client.mjs" type="module"></script>
+                <script src={`${base}/explorer-client.mjs`} type="module"></script>
             </body>
         </html>
     );

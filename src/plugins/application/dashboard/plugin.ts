@@ -589,7 +589,7 @@ export class Dashboard implements ShokupanPlugin {
             const body = await ctx.body();
             // Logic to replay request:
             // If direction is outbound, we fetch from the server.
-            // If inbound, we process via app.processRequest.
+            // If inbound, we process via app.internalRequest.
 
             const direction = body.direction || 'inbound';
 
@@ -622,13 +622,13 @@ export class Dashboard implements ShokupanPlugin {
                 }
             } else {
                 // Replay inbound request against the app
-                const app = (this as any)[$appRoot];
+                const app = this[$appRoot];
                 if (!app) return unknownError(ctx);
 
                 // Construct request
                 try {
                     // body should contain method, url, headers, body
-                    const result = await app.processRequest({
+                    const result = await app.internalRequest({
                         method: body.method,
                         path: body.url, // or path
                         headers: body.headers,
@@ -637,7 +637,7 @@ export class Dashboard implements ShokupanPlugin {
                     return ctx.json({
                         status: result.status,
                         headers: result.headers,
-                        data: result.data
+                        data: result.body
                     });
                 } catch (e) {
                     return ctx.json({ error: String(e) }, 500);
