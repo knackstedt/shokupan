@@ -45,6 +45,46 @@
             }
         },
         {
+            "label": "▶ database",
+            "type": "shell",
+            "command": "surreal",
+            "args": [
+                "start",
+                "--user=root",
+                "--pass=root",
+                "-A",
+                "rocksdb:./database/rocksdb"
+            ],
+            "options": {
+                "env": {
+                    "SURREAL_HTTP_MAX_RPC_BODY_SIZE": "10 MiB",
+                    "SURREAL_HTTP_MAX_SQL_BODY_SIZE": "10 MiB"
+                }
+            },
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "surrealdb",
+                "pattern": [
+                    {
+                        "severity": 1,
+                        "file": 2,
+                        "message": 3,
+                        "kind": "file",
+                        "regexp": " (ERROR) surreal::([^:]+): ([^\n]+)"
+                    }
+                ],
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": {
+                        "regexp": "INFO surreal::env: Running"
+                    },
+                    "endsPattern": {
+                        "regexp": "INFO surrealdb::net: Started web server"
+                    }
+                }
+            }
+        },
+        {
             "label": "▶ benchmark (lite)",
             "type": "shell",
             "command": "bun",
@@ -110,35 +150,35 @@
                 }
             }
         },
-        {
-            "label": "▶ Test",
-            "type": "shell",
-            "command": "bun",
-            "args": [
-                "run",
-                "test"
-            ],
-            "isBackground": true,
-            "problemMatcher": {
-                "owner": "bun",
-                "pattern": [
-                    {
-                        "regexp": "^\\s*at\\s+.*\\((.+):(\\d+):(\\d+)\\)$",
-                        "file": 1,
-                        "line": 2,
-                        "column": 3
-                    }
-                ],
-                "background": {
-                    "activeOnStart": true,
-                    "beginsPattern": {
-                        "regexp": "bun test v\\d+\\.\\d+\\.\\d+ (\\w+)"
-                    },
-                    "endsPattern": {
-                        "regexp": "Ran \\d+ tests across \\d+ files."
-                    }
-                }
-            }
-        }
+        // {
+        //     "label": "▶ Test",
+        //     "type": "shell",
+        //     "command": "bun",
+        //     "args": [
+        //         "run",
+        //         "test"
+        //     ],
+        //     "isBackground": true,
+        //     "problemMatcher": {
+        //         "owner": "bun",
+        //         "pattern": [
+        //             {
+        //                 "regexp": "^\\s*at\\s+.*\\((.+):(\\d+):(\\d+)\\)$",
+        //                 "file": 1,
+        //                 "line": 2,
+        //                 "column": 3
+        //             }
+        //         ],
+        //         "background": {
+        //             "activeOnStart": true,
+        //             "beginsPattern": {
+        //                 "regexp": "bun test v\\d+\\.\\d+\\.\\d+ (\\w+)"
+        //             },
+        //             "endsPattern": {
+        //                 "regexp": "Ran \\d+ tests across \\d+ files."
+        //             }
+        //         }
+        //     }
+        // }
     ]
 }
