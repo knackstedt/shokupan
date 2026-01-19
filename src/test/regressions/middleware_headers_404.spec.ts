@@ -25,7 +25,7 @@ describe("Routing 404 Issue", () => {
         expect(res.data).toBe("Not Found");
     });
 
-    it("should return 200 OK for matched route with empty handler", async () => {
+    it("should return 204 No Content for matched route with empty handler", async () => {
         const app = new Shokupan();
 
         app.get("/empty", () => { });
@@ -35,7 +35,7 @@ describe("Routing 404 Issue", () => {
             path: "/empty"
         });
 
-        expect(res.status).toBe(200);
+        expect(res.status).toBe(204);
         expect(res.data).toBe("");
     });
 });

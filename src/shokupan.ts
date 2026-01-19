@@ -614,9 +614,13 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                     // 2. Logic Split: Route Matched vs Not Found
                     else if (ctx[$routeMatched]) {
                         // A route WAS matched but returned nothing.
-                        // Default to 200 OK (unless user set status manually via ctx.response.status)
-                        // We send an empty response with the context's status (defaults to 200)
-                        response = ctx.send(null, { status: ctx.response.status, headers: ctx.response.headers });
+                        // Default to 204 No Content (unless user set status manually via ctx.response.status)
+                        let status = ctx.response.status;
+                        if (status === HTTP_STATUS.OK) {
+                            status = HTTP_STATUS.NO_CONTENT;
+                        }
+                        // We send an empty response with the determined status
+                        response = ctx.send(null, { status, headers: ctx.response.headers });
                     }
                     else {
                         // Fallback: If no route matched, check if it's a WebSocket upgrade request that can be handled by default handlers

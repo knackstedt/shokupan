@@ -102,7 +102,7 @@ describe("Core Fixes Implementation", () => {
         app.get("/explicit", (ctx) => { ctx.status(201); });
 
         const res1 = await app.fetch(new Request("http://localhost/void"));
-        expect(res1.status).toBe(200);
+        expect(res1.status).toBe(204);
 
         const res2 = await app.fetch(new Request("http://localhost/explicit"));
         expect(res2.status).toBe(201);
