@@ -91,6 +91,11 @@ export interface DashboardConfig {
      * @default 10_000
      */
     updateInterval?: number;
+    /**
+     * Maximum number of request logs to keep in memory.
+     * @default 1000
+     */
+    maxLogEntries?: number;
 }
 
 class Collector implements DebugCollector {
@@ -204,11 +209,12 @@ export class Dashboard implements ShokupanPlugin {
                 // No handler stack for outbound
             };
 
+            // Enforce log limit
+            const maxLogs = this.dashboardConfig.maxLogEntries ?? 1000;
+            if (this.metrics.logs.length >= maxLogs) {
+                this.metrics.logs.shift();
+            }
             this.metrics.logs.push(requestData);
-
-            // Persist
-            // We use 'request' table for both inbound and outbound.
-            // ID generation: 'req_out_<timestamp>_<random>'
 
             // Persist
             // We use 'request' table for both inbound and outbound.
