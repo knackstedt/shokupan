@@ -25,7 +25,7 @@ Shokupan is designed to make building APIs delightful again. With zero-config de
 - 📚 **OpenAPI Docs** - Beautiful OpenAPI documentation with [Scalar](https://scalar.dev/).
 - ⏩ **Short shift** - Very simple migration from [Express](https://expressjs.com/) or [NestJS](https://nestjs.com/) to Shokupan.
 
-![Shokupan Debug Dashboard](docs/src/assets/debug_dashboard_overview.png)
+![Shokupan Debug Dashboard](docs/src/assets/dashboard_charts_1.png)
 
 
 ## 🚀 Quick Start
@@ -65,6 +65,13 @@ That's it! Your server is running at `http://localhost:3000` 🎉
   - [Authentication](#authentication)
   - [Validation](#validation)
   - [Scalar (OpenAPI)](#scalar-openapi)
+  - [API Explorer](#api-explorer)
+  - [AsyncAPI](#asyncapi)
+  - [Cluster](#cluster)
+  - [GraphQL](#graphql)
+  - [HTTP Server](#http-server)
+  - [MCP Server](#mcp-server)
+  - [Socket.IO](#socket-io)
 - [Advanced Features](#advanced-features)
   - [Dependency Injection](#dependency-injection)
   - [OpenAPI Generation](#openapi-generation)
@@ -886,6 +893,77 @@ app.mount('/docs', new ScalarPlugin({
 
 The Scalar plugin automatically generates OpenAPI documentation from your routes and controllers!
 
+### API Explorer
+
+Built-in interactive documentation for your API.
+
+```typescript
+import { ApiExplorerPlugin } from 'shokupan';
+app.register(new ApiExplorerPlugin());
+```
+
+![API Explorer Middleware](docs/src/assets/api-explorer_middleware.png)
+
+### AsyncAPI
+
+Generate and view documentation for your WebSocket APIs.
+
+```typescript
+import { AsyncApiPlugin } from 'shokupan';
+app.register(new AsyncApiPlugin());
+```
+
+### Cluster
+
+Utilize multiple CPU cores for better performance.
+
+```typescript
+import { ClusterPlugin } from 'shokupan';
+app.register(new ClusterPlugin());
+```
+
+### GraphQL
+
+Support for Apollo Server and GraphQL Yoga.
+
+```typescript
+import { GraphQLApolloPlugin } from 'shokupan';
+// or
+import { GraphQLYogaPlugin } from 'shokupan';
+```
+
+### HTTP Server
+
+Use standard Node.js HTTP/HTTPS servers (e.g., for specific Node.js compatibility).
+
+```typescript
+import { createHttpServer } from 'shokupan';
+```
+
+### MCP Server
+
+Expose your API as tools to LLMs via the Model Context Protocol.
+
+```typescript
+import { McpServerPlugin } from 'shokupan';
+app.register(new McpServerPlugin({
+    name: 'My App',
+    version: '1.0.0'
+}));
+```
+
+### Socket.IO
+
+Easy integration with Socket.IO.
+
+```typescript
+import { attachSocketIOBridge } from 'shokupan';
+import { Server } from 'socket.io';
+
+const io = new Server(server.nodeServer);
+attachSocketIOBridge(io, app);
+```
+
 ### Proxy
 
 Create a reverse proxy to forward requests to another server:
@@ -997,6 +1075,18 @@ app.mount('/debug', new Dashboard({
 
 // Available at http://localhost:3000/debug
 ```
+
+#### Registry View
+
+View all registered controllers and routes:
+
+![Application Registry](docs/src/assets/application_registry.png)
+
+#### Network Overview
+
+Analyze request timings and waterfall:
+
+![Network Overview](docs/src/assets/network_overview.png)
 
 
 ## 🚀 Advanced Features
