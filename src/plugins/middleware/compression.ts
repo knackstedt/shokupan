@@ -63,14 +63,14 @@ export function Compression(options: CompressionOptions = {}): Middleware {
             if (requestEncoding.includes("br")) {
                 const decompressor = zlib.createBrotliDecompress();
                 const nodeStream = Readable.fromWeb(ctx.req.body as any);
-                stream = Readable.toWeb(nodeStream.pipe(decompressor)) as ReadableStream;
+                stream = Readable.toWeb(nodeStream.pipe(decompressor)) as unknown as ReadableStream;
             } else if (requestEncoding.includes("gzip")) {
                 if (typeof DecompressionStream !== 'undefined') {
                     stream = ctx.req.body.pipeThrough(new DecompressionStream("gzip"));
                 } else {
                     const decompressor = zlib.createGunzip();
                     const nodeStream = Readable.fromWeb(ctx.req.body as any);
-                    stream = Readable.toWeb(nodeStream.pipe(decompressor)) as ReadableStream;
+                    stream = Readable.toWeb(nodeStream.pipe(decompressor)) as unknown as ReadableStream;
                 }
             } else if (requestEncoding.includes("deflate")) {
                 if (typeof DecompressionStream !== 'undefined') {
@@ -78,7 +78,7 @@ export function Compression(options: CompressionOptions = {}): Middleware {
                 } else {
                     const decompressor = zlib.createInflate();
                     const nodeStream = Readable.fromWeb(ctx.req.body as any);
-                    stream = Readable.toWeb(nodeStream.pipe(decompressor)) as ReadableStream;
+                    stream = Readable.toWeb(nodeStream.pipe(decompressor)) as unknown as ReadableStream;
                 }
             }
 
