@@ -70,6 +70,11 @@ export interface AuthConfig {
      */
     jwtExpiration?: string; // e.g. "2h"
     /**
+     * JWT algorithm
+     * @default 'HS256'
+     */
+    jwtAlgorithm?: string;
+    /**
      * Cookie options
      */
     cookieOptions?: {
@@ -175,7 +180,7 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
     }
 
     private async createSession(user: AuthUser, ctx: ShokupanContext) {
-        const alg = 'HS256';
+        const alg = this.authConfig.jwtAlgorithm || 'HS256';
         const jwt = await new this.jose.SignJWT({ ...user })
             .setProtectedHeader({ alg })
             .setIssuedAt()
