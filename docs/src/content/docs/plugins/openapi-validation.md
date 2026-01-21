@@ -43,7 +43,7 @@ await app.listen();
 
 ### How it works
 1. **Boot**: When you call `app.listen()`, the server starts up.
-2. **Generation**: It generates the full OpenAPI spec from your code and decorators.
+2. **Generation**: It generates the full OpenAPI spec from your TS code and decorators.
 3. **Compilation**: The `onSpecAvailable` hook triggers, compiling Ajv validators for every path and method operation in your spec.
 4. **Listening**: The server binds to the port and accepts requests.
 
@@ -52,8 +52,7 @@ await app.listen();
 Define your routes as usual. The validator infers types from usage or respects explicit specs.
 
 ```typescript
-import { Controller, Get, Post, Body } from 'shokupan/decorators';
-import { ShokupanContext } from 'shokupan';
+import { ShokupanContext, Controller, Get, Post, Body } from 'shokupan';
 
 @Controller('/users')
 class UserController {
@@ -71,6 +70,21 @@ class UserController {
         return ctx.json({ id: ctx.params.id });
     }
 }
+```
+
+## Usage with Routers
+
+```typescript
+import { ShokupanRouter } from 'shokupan';
+
+const router = new ShokupanRouter();
+
+router.post('/users', (ctx) => {
+  // data is validated against the type it's cast to.
+  const { data } = ctx.body as { id: string, name: string };
+
+  return ctx.json(data);
+});
 ```
 
 ## Validation Errors

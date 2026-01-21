@@ -791,8 +791,7 @@ const res = await app.testRequest({ path: '/api/items' });
 
 ```typescript
 import { describe, it, expect } from 'bun:test';
-import { Shokupan } from 'shokupan';
-import { Compression } from 'shokupan/plugins';
+import { Shokupan, Compression } from 'shokupan';
 
 describe('Plugin Tests', () => {
     it('should compress responses', async () => {

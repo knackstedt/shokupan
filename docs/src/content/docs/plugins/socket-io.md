@@ -67,6 +67,8 @@ export class ChatController {
 }
 ```
 
+![WebSocket Explorer Code Emit](../../../assets/ws-explorer_code-emit.png)
+
 ### HTTP Bridge
 
 If `enableHttpBridge` is set to `true` in your Shokupan config, clients can send HTTP-like requests over the WebSocket connection.

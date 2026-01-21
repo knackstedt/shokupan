@@ -1,0 +1,97 @@
+---
+title: Debug Dashboard
+description: Visual dashboard for inspecting your Shokupan application.
+---
+
+The `Dashboard` provides a visual interface to inspect your running application. It allows you to:
+
+- View real-time metrics (requests/sec, errors, latency).
+- Visualize the endpoint layout and request flow.
+- Debug requests with Chrome DevTools inspired interface.
+- Directly test HTTP APIs with custom REST API explorer.
+- Directly test WebSocket APIs with custom WebSocket explorer.
+
+> Shokupan includes a built-in Dashboard plugin:
+
+## Stats 
+
+Showing Requests/Second and CPU Usage
+![Screenshot showing requests per second and CPU usage](../../../assets/dashboard_charts_0.png)
+Showing Memory and Heap usage
+![Screenshot showing memory and heap usage](../../../assets/dashboard_charts_1.png)
+Showing Event loop latency and Error rate
+![Screenshot showing event loop latency and error rate](../../../assets/dashboard_charts_2.png)
+
+## Application Structure 
+:::tip[Did you know?]
+Shokupan reads your source code and generates an AST of your code, then it can provide a visual representation of the application's structure, including routers, controllers, and middleware.
+This process is done either during startup or in your CI/CD pipeline, allowing you to write an application without managing DTOs or manually documenting your API.
+:::
+
+Application registry -- a tree view of your application's structure and registered routes.
+![Screenshot showing application registry](../../../assets/application_registry.png)
+
+Application graph -- a 2D graph view of your application's structure and registered routes.
+![Screenshot showing application graph](../../../assets/application_graph.png)
+Zoomed in view of application graph -- showing node level details.
+![Screenshot showing application graph zoomed in](../../../assets/application_graph_zoomed_in.png)
+
+## Network Requests 
+Network overview: A Chrome DevTools inspired interface for inspecting network requests.
+![Screenshot showing network overview](../../../assets/network_overview.png)
+Timings: Inspired by Chrome DevTools, Shokupan records middleware timings provides a clear breakdown.
+![Screenshot showing network timings](../../../assets/network_timings.png)
+
+:::note
+Shokupan records both incoming AND outgoing requests, allowing you to inspect the full request flow and directly replay requests from the dashboard.
+:::
+
+## API Explorer
+API Explorer: A Scalar inspired interface for inspecting and testing REST APIs. It has specialized support in order to present warnings where metadata could not be statically determined.
+![Screenshot showing API explorer](../../../assets/api-explorer_http-test.png)
+Multi-response: Shokupan can document multiple responses formats for a single request.
+![Screenshot showing API explorer multi-response](../../../assets/api-explorer_multi-response.png)
+Middleware: Documentation for which endpoints a middleware applies to, as well as the configuration and side-effects of the middleware.
+![Screenshot showing API explorer middleware](../../../assets/api-explorer_middleware.png)
+WS Explorer: A Hoppscotch inspired interface for inspecting and testing WebSocket APIs.
+![Screenshot showing WebSocket explorer](../../../assets/ws-explorer_code-emit.png)
+![Screenshot showing WebSocket explorer](../../../assets/ws-explorer_static-inference-fail.png)
+
+## Installation
+
+```typescript
+import { Dashboard } from 'shokupan';
+
+// Mount the dashboard at a path of your choice
+app.mount('/debug', new Dashboard({
+    retentionMs: 7200000 // Keep logs for 2 hours
+}));
+```
+
+## Configuration
+import DashboardConfig from '../api/interfaces/DashboardConfig.md';
+
+> <DashboardConfig />
+
+## Features
+
+### Middleware Graph
+Visualizes the structure of your application, showing how routers, controllers, and middleware are connected.
+
+![Middleware Graph](../../../assets/application_graph.png)
+
+### Component Registry
+Inspect all registered routes and controllers in a flat or hierarchical view.
+
+![Component Registry](../../../assets/application_registry.png)
+
+### Requests View
+Analyze incoming requests, their duration, and the time spent in each middleware.
+
+![Requests View](../../../assets/network_overview.png)
+
+### Failed Requests
+Lists requests that resulted in errors. You can click on a failure to see details and replay it.
+
+### Playback
+Replaying a request sends the identical request payload to the server again, which is useful for debugging idempotent operations or testing fixes.
