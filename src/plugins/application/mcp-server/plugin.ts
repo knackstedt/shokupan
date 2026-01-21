@@ -58,7 +58,7 @@ export class MCPServerPlugin implements ShokupanPlugin {
         });
     }
 
-    public async onInit(app: Shokupan) {
+    public onInit(app: Shokupan) {
         this[$appRoot] = app;
 
         // Initialize Analyzer
@@ -71,22 +71,25 @@ export class MCPServerPlugin implements ShokupanPlugin {
             this.registerPrompts();
         }
 
-        // Connect server to transport
-        await this.mcpServer.connect(this.transport);
+        // Register async startup hook
+        app.onStart(async () => {
+            // Connect server to transport
+            await this.mcpServer.connect(this.transport);
 
-        // Mount the router
-        app.mount(this.options.path, this.router);
+            // Mount the router
+            app.mount(this.options.path, this.router);
 
-        // Define Routes
-        this.setupRoutes();
+            // Define Routes
+            this.setupRoutes();
 
-        // Metadata
-        this.router.metadata = {
-            file: import.meta.file,
-            line: 1,
-            name: 'MCPServerPlugin',
-            pluginName: 'MCP Server'
-        };
+            // Metadata
+            this.router.metadata = {
+                file: import.meta.file,
+                line: 1,
+                name: 'MCPServerPlugin',
+                pluginName: 'MCP Server'
+            };
+        });
     }
 
     private setupRoutes() {

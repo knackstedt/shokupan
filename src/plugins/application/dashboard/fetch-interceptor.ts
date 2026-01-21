@@ -90,6 +90,10 @@ export type OutboundRequestCallback = (log: OutboundRequestLog) => void;
  * the original `fetch`. Proceed with caution.
  */
 export class FetchInterceptor {
+    private static originalFetch: typeof global.fetch | undefined;
+    private static originalHttpRequest: typeof http.request | undefined;
+    private static originalHttpsRequest: typeof https.request | undefined;
+
     private originalFetch: typeof global.fetch;
     private originalHttpRequest: typeof http.request;
     private originalHttpsRequest: typeof https.request;
@@ -97,9 +101,53 @@ export class FetchInterceptor {
     private isPatched: boolean = false;
 
     constructor() {
-        this.originalFetch = global.fetch;
-        this.originalHttpRequest = http.request;
-        this.originalHttpsRequest = https.request;
+        // Capture originals on first instantiation if not already captured
+        if (!FetchInterceptor.originalFetch) {
+            // Prevent capturing already patched fetch if module was reloaded but global stays dirty
+            if ((global.fetch as any).__isPatched) {
+                // Try to find original fetch if possible, or warn? 
+                // If we can't find original, we might be stuck.
+                // But hopefully we don't reload module while patched.
+                // Assuming standard behavior:
+                console.warn('[FetchInterceptor] Global fetch is already patched! Cannot capture original.');
+            } else {
+                FetchInterceptor.originalFetch = global.fetch;
+                FetchInterceptor.originalHttpRequest = http.request;
+                FetchInterceptor.originalHttpsRequest = https.request;
+            }
+        }
+
+        this.originalFetch = FetchInterceptor.originalFetch || global.fetch;
+        this.originalHttpRequest = FetchInterceptor.originalHttpRequest || http.request;
+        this.originalHttpsRequest = FetchInterceptor.originalHttpsRequest || https.request;
+    }
+
+    /**
+     * Statically restore the original network methods.
+     * Useful for cleaning up in tests.
+     */
+    /**
+     * Statically restore the original network methods.
+     * Useful for cleaning up in tests.
+     */
+    public static restore() {
+        if (FetchInterceptor.originalFetch) {
+            global.fetch = FetchInterceptor.originalFetch;
+        } else if ((global.fetch as any)?.__originalFetch) {
+            // Fallback: Restore from attached property if static was lost
+            global.fetch = (global.fetch as any).__originalFetch;
+        } else if (typeof Bun !== 'undefined' && (Bun as any).fetch) {
+            // Fallback: Restore Bun.fetch if in Bun environment (cleans up zombie patches)
+            global.fetch = (Bun as any).fetch;
+        }
+
+        if (FetchInterceptor.originalHttpRequest) {
+            http.request = FetchInterceptor.originalHttpRequest;
+        }
+        if (FetchInterceptor.originalHttpsRequest) {
+            https.request = FetchInterceptor.originalHttpsRequest;
+        }
+        console.log('[FetchInterceptor] Network layer restored (static).');
     }
 
     /**
@@ -118,59 +166,57 @@ export class FetchInterceptor {
 
     private patchGlobalFetch() {
         const self = this;
-        const newFetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+        // If we don't have a valid originalFetch (e.g. lost due to reload)
+        // and global.fetch is patched, try to recover it from the patched version
+        if (!this.originalFetch && (global.fetch as any).__isPatched && (global.fetch as any).__originalFetch) {
+            this.originalFetch = (global.fetch as any).__originalFetch;
+        }
 
+        const newFetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
             const startTime = performance.now();
             const timestamp = Date.now();
-            let method = 'GET';
-            let url = '';
-            let requestHeaders: Record<string, string> = {};
-            let requestBody: any = undefined;
 
-            // Extract request details
+            let url = '';
+            let method = 'GET';
+            let requestHeaders: Record<string, string> = {};
+
             try {
-                if (input instanceof URL) {
-                    url = input.toString();
-                } else if (typeof input === 'string') {
+                if (typeof input === 'string') {
                     url = input;
-                } else if (typeof input === 'object' && 'url' in input) {
+                } else if (input instanceof URL) {
+                    url = input.toString();
+                } else if (input instanceof Request) {
                     url = input.url;
                     method = input.method;
+                    input.headers.forEach((v, k) => requestHeaders[k] = v);
                 }
 
                 if (init) {
-                    if (init.method) method = init.method;
+                    if (init.method) method = init.method.toUpperCase();
                     if (init.headers) {
-                        if (init.headers instanceof Headers) {
-                            init.headers.forEach((v, k) => requestHeaders[k] = v);
-                        } else if (Array.isArray(init.headers)) {
-                            init.headers.forEach(([k, v]) => requestHeaders[k] = v);
-                        } else {
-                            Object.assign(requestHeaders, init.headers);
-                        }
+                        const h = new Headers(init.headers);
+                        h.forEach((v, k) => requestHeaders[k] = v);
                     }
-                    if (init.body) requestBody = init.body;
                 }
-            } catch (e) {
-                console.warn('[FetchInterceptor] Failed to parse request arguments', e);
-            }
+            } catch (e) { }
 
             try {
                 const response = await self.originalFetch.apply(global, [input, init]);
+
+                // Clone response to read body without consuming original
                 const clone = response.clone();
                 const duration = performance.now() - startTime;
 
+                // Process response asynchronously to not block
                 self.processResponse(clone, {
                     method,
                     url,
                     requestHeaders,
-                    requestBody,
-                    status: response.status,
                     startTime: timestamp,
                     duration,
-                    ...self.extractRequestMeta(url, requestHeaders),
-                    protocol: '1.1' // native fetch doesn't expose this easily, assume 1.1/2
-                });
+                    status: response.status,
+                    ...self.extractRequestMeta(url, requestHeaders)
+                }).catch(err => console.error("[FetchInterceptor] Error processing response:", err));
 
                 return response;
             } catch (error) {
@@ -179,22 +225,25 @@ export class FetchInterceptor {
                     method,
                     url,
                     requestHeaders,
-                    requestBody,
                     status: 0,
                     responseHeaders: {},
-                    responseBody: `Network Error: ${String(error)}`,
                     startTime: timestamp,
-                    duration
+                    duration,
+                    responseBody: `Error: ${error.message}`,
+                    ...self.extractRequestMeta(url, requestHeaders)
                 });
                 throw error;
             }
         };
 
-        // Copy static methods like preconnect
-        Object.assign(newFetch, this.originalFetch);
+        // Attach metadata
+        (newFetch as any).__isPatched = true;
+        (newFetch as any).__originalFetch = this.originalFetch;
 
-        global.fetch = newFetch as typeof global.fetch;
+        global.fetch = newFetch as any;
     }
+
+
 
     private patchNodeRequests() {
         const self = this;

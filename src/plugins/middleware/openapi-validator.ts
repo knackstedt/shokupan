@@ -74,7 +74,8 @@ export function openApiValidator(): Middleware {
         if (validators.body) {
             let body: any;
             try {
-                body = await ctx.req.json().catch(() => ({}));
+                // Use context's body parser which caches the result
+                body = await ctx.body();
             } catch {
                 body = {};
             }

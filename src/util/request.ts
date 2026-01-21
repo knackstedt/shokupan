@@ -32,6 +32,15 @@ class ShokupanRequestBase {
             this.headers = new Headers(this.headers);
         }
     }
+
+    clone(): ShokupanRequest<any> {
+        return new ShokupanRequest({
+            method: this.method,
+            url: this.url,
+            headers: new Headers(this.headers),
+            body: this.body // Shallow copy of body, might need deep copy if object
+        });
+    }
 }
 
 /**
