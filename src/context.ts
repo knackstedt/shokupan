@@ -7,7 +7,7 @@ import type { Shokupan } from './shokupan';
 import { VALID_HTTP_STATUSES, VALID_REDIRECT_STATUSES } from './util/http-status';
 import type { ShokupanRequest } from './util/request';
 import { ShokupanResponse } from './util/response';
-import { $bodyParsed, $bodyParseError, $bodyType, $cachedBody, $cachedHost, $cachedHostname, $cachedOrigin, $cachedProtocol, $cachedQuery, $debug, $finalResponse, $io, $rawBody, $requestId, $routeMatched, $socket, $url, $ws } from './util/symbol';
+import { $bodyParsed, $bodyParseError, $bodyType, $cachedBody, $cachedCookies, $cachedHost, $cachedHostname, $cachedOrigin, $cachedProtocol, $cachedQuery, $debug, $finalResponse, $io, $rawBody, $requestId, $routeMatched, $socket, $url, $ws } from './util/symbol';
 import type { CookieOptions, HeadersInit, JSXRenderer } from './util/types';
 
 /**
@@ -139,6 +139,7 @@ export class ShokupanContext<
     private [$cachedHost]?: string;
     private [$cachedOrigin]?: string;
     private [$cachedQuery]?: Record<string, any>;
+    private [$cachedCookies]?: Record<string, string>;
 
     private disconnectCallbacks: (() => void | Promise<void>)[] = [];
 
@@ -319,6 +320,32 @@ export class ShokupanContext<
         });
         this[$cachedQuery] = q;
         return q;
+    }
+
+    /**
+     * Request cookies
+     */
+    get cookies() {
+        if (this[$cachedCookies]) return this[$cachedCookies];
+
+        const c: Record<string, string> = Object.create(null);
+        const cookieHeader = this.request.headers.get("cookie");
+
+        if (cookieHeader) {
+            const pairs = cookieHeader.split(";");
+            for (let i = 0; i < pairs.length; i++) {
+                const pair = pairs[i];
+                const index = pair.indexOf("=");
+                if (index > 0) {
+                    const key = pair.slice(0, index).trim();
+                    const value = pair.slice(index + 1).trim();
+                    c[key] = decodeURIComponent(value);
+                }
+            }
+        }
+
+        this[$cachedCookies] = c;
+        return c;
     }
 
     /**

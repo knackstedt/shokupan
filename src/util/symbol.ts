@@ -36,6 +36,7 @@ export const $cachedProtocol = Symbol.for("Shokupan.ctx.cachedProtocol");
 export const $cachedHost = Symbol.for("Shokupan.ctx.cachedHost");
 export const $cachedOrigin = Symbol.for("Shokupan.ctx.cachedOrigin");
 export const $cachedQuery = Symbol.for("Shokupan.ctx.cachedQuery");
+export const $cachedCookies = Symbol.for("Shokupan.ctx.cachedCookies");
 export const $ws = Symbol.for("Shokupan.ctx.ws");
 export const $socket = Symbol.for("Shokupan.ctx.socket");
 export const $io = Symbol.for("Shokupan.ctx.io");
