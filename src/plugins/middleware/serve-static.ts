@@ -1,5 +1,5 @@
 import { Eta } from 'eta';
-import { readdir, readFile, stat } from 'fs/promises';
+import { readdir, stat } from 'fs/promises';
 import { basename, join, resolve, sep } from 'path';
 import type { ShokupanContext } from '../../context';
 import type { Middleware, StaticServeOptions } from '../../util/types';
@@ -188,14 +188,15 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
             response = new Response(Bun.file(finalPath));
         } else {
             // Node.js fallback using fs
-            const fileBuffer = await readFile(finalPath, { encoding: 'binary' });
+            // Stream the file instead of buffering to avoid memory spikes
+            const { createReadStream } = await import('node:fs');
+            const { Readable } = await import('node:stream');
 
-            // Set content-type from fileOptions if provided
-            // if (fileOptions?.type) {
-            //     headers.set('content-type', fileOptions.type);
-            // }
+            const fileStream = createReadStream(finalPath);
+            // Convert node stream to web stream
+            const webStream = Readable.toWeb(fileStream);
 
-            response = new Response(fileBuffer);
+            response = new Response(webStream as any);
         }
 
         if (config.hooks?.onResponse) {
