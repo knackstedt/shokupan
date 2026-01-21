@@ -547,7 +547,7 @@ export class Dashboard implements ShokupanPlugin {
             if (!this.instrumented && app) {
                 this.instrumentApp(app);
             }
-            const registry = app?.getComponentRegistry?.();
+            const registry = app?.registry;
             if (registry) {
                 this.assignIdsToRegistry(registry, 'root');
             }

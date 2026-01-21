@@ -21,7 +21,7 @@ describe("Component Registry", () => {
         authController.post("/login", () => new Response("Login"));
         app.mount("/auth", authController);
 
-        const registry = app.getComponentRegistry();
+        const registry = app.registry;
 
 
         expect(registry).toBeDefined();
