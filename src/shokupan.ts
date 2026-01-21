@@ -371,9 +371,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             }
         }
 
-        if (port === 0 && process.platform === "linux") {
 
-        }
 
         if (this.applicationConfig.autoBackpressureFeedback === true) {
             this.cpuMonitor = new SystemCpuMonitor();
@@ -404,6 +402,12 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
         // @ts-ignore
         this.server = await adapter.listen(finalPort, this);
+
+        // Update config port if 0 was used (random port assignment)
+        if (finalPort === 0 && this.server?.port) {
+            this.applicationConfig.port = this.server.port;
+        }
+
         return this.server;
     }
 
@@ -693,17 +697,13 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         const timeoutMs = this.applicationConfig.requestTimeout;
 
         if (timeoutMs && timeoutMs > 0) {
-            let timeoutId: any;
-            const timeoutPromise = new Promise<Response>((_, reject) => {
-                timeoutId = setTimeout(async () => {
-                    controller.abort(); // Signal cancellation to handlers
-                    await this.runHooks('onRequestTimeout', ctx);
-                    reject(new Error("Request Timeout"));
-                }, timeoutMs);
-            });
+            // Optimization: avoid Promise.race allocation
+            const timeoutId = setTimeout(async () => {
+                controller.abort(); // Signal cancellation to handlers
+                await this.runHooks('onRequestTimeout', ctx);
+            }, timeoutMs);
 
-            executionPromise = Promise.race([executionPromise, timeoutPromise])
-                .finally(() => clearTimeout(timeoutId));
+            executionPromise = executionPromise.finally(() => clearTimeout(timeoutId));
         }
 
         return executionPromise
