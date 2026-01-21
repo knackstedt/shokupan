@@ -102,14 +102,17 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
                 return ctx.text('Missing file parameter', 400);
             }
 
-            // Security: Prevent directory traversal
-            // Ensure path is absolute and within the project (cwd)
-            // Or just allow reading any file if it's a dev tool?
-            // Given the context of "Dev Mode", strict sandboxing might be overkill but good practice.
-            // For now, we will trust the path if it's absolute, as this is a dev-only tool.
+            // Security: Validate path is within project root
+            const { resolve } = await import('node:path');
+            const cwd = process.cwd();
+            const resolvedPath = resolve(cwd, file);
+
+            if (!resolvedPath.startsWith(cwd)) {
+                return ctx.text('Forbidden: File must be within project root', 403);
+            }
 
             try {
-                const content = await readFile(file, 'utf8');
+                const content = await readFile(resolvedPath, 'utf8');
                 return ctx.text(content);
             } catch (e: any) {
                 return ctx.text('File not found: ' + e.message, 404);

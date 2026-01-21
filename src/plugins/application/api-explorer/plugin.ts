@@ -80,11 +80,21 @@ export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin 
         this.get('/_source', async (ctx) => {
             const file = ctx.query['file'];
             if (!file) return ctx.text('Missing file parameter', 400);
+
+            // Security: Validate path is within project root
+            const { resolve, normalize, isAbsolute } = await import('node:path');
+            const cwd = process.cwd();
+            const resolvedPath = resolve(cwd, file);
+
+            // Ensure the resolved path starts with the cwd
+            // This prevents ../ traversal.
+            // We DO NOT resolve symlinks (no fs.realpath), so we trust the logical path structure.
+            if (!resolvedPath.startsWith(cwd)) {
+                return ctx.text('Forbidden: File must be within project root', 403);
+            }
+
             try {
-                // Security check? For now assuming internal tool usage / local strictness not needed as much
-                // But ideally we verify it's within source root. 
-                // Given the context of "ApiExplorerSource", we probably trust the file paths coming from our own metadata.
-                const content = await readFile(file, 'utf-8');
+                const content = await readFile(resolvedPath, 'utf-8');
                 return ctx.text(content);
             } catch (err) {
                 return ctx.text('File not found', 404);
