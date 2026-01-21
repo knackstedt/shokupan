@@ -30,6 +30,9 @@ export default defineConfig({
                 starlightThemeFlexoki(),
                 starlightLlmsTxt(),
                 starlightTypeDoc({
+                    typeDoc: {
+                        interfacePropertiesFormat: 'htmlTable',
+                    },
                     entryPoints: ['../src/index.ts'],
                     tsconfig: '../tsconfig.json'
                 }),
@@ -73,18 +76,22 @@ export default defineConfig({
                 {
                     label: 'Plugins',
                     items: [
+                        { label: 'Dashboard', link: '/plugins/dashboard/' },
+                        { label: 'API Explorer', link: '/plugins/api-explorer/' },
+                        { label: 'WS Explorer', link: '/plugins/asyncapi/' },
                         { label: 'Authentication', link: '/plugins/authentication/' },
-                        { label: 'CORS', link: '/plugins/cors/' },
                         { label: 'Compression', link: '/plugins/compression/' },
-                        { label: 'Debug Dashboard', link: '/plugins/debug-dashboard/' },
-                        { label: 'Failed Request Recorder', link: '/plugins/failed-request-recorder/' },
-                        { label: 'GraphQL (Apollo)', link: '/plugins/graphql/' },
+                        { label: 'CORS', link: '/plugins/cors/' },
+                        { label: 'GraphQL', link: '/plugins/graphql/' },
                         { label: 'Idempotency', link: '/plugins/idempotency/' },
+                        { label: 'MCP Server', link: '/plugins/mcp-server/' },
+                        { label: 'NodeJS/Deno', link: '/plugins/http-server/' },
                         { label: 'OpenAPI Validation', link: '/plugins/openapi-validation/' },
                         { label: 'Proxy', link: '/plugins/proxy/' },
                         { label: 'Rate Limiting', link: '/plugins/rate-limiting/' },
                         { label: 'Scalar (OpenAPI)', link: '/plugins/scalar/' },
                         { label: 'Security Headers', link: '/plugins/security-headers/' },
+                        { label: 'Socket.IO', link: '/plugins/socket-io/' },
                         { label: 'Sessions', link: '/plugins/sessions/' },
                         { label: 'Validation', link: '/plugins/validation/' },
                     ],
