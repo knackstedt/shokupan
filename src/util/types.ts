@@ -346,6 +346,15 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
     enableTracing?: boolean;
 
     /**
+     * Query parser mode.
+     * - `extended`: Arrays for duplicate keys (default).
+     * - `simple`: First value only for duplicate keys.
+     * - `strict`: Throws 400 error on duplicate keys.
+     * @default 'extended'
+     */
+    queryParserMode?: 'extended' | 'simple' | 'strict';
+
+    /**
      * JSON parser to use for parsing request bodies.
      * 
      * Options:
@@ -444,6 +453,14 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      * @default 30000
      */
     readTimeout: number;
+
+    /**
+     * Maximum allowed request body size in bytes.
+     * Requests larger than this will be rejected with 413 Payload Too Large.
+     * @default 10485760 (10MB)
+     */
+    maxBodySize?: number;
+
     /**
      * Timeout for processing the request (milliseconds).
      * Maps to `server.timeout(req, seconds)`.

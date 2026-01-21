@@ -287,6 +287,7 @@ export class ShokupanContext<
 
         // Security: Blocklist dangerous property names
         const blocklist = ['__proto__', 'constructor', 'prototype'];
+        const mode = this.app?.applicationConfig?.queryParserMode || 'extended';
 
         this.url.searchParams.forEach((value, key) => {
             // Security: Skip dangerous keys
@@ -294,10 +295,23 @@ export class ShokupanContext<
 
             // Use hasOwnProperty to avoid prototype chain issues
             if (Object.prototype.hasOwnProperty.call(q, key)) {
-                if (Array.isArray(q[key])) {
-                    q[key].push(value);
+                if (mode === 'strict') {
+                    throw new Error(`Duplicate query parameter '${key}' is not allowed in strict mode.`);
+                } else if (mode === 'simple') {
+                    // Start of list? End of list? Usually first occurrence wins or last. 
+                    // Let's stick to "first wins" or "last wins". 
+                    // URLSearchParams iteration order is insertion order.
+                    // If we want "last wins" (standard JS object behavior), we just overwrite.
+                    // If we want "first wins", we skip.
+                    // Let's do "last wins" (overwrite) to match standard `Object.fromEntries` behavior usually expected if not handling arrays.
+                    q[key] = value;
                 } else {
-                    q[key] = [q[key], value];
+                    // Extended (Array)
+                    if (Array.isArray(q[key])) {
+                        q[key].push(value);
+                    } else {
+                        q[key] = [q[key], value];
+                    }
                 }
             } else {
                 q[key] = value;
@@ -505,24 +519,23 @@ export class ShokupanContext<
         const contentType = this.request.headers.get("content-type") || "";
 
         if (contentType.includes("application/json") || contentType.includes("+json")) {
-            // Use native JSON parser which is significantly faster (C++)
             const parserType = this.app?.applicationConfig?.jsonParser || 'native';
 
+            // To enforce maxBodySize, we must read the raw body ourselves
+            // native request.json() might read everything without limit check (depending on runtime)
+            // safer to read text with limit, then parse.
+
+            const rawText = await this.readRawBody();
+
             if (parserType === 'native') {
-                // Determine if we can use the native request.json() method
-                // We can't use it if we've already read the body or if it's a clone
                 try {
-                    this[$cachedBody] = await this.request.json();
+                    // Handle empty body definition
+                    if (!rawText) return {} as any;
+                    this[$cachedBody] = JSON.parse(rawText);
                 } catch (e) {
-                    // Fallback for empty body or invalid JSON
-                    // If body is empty, return empty object/null based on preference, or let it fail
-                    // But standard behavior for empty JSON request is usually error or empty object
-                    // Re-throwing to match previous behavior
                     throw e;
                 }
             } else {
-                // For custom parsers, we still need the text
-                const rawText = await this.request.text();
                 const { getJSONParser } = await import('./util/json-parser');
                 const parser = getJSONParser(parserType);
                 this[$cachedBody] = parser(rawText);
@@ -530,12 +543,23 @@ export class ShokupanContext<
 
             this[$bodyType] = 'json';
         } else if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
-            // FormData still needs Request API as it's more complex to parse manually
+            // FormData limit check is harder as we want browser to parse it.
+            // But we can check Content-Length at least.
+            const maxBodySize = this.app?.applicationConfig?.maxBodySize ?? 10 * 1024 * 1024;
+            const cl = parseInt(this.request.headers.get("content-length") || "0", 10);
+            if (cl > maxBodySize) {
+                const err = new Error("Payload Too Large");
+                (err as any).status = 413;
+                throw err;
+            }
+            // NOTE: if CL is missing or lying (chunked), this might still read valid FormData until OOM in native parser. 
+            // Implementing streaming FormData parser is out of scope for "hardening" phase.
+
             this[$cachedBody] = await this.request.formData();
             this[$bodyType] = 'formData';
         } else {
-            // Use native text() method
-            this[$cachedBody] = await this.request.text();
+            // Use readRawBody for text to enforce limit
+            this[$cachedBody] = await this.readRawBody();
             this[$bodyType] = 'text';
         }
 
@@ -559,11 +583,26 @@ export class ShokupanContext<
             return;
         }
 
+        const maxBodySize = this.app?.applicationConfig?.maxBodySize ?? 10 * 1024 * 1024; // Default 10MB
+
+        // 1. Fast check: Content-Length header
+        const contentLength = parseInt(this.request.headers.get("content-length") || "0", 10);
+        if (contentLength > maxBodySize) {
+            this[$bodyParseError] = new Error("Payload Too Large");
+            (this[$bodyParseError] as any).status = 413;
+            // We can't easily return 413 here since this is async void, error stored for access
+            return;
+        }
+
         try {
             await this.body(); // Trigger body parsing and caching
-        } catch (error) {
-            // Store error for later throwing when body is accessed
-            this[$bodyParseError] = error as Error;
+        } catch (error: any) {
+            if (error.status === 413 || error.message === "Payload Too Large") {
+                this[$bodyParseError] = error;
+            } else {
+                // Store error for later throwing when body is accessed
+                this[$bodyParseError] = error as Error;
+            }
         }
     }
 
@@ -573,9 +612,17 @@ export class ShokupanContext<
      * Also handles the case where body is already a string (e.g., in tests).
      */
     private async readRawBody(): Promise<string> {
+        const maxBodySize = this.app?.applicationConfig?.maxBodySize ?? 10 * 1024 * 1024;
+
         // Handle test case where body is already a string
         if (typeof (this.request as any).body === 'string') {
-            return (this.request as any).body;
+            const body = (this.request as any).body;
+            if (body.length > maxBodySize) {
+                const err = new Error("Payload Too Large");
+                (err as any).status = 413;
+                throw err;
+            }
+            return body;
         }
 
         const reader = this.request.body?.getReader();
@@ -590,8 +637,15 @@ export class ShokupanContext<
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-                chunks.push(value);
+
                 totalSize += value.length;
+                if (totalSize > maxBodySize) {
+                    const err = new Error("Payload Too Large");
+                    (err as any).status = 413;
+                    throw err;
+                }
+
+                chunks.push(value);
             }
         } finally {
             reader.releaseLock();
