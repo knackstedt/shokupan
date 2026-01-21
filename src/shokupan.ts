@@ -27,6 +27,7 @@ const defaults: ShokupanConfig = {
     development: process.env.NODE_ENV !== "production",
     enableAsyncLocalStorage: false,
     enableHttpBridge: false,
+    enableOpenApiGen: true,
     reusePort: false,
 };
 

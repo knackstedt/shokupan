@@ -72,7 +72,13 @@ app.mount('/docs', new ScalarPlugin({
         layout: 'modern',     // 'modern' or 'classic'
         showSidebar: true,
         hideDownloadButton: false
-    }
+    },
+    
+    // Mount path (default: '/reference' or '/docs' if mounted manually)
+    path: '/reference',
+
+    // Enable eager static analysis of entrypoint (TypeScript only)
+    enableStaticAnalysis: true
 }));
 ```
 

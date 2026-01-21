@@ -25,8 +25,6 @@ const app = new Shokupan({
 
 // Register the MCP server
 app.register(new McpServerPlugin({
-    name: 'My Shokupan App',
-    version: '1.0.0',
     path: '/mcp', // Mount path for SSE endpoint
     allowIntrospection: true,
     allowToolExecution: true
@@ -37,23 +35,18 @@ app.register(new McpServerPlugin({
 
 The `McpServerPlugin` accepts the following options:
 
-```typescript
 interface McpServerPluginOptions {
-    /**
-     * Name of the MCP server.
-     */
-    name: string;
-
-    /**
-     * Version of the MCP server.
-     */
-    version: string;
-
     /**
      * Path to mount the MCP server (SSE endpoint).
      * @default '/mcp'
      */
     path?: string;
+
+    /**
+     * Root directory to scan for OpenAPI documents.
+     * @default process.cwd()
+     */
+    rootDir?: string;
 
     /**
      * Whether to allow introspection (listing tools).
@@ -68,6 +61,14 @@ interface McpServerPluginOptions {
     allowToolExecution?: boolean;
 }
 ```
+
+## Available Prompts
+
+The server exposes several built-in prompts for LLMs:
+
+- `generate-client`: Generates a TypeScript client for an endpoint.
+- `refactor-endpoint`: Suggests refactoring improvements for an endpoint handler.
+- `generate-tests`: specific unit tests for an endpoint.
 
 ## How It Works
 

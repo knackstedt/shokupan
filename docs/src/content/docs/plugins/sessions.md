@@ -42,8 +42,8 @@ app.listen();
 app.use(Session({
     secret: 'your-secret-key',  // Required
     name: 'sessionId',          // Cookie name (default: 'connect.sid')
-    resave: false,              // Don't save unchanged sessions
-    saveUninitialized: false,   // Don't create sessions until needed
+    resave: true,               // Resave session even if unmodified (default: true)
+    saveUninitialized: true,    // Save new sessions (default: true)
     
     cookie: {
         httpOnly: true,
@@ -54,84 +54,9 @@ app.use(Session({
 }));
 ```
 
-## Session Stores
-
-### Memory Store (Development)
-
-The default memory store is for development only:
-
-```typescript
-app.use(Session({
-    secret: 'dev-secret'
-    // Uses memory store by default
-}));
-```
-
-:::caution[Production Warning]
-Memory store doesn't scale and loses data on restart. Use a persistent store in production.
-:::
-
-### Redis Store
-
-```bash
-bun add connect-redis redis
-```
-
-```typescript
-import { Session } from 'shokupan';
-import RedisStore from 'connect-redis';
-import { createClient } from 'redis';
-
-const redisClient = createClient();
-await redisClient.connect();
-
-app.use(Session({
-    secret: process.env.SESSION_SECRET!,
-    store: new RedisStore({ client: redisClient }),
-    cookie: {
-        maxAge: 24 * 60 * 60 * 1000
-    }
-}));
-```
-
-### MongoDB Store
-
-```bash
-bun add connect-mongo
-```
-
-```typescript
-import MongoStore from 'connect-mongo';
-
-app.use(Session({
-    secret: process.env.SESSION_SECRET!,
-    store: MongoStore.create({
-        mongoUrl: process.env.MONGODB_URL!
-    })
-}));
-```
-
-### SQLite Store
-
-```bash
-bun add connect-sqlite3
-```
-
-```typescript
-import SQLiteStore from 'connect-sqlite3';
-
-const SQLiteSession = SQLiteStore(Session);
-
-app.use(Session({
-    secret: process.env.SESSION_SECRET!,
-    store: new SQLiteSession({
-        db: 'sessions.db',
-        dir: './data'
-    })
-}));
-```
-
 ## Session Methods
+
+The session methods (`regenerate`, `destroy`, `save`, `reload`) are callback-based.
 
 ### Set Data
 
@@ -159,20 +84,14 @@ app.get('/cart', (ctx) => {
 });
 ```
 
-### Delete Data
-
-```typescript
-app.post('/cart/clear', (ctx) => {
-    delete ctx.session.cart;
-    return { message: 'Cart cleared' };
-});
-```
-
 ### Destroy Session
 
 ```typescript
 app.post('/logout', (ctx) => {
-    ctx.session.destroy();
+    // Destroy session (callback-based, but fire-and-forget here)
+    ctx.session.destroy((err) => {
+        if (err) console.error('Session destroy error', err);
+    });
     return { message: 'Logged out' };
 });
 ```
@@ -188,7 +107,9 @@ app.post('/login', async (ctx) => {
     
     if (user) {
         // Regenerate session ID (security best practice)
-        await ctx.session.regenerate();
+        await new Promise<void>((resolve, reject) => {
+             ctx.session.regenerate((err) => err ? reject(err) : resolve());
+        });
         
         ctx.session.user = user;
         return { message: 'Logged in' };

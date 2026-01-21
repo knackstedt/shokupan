@@ -28,8 +28,10 @@ app.use(Compression({
 
 ## Options
 
-- **threshold**: Minimum response size to compress (in bytes, default: 1024)
-- **level**: Compression level from 1 (fastest) to 9 (best compression), default: 6
+- **threshold**: Minimum response size to compress (in bytes, default: 512)
+- **allowedAlgorithms**: Allowed compression algorithms (default: `['br', 'gzip', 'zstd', 'deflate']`)
+- **decompress**: Enable request decompression (default: `true`)
+- **maxDecompressedSize**: Max request body size when decompressing (default: 10MB)
 
 ## How It Works
 

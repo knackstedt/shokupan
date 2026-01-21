@@ -136,11 +136,16 @@ app.use(SecurityHeaders({
 ## All Headers Explained
 
 - **Content-Security-Policy**: Prevents XSS attacks
-- **X-Content-Type-Options**: Prevents MIME type sniffing
-- **X-Frame-Options**: Prevents clickjacking
-- **X-XSS-Protection**: Browser XSS protection
-- **Strict-Transport-Security**: Forces HTTPS
-- **Referrer-Policy**: Controls referrer information
+- **X-Content-Type-Options**: Prevents MIME type sniffing (default: `nosniff`)
+- **X-Frame-Options**: Prevents clickjacking (default: `SAMEORIGIN`)
+- **X-XSS-Protection**: Browser XSS protection (default: `0` - disabled for modern security)
+- **Strict-Transport-Security**: Forces HTTPS (default: max-age 180 days)
+- **Referrer-Policy**: Controls referrer information (default: `no-referrer`)
+- **X-Download-Options**: IE8 specific security (default: `noopen`)
+- **X-DNS-Prefetch-Control**: Controls DNS prefetching
+- **Cross-Origin-Opener-Policy**: Isolates browsing context
+- **Cross-Origin-Embedder-Policy**: Controls resource embedding
+- **Cross-Origin-Resource-Policy**: Controls resource sharing
 
 ## Next Steps
 

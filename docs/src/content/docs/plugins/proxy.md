@@ -26,6 +26,8 @@ app.use('/api', Proxy({
 | `changeOrigin` | `boolean` | No | Changes the origin of the host header to the target URL. |
 | `ws` | `boolean` | No | Enable WebSocket proxying. |
 | `headers` | `Record<string, string>` | No | Custom headers to add to the forwarded request. |
+| `allowedHosts` | `string[]` | No | Whitelist of allowed target hostnames for security. |
+| `allowPrivateIPs` | `boolean` | `false` | Allow proxying to private IP ranges (e.g. localhost, 192.168.x.x). |
 
 ## Examples
 

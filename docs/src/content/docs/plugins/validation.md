@@ -201,6 +201,39 @@ app.post('/users',
 );
 ```
 
+## Class Validator Validation
+
+[Class Validator](https://github.com/typestack/class-validator) uses decorators for validation:
+
+```bash
+bun add class-validator class-transformer reflect-metadata
+```
+
+```typescript
+import { IsString, MinLength, IsEmail, Min } from 'class-validator';
+import { validate } from 'shokupan';
+
+class UserDto {
+    @IsString()
+    @MinLength(2)
+    name: string;
+
+    @IsEmail()
+    email: string;
+
+    @Min(18)
+    age: number;
+}
+
+app.post('/users',
+    validate({ body: UserDto }),
+    async (ctx) => {
+        const user = await ctx.body(); // Typed as UserDto instance
+        return { created: user };
+    }
+);
+```
+
 ## Error Handling
 
 Validation errors automatically return 400 responses:

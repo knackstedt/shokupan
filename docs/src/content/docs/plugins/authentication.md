@@ -37,7 +37,7 @@ const auth = new AuthPlugin({
 app.mount('/auth', auth);
 
 // Protect routes
-app.get('/protected', auth.middleware(), (ctx) => {
+app.get('/protected', auth.getMiddleware(), (ctx) => {
     return { user: ctx.state.user };
 });
 
@@ -129,17 +129,15 @@ oauth2: {
 
 ## Auth Routes
 
-The plugin automatically creates these routes:
+The plugin automatically creates these routes for each configured provider:
 
-- `GET /auth/{provider}` - Initiate OAuth flow
+- `GET /auth/{provider}/login` - Initiate OAuth flow
 - `GET /auth/{provider}/callback` - OAuth callback
-- `GET /auth/logout` - Logout
-- `GET /auth/me` - Get current user (protected)
 
 Example flow:
 
 ```
-1. User visits →  GET /auth/github
+1. User visits →  GET /auth/github/login
 2. Redirected to GitHub OAuth
 3. User authorizes
 4. Callback →     GET /auth/github/callback

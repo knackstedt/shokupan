@@ -12,11 +12,8 @@ import { Shokupan, RateLimit } from 'shokupan';
 
 const app = new Shokupan();
 
-// 100 requests per 15 minutes
-app.use(RateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100
-}));
+// Default: 5 requests per 1 minute
+app.use(RateLimit());
 
 app.listen();
 ```
@@ -25,12 +22,31 @@ app.listen();
 
 ```typescript
 app.use(RateLimit({
-    windowMs: 15 * 60 * 1000,  // Time window (15 minutes)
-    max: 100,                   // Max requests per window
-    message: 'Too many requests from this IP, please try again later',
+    windowMs: 60 * 1000,        // Time window (1 minute)
+    max: 5,                     // Max requests per window
+    message: 'Too many requests', // Response message
     statusCode: 429,            // HTTP status code
-    keyGenerator: (ctx) => ctx.ip  // How to identify clients
+    keyGenerator: (ctx) => ctx.ip, // How to identify clients
+    headers: true,              // Send X-RateLimit headers
+    mode: 'user',               // 'user' (default) or 'absolute'
+    cleanupInterval: 60000,     // Cleanup interval (default: windowMs)
+    trustedProxies: []          // List of trusted proxy IPs
 }));
+```
+
+## Options
+
+- **windowMs**: Time window in milliseconds (default: `60000`)
+- **max** (or **limit**): Max hits per window (default: `5`)
+- **message**: Response message or object (default: `"Too many requests..."`)
+- **statusCode**: HTTP status for limited requests (default: `429`)
+- **headers**: Send `X-RateLimit-*` headers (default: `true`)
+- **keyGenerator**: Function to generate unique key (default: `ctx.ip`)
+- **onRateLimited**: Hook called when limit is reached
+- **skip**: Function to skip limiting
+- **mode**: `'user'` (default) or `'absolute'`
+- **trustedProxies**: IPs to trust for `X-Forwarded-For`
+- **cleanupInterval**: Interval to clear expired records
 ```
 
 ## Different Limits per Route
