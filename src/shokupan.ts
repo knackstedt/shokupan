@@ -142,6 +142,12 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             name: 'ShokupanApplication'
         };
 
+        // Security: Apply default security headers
+        if (this.applicationConfig.securityHeaders !== false) {
+            const { SecurityHeaders } = require("./plugins/middleware/security-headers");
+            this.use(SecurityHeaders(this.applicationConfig.securityHeaders === true ? {} : this.applicationConfig.securityHeaders));
+        }
+
         if (this.applicationConfig.adapter !== 'wintercg') {
             this.dbPromise = this.initDatastore().catch(err => {
                 // Log but don't crash if optional datastore init fails

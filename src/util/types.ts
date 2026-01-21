@@ -557,6 +557,13 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
     };
 
     /**
+     * Configuration for Security Headers.
+     * Can be a boolean to enable/disable defaults, or an object options.
+     * @default true
+     */
+    securityHeaders?: boolean | any;
+
+    /**
      * Any other config options are allowed, but will be ignored. 
      * @deprecated
      */
