@@ -742,7 +742,22 @@ export class ShokupanContext<
         this.response.status = status;
 
         const finalHeaders = this.mergeHeaders();
-        finalHeaders.set('Location', url instanceof Promise ? await url : url);
+        const targetUrl = url instanceof Promise ? await url : url;
+
+        // Security: Prevent Open Redirects & XSS via redirect
+        // Block protocol-relative URLs (//evil.com) which browsers treat as same-scheme
+        if (targetUrl.startsWith('//')) {
+            // We could rewrite to / or throw. Throwing is safer/clearer.
+            throw new Error("Invalid redirect: Protocol-relative URLs are not allowed.");
+        }
+
+        // Block dangerous pseudo-protocols
+        const lowerUrl = targetUrl.toLowerCase();
+        if (lowerUrl.startsWith('javascript:') || lowerUrl.startsWith('data:') || lowerUrl.startsWith('vbscript:')) {
+            throw new Error(`Invalid redirect: Unsafe protocol '${targetUrl.split(':')[0]}'`);
+        }
+
+        finalHeaders.set('Location', targetUrl);
 
         this[$finalResponse] = new Response(null, { status, headers: finalHeaders });
         return this[$finalResponse];
