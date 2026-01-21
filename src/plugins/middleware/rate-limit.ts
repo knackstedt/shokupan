@@ -50,6 +50,11 @@ export interface RateLimitOptions {
      * List of trusted proxy IPs
      */
     trustedProxies?: string[];
+    /**
+     * Interval in milliseconds to clean up expired entries.
+     * Defaults to windowMs.
+     */
+    cleanupInterval?: number;
 }
 
 interface HitRecord {
@@ -70,6 +75,7 @@ export function RateLimitMiddleware(options: RateLimitOptions = {}): Middleware 
     const headers = options.headers !== false;
     const mode = options.mode || 'user';
     const trustedProxies = options.trustedProxies || [];
+    const cleanupInterval = options.cleanupInterval || windowMs;
 
     const keyGenerator = options.keyGenerator || ((ctx) => {
         if (mode === 'absolute') {
@@ -113,7 +119,7 @@ export function RateLimitMiddleware(options: RateLimitOptions = {}): Middleware 
                 hits.delete(key);
             }
         }
-    }, windowMs);
+    }, cleanupInterval);
 
     // Ensure interval doesn't block process exit
     if (interval.unref) interval.unref();
