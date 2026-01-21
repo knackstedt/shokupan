@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { afterAll, describe, expect, it } from 'bun:test';
 import tap from 'supertest';
 import { Dashboard } from '../../plugins/application/dashboard/plugin';
 import { Shokupan } from '../../shokupan';
@@ -33,17 +33,15 @@ describe('Debug Dashboard Plugin', () => {
         const metricsRes = await request.get('/admin/metrics').expect(200);
         const data = metricsRes.body;
 
-        // Total requests: 
-        // 2x /success (200)
-        // 1x /fail (500)
-        // 1x /admin (200) - initial HTML render
-        // 1x /admin/metrics (200) - get metrics (still active)
-        // Router hooks now fire correctly, adding extra metric tracking
-        // Total = 8 (router hooks properly executing)
         expect(data.metrics.totalRequests).toBeGreaterThan(0);
         expect(data.metrics.successfulRequests).toBeGreaterThan(0);
         expect(data.metrics.failedRequests).toBeGreaterThanOrEqual(0);
         expect(data.metrics.activeRequests).toBeGreaterThanOrEqual(0); // Router hooks cause different counting
         expect(data.uptime).toBeDefined();
+    });
+
+    afterAll(() => {
+        const { FetchInterceptor } = require('../../plugins/application/dashboard/fetch-interceptor');
+        FetchInterceptor.restore();
     });
 });

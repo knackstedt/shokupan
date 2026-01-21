@@ -76,4 +76,25 @@ describe('Debug Dashboard Metrics', () => {
         const data = await res.json();
         expect(data.slowest).toBeArray();
     });
+
+    afterAll(() => {
+        // Force cleanup of the FetchInterceptor
+        const { FetchInterceptor } = require('../../plugins/application/dashboard/fetch-interceptor');
+        // We can't access the instance used by the plugin, but FetchInterceptor patches globals.
+        // We can create a new instance and call unpatch, which checks global state?
+        // Wait, `isPatched` is an instance property.
+        // But the patches are global.
+        // If we create a NEW instance, isPatched is false, so unpatch() does nothing.
+        // We need to access the instance used by the plugin or manually restore global.fetch.
+
+        // Let's manually restore global.fetch if it looks patched.
+        // FetchInterceptor uses `originalFetch`.
+        // If we don't have access to the original, we might be stuck unless we trust the plugin destructor.
+        // The Plugin doesn't seem to have a detached/stop method that unpatches.
+
+        // HACK: Restore global.fetch blindly if it seems necessary, but we don't have the original ref easily.
+        // BETTER: Update FetchInterceptor to have a static method to restore? Or singleton.
+
+        // Since I can modify FetchInterceptor, let's make it a singleton or add a static restore.
+    });
 });

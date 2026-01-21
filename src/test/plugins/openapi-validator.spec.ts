@@ -9,7 +9,8 @@ describe('OpenAPI Validator Plugin', () => {
     it('should validate request body against generated spec', async () => {
         const port = await getPort();
         const app = new Shokupan({
-            port
+            port,
+            enableOpenApiGen: false
         });
 
         app.get('/items', (ctx) => {
@@ -104,7 +105,7 @@ describe('OpenAPI Validator Plugin', () => {
 
     it('should validate path parameters', async () => {
         const port = await getPort();
-        const app = new Shokupan({ port });
+        const app = new Shokupan({ port, enableOpenApiGen: false });
 
         app.get('/users/:id', (ctx) => ctx.text(`User ${ctx.params['id']}`));
         app.use(openApiValidator());
