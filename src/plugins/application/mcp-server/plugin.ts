@@ -232,7 +232,8 @@ export class MCPServerPlugin implements ShokupanPlugin {
             {
                 mimeType: "text/typescript"
             },
-            async (uri, { method, path }) => {
+            async (uri, args: any) => {
+                const { method, path } = args;
                 const { applications } = await this.analyzer.analyze();
                 const route = applications.flatMap(app => app.routes)
                     .find(r => r.method.toUpperCase() === method.toUpperCase() && r.path === `/${path}`);
