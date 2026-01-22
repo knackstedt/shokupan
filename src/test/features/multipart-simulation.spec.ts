@@ -35,7 +35,8 @@ describe('Multipart Support (Simulation)', () => {
             method: 'POST',
             url: '/upload',
             headers: {
-                'content-type': `multipart/form-data; boundary=${boundary}`
+                'content-type': `multipart/form-data; boundary=${boundary}`,
+                'content-length': body.length.toString()
             },
             body: body
         });

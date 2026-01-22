@@ -57,7 +57,20 @@ export class BodyParser {
      * Parsing helper for FormData
      */
     static async parseFormData(req: ShokupanRequest<any>, maxBodySize: number): Promise<FormData> {
-        const cl = parseInt(req.headers.get("content-length") || "0", 10);
+        const clHeader = req.headers.get("content-length");
+        if (!clHeader) {
+            const err = new Error("Length Required");
+            (err as any).status = 411;
+            throw err;
+        }
+
+        const cl = parseInt(clHeader, 10);
+        if (isNaN(cl)) {
+            const err = new Error("Bad Request");
+            (err as any).status = 400;
+            throw err;
+        }
+
         if (cl > maxBodySize) {
             const err = new Error("Payload Too Large");
             (err as any).status = 413;
