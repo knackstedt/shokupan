@@ -85,6 +85,37 @@
             }
         },
         {
+            "label": "▶ docs",
+            "type": "shell",
+            "command": "bun",
+            "args": [
+                "run",
+                "docs"
+            ],
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "surrealdb",
+                "pattern": [
+                    {
+                        "severity": 1,
+                        "file": 2,
+                        "message": 3,
+                        "kind": "file",
+                        "regexp": " (ERROR) surreal::([^:]+): ([^\n]+)"
+                    }
+                ],
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": {
+                        "regexp": "\\$ astro dev"
+                    },
+                    "endsPattern": {
+                        "regexp": "astro  v\\d+\\.\\d+\\.\\d+ ready in \\d+ ms"
+                    }
+                }
+            }
+        },
+        {
             "label": "▶ benchmark (lite)",
             "type": "shell",
             "command": "bun",

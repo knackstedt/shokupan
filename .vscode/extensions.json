@@ -1,6 +1,10 @@
 {
   "recommendations": [
     "actboy168.tasks",
-    "oven.bun-vscode"
+    "oven.bun-vscode",
+    "YoavBls.pretty-ts-errors",
+    "astro-build.astro-vscode",
+    "shadowtime2000.eta-vscode",
+    "unifiedjs.vscode-mdx"
   ]
 }
