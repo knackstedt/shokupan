@@ -79,13 +79,20 @@ const app = new Shokupan({
 });
 ```
 
-## Production Checklist
+## Basic Production Checklist
 
-- [ ] Use environment variables for secrets
-- [ ] Enable HTTPS
-- [ ] Set security headers
-- [ ] Configure CORS properly
-- [ ] Add rate limiting
-- [ ] Use production database
-- [ ] Set up logging
-- [ ] Configure monitoring
+import MigrationChecklist from '../../../components/MigrationChecklist.astro';
+
+<MigrationChecklist 
+  id="deployment-production"
+  items={[
+    "Use environment variables or mounted volumes for secrets",
+    "Enable HTTPS",
+    "Set security headers",
+    "Configure CORS properly",
+    "Add rate limiting",
+    "Use production database",
+    "Set up logging",
+    "Configure monitoring"
+  ]}
+/>

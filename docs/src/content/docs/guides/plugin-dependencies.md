@@ -250,7 +250,7 @@ If using class-validator, ensure you have:
 
 Ensure you have the type definitions installed:
 ```bash
-bun add -d @types/node
+bun add -d @types/node @types/bun
 ```
 
 ## See Also

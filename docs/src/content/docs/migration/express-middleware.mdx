@@ -1,0 +1,43 @@
+---
+title: Express Middleware
+description: Use Express middleware with Shokupan
+---
+
+Many Express middleware packages work with Shokupan using the compatibility adapter.
+
+## useExpress Adapter
+
+You can use the `useExpress` adapter to wrap existing Express middleware.
+
+```typescript
+import { Shokupan, useExpress } from 'shokupan';
+import helmet from 'helmet';
+
+const app = new Shokupan();
+
+// Use Express middleware
+app.use(useExpress(helmet()));
+
+app.listen(3000);
+```
+
+## Native Alternatives
+
+For better performance and deeper integration, use native Shokupan plugins when available:
+
+```typescript
+import { Shokupan, SecurityHeaders, Compression, Cors } from 'shokupan';
+
+const app = new Shokupan();
+
+// Native plugins are faster and context-aware
+app.use(SecurityHeaders());
+app.use(Compression());
+app.use(Cors());
+
+app.listen(3000);
+```
+
+## Next Steps
+
+- [Plugins](/plugins/cors/) - Native Shokupan plugins

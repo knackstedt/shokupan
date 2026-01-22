@@ -403,27 +403,34 @@ sudo systemctl start myapp
 sudo systemctl status myapp
 ```
 
-## Production Checklist
+## Comprehensive Production Checklist
 
-- [ ] **Logging**: Configure structured logging with appropriate log levels
-- [ ] **Compression**: Enable compression middleware for responses > 1KB
-- [ ] **Security Headers**: Apply security headers plugin
-- [ ] **CORS**: Configure CORS with specific allowed origins
-- [ ] **Rate Limiting**: Implement rate limiting on all endpoints
-- [ ] **Authentication**: Secure private endpoints with JWT or sessions
-- [ ] **Error Handling**: Implement global error handler
-- [ ] **Graceful Shutdown**: Handle SIGTERM/SIGINT signals
-- [ ] **Health Checks**: Add `/health` and `/health/ready` endpoints
-- [ ] **Environment Variables**: Use env vars for all secrets and config
-- [ ] **HTTPS**: Enable HTTPS (via reverse proxy like nginx/Caddy)
-- [ ] **Database**: Use connection pooling
-- [ ] **Monitoring**: Set up metrics and alerting
-- [ ] **AsyncLocalStorage**: Disable if not needed for performance
-- [ ] **Debug Logs**: Disable debug logging in production
+import MigrationChecklist from '../../../components/MigrationChecklist.astro';
+
+<MigrationChecklist 
+  id="production-readiness"
+  items={[
+    "**Logging**: Configure structured logging with appropriate log levels",
+    "**Compression**: Enable compression middleware for responses > 1KB",
+    "**Security Headers**: Apply security headers plugin",
+    "**CORS**: Configure CORS with specific allowed origins",
+    "**Rate Limiting**: Implement rate limiting on all endpoints",
+    "**Authentication**: Secure private endpoints with JWT or sessions",
+    "**Error Handling**: Implement global error handler",
+    "**Graceful Shutdown**: Handle SIGTERM/SIGINT signals",
+    "**Health Checks**: Add `/health` and `/health/ready` endpoints",
+    "**Environment Variables**: Use env vars for all secrets and config",
+    "**HTTPS**: Enable HTTPS (via reverse proxy like nginx/Caddy)",
+    "**Database**: Use connection pooling",
+    "**Monitoring**: Set up metrics and alerting",
+    "**AsyncLocalStorage**: Disable if not needed for performance",
+    "**Debug Logs**: Disable debug logging in production"
+  ]}
+/>
 
 ## Reverse Proxy (nginx)
 
-Run Shokupan behind nginx for HTTPS and load balancing:
+Run Shokupan behind nginx for optimized HTTPS termination and load balancing:
 
 ```nginx
 upstream shokupan {
@@ -462,10 +469,10 @@ server {
 ## Performance Tips
 
 1. **Use Bun Runtime**: Bun provides the best performance for Shokupan
-2. **Enable zstd Compression**: 20%+ performance improvement for JSON APIs
+2. **Enable zstd Compression**: 20%+ performance improvement over no compression for JSON APIs
 3. **Minimize Middleware**: Only use middleware you actually need
 4. **Connection Pooling**: Pool database connections (max 20-50 connections)
-5. **Caching**: Use Redis or in-memory caching for frequently accessed data
+5. **Caching**: Use caching for frequently accessed data
 6. **Static Assets**: Serve static files through CDN or nginx
 7. **Database Indexes**: Ensure proper database indexing
 8. **Monitor Memory**: Watch for memory leaks with process.memoryUsage()

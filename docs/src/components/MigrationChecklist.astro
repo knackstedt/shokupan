@@ -1,0 +1,96 @@
+---
+// src/components/MigrationChecklist.astro
+interface Props {
+  id: string;
+  items: string[];
+}
+
+const { id, items } = Astro.props;
+---
+
+<div class="migration-checklist" data-checklist-id={id}>
+  {items.map((item, index) => (
+    <label class="checklist-item">
+      <input 
+        type="checkbox" 
+        data-index={index}
+      />
+      <span class="checklist-text">{item}</span>
+    </label>
+  ))}
+</div>
+
+<style>
+  .migration-checklist {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+    background-color: var(--sl-color-bg-nav);
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 0.5rem;
+    margin: 1.5rem 0;
+  }
+
+  .checklist-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    cursor: pointer;
+    padding: 0.25rem 0;
+  }
+
+  .checklist-item input {
+    margin-top: 0.3rem;
+    width: 1.1rem;
+    height: 1.1rem;
+    accent-color: var(--sl-color-accent-high);
+  }
+
+  .checklist-text {
+    color: var(--sl-color-white);
+    line-height: 1.5;
+  }
+
+  /* Optional: Strike through when checked */
+  .checklist-item input:checked + .checklist-text {
+    text-decoration: line-through;
+    color: var(--sl-color-gray-4);
+  }
+</style>
+
+<script>
+  function setupChecklists() {
+    const checklists = document.querySelectorAll('.migration-checklist');
+    
+    checklists.forEach((list) => {
+      const listId = list.getAttribute('data-checklist-id');
+      const checkboxes = list.querySelectorAll('input[type="checkbox"]');
+      
+      // Load saved state
+      const savedState = JSON.parse(localStorage.getItem(`checklist-${listId}`) || '{}');
+      
+      checkboxes.forEach((checkbox) => {
+        const index = checkbox.getAttribute('data-index');
+        if (!index) return;
+        
+        // Restore state
+        if (savedState[index]) {
+          (checkbox as HTMLInputElement).checked = true;
+        }
+
+        // Save on change
+        checkbox.addEventListener('change', (e) => {
+          const target = e.target as HTMLInputElement;
+          const currentState = JSON.parse(localStorage.getItem(`checklist-${listId}`) || '{}');
+          currentState[index] = target.checked;
+          localStorage.setItem(`checklist-${listId}`, JSON.stringify(currentState));
+        });
+      });
+    });
+  }
+
+  // Initialize on page load and after Starlight page transitions
+  setupChecklists();
+  document.addEventListener('astro:after-swap', setupChecklists);
+</script>

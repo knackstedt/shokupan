@@ -1,0 +1,88 @@
+---
+title: Migrating from Hono
+description: Guide to migrating from Hono to Shokupan
+---
+
+Hono and Shokupan share many modern design philosophies (Web Standards, TypeScript first), so migration is typically converting syntax rather than logic.
+
+## Key Differences
+
+1. **Context Name**: Hono uses `c` by convention; Shokupan uses `ctx`. You can use `c` if you prefer.
+2. **Chaining**: Hono apps often chain methods (`app.get().post()`); Shokupan recommends separate statements (`app.get(); app.post()`) though you can chain if you prefer.
+3. **Middleware**: Both use `await next()` for async middleware patterns.
+
+## Basic Server
+
+**Hono:**
+```typescript
+import { Hono } from 'hono';
+const app = new Hono();
+
+app.get('/', (c) => c.text('Hello Hono!'));
+
+export default app;
+```
+
+**Shokupan:**
+```typescript
+import { Shokupan } from 'shokupan';
+const app = new Shokupan();
+
+app.get('/', (ctx) => {
+    return ctx.text('Hello Shokupan!');
+});
+
+app.listen(3000);
+```
+
+## Middleware
+
+Both frameworks use similar middleware patterns.
+
+**Hono:**
+```typescript
+app.use(async (c, next) => {
+    const start = Date.now();
+
+    await next();
+
+    const end = Date.now();
+    c.res.headers.set('X-Response-Time', `${end - start}ms`);
+});
+```
+
+**Shokupan:**
+```typescript
+app.use(async (ctx, next) => {
+    const start = Date.now();
+    
+    await next();
+    
+    const end = Date.now();
+    ctx.response.headers.set('X-Response-Time', `${end - start}ms`);
+});
+```
+
+## Validation
+
+Hono uses `zod-validator` middleware. Shokupan supports Zod validation with the [Validation](/plugins/validation/) plugin.
+
+**Shokupan Validation:**
+```typescript
+import { Validation } from 'shokupan';
+import { z } from 'zod';
+
+const schema = z.object({
+    name: z.string()
+});
+
+app.post('/user', Validation(schema), (ctx) => {
+    const data = ctx.body; // Typed automatically!
+    return { created: data.name };
+});
+```
+
+## Next Steps
+
+- [Routing](/core/routing/) - Routing guide
+- [Validation](/plugins/validation/) - Input validation

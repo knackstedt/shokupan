@@ -1,0 +1,63 @@
+---
+title: Migrating from Koa
+description: Guide to migrating from Koa to Shokupan
+---
+
+Shokupan's context-based approach is heavily inspired by Koa, making it a very natural transition.
+
+## Key Differences
+
+1. **Return Value**: Shokupan handlers return data directly instead of setting `ctx.body`.
+2. **Routing**: Shokupan has a built-in router; Koa requires `koa-router` or similar.
+3. **Body Parsing**: Built-in; no need for `koa-bodyparser`.
+
+## Middleware
+
+Both frameworks use similar middleware patterns with `await next()`.
+
+**Koa:**
+```typescript
+app.use(async (ctx, next) => {
+    await next();
+    ctx.set('X-Response-Time', '10ms');
+});
+```
+
+**Shokupan:**
+```typescript
+app.use(async (ctx, next) => {
+    // Wait for downstream
+    await next();
+    
+    // Modify headers after handler completes
+    ctx.response.headers.set('X-Response-Time', '10ms');
+});
+```
+
+## Context Comparison
+
+| Feature | Koa | Shokupan |
+| :--- | :--- | :--- |
+| **Request Body** | `ctx.request.body` (with middleware) | `ctx.body` (built-in) |
+| **Query String** | `ctx.query` | `ctx.query` (URLSearchParams) |
+| **Sending Text** | `ctx.body = 'Hello'` | `return 'Hello'` or `return ctx.text('Hello')` |
+| **Sending JSON** | `ctx.body = { foo: 'bar' }` | `return { foo: 'bar' }` |
+| **Status Code** | `ctx.status = 404` | `return ctx.text('Not Found', 404)` |
+
+## Migration Checklist
+
+import MigrationChecklist from '../../../components/MigrationChecklist.astro';
+
+<MigrationChecklist 
+  id="koa-migration"
+  items={[
+    "Change `ctx.body = ...` to `return ...` or `return ctx.text(...)`",
+    "Remove Koa middleware",
+    "Update `ctx.request.query` usage to `ctx.query.get()`"
+  ]}
+/>
+
+## Next Steps
+
+- [Core Concepts](/core/routing/) - Learn Shokupan patterns
+- [Controllers](/core/controllers/) - Use Class-based routing

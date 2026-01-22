@@ -162,26 +162,6 @@ app.mount('/external', webhookRouter);
 }
 ```
 
-## Migration Guide
-
-### From Native to parse-json
-No code changes needed - just update config:
-
-```diff
-const app = new Shokupan({
-+   jsonParser: 'parse-json'
-});
-```
-
-### From Native to secure-json-parse
-No code changes needed - just update config:
-
-```diff
-const app = new Shokupan({
-+   jsonParser: 'secure-json-parse'
-});
-```
-
 ## Notes
 
 - If a parser library is not installed, Shokupan will automatically fall back to native `JSON.parse` with a warning
@@ -191,6 +171,5 @@ const app = new Shokupan({
 
 ## See Also
 
-- [JSON Performance Benchmarks](../src/test/json-performance-results.md)
 - [parse-json on npm](https://www.npmjs.com/package/parse-json)
 - [secure-json-parse on npm](https://www.npmjs.com/package/secure-json-parse)

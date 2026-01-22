@@ -1,0 +1,150 @@
+---
+title: Migrating from Express
+description: Guide to migrating from Express.js to Shokupan
+---
+
+Shokupan is designed to feel familiar to Express developers, but with modern enhancements like built-in TypeScript support, a unified context object, and standard Web API usage.
+
+## Key Differences
+
+1. **Context vs Req/Res**: Instead of separate `req` and `res` objects, Shokupan passes a single `ctx` (context) object.
+2. **Return vs Send**: Handlers return data directly (JSON, string, Response) or call `ctx.send()`, `ctx.json()`, `ctx.text()`, etc. instead of calling `res.json()`.
+3. **Async Middleware**: Middleware can `await next()` to easily run code after downstream handlers.
+4. **Web Standards**: Uses standard `Request`, `Response`, and `URL` objects.
+
+## Basic Server
+
+**Express:**
+```typescript
+import express from 'express';
+const app = express();
+
+app.get('/', (req, res) => {
+    res.json({ message: 'Hello' });
+});
+
+app.listen(3000);
+```
+
+**Shokupan:**
+```typescript
+import { Shokupan } from 'shokupan';
+const app = new Shokupan({ port: 3000 });
+
+app.get('/', (ctx) => {
+    // Return data directly or call ctx.send(), ctx.json(), ctx.text(), etc.
+    return { message: 'Hello' };
+});
+
+app.listen();
+```
+
+## Middleware
+
+Middleware in Shokupan can optionally `await next()` to run code after downstream handlers complete.
+
+**Express:**
+```typescript
+app.use((req, res, next) => {
+    console.log(req.method, req.path);
+    req.on("finish", () => {
+        console.log(`Request finished with status ${res.statusCode}`);
+    });
+    next();
+});
+```
+
+**Shokupan:**
+```typescript
+app.use(async (ctx, next) => {
+    console.log(ctx.method, ctx.path);
+    
+    // Optional: await next() to run code after handler
+    await next();
+    
+    // Post-processing happens after downstream completes
+    console.log(`Request finished with status ${ctx.response.status}`);
+});
+```
+
+## Async Error Handling
+
+One of the biggest pain points in Express is that **async route handlers require manual try/catch wrappers** to handle errors. Shokupan handles this automatically.
+
+**Express (Manual Error Handling Required):**
+```typescript
+// ❌ This will throw an unhandled error if fetchUser throws -- leading to requests that never complete.
+app.get('/users/:id', async (req, res) => {
+    const user = await fetchUser(req.params.id);
+    res.json(user);
+});
+
+// ✅ Express requires manual try/catch
+app.get('/users/:id', async (req, res, next) => {
+    try {
+        const user = await fetchUser(req.params.id);
+        res.json(user);
+    } catch (error) {
+        next(error); // Pass to error handler
+    }
+});
+```
+
+**Shokupan (Automatic Error Handling):**
+```typescript
+// ✅ async errors are automatically caught and handled
+app.get('/users/:id', async (ctx) => {
+    const user = await fetchUser(ctx.params.id);
+    return user;
+});
+
+// Optional: Add global error handling middleware for custom error responses
+app.use(async (ctx, next) => {
+    try {
+        await next();
+    } catch (error) {
+        return ctx.json({ error: error.message }, 500);
+    }
+});
+
+// OR use an error hook
+app.onError((ctx, error) => {
+    return ctx.json({ error: error.message }, 500);
+});
+```
+
+:::tip
+Shokupan automatically catches async errors in all handlers and middleware, eliminating the need for try/catch wrappers in every route.
+:::
+
+## Request & Response
+
+| Feature | Express | Shokupan |
+| :--- | :--- | :--- |
+| **Path** | `req.path` | `ctx.path` |
+| **Method** | `req.method` | `ctx.method` |
+| **Query** | `req.query['id']` | `ctx.query.get('id')` |
+| **Headers** | `req.headers['auth']` | `ctx.headers.get('auth')` |
+| **Body** | `req.body` | `ctx.body` (typed) |
+| **Status** | `res.status(404)` | `return ctx.text('Not Found', 404)` |
+| **Send JSON** | `res.json(data)` | `return data` or `return ctx.json(data)` |
+
+## Migration Checklist
+
+import MigrationChecklist from '../../../components/MigrationChecklist.astro';
+
+<MigrationChecklist 
+  id="express-migration"
+  items={[
+    "Replace `req` and `res` with `ctx`",
+    "Change `res.json()` to `return` or `ctx.json()`",
+    "Remove Express middleware",
+    "Update header access to use `ctx.headers.get()`",
+    "Update query params to use `ctx.query.get()`"
+  ]}
+/>
+
+## Next Steps
+
+- [Routing](/core/routing/) - Learn Shokupan patterns
+- [Controllers](/core/controllers/) - Use class-based controllers

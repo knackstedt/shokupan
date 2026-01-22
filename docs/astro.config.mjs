@@ -103,6 +103,8 @@ export default defineConfig({
                         { label: 'From Express', link: '/migration/from-express/' },
                         { label: 'From Koa', link: '/migration/from-koa/' },
                         { label: 'From NestJS', link: '/migration/from-nestjs/' },
+                        { label: 'From Hono', link: '/migration/from-hono/' },
+                        { label: 'From Fastify', link: '/migration/from-fastify/' },
                         { label: 'Express Middleware', link: '/migration/express-middleware/' },
                     ],
                 },

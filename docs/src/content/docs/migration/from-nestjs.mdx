@@ -1,0 +1,78 @@
+---
+title: Migrating from NestJS
+description: Guide to migrating from NestJS to Shokupan
+---
+
+Shokupan supports NestJS-style decorators for defining controllers and handling requests, but without the heavy module boilerplate.
+
+## Controllers
+
+Shokupan controllers are plain classes with decorators.
+
+**NestJS:**
+```typescript
+@Controller('users')
+export class UserController {
+    @Get(':id')
+    getUser(@Param('id') id: string) {
+        return { id };
+    }
+}
+```
+
+**Shokupan:**
+```typescript
+import { Controller, Get, Param, Shokupan } from 'shokupan';
+
+@Controller('/users')
+export class UserController {
+    
+    @Get('/:id')
+    getUser(@Param('id') id: string) {
+        return { id };
+    }
+}
+
+const app = new Shokupan();
+
+// Register the controller (/api/users)
+app.mount('/api', new UserController());
+app.listen(3000);
+```
+
+## Dependency Injection
+
+Shokupan has a built-in lightweight DI container. You can use `@Inject` or `@Injectable`.
+
+```typescript
+import { Injectable, Inject, Controller, Get } from 'shokupan';
+
+// 1. Define a Service
+@Injectable('singleton')
+class UserService {
+    getUsers() {
+        return ['Alice', 'Bob'];
+    }
+}
+
+// 2. Inject into Controller
+@Controller('/users')
+class UserController {
+    
+    // Property Injection
+    @Inject(UserService)
+    private userService: UserService;
+
+    @Get('/')
+    list() {
+        return this.userService.getUsers();
+    }
+}
+```
+> [!NOTE]
+> Unlike NestJS, you don't need to declare "Modules" or "Providers" arrays. Services are simpler and resolved globally or per-scope. This is an intentional architectural decision in order to follow KISS principles.
+
+## Next Steps
+
+- [Controllers](/core/controllers/) - Full controller documentation
+- [Dependency Injection](/core/di/) - Learn more about DI

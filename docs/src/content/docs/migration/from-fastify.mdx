@@ -1,0 +1,105 @@
+---
+title: Migrating from Fastify
+description: Guide to migrating from Fastify to Shokupan
+---
+
+Fastify is known for speed and schemas. Shokupan offers comparable performance and strong typing but with a Web Standards-based API and support for Controllers and DI.
+
+## Key Differences
+
+1. **Callback vs Return**: Fastify uses `reply.send()`. Shokupan uses direct returns and `ctx.send()`, `ctx.json()`, `ctx.text()`, etc.
+2. **Context**: Fastify splits `request` and `reply`. Shokupan combines them into `ctx`.
+3. **Schemas**: Fastify uses JSON Schema by default. Shokupan is validator-agnostic but integrates well with Zod and other validators via the [Validation](/plugins/validation/) plugin.
+
+## Basic Server
+
+**Fastify:**
+```typescript
+import Fastify from 'fastify';
+const fastify = Fastify();
+
+fastify.get('/', async (request, reply) => {
+    return { hello: 'world' };
+});
+
+fastify.listen({ port: 3000 });
+```
+
+**Shokupan:**
+```typescript
+import { Shokupan } from 'shokupan';
+const app = new Shokupan();
+
+app.get('/', (ctx) => {
+    return { hello: 'world' };
+});
+
+app.listen(3000);
+```
+
+## Middleware / Hooks
+
+Fastify uses Hooks (`onRequest`, `preHandler`). Shokupan supports both middleware and hooks.
+
+**Fastify:**
+```typescript
+fastify.addHook('onRequest', async (request, reply) => {
+    // Audit log
+});
+```
+
+**Shokupan:**
+Middleware:
+```typescript
+app.use(async (ctx, next) => {
+    // Pre-processing / Audit log
+    await next();
+});
+```
+
+OR
+
+Hooks:
+```typescript
+const app = new Shokupan({
+    hooks: {
+        onRequestStart: (ctx) => {
+            console.log("Request started");
+        }
+    }
+});
+```
+
+## Validation
+
+**Fastify (JSON Schema):**
+```typescript
+fastify.get('/', {
+  schema: {
+    querystring: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' }
+      }
+    }
+  }
+}, handler)
+```
+
+**Shokupan (Zod):**
+```typescript
+import { Validation } from 'shokupan';
+import { z } from 'zod';
+
+app.get('/', Validation(z.object({
+    name: z.string()
+})), (ctx) => {
+    // ctx.body / ctx.query is typed
+    return { name: ctx.body.name };
+});
+```
+
+## Next Steps
+
+- [Performance](/guides/performance/) - Performance tips
+- [Plugins](/plugins/overview/) - Explore the ecosystem

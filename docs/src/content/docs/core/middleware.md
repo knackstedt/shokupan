@@ -16,18 +16,13 @@ const logger: Middleware = async (ctx, next) => {
     console.log(`${ctx.method} ${ctx.path}`);
     const start = Date.now();
     
-    const result = await next();
+    await next();
     
     console.log(`${ctx.method} ${ctx.path} - ${Date.now() - start}ms`);
-    return result;
 };
 
 app.use(logger);
 ```
-
-:::caution[Important]
-Always `return` the result from `next()`. Forgetting this will cause issues with response handling.
-:::
 
 ## Global Middleware
 
@@ -37,13 +32,13 @@ Apply middleware to all routes:
 // Logging
 app.use(async (ctx, next) => {
     console.log(`→ ${ctx.method} ${ctx.path}`);
-    return next();
+    await next();
 });
 
 // Request ID
 app.use(async (ctx, next) => {
     ctx.state.requestId = crypto.randomUUID();
-    return next();
+    await next();
 });
 
 // Add routes after middleware
@@ -67,7 +62,7 @@ const authenticate = async (ctx, next) => {
     // Validate token and attach user
     ctx.state.user = { id: '123', name: 'Alice' };
     
-    return next();
+    await next();
 };
 
 // Apply to single route
@@ -154,13 +149,11 @@ Track request duration:
 ```typescript
 const timing: Middleware = async (ctx, next) => {
     const start = Date.now();
-    const result = await next();
+    await next();
     const duration = Date.now() - start;
     
     // Add timing header
     ctx.set('X-Response-Time', `${duration}ms`);
-    
-    return result;
 };
 
 app.use(timing);
@@ -182,7 +175,7 @@ const authenticate: Middleware = async (ctx, next) => {
         // Verify JWT token
         const user = await verifyToken(token);
         ctx.state.user = user;
-        return next();
+        await next();
     } catch (error) {
         return ctx.json({ error: 'Invalid token' }, 401);
     }
@@ -198,7 +191,7 @@ const requestId: Middleware = async (ctx, next) => {
     const id = crypto.randomUUID();
     ctx.state.requestId = id;
     ctx.set('X-Request-ID', id);
-    return next();
+    await next();
 };
 
 app.use(requestId);
@@ -223,7 +216,7 @@ const cors: Middleware = async (ctx, next) => {
         return ctx.status(204);
     }
     
-    return next();
+    await next();
 };
 
 app.use(cors);
@@ -237,11 +230,12 @@ Apply middleware conditionally:
 const conditionalAuth: Middleware = async (ctx, next) => {
     // Skip auth for public endpoints
     if (ctx.path.startsWith('/public')) {
-        return next();
+        await next();
+        return;
     }
     
     // Require auth for all other endpoints
-    return authenticate(ctx, next);
+    await authenticate(ctx, next);
 };
 
 app.use(conditionalAuth);
@@ -273,13 +267,11 @@ Middleware can modify responses:
 
 ```typescript
 const addHeaders: Middleware = async (ctx, next) => {
-    const result = await next();
+    await next();
     
     // Add custom headers to response
     ctx.set('X-Powered-By', 'Shokupan');
     ctx.set('X-Version', '1.0.0');
-    
-    return result;
 };
 
 app.use(addHeaders);
@@ -295,14 +287,14 @@ const loadUser: Middleware = async (ctx, next) => {
     if (userId) {
         ctx.state.user = await fetchUser(userId);
     }
-    return next();
+    await next();
 };
 
 const checkPermissions: Middleware = async (ctx, next) => {
     if (!ctx.state.user?.isAdmin) {
         return ctx.json({ error: 'Forbidden' }, 403);
     }
-    return next();
+    await next();
 };
 
 app.get('/admin', loadUser, checkPermissions, (ctx) => {

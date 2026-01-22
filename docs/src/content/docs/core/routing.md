@@ -166,12 +166,12 @@ const authenticate = async (ctx, next) => {
     if (!ctx.headers.get('authorization')) {
         return ctx.json({ error: 'Unauthorized' }, 401);
     }
-    return next();
+    await next();
 };
 
 const authorize = async (ctx, next) => {
     // Check permissions
-    return next();
+    await next();
 };
 
 app.get('/protected', 
