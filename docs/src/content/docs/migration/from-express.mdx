@@ -129,6 +129,71 @@ Shokupan automatically catches async errors in all handlers and middleware, elim
 | **Status** | `res.status(404)` | `return ctx.text('Not Found', 404)` |
 | **Send JSON** | `res.json(data)` | `return data` or `return ctx.json(data)` |
 
+## Streaming
+
+Express uses `res.write()` and `res.pipe()` for streaming. Shokupan provides modern streaming helpers.
+
+**Express (Manual Streaming):**
+```typescript
+app.get('/stream', (req, res) => {
+    res.setHeader('Content-Type', 'text/plain');
+    res.write('Hello ');
+    res.write('World');
+    res.end();
+});
+
+// Piping
+app.get('/file', (req, res) => {
+    const stream = fs.createReadStream('./file.txt');
+    stream.pipe(res);
+});
+```
+
+**Shokupan (Built-in Streaming):**
+```typescript
+app.get('/stream', (ctx) => {
+    return ctx.streamText(async (stream) => {
+        await stream.write('Hello ');
+        await stream.write('World');
+    });
+});
+
+// Piping
+app.get('/file', async (ctx) => {
+    const file = Bun.file('./file.txt');
+    return ctx.pipe(file.stream());
+});
+```
+
+**Server-Sent Events:**
+
+Express requires manual SSE formatting:
+```typescript
+app.get('/events', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    
+    setInterval(() => {
+        res.write(`data: ${JSON.stringify({ time: Date.now() })}\n\n`);
+    }, 1000);
+});
+```
+
+Shokupan has built-in SSE support:
+```typescript
+app.get('/events', (ctx) => {
+    return ctx.streamSSE(async (stream) => {
+        while (true) {
+            await stream.writeSSE({
+                data: JSON.stringify({ time: Date.now() })
+            });
+            await stream.sleep(1000);
+        }
+    });
+});
+```
+
+
 ## Migration Checklist
 
 import MigrationChecklist from '../../../components/MigrationChecklist.astro';

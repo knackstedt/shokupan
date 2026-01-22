@@ -142,6 +142,120 @@ export interface CookieOptions {
     priority?: 'low' | 'medium' | 'high' | 'Low' | 'Medium' | 'High';
 }
 
+/**
+ * Helper interface for generic streaming operations.
+ * Provides methods to write data, pipe streams, and handle abort events.
+ */
+export interface StreamHelper {
+    /**
+     * Write data to the stream.
+     * @param data Data to write (Uint8Array or string, strings are auto-encoded to UTF-8)
+     */
+    write(data: Uint8Array | string): Promise<void>;
+    /**
+     * Pipe a ReadableStream to this stream.
+     * @param stream ReadableStream to pipe
+     */
+    pipe(stream: ReadableStream): Promise<void>;
+    /**
+     * Sleep for a specified duration.
+     * @param ms Milliseconds to sleep
+     */
+    sleep(ms: number): Promise<void>;
+    /**
+     * Register a callback to be executed when the stream is aborted.
+     * @param callback Callback function
+     */
+    onAbort(callback: () => void): void;
+}
+
+/**
+ * Helper interface for text streaming operations.
+ * Provides methods to write text with or without newlines.
+ */
+export interface TextStreamHelper {
+    /**
+     * Write text to the stream without a newline.
+     * @param text Text to write
+     */
+    write(text: string): Promise<void>;
+    /**
+     * Write text to the stream with a newline.
+     * @param text Text to write
+     */
+    writeln(text: string): Promise<void>;
+    /**
+     * Sleep for a specified duration.
+     * @param ms Milliseconds to sleep
+     */
+    sleep(ms: number): Promise<void>;
+    /**
+     * Register a callback to be executed when the stream is aborted.
+     * @param callback Callback function
+     */
+    onAbort(callback: () => void): void;
+}
+
+/**
+ * Helper interface for Server-Sent Events (SSE) streaming.
+ * Provides methods to write SSE-formatted messages.
+ */
+export interface SSEStreamHelper {
+    /**
+     * Write a Server-Sent Event message.
+     * @param message SSE message with data, event, id, and retry fields
+     */
+    writeSSE(message: SSEMessage): Promise<void>;
+    /**
+     * Sleep for a specified duration.
+     * @param ms Milliseconds to sleep
+     */
+    sleep(ms: number): Promise<void>;
+    /**
+     * Register a callback to be executed when the stream is aborted.
+     * @param callback Callback function
+     */
+    onAbort(callback: () => void): void;
+}
+
+/**
+ * Server-Sent Event message format.
+ */
+export interface SSEMessage {
+    /**
+     * The data payload of the event.
+     */
+    data: string;
+    /**
+     * Optional event type.
+     */
+    event?: string;
+    /**
+     * Optional event ID.
+     */
+    id?: string;
+    /**
+     * Optional reconnection time in milliseconds.
+     */
+    retry?: number;
+}
+
+/**
+ * Error handler for stream operations.
+ */
+export type StreamErrorHandler = (err: Error, stream: StreamHelper) => void | Promise<void>;
+
+/**
+ * Error handler for text stream operations.
+ */
+export type TextStreamErrorHandler = (err: Error, stream: TextStreamHelper) => void | Promise<void>;
+
+/**
+ * Error handler for SSE stream operations.
+ */
+export type SSEStreamErrorHandler = (err: Error, stream: SSEStreamHelper) => void | Promise<void>;
+
+
 
 export type ShokupanHandler<
     State extends Record<string, any> = Record<string, any>,

@@ -8,7 +8,7 @@ import { VALID_HTTP_STATUSES, VALID_REDIRECT_STATUSES } from './util/http-status
 import type { ShokupanRequest } from './util/request';
 import { ShokupanResponse } from './util/response';
 import { $bodyParsed, $bodyParseError, $bodyType, $cachedBody, $cachedCookies, $cachedHost, $cachedHostname, $cachedOrigin, $cachedProtocol, $cachedQuery, $debug, $finalResponse, $io, $rawBody, $requestId, $routeMatched, $socket, $url, $ws } from './util/symbol';
-import type { CookieOptions, HeadersInit, JSXRenderer } from './util/types';
+import type { CookieOptions, HeadersInit, JSXRenderer, SSEMessage, SSEStreamErrorHandler, SSEStreamHelper, StreamErrorHandler, StreamHelper, TextStreamErrorHandler, TextStreamHelper } from './util/types';
 
 /**
  * Security: Validate if a cookie domain is safe to use
@@ -912,5 +912,222 @@ export class ShokupanContext<
 
         const html = await this.renderer(element, args);
         return this.html(html, status, headers); // html() already stores _rawBody
+    }
+
+    /**
+     * Pipe a ReadableStream to the response
+     * @param stream ReadableStream to pipe
+     * @param options Response options (status, headers)
+     */
+    public pipe(stream: ReadableStream, options?: ResponseInit): Response {
+        const headers = this.mergeHeaders(options?.headers as any);
+        const status = options?.status ?? this.response.status ?? 200;
+
+        if (this.app?.applicationConfig?.validateStatusCodes && !VALID_HTTP_STATUSES.has(status)) {
+            throw new Error(`Invalid HTTP status code: ${status}`);
+        }
+
+        this[$finalResponse] = new Response(stream, { status, headers });
+        return this[$finalResponse];
+    }
+
+    /**
+     * Internal helper to create a streaming response with common infrastructure
+     * @private
+     */
+    private createStreamHelper<THelper>(
+        helperFactory: (
+            controller: ReadableStreamDefaultController,
+            aborted: { value: boolean; },
+            abortCallbacks: (() => void)[],
+            encoder: TextEncoder
+        ) => THelper,
+        callback: (helper: THelper) => Promise<void> | void,
+        onError?: (err: Error, helper: THelper) => void | Promise<void>,
+        headers?: HeadersInit
+    ): Response {
+        let controller: ReadableStreamDefaultController;
+        const aborted = { value: false }; // Use object for reference sharing
+        const abortCallbacks: (() => void)[] = [];
+        const encoder = new TextEncoder();
+        let helper: THelper;
+
+        const stream = new ReadableStream({
+            start(ctrl) {
+                controller = ctrl;
+                // Create helper after controller is initialized
+                helper = helperFactory(controller, aborted, abortCallbacks, encoder);
+
+                // Execute callback asynchronously
+                (async () => {
+                    try {
+                        await callback(helper);
+                        controller.close();
+                    } catch (err) {
+                        if (onError) {
+                            try {
+                                await onError(err as Error, helper);
+                            } catch (handlerErr) {
+                                console.error('Error in stream error handler:', handlerErr);
+                            }
+                        } else {
+                            console.error('Stream error:', err);
+                        }
+                        if (!aborted.value) {
+                            controller.close();
+                        }
+                    }
+                })();
+            },
+            async pull() {
+                // Stream is ready for more data
+            },
+            cancel() {
+                aborted.value = true;
+                abortCallbacks.forEach(cb => {
+                    try {
+                        cb();
+                    } catch (err) {
+                        console.error('Error in abort callback:', err);
+                    }
+                });
+            }
+        });
+
+        return this.pipe(stream, { headers });
+    }
+
+    /**
+     * Generic streaming helper for binary/text data
+     * @param callback Callback function that receives a StreamHelper
+     * @param onError Optional error handler
+     */
+    public stream(
+        callback: (stream: StreamHelper) => Promise<void> | void,
+        onError?: StreamErrorHandler
+    ): Response {
+        return this.createStreamHelper<StreamHelper>(
+            (controller, aborted, abortCallbacks, encoder) => ({
+                async write(data: Uint8Array | string): Promise<void> {
+                    if (aborted.value) return;
+                    const chunk = typeof data === 'string' ? encoder.encode(data) : data;
+                    controller.enqueue(chunk);
+                },
+                async pipe(stream: ReadableStream): Promise<void> {
+                    if (aborted.value) return;
+                    const reader = stream.getReader();
+                    try {
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done || aborted.value) break;
+                            controller.enqueue(value);
+                        }
+                    } finally {
+                        reader.releaseLock();
+                    }
+                },
+                sleep(ms: number): Promise<void> {
+                    return new Promise(resolve => setTimeout(resolve, ms));
+                },
+                onAbort(callback: () => void): void {
+                    abortCallbacks.push(callback);
+                }
+            }),
+            callback,
+            onError
+        );
+    }
+
+    /**
+     * Text streaming helper with proper headers
+     * @param callback Callback function that receives a TextStreamHelper
+     * @param onError Optional error handler
+     */
+    public streamText(
+        callback: (stream: TextStreamHelper) => Promise<void> | void,
+        onError?: TextStreamErrorHandler
+    ): Response {
+        const headers = new Headers(this.response.headers);
+        headers.set('Content-Type', 'text/plain; charset=utf-8');
+        headers.set('Transfer-Encoding', 'chunked');
+        headers.set('X-Content-Type-Options', 'nosniff');
+
+        return this.createStreamHelper<TextStreamHelper>(
+            (controller, aborted, abortCallbacks, encoder) => ({
+                async write(text: string): Promise<void> {
+                    if (aborted.value) return;
+                    controller.enqueue(encoder.encode(text));
+                },
+                async writeln(text: string): Promise<void> {
+                    if (aborted.value) return;
+                    controller.enqueue(encoder.encode(text + '\n'));
+                },
+                sleep(ms: number): Promise<void> {
+                    return new Promise(resolve => setTimeout(resolve, ms));
+                },
+                onAbort(callback: () => void): void {
+                    abortCallbacks.push(callback);
+                }
+            }),
+            callback,
+            onError,
+            headers
+        );
+    }
+
+    /**
+     * Server-Sent Events (SSE) streaming helper
+     * @param callback Callback function that receives an SSEStreamHelper
+     * @param onError Optional error handler
+     */
+    public streamSSE(
+        callback: (stream: SSEStreamHelper) => Promise<void> | void,
+        onError?: SSEStreamErrorHandler
+    ): Response {
+        const headers = new Headers(this.response.headers);
+        headers.set('Content-Type', 'text/event-stream');
+        headers.set('Cache-Control', 'no-cache');
+        headers.set('Connection', 'keep-alive');
+
+        return this.createStreamHelper<SSEStreamHelper>(
+            (controller, aborted, abortCallbacks, encoder) => ({
+                async writeSSE(message: SSEMessage): Promise<void> {
+                    if (aborted.value) return;
+
+                    let sseMessage = '';
+
+                    // Format according to SSE spec
+                    if (message.event) {
+                        sseMessage += `event: ${message.event}\n`;
+                    }
+                    if (message.id !== undefined) {
+                        sseMessage += `id: ${message.id}\n`;
+                    }
+                    if (message.retry !== undefined) {
+                        sseMessage += `retry: ${message.retry}\n`;
+                    }
+
+                    // Data can be multi-line, each line prefixed with "data: "
+                    const dataLines = message.data.split('\n');
+                    for (const line of dataLines) {
+                        sseMessage += `data: ${line}\n`;
+                    }
+
+                    // SSE messages end with double newline
+                    sseMessage += '\n';
+
+                    controller.enqueue(encoder.encode(sseMessage));
+                },
+                sleep(ms: number): Promise<void> {
+                    return new Promise(resolve => setTimeout(resolve, ms));
+                },
+                onAbort(callback: () => void): void {
+                    abortCallbacks.push(callback);
+                }
+            }),
+            callback,
+            onError,
+            headers
+        );
     }
 }

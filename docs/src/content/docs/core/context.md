@@ -329,6 +329,253 @@ app.get('/set-cookie', (ctx) => {
 });
 ```
 
+## Streaming Responses
+
+Shokupan provides powerful streaming capabilities for efficient data transfer, real-time updates, and Server-Sent Events (SSE).
+
+### Generic Streaming (`ctx.stream()`)
+
+Stream binary or text data with full control:
+
+```typescript
+app.get('/stream', (ctx) => {
+    return ctx.stream(async (stream) => {
+        // Write binary data
+        await stream.write(new Uint8Array([0x48, 0x65, 0x6c, 0x6c, 0x6f]));
+        
+        // Write string data (auto-encoded to UTF-8)
+        await stream.write("Hello World");
+        
+        // Sleep for delayed writes
+        await stream.sleep(1000);
+        
+        // Pipe another ReadableStream
+        const externalStream = await fetchDataStream();
+        await stream.pipe(externalStream);
+        
+        // Handle client disconnect
+        stream.onAbort(() => {
+            console.log('Client disconnected');
+            cleanup();
+        });
+    });
+});
+```
+
+**Error Handling:**
+
+```typescript
+app.get('/stream-safe', (ctx) => {
+    return ctx.stream(
+        async (stream) => {
+            await stream.write("Starting...");
+            throw new Error("Something went wrong");
+        },
+        (err, stream) => {
+            // Custom error handler
+            console.error('Stream error:', err);
+            // Optionally write error message
+        }
+    );
+});
+```
+
+### Text Streaming (`ctx.streamText()`)
+
+Optimized for text streaming with proper headers:
+
+```typescript
+app.get('/logs', (ctx) => {
+    return ctx.streamText(async (stream) => {
+        // Write without newline
+        await stream.write("Log: ");
+        
+        // Write with newline
+        await stream.writeln("Application started");
+        await stream.writeln("Loading modules...");
+        
+        // Delayed output
+        await stream.sleep(1000);
+        await stream.writeln("Ready!");
+    });
+});
+```
+
+**Automatically sets:**
+- `Content-Type: text/plain; charset=utf-8`
+- `Transfer-Encoding: chunked`
+- `X-Content-Type-Options: nosniff`
+
+**Real-time Log Streaming:**
+
+```typescript
+app.get('/tail-logs', (ctx) => {
+    return ctx.streamText(async (stream) => {
+        const logWatcher = watchLogFile('./app.log');
+        
+        stream.onAbort(() => {
+            logWatcher.close();
+        });
+        
+        for await (const line of logWatcher) {
+            await stream.writeln(line);
+        }
+    });
+});
+```
+
+### Server-Sent Events (`ctx.streamSSE()`)
+
+Perfect for real-time updates and live data:
+
+```typescript
+app.get('/events', (ctx) => {
+    return ctx.streamSSE(async (stream) => {
+        let id = 0;
+        
+        while (true) {
+            await stream.writeSSE({
+                event: 'time-update',
+                id: String(id++),
+                data: new Date().toISOString(),
+                retry: 5000  // Reconnect after 5s
+            });
+            
+            await stream.sleep(1000);
+        }
+    });
+});
+```
+
+**Automatically sets:**
+- `Content-Type: text/event-stream`
+- `Cache-Control: no-cache`
+- `Connection: keep-alive`
+
+**Live Updates Example:**
+
+```typescript
+app.get('/stock-prices', (ctx) => {
+    return ctx.streamSSE(async (stream) => {
+        const subscription = subscribeToStockUpdates();
+        
+        stream.onAbort(() => {
+            subscription.unsubscribe();
+        });
+        
+        for await (const update of subscription) {
+            await stream.writeSSE({
+                event: 'price-update',
+                data: JSON.stringify({
+                    symbol: update.symbol,
+                    price: update.price,
+                    change: update.change
+                }),
+                id: update.id
+            });
+        }
+    });
+});
+```
+
+**Client-side (Browser):**
+
+```javascript
+const eventSource = new EventSource('/stock-prices');
+
+eventSource.addEventListener('price-update', (event) => {
+    const data = JSON.parse(event.data);
+    console.log(`${data.symbol}: $${data.price}`);
+});
+
+eventSource.onerror = () => {
+    console.error('Connection lost, reconnecting...');
+};
+```
+
+### Piping Streams (`ctx.pipe()`)
+
+Pipe external ReadableStreams directly:
+
+```typescript
+app.get('/video/:id', async (ctx) => {
+    const videoId = ctx.params.id;
+    const videoStream = await getVideoStream(videoId);
+    
+    return ctx.pipe(videoStream, {
+        status: 200,
+        headers: {
+            'Content-Type': 'video/mp4',
+            'Accept-Ranges': 'bytes'
+        }
+    });
+});
+```
+
+**Proxy Example:**
+
+```typescript
+app.get('/proxy/:url', async (ctx) => {
+    const targetUrl = decodeURIComponent(ctx.params.url);
+    const response = await fetch(targetUrl);
+    
+    return ctx.pipe(response.body!, {
+        headers: {
+            'Content-Type': response.headers.get('Content-Type') || 'application/octet-stream'
+        }
+    });
+});
+```
+
+### AI/LLM Streaming
+
+Stream AI responses in real-time:
+
+```typescript
+app.post('/ai/chat', async (ctx) => {
+    const { message } = await ctx.body();
+    
+    return ctx.streamText(async (stream) => {
+        const aiStream = await callOpenAI(message);
+        
+        for await (const chunk of aiStream) {
+            await stream.write(chunk.content);
+        }
+    });
+});
+```
+
+### Performance Tips
+
+1. **Use appropriate method:**
+   - `ctx.stream()` for binary data or custom headers
+   - `ctx.streamText()` for text/logs
+   - `ctx.streamSSE()` for real-time events
+   - `ctx.pipe()` for external streams
+
+2. **Handle cleanup:**
+   ```typescript
+   stream.onAbort(() => {
+       // Close connections
+       // Release resources
+       // Stop background tasks
+   });
+   ```
+
+3. **Error handling:**
+   ```typescript
+   return ctx.streamText(
+       async (stream) => { /* ... */ },
+       (err, stream) => {
+           console.error('Stream error:', err);
+       }
+   );
+   ```
+
+4. **Backpressure:**
+   Streams automatically handle backpressure - no manual management needed!
+
+
 ## Advanced Features
 
 ### Client IP
