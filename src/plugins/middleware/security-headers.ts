@@ -71,10 +71,8 @@ export interface SecurityHeadersOptions {
  */
 export function SecurityHeaders(options: SecurityHeadersOptions = {}): Middleware {
     const securityHeadersMiddleware: Middleware = async function SecurityHeadersMiddleware(ctx: ShokupanContext, next: NextFn) {
-        const headers: Record<string, string> = {};
-
-        // Helper to set header if not already set or force it
-        const set = (k: string, v: string) => headers[k] = v;
+        // Helper to set header on the context response immediately
+        const set = (k: string, v: string) => ctx.response.set(k, v);
 
         // X-DNS-Prefetch-Control
         if (options.dnsPrefetchControl !== false) {
@@ -160,25 +158,6 @@ export function SecurityHeaders(options: SecurityHeadersOptions = {}): Middlewar
         // We need to intercept the response.
 
         const response = await next();
-
-        if (response instanceof Response) {
-            const headerEntries = Object.entries(headers);
-            for (let i = 0; i < headerEntries.length; i++) {
-                const [k, v] = headerEntries[i];
-                response.headers.set(k, v);
-            }
-            return response;
-        }
-
-        // If next() returned something else (e.g. string/json that router will wrap),
-        // we can't easily attach headers here unless we wrap the result in a Response.
-        // BUT `compose` and `router` logic allows next() to return result which `router` converts to Response.
-        // If middleware runs *before* router, next() returns the router's result.
-
-        // If we want to ensure headers are set, we might need to rely on `ctx` having a way to set "outgoing" headers 
-        // that the router respects, OR we must wrap the response.
-
-        return response;
         return response;
     };
     securityHeadersMiddleware.isBuiltin = true;

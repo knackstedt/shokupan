@@ -17,7 +17,8 @@ import "./util/instrumentation";
 import { MiddlewareTracker } from './util/middleware-tracker';
 import { ShokupanRequest } from './util/request';
 import { getCallerInfo } from './util/stack';
-import { $appRoot, $dispatch, $finalResponse, $isApplication, $routeMatched } from './util/symbol';
+import { $appRoot, $childRouters, $dispatch, $finalResponse, $isApplication, $mountPath, $routeMatched, $routes } from './util/symbol';
+import { RouterTrie } from './util/trie';
 import type { Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig, ShokupanPlugin } from './util/types';
 
 
@@ -107,6 +108,9 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     private server?: Server<any>;
     private datastore?: SurrealDatastore;
     public dbPromise?: Promise<any>;
+
+    // Performance: Flattened Router Trie
+    private rootTrie?: RouterTrie<T>;
 
     public override get db(): SurrealDatastore | undefined {
         return this.datastore;
@@ -400,6 +404,9 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             throw new Error("WinterCG adapter does not support listen(). Use fetch directly.");
         }
 
+        // Compile Routes (Flattening Optimization)
+        this.compile();
+
         // @ts-ignore
         this.server = await adapter.listen(finalPort, this);
 
@@ -456,6 +463,10 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
      * Processes a request by wrapping the standard fetch method.
      */
     public override async testRequest(options: RequestOptions): Promise<ProcessResult> {
+        if (!this.rootTrie) {
+            this.compile();
+        }
+
         let url = options.url || options.path || "/";
         if (!url.startsWith("http")) {
             const base = `http://${this.applicationConfig.hostname || "localhost"}:${this.applicationConfig.port || 3000}`;
@@ -574,7 +585,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
             try {
                 // Request Start Hook
-                // Request Start Hook
                 if (this.hasOnRequestStartHook) await this.runHooks('onRequestStart', ctx);
 
                 // Compose middleware + router dispatch
@@ -686,8 +696,13 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                     status = 400;
                 }
 
-                const body: any = { error: err.message || "Internal Server Error" };
-                if (err.errors) body.errors = err.errors;
+                // Mask error details in production
+                const isDev = this.applicationConfig.development !== false;
+                const message = isDev ? (err.message || "Internal Server Error") : "Internal Server Error";
+
+                const body: any = { error: message };
+                if (isDev && err.errors) body.errors = err.errors;
+                if (isDev && err.stack) body.stack = err.stack;
 
                 // Error Hook
                 if (this.hasOnErrorHook) await this.runHooks('onError', ctx, err);
@@ -729,5 +744,112 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 await this.runHooks('onResponseEnd', ctx, res);
                 return res;
             });
+    }
+
+    /**
+     * Compiles all routes into a master Trie for O(1) router lookup.
+     * Use this if adding routes dynamically after start (not recommended but possible).
+     */
+    public compile() {
+        this.rootTrie = new RouterTrie<T>();
+        this.flattenRoutes(this.rootTrie, this, "", []);
+        // Trigger generic instrumentation?
+    }
+
+    private flattenRoutes(
+        trie: RouterTrie<T>,
+        router: ShokupanRouter<T>,
+        prefix: string,
+        middlewareStack: Middleware[]
+    ) {
+        // 1. Determine Stack for this level
+        // If router is THIS (application), we do NOT add its middleware to the stack
+        // because it is already executed globally in handleRequest.
+        // If router is a child, we MUST add its middleware.
+        let effectiveStack = middlewareStack;
+        if (router !== this as any) {
+            effectiveStack = [...middlewareStack, ...router.middleware];
+        }
+
+        // Helper to join paths correctly, ensuring no double slashes or accidental trailing slashes
+        const joinPath = (base: string, segment: string) => {
+            let b = base;
+            // Normalize base: remove trailing slash unless it's root
+            if (b !== '/' && b.endsWith('/')) {
+                b = b.slice(0, -1);
+            }
+
+            let s = segment;
+
+            // For root segment, return base directly (no trailing slash)
+            if (s === '/') {
+                return b;
+            }
+
+            if (s === '') {
+                return b;
+            }
+
+            // Ensure separator
+            if (!s.startsWith('/')) {
+                s = '/' + s;
+            }
+
+            // If base is root '/', return s directly (s starts with /)
+            if (b === '/') {
+                return s;
+            }
+
+            return b + s;
+        };
+
+        // 2. Add local routes
+        for (const route of router[$routes]) {
+            const fullPath = joinPath(prefix, route.path);
+
+            // Wrap Handler with Middleware Stack
+            let handler = route.bakedHandler || route.handler;
+            if (effectiveStack.length > 0) {
+                const fn = compose(effectiveStack);
+                const originalHandler = handler;
+                handler = async (ctx) => {
+                    // Middleware stack needs "next" to proceed to handler
+                    // Handler is the terminal "next"
+                    return fn(ctx, () => originalHandler(ctx));
+                };
+                // Preserve metadata if any
+                (handler as any).originalHandler = (originalHandler as any).originalHandler || originalHandler;
+            }
+
+            trie.insert(route.method, fullPath, handler);
+
+            // Handle Trailing Slash Ambiguity for Root Routes
+            // If the route is effectively the "index" of the mount point (e.g. /docs or /asyncapi),
+            // we register BOTH /docs and /docs/ to ensure maximum compatibility.
+            if ((route.path === '/' || route.path === '') && fullPath !== '/') {
+                trie.insert(route.method, fullPath + '/', handler);
+            }
+        }
+
+        // 3. Recurse children
+        for (const child of router[$childRouters]) {
+            const mountPath = child[$mountPath];
+            const childPrefix = joinPath(prefix, mountPath);
+            this.flattenRoutes(trie, child, childPrefix, effectiveStack);
+        }
+    }
+
+    public override find(method: string, path: string) {
+        if (this.rootTrie) {
+            const result = this.rootTrie.search(method, path);
+            if (result) return result;
+
+            // Fallback HEAD -> GET
+            if (method === "HEAD") {
+                return this.rootTrie.search("GET", path);
+            }
+            return null;
+        }
+        return super.find(method, path);
     }
 }
