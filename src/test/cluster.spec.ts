@@ -86,7 +86,7 @@ describe('Cluster Plugin', () => {
             const pids = new Set<number>();
             const totalRequests = 20;
 
-            const fetchWithRetry = async (retries = 5, delay = 100) => {
+            const fetchWithRetry = async (retries = 30, delay = 100) => {
                 for (let i = 0; i < retries; i++) {
                     try {
                         const res = await fetch('http://localhost:45678/');

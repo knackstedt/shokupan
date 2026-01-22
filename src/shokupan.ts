@@ -701,13 +701,18 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         const timeoutMs = this.applicationConfig.requestTimeout;
 
         if (timeoutMs && timeoutMs > 0) {
-            // Optimization: avoid Promise.race allocation
-            const timeoutId = setTimeout(async () => {
-                controller.abort(); // Signal cancellation to handlers
-                await this.runHooks('onRequestTimeout', ctx);
-            }, timeoutMs);
+            let timeoutId: ReturnType<typeof setTimeout>;
 
-            executionPromise = executionPromise.finally(() => clearTimeout(timeoutId));
+            const timeoutPromise = new Promise<never>((_, reject) => {
+                timeoutId = setTimeout(async () => {
+                    controller.abort(); // Signal cancellation to handlers
+                    await this.runHooks('onRequestTimeout', ctx);
+                    reject(new Error("Request Timeout"));
+                }, timeoutMs);
+            });
+
+            executionPromise = Promise.race([executionPromise, timeoutPromise])
+                .finally(() => clearTimeout(timeoutId));
         }
 
         return executionPromise
