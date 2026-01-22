@@ -6,7 +6,7 @@ import { ShokupanContext } from "./context";
 import { compose } from "./middleware";
 import { generateOpenApi } from "./plugins/application/openapi/openapi";
 import { ShokupanRouter } from './router';
-import { BunAdapter, NodeAdapter } from './util/adapter/adapters';
+import { ShokupanServer } from './server';
 import { DefaultFileSystemAdapter } from './util/adapter/filesystem';
 import { asyncContext, RequestContextStore } from "./util/async-hooks";
 import { SystemCpuMonitor } from "./util/cpu-monitor";
@@ -105,14 +105,15 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     private asyncApiSpecPromise?: Promise<any>;
     private composedMiddleware?: Middleware;
     private cpuMonitor?: SystemCpuMonitor;
-    private server?: Server<any>;
+    public server?: Server<any>;
+    private httpServer?: ShokupanServer;
     private datastore?: SurrealDatastore;
     public dbPromise?: Promise<any>;
 
     // Performance: Flattened Router Trie
     private rootTrie?: RouterTrie<T>;
 
-    public override get db(): SurrealDatastore | undefined {
+    public get db(): SurrealDatastore | undefined {
         return this.datastore;
     }
 
@@ -252,13 +253,11 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
      * @param port - The port to listen on. If not specified, the port from the configuration is used. If that is not specified, port 3000 is used.
      * @returns The server instance.
      */
-    public async listen(port?: number) {
-        const finalPort = port ?? this.applicationConfig.port ?? 3000;
-
-        if (finalPort < 0 || finalPort > 65535 || finalPort % 1 !== 0) {
-            throw new Error("Invalid port number");
-        }
-
+    /**
+     * Prepare the application for listening.
+     * Use this if you want to initialize the app without starting the server immediately.
+     */
+    public async start() {
         // Run startup hooks
         await Promise.all(this.startupHooks.map(hook => hook()));
 
@@ -299,12 +298,12 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                         auth: config.auth || { type: "none" },
                         api: config.api || {
                             type: "openapi",
-                            url: `${this.applicationConfig.hostname === 'localhost' ? 'http' : 'https'}://${this.applicationConfig.hostname}:${finalPort}/.well-known/openapi.yaml`,
+                            url: `${this.applicationConfig.hostname === 'localhost' ? 'http' : 'https'}://${this.applicationConfig.hostname}:${this.applicationConfig.port}/.well-known/openapi.yaml`,
                             is_user_authenticated: false
                         },
-                        logo_url: config.logo_url || `${this.applicationConfig.hostname === 'localhost' ? 'http' : 'https'}://${this.applicationConfig.hostname}:${finalPort}/logo.png`, // Placeholder default
+                        logo_url: config.logo_url || `${this.applicationConfig.hostname === 'localhost' ? 'http' : 'https'}://${this.applicationConfig.hostname}:${this.applicationConfig.port}/logo.png`, // Placeholder default
                         contact_email: config.contact_email || pkg.author?.email || "support@example.com",
-                        legal_info_url: config.legal_info_url || `${this.applicationConfig.hostname === 'localhost' ? 'http' : 'https'}://${this.applicationConfig.hostname}:${finalPort}/legal`
+                        legal_info_url: config.legal_info_url || `${this.applicationConfig.hostname === 'localhost' ? 'http' : 'https'}://${this.applicationConfig.hostname}:${this.applicationConfig.port}/legal`
                     };
 
                     return ctx.json(manifest);
@@ -322,8 +321,8 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                         versions: config.versions || [
                             {
                                 name: this.openApiSpec.info.version || "v1",
-                                url: `${this.applicationConfig.hostname === 'localhost' ? 'http' : 'https'}://${this.applicationConfig.hostname}:${finalPort}/`,
-                                spec_url: `${this.applicationConfig.hostname === 'localhost' ? 'http' : 'https'}://${this.applicationConfig.hostname}:${finalPort}/.well-known/openapi.yaml`
+                                url: `${this.applicationConfig.hostname === 'localhost' ? 'http' : 'https'}://${this.applicationConfig.hostname}:${this.applicationConfig.port}/`,
+                                spec_url: `${this.applicationConfig.hostname === 'localhost' ? 'http' : 'https'}://${this.applicationConfig.hostname}:${this.applicationConfig.port}/.well-known/openapi.yaml`
                             }
                         ]
                     };
@@ -381,40 +380,17 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             this.cpuMonitor = new SystemCpuMonitor();
             this.cpuMonitor.start();
         }
+    }
 
-
-        // Use Adapter
-        let adapter = this.applicationConfig.adapter;
-        if (!adapter) {
-            // Auto-detect if adapter not specified
-            // @ts-ignore
-            if (typeof Bun !== "undefined") {
-                this.applicationConfig.adapter = 'bun';
-                adapter = new BunAdapter();
-            } else {
-                this.applicationConfig.adapter = 'node';
-                adapter = new NodeAdapter();
-            }
-        } else if (adapter === 'bun') {
-            adapter = new BunAdapter();
-        } else if (adapter === 'node') {
-            adapter = new NodeAdapter();
-        } else if (adapter === 'wintercg') {
-            // WinterCG adapter doesn't listen
-            throw new Error("WinterCG adapter does not support listen(). Use fetch directly.");
-        }
-
-        // Compile Routes (Flattening Optimization)
-        this.compile();
-
-        // @ts-ignore
-        this.server = await adapter.listen(finalPort, this);
-
-        // Update config port if 0 was used (random port assignment)
-        if (finalPort === 0 && this.server?.port) {
-            this.applicationConfig.port = this.server.port;
-        }
-
+    /**
+     * Starts the application server.
+     * 
+     * @param port - The port to listen on. If not specified, the port from the configuration is used. If that is not specified, port 3000 is used.
+     * @returns The server instance.
+     */
+    public async listen(port?: number) {
+        this.httpServer = new ShokupanServer(this);
+        this.server = await this.httpServer.listen(port);
         return this.server;
     }
 
@@ -445,10 +421,13 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         }
 
         // Stop the server if it exists
-        if (this.server) {
+        if (this.httpServer !== undefined) {
+            await this.httpServer.stop(closeActiveConnections);
+        } else if (this.server?.stop) {
+            // Fallback
             await this.server.stop(closeActiveConnections);
-            this.server = undefined;
         }
+        this.server = undefined;
 
         // Teardown DI Container
         const { Container } = await import("./util/di");

@@ -4,7 +4,6 @@ import { generateOpenApi } from './plugins/application/openapi/openapi';
 import { serveStatic } from './plugins/middleware/serve-static';
 import type { Shokupan } from './shokupan';
 import { ControllerScanner } from './util/controller-scanner';
-import type { SurrealDatastore } from './util/datastore';
 import { EventError, getErrorStatus } from './util/http-error';
 import { HTTP_STATUS } from './util/http-status';
 import { MiddlewareTracker } from './util/middleware-tracker';
@@ -113,9 +112,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
     public requestTimeout?: number;
 
-    public get db(): SurrealDatastore | undefined {
-        return this.root?.db;
-    }
+
 
     private hookCache = new Map<keyof ShokupanHooks, Function[]>();
     private hooksInitialized: boolean = false;

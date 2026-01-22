@@ -1,15 +1,11 @@
+
 import type { Server } from "bun";
 import { ShokupanContext } from "../../context";
 import { compose } from "../../middleware";
-import { createHttpServer } from "../../plugins/application/http-server";
 import type { Shokupan } from "../../shokupan";
 import { ShokupanRequest } from "../request";
 import { $ws } from "../symbol";
-
-export interface ServerAdapter {
-    listen(port: number, app: Shokupan): Promise<any>;
-    stop?(): Promise<void>;
-}
+import type { ServerAdapter } from "./interface";
 
 export class BunAdapter implements ServerAdapter {
     private server?: Server<any>;
@@ -170,42 +166,5 @@ export class BunAdapter implements ServerAdapter {
         if (this.server) {
             this.server.stop();
         }
-    }
-}
-
-export class NodeAdapter implements ServerAdapter {
-    private server?: any;
-
-    async listen(port: number, app: Shokupan): Promise<any> {
-        let factory = app.applicationConfig.serverFactory;
-
-        if (!factory) {
-            factory = createHttpServer();
-        }
-
-        const serveOptions = {
-            port: port,
-            hostname: app.applicationConfig.hostname,
-            development: app.applicationConfig.development,
-            fetch: app.fetch.bind(app),
-            reusePort: app.applicationConfig.reusePort,
-            // Node adapter might not support all options exactly the same
-        };
-
-        this.server = await factory(serveOptions);
-        return this.server;
-    }
-
-    async stop() {
-        if (this.server?.stop) {
-            await this.server.stop();
-        }
-    }
-}
-
-export class WinterCGAdapter implements ServerAdapter {
-    async listen(port: number, app: Shokupan): Promise<any> {
-        console.warn("WinterCGAdapter does not support 'listen()'. Use 'export default app' or invoke 'app.fetch' directly.");
-        return {};
     }
 }

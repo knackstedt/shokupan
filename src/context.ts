@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { inspect } from 'node:util';
 import type { Socket, Server as SocketServer } from 'socket.io';
 import type { Shokupan } from './shokupan';
+import { BodyParser } from './util/body-parser';
 import { VALID_HTTP_STATUSES, VALID_REDIRECT_STATUSES } from './util/http-status';
 import type { ShokupanRequest } from './util/request';
 import { ShokupanResponse } from './util/response';
@@ -532,6 +533,10 @@ export class ShokupanContext<
      * Read request body with caching to avoid double parsing.
      * The body is only parsed once and cached for subsequent reads.
      */
+    /**
+     * Read request body with caching to avoid double parsing.
+     * The body is only parsed once and cached for subsequent reads.
+     */
     async body<T = any>(): Promise<T> {
         // If there was an error during pre-parsing, throw it now
         if (this[$bodyParseError] !== undefined) {
@@ -543,54 +548,13 @@ export class ShokupanContext<
             return this[$cachedBody] as T;
         }
 
-        const contentType = this.request.headers.get("content-type") || "";
+        const config = this.app?.applicationConfig || {};
+        const { type, body } = await BodyParser.parse(this.request, config);
 
-        if (contentType.includes("application/json") || contentType.includes("+json")) {
-            const parserType = this.app?.applicationConfig?.jsonParser || 'native';
-
-            // To enforce maxBodySize, we must read the raw body ourselves
-            // native request.json() might read everything without limit check (depending on runtime)
-            // safer to read text with limit, then parse.
-
-            const rawText = await this.readRawBody();
-
-            if (parserType === 'native') {
-                try {
-                    // Handle empty body definition
-                    if (!rawText) return {} as any;
-                    this[$cachedBody] = JSON.parse(rawText);
-                } catch (e) {
-                    throw e;
-                }
-            } else {
-                const { getJSONParser } = await import('./util/json-parser');
-                const parser = getJSONParser(parserType);
-                this[$cachedBody] = parser(rawText);
-            }
-
-            this[$bodyType] = 'json';
-        } else if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
-            // FormData limit check is harder as we want browser to parse it.
-            // But we can check Content-Length at least.
-            const maxBodySize = this.app?.applicationConfig?.maxBodySize ?? 10 * 1024 * 1024;
-            const cl = parseInt(this.request.headers.get("content-length") || "0", 10);
-            if (cl > maxBodySize) {
-                const err = new Error("Payload Too Large");
-                (err as any).status = 413;
-                throw err;
-            }
-            // NOTE: if CL is missing or lying (chunked), this might still read valid FormData until OOM in native parser. 
-            // Implementing streaming FormData parser is out of scope for "hardening" phase.
-
-            this[$cachedBody] = await this.request.formData();
-            this[$bodyType] = 'formData';
-        } else {
-            // Use readRawBody for text to enforce limit
-            this[$cachedBody] = await this.readRawBody();
-            this[$bodyType] = 'text';
-        }
-
+        this[$bodyType] = type as any;
+        this[$cachedBody] = body;
         this[$bodyParsed] = true;
+
         return this[$cachedBody] as T;
     }
 
@@ -633,62 +597,7 @@ export class ShokupanContext<
         }
     }
 
-    /**
-     * Read raw body from ReadableStream efficiently.
-     * This is much faster than request.text() for large payloads.
-     * Also handles the case where body is already a string (e.g., in tests).
-     */
-    private async readRawBody(): Promise<string> {
-        const maxBodySize = this.app?.applicationConfig?.maxBodySize ?? 10 * 1024 * 1024;
 
-        // Handle test case where body is already a string
-        if (typeof (this.request as any).body === 'string') {
-            const body = (this.request as any).body;
-            if (body.length > maxBodySize) {
-                const err = new Error("Payload Too Large");
-                (err as any).status = 413;
-                throw err;
-            }
-            return body;
-        }
-
-        const reader = this.request.body?.getReader();
-        if (!reader) {
-            return '';
-        }
-
-        const chunks: Uint8Array[] = [];
-        let totalSize = 0;
-
-        try {
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                totalSize += value.length;
-                if (totalSize > maxBodySize) {
-                    const err = new Error("Payload Too Large");
-                    (err as any).status = 413;
-                    throw err;
-                }
-
-                chunks.push(value);
-            }
-        } finally {
-            reader.releaseLock();
-        }
-
-        // Efficiently combine chunks into single buffer
-        const result = new Uint8Array(totalSize);
-        let offset = 0;
-        for (let i = 0; i < chunks.length; i++) {
-            const chunk = chunks[i];
-            result.set(chunk, offset);
-            offset += chunk.length;
-        }
-
-        return new TextDecoder().decode(result);
-    }
 
     /**
      * Send a response

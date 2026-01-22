@@ -1,12 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import { createHttpServer } from "../../plugins/application/http-server";
 import { Shokupan } from "../../shokupan";
 
 describe("Server Adapters", () => {
     it("should support swapping the server engine to node:http", async () => {
         const app = new Shokupan({
             port: 0,
-            serverFactory: createHttpServer()
+            adapter: 'node'
         });
 
         app.get("/", ctx => ctx.text("Hello from Node HTTP"));
@@ -23,7 +22,7 @@ describe("Server Adapters", () => {
     it("should support app.stop() with node:http server", async () => {
         const app = new Shokupan({
             port: 0,
-            serverFactory: createHttpServer()
+            adapter: 'node'
         });
 
         app.get("/", ctx => ctx.text("Hello from Node HTTP"));
