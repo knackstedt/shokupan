@@ -57,7 +57,7 @@ export class ControllerScanner {
             name: instance.constructor.name
         };
 
-        router.registerControllerInstance(instance);
+        router.bindController(instance);
 
         // Get Middleware for Controller
         const controllerMiddleware = (typeof controller === 'function' ? (controller as any)[$middleware] : (instance as any)[$middleware]) || [];
@@ -218,6 +218,9 @@ export class ControllerScanner {
                                     break;
                                 case RouteParamType.CONTEXT:
                                     args[arg.index] = ctx;
+                                    break;
+                                case RouteParamType.SERVICE:
+                                    args[arg.index] = Container.resolve(arg.token);
                                     break;
                             }
                         }

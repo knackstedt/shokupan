@@ -62,6 +62,7 @@ export default defineConfig({
                         { label: 'Routing', link: '/core/routing/' },
                         { label: 'Controllers', link: '/core/controllers/' },
                         { label: 'Middleware', link: '/core/middleware/' },
+                        { label: 'Dependency Injection', link: '/core/dependency-injection/' },
                         { label: 'Context', link: '/core/context/' },
                         { label: 'Static Files', link: '/core/static-files/' },
                         { label: 'WebSockets', link: '/core/websockets/' },

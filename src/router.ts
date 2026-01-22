@@ -148,7 +148,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
 
     // Registry Accessor
-    public getComponentRegistry(): {
+    public get registry(): {
         metadata: RouteMetadata,
         middleware: { name: string, metadata: RouteMetadata, order: number, _fn: Middleware; }[],
         routes: { type: 'route', path: string, method: Method, metadata: RouteMetadata, handlerName: string, tags: string[], order: number, _fn: ShokupanHandler<T>; }[],
@@ -197,7 +197,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             type: 'router' as 'router',
             path: r[$mountPath].startsWith('/') ? r[$mountPath] : '/' + r[$mountPath],
             metadata: r.metadata,
-            children: r.getComponentRegistry()
+            children: r.registry
         }));
 
         // Collect child controllers
@@ -323,7 +323,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     /**
      * Registers a controller instance to the router.
      */
-    public registerControllerInstance(controller: any) {
+    public bindController(controller: any) {
         this[$childControllers].push(controller);
     }
 

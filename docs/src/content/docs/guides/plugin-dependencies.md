@@ -5,7 +5,7 @@ description: Shokupan uses an optional peer dependency model for plugin-specific
 
 ## Overview
 
-Most of Shokupan's dependencies are now **optional peer dependencies**. This means:
+Most of Shokupan's dependencies are **optional peer dependencies**. This means:
 - ✅ Smaller install size for basic apps
 - ✅ Install only what you use
 - ✅ Clear error messages when dependencies are missing

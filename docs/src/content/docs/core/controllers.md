@@ -260,26 +260,24 @@ export class UserController {
 ```
 
 ## Dependency Injection
-
-Use the DI container in controllers:
-
+ 
+Use the DI container to inject services into your controllers:
+ 
 ```typescript
-import { Container } from 'shokupan';
-
+import { Injectable, Controller, Get } from 'shokupan';
+ 
+@Injectable()
 class UserService {
     getUsers() {
         return ['Alice', 'Bob'];
     }
 }
-
-Container.register('userService', UserService);
-
+ 
+@Controller('/users')
 export class UserController {
-    private userService: UserService;
     
-    constructor() {
-        this.userService = Container.resolve('userService');
-    }
+    // Automatic Constructor Injection
+    constructor(private userService: UserService) {}
     
     @Get('/')
     getAllUsers() {
@@ -287,6 +285,7 @@ export class UserController {
     }
 }
 ```
+
 
 ## Multiple Controllers
 
@@ -330,5 +329,5 @@ For controllers to work, enable decorators in `tsconfig.json`:
 ## Next Steps
 
 - [Middleware](/core/middleware/) - Create custom middleware
-- [Dependency Injection](/advanced/dependency-injection/) - Advanced DI patterns
+- [Dependency Injection](/guides/dependency-injection/) - Advanced DI patterns
 - [Validation](/plugins/validation/) - Validate controller inputs

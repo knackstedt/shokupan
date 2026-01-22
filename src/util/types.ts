@@ -156,7 +156,8 @@ export enum RouteParamType {
     QUERY = "QUERY",
     HEADER = "HEADER",
     REQUEST = "REQUEST",
-    CONTEXT = "CONTEXT"
+    CONTEXT = "CONTEXT",
+    SERVICE = "SERVICE"
 }
 
 export interface ServerFactory {

@@ -442,6 +442,10 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             await this.server.stop(closeActiveConnections);
             this.server = undefined;
         }
+
+        // Teardown DI Container
+        const { Container } = await import("./util/di");
+        await Container.teardown();
     }
 
     public [$dispatch](req: ShokupanRequest<T>) {
