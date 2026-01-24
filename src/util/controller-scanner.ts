@@ -1,6 +1,7 @@
 
 import { ShokupanContext } from '../context';
 import { compose } from '../middleware';
+import { ResilienceFactory } from '../plugins/resilience/factory';
 import type { ShokupanRouter } from '../router';
 import { Container } from './di';
 import { traceHandler } from './instrumentation';
@@ -14,6 +15,7 @@ import {
     $mcpTools,
     $middleware,
     $mountPath,
+    $resilienceConfig,
     $routeArgs,
     $routeMethods,
     $routeSpec
@@ -84,7 +86,9 @@ export class ControllerScanner {
         const decoratedEvents = (instance as any)[$eventMethods] || (proto && (proto as any)[$eventMethods]);
         const mcpTools = (instance as any)[$mcpTools] || (proto && (proto as any)[$mcpTools]);
         const mcpPrompts = (instance as any)[$mcpPrompts] || (proto && (proto as any)[$mcpPrompts]);
+
         const mcpResources = (instance as any)[$mcpResources] || (proto && (proto as any)[$mcpResources]);
+        const resilienceConfigMap = (instance as any)[$resilienceConfig] || (proto && (proto as any)[$resilienceConfig]);
 
         let routesAttached = 0;
         for (let i = 0; i < Array.from(methods).length; i++) {
@@ -245,6 +249,16 @@ export class ControllerScanner {
                     const composed = compose(allMiddleware);
                     finalHandler = async (ctx) => {
                         return composed(ctx, () => wrappedHandler(ctx));
+                    };
+                }
+
+                // Resilience Policy Wrapping
+                const config = resilienceConfigMap?.get(name);
+                if (config) {
+                    const policy = ResilienceFactory.createPolicy(config);
+                    const baseHandler = finalHandler;
+                    finalHandler = async (ctx) => {
+                        return policy.execute(() => baseHandler(ctx));
                     };
                 }
 
