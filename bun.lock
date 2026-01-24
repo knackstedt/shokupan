@@ -6,6 +6,7 @@
       "name": "shokupan",
       "dependencies": {
         "@clack/prompts": "^0.11.0",
+        "cockatiel": "^3.2.1",
         "nanoid": "^5.1.6",
         "tslib": "^2.8.1",
       },
@@ -60,11 +61,6 @@
         "@apollo/server": "^5.2.0",
         "@modelcontextprotocol/sdk": "^1.25.2",
         "@opentelemetry/api": "^1.9.0",
-        "@opentelemetry/exporter-trace-otlp-proto": "^0.208.0",
-        "@opentelemetry/resources": "^2.3.0",
-        "@opentelemetry/sdk-trace-base": "^2.3.0",
-        "@opentelemetry/sdk-trace-node": "^2.3.0",
-        "@opentelemetry/semantic-conventions": "^1.38.0",
         "@scalar/api-reference": "^1.0.0",
         "@scalar/openapi-types": "^0.5.3",
         "@surrealdb/node": "^2.4.0",
@@ -88,11 +84,6 @@
         "@apollo/server",
         "@modelcontextprotocol/sdk",
         "@opentelemetry/api",
-        "@opentelemetry/exporter-trace-otlp-proto",
-        "@opentelemetry/resources",
-        "@opentelemetry/sdk-trace-base",
-        "@opentelemetry/sdk-trace-node",
-        "@opentelemetry/semantic-conventions",
         "@scalar/api-reference",
         "@scalar/openapi-types",
         "@surrealdb/node",
@@ -730,6 +721,8 @@
     "class-validator": ["class-validator@0.14.3", "", { "dependencies": { "@types/validator": "^13.15.3", "libphonenumber-js": "^1.11.1", "validator": "^13.15.20" } }, "sha512-rXXekcjofVN1LTOSw+u4u9WXVEUvNBVjORW154q/IdmYWy1nMbOU9aNtZB0t8m+FJQ9q91jlr2f9CwwUFdFMRA=="],
 
     "clsx": ["clsx@2.1.1", "", {}, "sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA=="],
+
+    "cockatiel": ["cockatiel@3.2.1", "", {}, "sha512-gfrHV6ZPkquExvMh9IOkKsBzNDk6sDuZ6DdBGUBkvFnTCqCxzpuq48RySgP0AnaqQkw2zynOFj9yly6T1Q2G5Q=="],
 
     "combined-stream": ["combined-stream@1.0.8", "", { "dependencies": { "delayed-stream": "~1.0.0" } }, "sha512-FQN4MRfuJeHf7cBbBMJFXhKSDq+2kAArBlmRBvcvFE5BB1HZKXtSFASDhdlz9zOYwxh8lDdnvmMOe/+5cdoEdg=="],
 
