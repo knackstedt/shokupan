@@ -149,6 +149,9 @@
         },
         "socket.io": {
             "optional": true
+        },
+        "youch": {
+            "optional": true
         }
     },
     "devDependencies": {

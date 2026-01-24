@@ -9,7 +9,7 @@ import { DefaultFileSystemAdapter } from './util/adapter/filesystem';
 import { asyncContext, RequestContextStore } from "./util/async-hooks";
 import { SystemCpuMonitor } from "./util/cpu-monitor";
 import { SurrealDatastore } from './util/datastore';
-import { getErrorStatus } from "./util/http-error";
+import { getErrorStatus, NotFoundError } from "./util/http-error";
 import { HTTP_STATUS } from "./util/http-status";
 import "./util/instrumentation";
 import { MiddlewareTracker } from './util/middleware-tracker';
@@ -146,9 +146,9 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         };
 
         // Security: Apply default security headers
-        if (this.applicationConfig.securityHeaders !== false) {
+        if (this.applicationConfig.defaultSecurityHeaders) {
             const { SecurityHeaders } = require("./plugins/middleware/security-headers");
-            this.use(SecurityHeaders(this.applicationConfig.securityHeaders === true ? {} : this.applicationConfig.securityHeaders));
+            this.use(SecurityHeaders(this.applicationConfig.defaultSecurityHeaders === true ? {} : this.applicationConfig.defaultSecurityHeaders));
         }
 
         if (this.applicationConfig.adapter !== 'wintercg') {
@@ -594,7 +594,20 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                         return match.handler(ctx);
                     }
 
-                    return null;
+                    // Fallback: If no route matched, check if it's a WebSocket upgrade request that can be handled by default handlers
+                    // This supports Shokupan's Native WebSocket Events if no specific middleware/route handled it
+                    if (ctx.upgrade()) {
+                        return undefined as unknown as Response;
+                    }
+
+                    // No route matched - return 404 Not Found
+                    // Exception: If middleware manually changed the status from default 200,
+                    // respect that (e.g., auth middleware set 401)
+                    if (ctx.response.status !== HTTP_STATUS.OK) {
+                        return ctx.send(null, { status: ctx.response.status, headers: ctx.response.headers });
+                    }
+
+                    throw new NotFoundError();
                 });
 
                 let response: Response | Promise<Response>;
@@ -605,7 +618,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 else if ((result === null || result === undefined) && ctx[$finalResponse] instanceof Response) {
                     response = ctx[$finalResponse];
                 }
-                // (Logic moved to main block below)
                 else if (result === null || result === undefined) {
                     // Handler returned nothing (void/null/undefined)
 
@@ -616,7 +628,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                         // Request was successfully upgraded to WebSocket
                         return undefined as unknown as Response;
                     }
-                    // 2. Logic Split: Route Matched vs Not Found
                     else if (ctx[$routeMatched]) {
                         // A route WAS matched but returned nothing.
                         // Default to 204 No Content (unless user set status manually via ctx.response.status)
@@ -626,22 +637,9 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                         }
                         // We send an empty response with the determined status
                         response = ctx.send(null, { status, headers: ctx.response.headers });
-                    }
-                    else {
-                        // Fallback: If no route matched, check if it's a WebSocket upgrade request that can be handled by default handlers
-                        // This supports Shokupan's Native WebSocket Events if no specific middleware/route handled it
-                        if (ctx.upgrade()) {
-                            return undefined as unknown as Response;
-                        }
-
-                        // No route matched - return 404 Not Found
-                        // Exception: If middleware manually changed the status from default 200,
-                        // respect that (e.g., auth middleware set 401)
-                        if (ctx.response.status !== HTTP_STATUS.OK) {
-                            response = ctx.send(null, { status: ctx.response.status, headers: ctx.response.headers });
-                        } else {
-                            response = ctx.text("Not Found", HTTP_STATUS.NOT_FOUND);
-                        }
+                    } else {
+                        // Should have been thrown inside the middleware chain
+                        throw new NotFoundError();
                     }
                 }
                 else if (typeof result === "object") {
@@ -724,7 +722,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 await this.runHooks('onResponseEnd', ctx, res);
                 return res;
             });
-    }
+    };
 
     /**
      * Compiles all routes into a master Trie for O(1) router lookup.
