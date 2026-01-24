@@ -1,12 +1,25 @@
-import { SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 import type { Middleware, ShokupanHandler } from "./types";
 
-const tracer = trace.getTracer("shokupan.middleware");
+let trace: any;
+let SpanKind: any;
+let SpanStatusCode: any;
+
+try {
+    const otel = require('@opentelemetry/api');
+    trace = otel.trace;
+    SpanKind = otel.SpanKind;
+    SpanStatusCode = otel.SpanStatusCode;
+} catch (e) {
+    // OpenTelemetry not available
+}
 
 /**
  * Wraps a middleware function with an OpenTelemetry span.
  */
 export function traceMiddleware(fn: Middleware, name?: string): Middleware {
+    if (!trace) return fn;
+
+    const tracer = trace.getTracer("shokupan.middleware");
     const middlewareName = name || fn.name || "anonymous middleware";
 
     return async (ctx, next) => {
@@ -16,7 +29,7 @@ export function traceMiddleware(fn: Middleware, name?: string): Middleware {
                 "code.function": middlewareName,
                 "component": "shokupan.middleware"
             }
-        }, async (span) => {
+        }, async (span: any) => {
             try {
                 const result = await fn(ctx, next);
                 return result;
@@ -37,6 +50,10 @@ export function traceMiddleware(fn: Middleware, name?: string): Middleware {
  * Wraps a route handler with an OpenTelemetry span.
  */
 export function traceHandler(fn: ShokupanHandler | ((...args: any[]) => any), name: string): ShokupanHandler {
+    if (!trace) return fn as ShokupanHandler;
+
+    const tracer = trace.getTracer("shokupan.middleware");
+
     return async function (this: any, ...args: any[]) {
         return tracer.startActiveSpan(`route handler - ${name}`, {
             kind: SpanKind.INTERNAL,
@@ -44,7 +61,7 @@ export function traceHandler(fn: ShokupanHandler | ((...args: any[]) => any), na
                 "http.route": name,
                 "component": "shokupan.route"
             }
-        }, async (span) => {
+        }, async (span: any) => {
             try {
                 const result = await (fn as Function).apply(this, args);
                 return result;

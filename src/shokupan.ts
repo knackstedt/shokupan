@@ -1,6 +1,4 @@
-import { context, trace } from '@opentelemetry/api';
 import type { Server } from 'bun';
-import { dump } from 'js-yaml';
 import { Surreal } from 'surrealdb';
 import { ShokupanContext } from "./context";
 import { compose } from "./middleware";
@@ -269,6 +267,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 try {
                     // Wait for spec if not ready yet
                     await this.openApiSpecPromise;
+                    const { dump } = await import('js-yaml');
                     const yaml = dump(this.openApiSpec);
                     return ctx.send(yaml, { status: 200, headers: { 'content-type': 'application/yaml' } });
                 } catch (e) {
@@ -511,6 +510,8 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
 
         if (this.applicationConfig.enableTracing) {
+            // Dynamic import to avoid hard dependency
+            const { trace, context } = await import('@opentelemetry/api');
             const tracer = trace.getTracer("shokupan.application");
             const store = asyncContext.getStore();
 
