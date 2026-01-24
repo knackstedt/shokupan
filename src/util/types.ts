@@ -3,6 +3,8 @@ import type { Server } from 'bun';
 import type { Server as NodeServer } from 'node:http';
 import type { ConnectOptions, Engines } from 'surrealdb';
 import type { ShokupanContext } from '../context';
+import type { ServerAdapter } from './adapter';
+import type { FileSystemAdapter } from './adapter/filesystem';
 import { $isRouter } from "./symbol";
 
 export type HeadersInit = Headers | Record<string, string> | [string, string][];
@@ -605,12 +607,12 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      * The server adapter to use.
      * overrides `serverFactory`.
      */
-    adapter?: 'bun' | 'node' | 'wintercg' | import('./adapter/adapters').ServerAdapter;
+    adapter?: 'bun' | 'node' | 'wintercg' | ServerAdapter;
 
     /**
      * The file system adapter to use for `ctx.file`.
      */
-    fileSystem?: import('./adapter/filesystem').FileSystemAdapter;
+    fileSystem?: FileSystemAdapter;
 
     /**
      * Lifecycle hooks.
