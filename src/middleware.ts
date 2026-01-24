@@ -1,3 +1,4 @@
+import { RecordId } from 'surrealdb';
 import type { ShokupanContext } from "./context";
 import { $debug } from './util/symbol';
 import type { Middleware, NextFn } from './util/types';
@@ -31,38 +32,127 @@ export const compose = (middleware: Middleware[]) => {
             if (typeof fn !== 'function') {
                 const name = (fn as any)?.constructor?.name;
                 console.error(`[Middleware Error] Item at index ${i} is not a function! It is: ${typeof fn} (${name})`, fn);
-                // Skip it or throw better error
                 throw new TypeError(`Middleware at index ${i} must be a function, got ${name}`);
             }
 
-            // Fast path: No debug tracking
-            if (!context[$debug]) {
-                return fn(context, () => runner(i + 1));
+            // --- Tracking Setup ---
+            const trackingEnabled = context.app?.applicationConfig?.enableMiddlewareTracking;
+            const meta = fn.metadata;
+            let trackingStartTime = 0;
+
+            if (trackingEnabled && meta) {
+                trackingStartTime = performance.now();
+                context.handlerStack.push({
+                    name: meta.name || fn.name || 'anonymous',
+                    file: meta.file,
+                    line: meta.line,
+                    isBuiltin: meta.isBuiltin,
+                    startTime: trackingStartTime,
+                    duration: -1
+                });
             }
 
-            // Slow path: Debug tracking
+            // --- Debug Setup ---
             const debug = context[$debug];
-            const debugId = (fn as any)._debugId || fn.name || 'anonymous';
-            const previousNode = debug.getCurrentNode();
+            let debugId: string | undefined;
+            let previousNode: string | undefined;
+            let debugStart = 0;
 
-            debug.trackEdge(previousNode, debugId);
-            debug.setNode(debugId);
+            if (debug) {
+                debugId = (fn as any)._debugId || fn.name || 'anonymous';
+                previousNode = debug.getCurrentNode();
+                debug.trackEdge(previousNode, debugId);
+                debug.setNode(debugId!);
+                debugStart = performance.now();
+            }
 
-            const start = performance.now();
             try {
-                const res = await Promise.resolve(fn(context, () => runner(i + 1)));
-                debug.trackStep(debugId, 'middleware', performance.now() - start, 'success');
+                // Execute Middleware
+                const res = await fn(context, () => runner(i + 1));
+
+                // --- Tracking Success ---
+                if (trackingEnabled && meta) {
+                    const duration = performance.now() - trackingStartTime;
+                    const stackItem = context.handlerStack[context.handlerStack.length - 1];
+                    if (stackItem) stackItem.duration = duration;
+
+                    Promise.resolve().then(async () => {
+                        try {
+                            const db = context.app?.db;
+                            if (!db) return;
+
+                            const timestamp = Date.now();
+                            await db.upsert(new RecordId('middleware_tracking', {
+                                timestamp,
+                                name: meta.name
+                            }), {
+                                name: meta.name,
+                                path: context.path,
+                                timestamp,
+                                duration,
+                                file: meta.file,
+                                line: meta.line,
+                                error: undefined,
+                                metadata: {
+                                    isBuiltin: meta.isBuiltin,
+                                    pluginName: meta.pluginName
+                                }
+                            });
+                        } catch (e) { }
+                    });
+                }
+
+                // --- Debug Success ---
+                if (debug) {
+                    debug.trackStep(debugId, 'middleware', performance.now() - debugStart, 'success');
+                }
+
                 return res;
+
             } catch (err) {
-                debug.trackStep(debugId, 'middleware', performance.now() - start, 'error', err);
-                return Promise.reject(err);
+                // --- Tracking Error ---
+                if (trackingEnabled && meta) {
+                    const duration = performance.now() - trackingStartTime;
+                    const stackItem = context.handlerStack[context.handlerStack.length - 1];
+                    if (stackItem) stackItem.duration = duration;
+
+                    Promise.resolve().then(async () => {
+                        try {
+                            const db = context.app?.db;
+                            if (!db) return;
+
+                            const timestamp = Date.now();
+                            await db.upsert(new RecordId('middleware_tracking', {
+                                timestamp,
+                                name: meta.name
+                            }), {
+                                name: meta.name,
+                                path: context.path,
+                                timestamp,
+                                duration,
+                                file: meta.file,
+                                line: meta.line,
+                                error: String(err),
+                                metadata: {
+                                    isBuiltin: meta.isBuiltin,
+                                    pluginName: meta.pluginName
+                                }
+                            });
+                        } catch (e) { }
+                    });
+                }
+
+                // --- Debug Error ---
+                if (debug) {
+                    debug.trackStep(debugId, 'middleware', performance.now() - debugStart, 'error', err);
+                }
+
+                throw err;
             } finally {
-                if (previousNode) debug.setNode(previousNode);
+                if (debug && previousNode) debug.setNode(previousNode);
             }
         }
 
         return runner(0);
     };
 };
-
-

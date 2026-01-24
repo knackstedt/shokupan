@@ -1,5 +1,5 @@
 import type { Server } from 'bun';
-import { Surreal } from 'surrealdb';
+import { RecordId, Surreal } from 'surrealdb';
 import { ShokupanContext } from "./context";
 import { compose } from "./middleware";
 import { generateOpenApi } from "./plugins/application/openapi/openapi";
@@ -590,6 +590,91 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
                         // Ensure body is parsed before handler executes
                         if (bodyParsing) await bodyParsing;
+
+                        // --- Manual Tracking for Route Handler ---
+                        if (this.applicationConfig.enableMiddlewareTracking) {
+                            const handler = match.handler;
+                            const meta = (handler as any).metadata;
+
+                            if (meta) {
+                                const trackingStartTime = performance.now();
+                                const handlerName = meta.name || handler.name || 'anonymous';
+
+                                ctx.handlerStack.push({
+                                    name: handlerName,
+                                    file: meta.file,
+                                    line: meta.line,
+                                    isBuiltin: meta.isBuiltin,
+                                    startTime: trackingStartTime,
+                                    duration: -1
+                                });
+
+                                try {
+                                    const res = await handler(ctx);
+
+                                    const duration = performance.now() - trackingStartTime;
+                                    const stackItem = ctx.handlerStack[ctx.handlerStack.length - 1];
+                                    if (stackItem) stackItem.duration = duration;
+
+                                    Promise.resolve().then(async () => {
+                                        try {
+                                            const db = this.db;
+                                            if (!db) return;
+
+                                            const timestamp = Date.now();
+                                            await db.upsert(new RecordId('middleware_tracking', {
+                                                timestamp,
+                                                name: handlerName
+                                            }), {
+                                                name: handlerName,
+                                                path: ctx.path,
+                                                timestamp,
+                                                duration,
+                                                file: meta.file,
+                                                line: meta.line,
+                                                error: undefined,
+                                                metadata: {
+                                                    isBuiltin: meta.isBuiltin,
+                                                    pluginName: meta.pluginName
+                                                }
+                                            });
+                                        } catch (e) { }
+                                    });
+
+                                    return res;
+                                } catch (err) {
+                                    const duration = performance.now() - trackingStartTime;
+                                    const stackItem = ctx.handlerStack[ctx.handlerStack.length - 1];
+                                    if (stackItem) stackItem.duration = duration;
+
+                                    Promise.resolve().then(async () => {
+                                        try {
+                                            const db = this.db;
+                                            if (!db) return;
+
+                                            const timestamp = Date.now();
+                                            await db.upsert(new RecordId('middleware_tracking', {
+                                                timestamp,
+                                                name: handlerName
+                                            }), {
+                                                name: handlerName,
+                                                path: ctx.path,
+                                                timestamp,
+                                                duration,
+                                                file: meta.file,
+                                                line: meta.line,
+                                                error: String(err),
+                                                metadata: {
+                                                    isBuiltin: meta.isBuiltin,
+                                                    pluginName: meta.pluginName
+                                                }
+                                            });
+                                        } catch (e) { }
+                                    });
+                                    throw err;
+                                }
+                            }
+                        }
 
                         return match.handler(ctx);
                     }

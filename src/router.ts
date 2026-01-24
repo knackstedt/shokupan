@@ -757,75 +757,62 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             }
         }
 
-        // Wrap handler with current guards if any exist
-        let wrappedHandler = async (ctx: ShokupanContext<T>) => {
-            // Check for WebSocket upgrade before executing handler logic
-            // This allows the router to handle the request (running middleware/guards)
-            // but upgrading to WebSocket instead of running the HTTP handler.
-            // if (ctx.upgrade()) {
-            //    return undefined;
-            // }
-            return handler(ctx);
-        };
-        (wrappedHandler as any).originalHandler = (handler as any).originalHandler || handler;
+        // --- Flattened Route Execution Wrapper ---
+        const effectiveTimeout = requestTimeout ?? this.requestTimeout ?? this.rootConfig?.requestTimeout;
+        const effectiveRenderer = renderer ?? this.config?.renderer ?? this.rootConfig?.renderer;
         const routeGuards = [...this.currentGuards];
 
-        // Wrap for Timeout
-        const effectiveTimeout = requestTimeout ?? this.requestTimeout ?? this.rootConfig?.requestTimeout;
+        let wrappedHandler = handler;
 
-        if (effectiveTimeout !== undefined && effectiveTimeout > 0) {
-            const originalHandler = wrappedHandler;
+        // Optimization: Only create a wrapper closure if we actually have features to apply
+        if ((effectiveTimeout && effectiveTimeout > 0) || effectiveRenderer || routeGuards.length > 0) {
+            const originalHandler = handler;
             wrappedHandler = async (ctx: ShokupanContext<T>) => {
-                if (ctx.server) {
+                // 1. Timeout
+                if (effectiveTimeout && effectiveTimeout > 0 && ctx.server) {
                     ctx.server.timeout(ctx.req as unknown as Request, effectiveTimeout / 1000);
                 }
-                return originalHandler(ctx);
-            };
-            (wrappedHandler as any).originalHandler = (originalHandler as any).originalHandler || originalHandler;
-        }
 
-        if (routeGuards.length > 0) {
-            const innerHandler = wrappedHandler;
-            wrappedHandler = async (ctx: ShokupanContext<T>) => {
+                // 2. Renderer
+                if (effectiveRenderer) {
+                    ctx.setRenderer(effectiveRenderer);
+                }
+
+                // 3. Guards
                 // Execute guards in order
-                for (let i = 0; i < routeGuards.length; i++) {
-                    const guard = routeGuards[i];
-                    let guardPassed = false;
-                    let nextCalled = false;
-                    const next = () => {
-                        nextCalled = true;
-                        return Promise.resolve();
-                    };
+                if (routeGuards.length > 0) {
+                    for (let i = 0; i < routeGuards.length; i++) {
+                        const guard = routeGuards[i];
+                        let guardPassed = false;
+                        let nextCalled = false;
+                        const next = () => {
+                            nextCalled = true;
+                            return Promise.resolve();
+                        };
 
-                    try {
-                        const result = await guard.handler(ctx, next);
-                        if (result === true || nextCalled) {
-                            guardPassed = true;
-                        } else if (result !== undefined && result !== null && result !== false) {
-                            return result;
-                        } else {
+                        try {
+                            const result = await guard.handler(ctx, next);
+                            if (result === true || nextCalled) {
+                                guardPassed = true;
+                            } else if (result !== undefined && result !== null && result !== false) {
+                                return result;
+                            } else {
+                                return ctx.json({ error: 'Forbidden' }, 403);
+                            }
+                        } catch (error) {
+                            throw error;
+                        }
+
+                        if (!guardPassed) {
                             return ctx.json({ error: 'Forbidden' }, 403);
                         }
-                    } catch (error) {
-                        throw error;
-                    }
-
-                    if (!guardPassed) {
-                        return ctx.json({ error: 'Forbidden' }, 403);
                     }
                 }
-                return innerHandler(ctx);
-            };
-        }
 
-        // Inject Renderer
-        const effectiveRenderer = renderer ?? this.config?.renderer ?? this.rootConfig?.renderer;
-        if (effectiveRenderer) {
-            const innerHandler = wrappedHandler;
-            wrappedHandler = async (ctx: ShokupanContext<T>) => {
-                ctx.setRenderer(effectiveRenderer);
-                return innerHandler(ctx);
+                // 4. Handler
+                return originalHandler(ctx);
             };
+            (wrappedHandler as any).originalHandler = (handler as any).originalHandler || handler;
         }
 
         // --- Middleware Tracking Logic ---
