@@ -22,7 +22,9 @@ describe("Routing 404 Issue", () => {
         });
 
         expect(res.status).toBe(404);
-        expect(res.data).toBe("Not Found");
+        expect(res.data).toEqual(expect.objectContaining({
+            error: "Not Found"
+        }));
     });
 
     it("should return 204 No Content for matched route with empty handler", async () => {

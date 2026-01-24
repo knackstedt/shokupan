@@ -6,9 +6,7 @@ describe('Security Audit Fixes', () => {
 
     it('should apply security headers when handler returns POJO', async () => {
         const app = new Shokupan({
-            securityHeaders: {
-                contentSecurityPolicy: true
-            }
+            defaultSecurityHeaders: true
         });
 
         app.get('/json', (ctx) => {
@@ -45,7 +43,7 @@ describe('Security Audit Fixes', () => {
 
     it('should apply security headers if handler returns Response object', async () => {
         const app = new Shokupan({
-            securityHeaders: {
+            defaultSecurityHeaders: {
                 contentSecurityPolicy: true
             }
         });

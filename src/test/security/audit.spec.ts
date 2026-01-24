@@ -4,15 +4,15 @@ import { Shokupan } from "../../shokupan";
 describe("Security Audit", () => {
 
     describe("CWE-693: Security Headers", () => {
-        it("should set X-Content-Type-Options: nosniff by default", async () => {
-            const app = new Shokupan();
+        it("should set X-Content-Type-Options: nosniff when enabled", async () => {
+            const app = new Shokupan({ defaultSecurityHeaders: true });
             app.get("/", (ctx) => ctx.text("ok"));
             const res = await app.testRequest({ path: "/" });
             expect(res.headers["x-content-type-options"]).toBe("nosniff");
         });
 
-        it("should set X-Frame-Options: SAMEORIGIN by default", async () => {
-            const app = new Shokupan();
+        it("should set X-Frame-Options: SAMEORIGIN when enabled", async () => {
+            const app = new Shokupan({ defaultSecurityHeaders: true });
             app.get("/", (ctx) => ctx.text("ok"));
             const res = await app.testRequest({ path: "/" });
 
@@ -21,8 +21,8 @@ describe("Security Audit", () => {
             expect(["DENY", "SAMEORIGIN"]).toContain(frameOptions);
         });
 
-        it("should set Strict-Transport-Security on HTTPS", async () => {
-            const app = new Shokupan();
+        it("should set Strict-Transport-Security on HTTPS when enabled", async () => {
+            const app = new Shokupan({ defaultSecurityHeaders: true });
             app.get("/", (ctx) => ctx.text("ok"));
             // Simulate HTTPS
             const res = await app.testRequest({

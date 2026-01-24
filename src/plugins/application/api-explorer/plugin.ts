@@ -6,6 +6,7 @@ import { ShokupanRouter } from '../../../router';
 import type { Shokupan } from '../../../shokupan.ts';
 import type { ShokupanPlugin, ShokupanPluginOptions } from '../../../util/types.ts';
 import { ApiExplorerApp } from './components.tsx';
+
 export interface ApiExplorerOptions {
     baseDocument?: any;
     path?: string;

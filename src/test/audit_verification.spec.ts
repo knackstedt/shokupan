@@ -6,7 +6,7 @@ describe('Security Remediation Verification', () => {
 
     it('SHK-001: Should apply security headers when handler returns POJO', async () => {
         const app = new Shokupan({
-            securityHeaders: { contentSecurityPolicy: true }
+            defaultSecurityHeaders: { contentSecurityPolicy: true }
         });
 
         app.get('/json', (ctx) => {

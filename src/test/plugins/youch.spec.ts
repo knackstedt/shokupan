@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'bun:test';
-import { YouchPlugin } from '../../plugins/application/youch';
+import { ErrorView } from '../../plugins/application/error-view';
 import { Shokupan } from '../../shokupan';
 
-describe('Youch Plugin', () => {
+describe('Error View Plugin', () => {
 
     it('should register without errors', async () => {
         const app = new Shokupan();
-        const plugin = new YouchPlugin();
+        const plugin = new ErrorView();
         await plugin.onInit(app);
         expect(app).toBeDefined();
     });
@@ -16,7 +16,7 @@ describe('Youch Plugin', () => {
             securityHeaders: false
         });
 
-        const plugin = new YouchPlugin();
+        const plugin = new ErrorView();
         await plugin.onInit(app);
 
         app.get('/error', (ctx) => {
@@ -39,7 +39,7 @@ describe('Youch Plugin', () => {
 
     it('should return JSON error when Accept header does not include text/html', async () => {
         const app = new Shokupan({ securityHeaders: false });
-        const plugin = new YouchPlugin();
+        const plugin = new ErrorView();
         await plugin.onInit(app);
 
         app.get('/error', () => {

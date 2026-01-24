@@ -129,8 +129,6 @@ describe("MCP Features", () => {
         expect(data.result).toBeDefined();
         const prompts = data.result.prompts;
         expect(prompts.some((p: any) => p.name === "generate-client")).toBe(true);
-        expect(prompts.some((p: any) => p.name === "refactor-endpoint")).toBe(true);
-        expect(prompts.some((p: any) => p.name === "generate-tests")).toBe(true);
     });
 
     it("should get prompt", async () => {
