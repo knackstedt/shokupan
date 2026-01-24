@@ -1,4 +1,5 @@
 import type { Server } from 'bun';
+import { nanoid } from 'nanoid';
 import { RecordId, Surreal } from 'surrealdb';
 import { ShokupanContext } from "./context";
 import { compose } from "./middleware";
@@ -13,6 +14,7 @@ import { getErrorStatus, NotFoundError } from "./util/http-error";
 import { HTTP_STATUS } from "./util/http-status";
 import "./util/instrumentation";
 import { MiddlewareTracker } from './util/middleware-tracker';
+import { enablePromisePatch, kContext } from './util/promise';
 import { ShokupanRequest } from './util/request';
 import { getCallerInfo } from './util/stack';
 import { $appRoot, $childRouters, $dispatch, $finalResponse, $isApplication, $mountPath, $routeMatched, $routes } from './util/symbol';
@@ -156,6 +158,30 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 // Log but don't crash if optional datastore init fails
                 this.logger?.debug("Failed to initialize default datastore", { error: err });
             });
+        }
+
+        if (this.applicationConfig.enablePromiseMonkeypatch) {
+            enablePromisePatch();
+
+            // Register global handler for unhandled rejections to log with context
+            // We use process.prependListener if available to try to catch it before others, 
+            // or just on() 
+            // Note: In Bun, unhandledRejection might behave slightly differently than Node.
+            const processRef = typeof process !== 'undefined' ? process : undefined;
+            if (processRef && processRef.on) {
+                processRef.on('unhandledRejection', (reason: any, promise: any) => {
+                    const ctx = promise?.[kContext];
+                    // Check if this promise belongs to this app's context
+                    if (ctx && ctx.store && ctx.store.app === this) {
+                        const { requestId } = ctx.store;
+                        this.logger.error("Unhandled Rejection in Shokupan Request", {
+                            error: reason,
+                            requestId,
+                            creationStack: ctx.stack
+                        });
+                    }
+                });
+            }
         }
     }
 
@@ -535,21 +561,24 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
         // If ALS is enabled but tracing is not
         if (this.applicationConfig.enableAsyncLocalStorage) {
+            const requestId = this.applicationConfig.idGenerator?.() ?? nanoid();
             const ctxStore = new RequestContextStore();
             ctxStore.request = req;
-            return asyncContext.run(ctxStore, () => this.handleRequest(req, server));
+            ctxStore['requestId'] = requestId;
+            ctxStore['app'] = this;
+            return asyncContext.run(ctxStore, () => this.handleRequest(req, server, requestId));
         }
 
         return this.handleRequest(req, server);
     }
 
-    private async handleRequest(req: Request, server?: Server<any>): Promise<Response> {
+    private async handleRequest(req: Request, server?: Server<any>, requestId?: string): Promise<Response> {
         // Cast to ShokupanRequest if needed, though at runtime it's just a Request
         // But ShokupanContext expects ShokupanRequest.
         const request = req as unknown as ShokupanRequest<T>;
 
         const controller = new AbortController();
-        const ctx = new ShokupanContext<T>(request, server, undefined, this, controller.signal, this.applicationConfig.enableMiddlewareTracking);
+        const ctx = new ShokupanContext<T>(request, server, undefined, this, controller.signal, this.applicationConfig.enableMiddlewareTracking, requestId);
 
         const handle = async () => {
 

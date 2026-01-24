@@ -428,6 +428,14 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      */
     enableOpenApiGen: boolean;
     /**
+     * Whether to enable monkeypatching of the global Promise constructor.
+     * When enabled, Promises created within an async context will carry that context
+     * (including `requestId`) and the creation stack trace. This increases memory and
+     * cpu usage, but provides richer logging for unhandled rejections.
+     * @default false
+     */
+    enablePromiseMonkeypatch: boolean;
+    /**
      * Whether to block server startup until OpenAPI generation completes.
      * Only applies when enableOpenApiGen is true.
      * When false, OpenAPI generation happens asynchronously in the background.
