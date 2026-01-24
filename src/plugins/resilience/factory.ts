@@ -1,4 +1,4 @@
-import { bulkhead, circuitBreaker, ConsecutiveBreaker, ConstantBackoff, ExponentialBackoff, fallback, handleAll, retry, timeout, wrap, type IPolicy } from 'cockatiel';
+import { bulkhead, circuitBreaker, ConsecutiveBreaker, ConstantBackoff, ExponentialBackoff, fallback, handleAll, retry, timeout, TimeoutStrategy, wrap, type IPolicy } from 'cockatiel';
 import type { ResilienceConfig } from './decorators';
 
 export class ResilienceFactory {
@@ -20,10 +20,10 @@ export class ResilienceFactory {
             if (config.retry.backoff === 'exponential') {
                 retryPolicy = retry(builder, {
                     maxAttempts: retries,
-                    backoff: new ExponentialBackoff(
-                        config.retry.delay || 1000,
-                        config.retry.maxDelay || 30000
-                    )
+                    backoff: new ExponentialBackoff({
+                        initialDelay: config.retry.delay || 1000,
+                        maxDelay: config.retry.maxDelay || 30000
+                    })
                 });
             } else {
                 retryPolicy = retry(builder, {
@@ -46,7 +46,7 @@ export class ResilienceFactory {
 
         // 3. Timeout
         if (config.timeout) {
-            policies.push(timeout(config.timeout, { strategy: 'Signal' }));
+            policies.push(timeout(config.timeout, { strategy: TimeoutStrategy.Aggressive, abortOnReturn: true }));
         }
 
         // 2. Bulkhead
@@ -58,7 +58,7 @@ export class ResilienceFactory {
         if (config.fallback !== undefined) {
             const builder = handleAll;
             const fb = fallback(builder, config.fallback);
-            policies.push(fb);
+            policies.push(fb as any);
         }
 
         // wrap takes arguments from outer to inner.
