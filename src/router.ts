@@ -6,6 +6,7 @@ import type { Shokupan } from './shokupan';
 import { ControllerScanner } from './util/controller-scanner';
 import { EventError, getErrorStatus } from './util/http-error';
 import { HTTP_STATUS } from './util/http-status';
+import { McpProtocol, type McpPrompt } from './util/mcp-protocol';
 import { MiddlewareTracker } from './util/middleware-tracker';
 import { ShokupanRequest } from './util/request';
 import { getCallerInfo } from './util/stack';
@@ -129,6 +130,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     public [$routes]: ShokupanRoute[] = []; // Public via Symbol for OpenAPI generator
     private trie = new RouterTrie<T>();
     public metadata?: RouteMetadata; // Metadata for the router itself
+
+    public mcpProtocol = new McpProtocol();
 
     private currentGuards: { handler: ShokupanHandler<T>; spec?: GuardAPISpec; }[] = [];
     private eventHandlers = new Map<string, ShokupanHandler<T>[]>();
@@ -295,6 +298,42 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             this._hasAfterValidateHook ||= name === 'afterValidate';
         }
         handlers.push(handler);
+        return this;
+    }
+
+    /**
+     * Registers an MCP Tool.
+     */
+    public tool(name: string, schema: any, handler: Function) {
+        this.mcpProtocol.addTool({
+            name,
+            inputSchema: schema,
+            handler: handler as any
+        });
+        return this;
+    }
+
+    /**
+     * Registers an MCP Prompt.
+     */
+    public prompt(name: string, args: McpPrompt['arguments'], handler: Function) {
+        this.mcpProtocol.addPrompt({
+            name,
+            arguments: args,
+            handler: handler as any
+        });
+        return this;
+    }
+
+    /**
+     * Registers an MCP Resource.
+     */
+    public resource(uri: string, options: { name?: string; description?: string; mimeType?: string; }, handler: Function) {
+        this.mcpProtocol.addResource({
+            uri,
+            handler: handler as any,
+            ...options
+        });
         return this;
     }
 

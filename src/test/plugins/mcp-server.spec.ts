@@ -23,7 +23,7 @@ describe("MCP Server Plugin", async () => {
     server = await app.listen(0);
     const port = server.port;
 
-    it.skip("should list endpoints via list_endpoints tool", async () => {
+    it("should list endpoints via list_endpoints tool", async () => {
         const aborter = new AbortController();
         // Connect to SSE (still required for initialization/session)
         const sseRes = await fetch(`http://localhost:${port}/mcp`, {
@@ -32,9 +32,8 @@ describe("MCP Server Plugin", async () => {
         });
         expect(sseRes.status).toBe(200);
 
-        const sessionId = sseRes.headers.get('mcp-session-id') ||
-            new URL(sseRes.url).searchParams.get('sessionId') ||
-            '';
+        // Mock session ID not needed for lightweight server
+        const sessionId = "mock-session";
 
         // Send a tool call
         const toolCall = {
@@ -47,7 +46,7 @@ describe("MCP Server Plugin", async () => {
             }
         };
 
-        const postRes = await fetch(`http://localhost:${port}/mcp?sessionId=${sessionId}`, {
+        const postRes = await fetch(`http://localhost:${port}/mcp`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

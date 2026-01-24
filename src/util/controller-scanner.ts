@@ -9,6 +9,9 @@ import {
     $controllerPath,
     $eventMethods,
     $isMounted,
+    $mcpPrompts,
+    $mcpResources,
+    $mcpTools,
     $middleware,
     $mountPath,
     $routeArgs,
@@ -79,6 +82,9 @@ export class ControllerScanner {
         const decoratedArgs = (instance as any)[$routeArgs] || (proto && (proto as any)[$routeArgs]);
         const methodMiddlewareMap = (instance as any)[$middleware] || (proto && (proto as any)[$middleware]);
         const decoratedEvents = (instance as any)[$eventMethods] || (proto && (proto as any)[$eventMethods]);
+        const mcpTools = (instance as any)[$mcpTools] || (proto && (proto as any)[$mcpTools]);
+        const mcpPrompts = (instance as any)[$mcpPrompts] || (proto && (proto as any)[$mcpPrompts]);
+        const mcpResources = (instance as any)[$mcpResources] || (proto && (proto as any)[$mcpResources]);
 
         let routesAttached = 0;
         for (let i = 0; i < Array.from(methods).length; i++) {
@@ -311,6 +317,31 @@ export class ControllerScanner {
                 (wrappedHandler as any).originalHandler = originalHandler;
 
                 router.event(eventConfig.eventName, wrappedHandler);
+            }
+
+            // 4. Check for MCP Tools
+            const toolConfig = mcpTools?.get(name);
+            if (toolConfig) {
+                const handler = originalHandler.bind(instance);
+                router.tool(toolConfig.name || name, toolConfig.inputSchema, handler);
+            }
+
+            // 5. Check for MCP Prompts
+            const promptConfig = mcpPrompts?.get(name);
+            if (promptConfig) {
+                const handler = originalHandler.bind(instance);
+                router.prompt(promptConfig.name || name, promptConfig.arguments, handler);
+            }
+
+            // 6. Check for MCP Resources
+            const resourceConfig = mcpResources?.get(name);
+            if (resourceConfig) {
+                const handler = originalHandler.bind(instance);
+                router.resource(resourceConfig.uri, {
+                    name: resourceConfig.name || name,
+                    description: resourceConfig.description,
+                    mimeType: resourceConfig.mimeType
+                }, handler);
             }
         }
 

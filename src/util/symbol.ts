@@ -41,3 +41,8 @@ export const $ws = Symbol.for("Shokupan.ctx.ws");
 export const $socket = Symbol.for("Shokupan.ctx.socket");
 export const $io = Symbol.for("Shokupan.ctx.io");
 
+export const $mcpTools = Symbol.for("Shokupan.mcp.tools");
+export const $mcpPrompts = Symbol.for("Shokupan.mcp.prompts");
+export const $mcpResources = Symbol.for("Shokupan.mcp.resources");
+
+

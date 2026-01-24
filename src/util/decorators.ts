@@ -2,7 +2,7 @@ import { RateLimitMiddleware, type RateLimitOptions } from "../plugins/middlewar
 import { Container } from "./di";
 import './metadata';
 import { getCallerInfo } from "./stack";
-import { $controllerPath, $eventMethods, $middleware, $routeArgs, $routeMethods, $routeSpec } from "./symbol";
+import { $controllerPath, $eventMethods, $mcpPrompts, $mcpResources, $mcpTools, $middleware, $routeArgs, $routeMethods, $routeSpec } from "./symbol";
 import type { AsyncAPISpec, GuardAPISpec, MethodAPISpec } from "./types";
 import { type Method, type Middleware, RouteParamType } from "./types";
 
@@ -311,4 +311,57 @@ export function Event(eventName: string) {
  */
 export function RateLimit(options: RateLimitOptions) {
     return Use(RateLimitMiddleware(options));
+}
+
+/**
+ * Decorator: Registers a method as an MCP Tool.
+ * @param name The name of the tool (defaults to method name if not provided)
+ * @param description Optional description
+ * @param inputSchema Optional JSON Schema for input arguments
+ */
+export function Tool(options?: { name?: string; description?: string; inputSchema?: any; }) {
+    return (target: any, propertyKey: string, descriptor: PropertyDescriptor) => {
+        target[$mcpTools] ??= new Map();
+        target[$mcpTools].set(propertyKey, {
+            name: options?.name,
+            description: options?.description,
+            inputSchema: options?.inputSchema
+        });
+    };
+}
+
+/**
+ * Decorator: Registers a method as an MCP Prompt.
+ * @param name The name of the prompt
+ * @param description Optional description
+ * @param args Optional list of arguments
+ */
+export function Prompt(options?: { name?: string; description?: string; arguments?: { name: string; description?: string; required?: boolean; }[]; }) {
+    return (target: any, propertyKey: string, descriptor: PropertyDescriptor) => {
+        target[$mcpPrompts] ??= new Map();
+        target[$mcpPrompts].set(propertyKey, {
+            name: options?.name,
+            description: options?.description,
+            arguments: options?.arguments
+        });
+    };
+}
+
+/**
+ * Decorator: Registers a method as an MCP Resource handler.
+ * @param uri The URI pattern for the resource
+ * @param name Optional name
+ * @param description Optional description
+ * @param mimeType Optional MIME type
+ */
+export function Resource(uri: string, options?: { name?: string; description?: string; mimeType?: string; }) {
+    return (target: any, propertyKey: string, descriptor: PropertyDescriptor) => {
+        target[$mcpResources] ??= new Map();
+        target[$mcpResources].set(propertyKey, {
+            uri,
+            name: options?.name,
+            description: options?.description,
+            mimeType: options?.mimeType
+        });
+    };
 }
