@@ -278,10 +278,10 @@ function unsign(input: string, secret: string) {
 export interface SessionContext {
     session: SessionData & {
         id: string;
-        regenerate(callback: (err: any) => void): void;
-        destroy(callback: (err: any) => void): void;
-        reload(callback: (err: any) => void): void;
-        save(callback: (err: any) => void): void;
+        regenerate(): Promise<void>;
+        destroy(): Promise<void>;
+        reload(): Promise<void>;
+        save(): Promise<void>;
         touch(): void;
     };
     sessionID: string;
@@ -372,51 +372,63 @@ export function Session(options: SessionOptions): Middleware {
             // Methods
             Object.defineProperty(sessObj, 'id', { value: sessionID, configurable: true });
 
-            sessObj.save = (cb: any) => {
-                store.set(sessObj.id, sessObj, cb);
-            };
-
-            sessObj.destroy = (cb: any) => {
-                store.destroy(sessObj.id, (err) => {
-                    // TODO: clear cookie?
-                    if (cb) cb(err);
+            sessObj.save = () => {
+                return new Promise<void>((resolve, reject) => {
+                    store.set(sessObj.id, sessObj, (err) => {
+                        if (err) reject(err);
+                        else resolve();
+                    });
                 });
             };
 
-            sessObj.regenerate = (cb: any) => {
-                store.destroy(sessObj.id, (err) => {
-                    sessionID = generateId(ctx);
-                    // Create new session object
-                    // We actually need to replace the whole ctx.session object, which is tricky inside a method of that object.
-                    // Typically middleware attaches a proxy or the consumer does this.
-                    // But here we can reset properties.
-                    const keys = Object.keys(sessObj);
-                    for (let i = 0; i < keys.length; i++) {
-                        const key = keys[i];
-                        if (key !== 'cookie' && key !== 'id' && typeof sessObj[key] !== 'function') {
-                            delete sessObj[key];
+            sessObj.destroy = () => {
+                return new Promise<void>((resolve, reject) => {
+                    store.destroy(sessObj.id, (err) => {
+                        if (err) reject(err);
+                        else resolve();
+                    });
+                });
+            };
+
+            sessObj.regenerate = () => {
+                return new Promise<void>((resolve, reject) => {
+                    store.destroy(sessObj.id, (err) => {
+                        if (err) return reject(err);
+                        sessionID = generateId(ctx);
+                        // Create new session object
+                        // We actually need to replace the whole ctx.session object, which is tricky inside a method of that object.
+                        // Typically middleware attaches a proxy or the consumer does this.
+                        // But here we can reset properties.
+                        const keys = Object.keys(sessObj);
+                        for (let i = 0; i < keys.length; i++) {
+                            const key = keys[i];
+                            if (key !== 'cookie' && key !== 'id' && typeof sessObj[key] !== 'function') {
+                                delete sessObj[key];
+                            }
                         }
-                    }
-                    Object.defineProperty(sessObj, 'id', { value: sessionID, configurable: true });
-                    if (cb) cb(err);
+                        Object.defineProperty(sessObj, 'id', { value: sessionID, configurable: true });
+                        resolve();
+                    });
                 });
             };
 
             sessObj.undefined = () => { }; // Helper? no
-            sessObj.reload = (cb: any) => {
-                store.get(sessObj.id, (err, sess) => {
-                    if (err) return cb(err);
-                    if (!sess) return cb(new Error("Session not found"));
-                    // Populate
-                    const keys = Object.keys(sessObj);
-                    for (let i = 0; i < keys.length; i++) {
-                        const key = keys[i];
-                        if (key !== 'cookie' && key !== 'id' && typeof sessObj[key] !== 'function') {
-                            delete sessObj[key];
+            sessObj.reload = () => {
+                return new Promise<void>((resolve, reject) => {
+                    store.get(sessObj.id, (err, sess) => {
+                        if (err) return reject(err);
+                        if (!sess) return reject(new Error("Session not found"));
+                        // Populate
+                        const keys = Object.keys(sessObj);
+                        for (let i = 0; i < keys.length; i++) {
+                            const key = keys[i];
+                            if (key !== 'cookie' && key !== 'id' && typeof sessObj[key] !== 'function') {
+                                delete sessObj[key];
+                            }
                         }
-                    }
-                    Object.assign(sessObj, sess);
-                    cb(null);
+                        Object.assign(sessObj, sess);
+                        resolve();
+                    });
                 });
             };
 

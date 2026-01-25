@@ -117,9 +117,10 @@ Here is the layman's breakdown:
 :::
 
 
+
 ## Session Methods
 
-The session methods (`regenerate`, `destroy`, `save`, `reload`) are callback-based.
+The session methods (`regenerate`, `destroy`, `save`, `reload`) return a `Promise`, allowing you to use `await` or `.then()`.
 
 ### Set Data
 
@@ -150,11 +151,9 @@ app.get('/cart', (ctx) => {
 ### Destroy Session
 
 ```typescript
-app.post('/logout', (ctx) => {
-    // Destroy session (callback-based, but fire-and-forget here)
-    ctx.session.destroy((err) => {
-        if (err) console.error('Session destroy error', err);
-    });
+app.post('/logout', async (ctx) => {
+    // Destroy session
+    await ctx.session.destroy();
     return { message: 'Logged out' };
 });
 ```
@@ -170,9 +169,7 @@ app.post('/login', async (ctx) => {
     
     if (user) {
         // Regenerate session ID (security best practice)
-        await new Promise<void>((resolve, reject) => {
-             ctx.session.regenerate((err) => err ? reject(err) : resolve());
-        });
+        await ctx.session.regenerate();
         
         ctx.session.user = user;
         return { message: 'Logged in' };

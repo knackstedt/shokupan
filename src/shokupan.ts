@@ -12,7 +12,7 @@ import { SystemCpuMonitor } from "./util/cpu-monitor";
 import { SurrealDatastore } from './util/datastore';
 import { getErrorStatus, NotFoundError } from "./util/http-error";
 import { HTTP_STATUS } from "./util/http-status";
-import "./util/instrumentation";
+
 import { MiddlewareTracker } from './util/middleware-tracker';
 import { enablePromisePatch, kContext } from './util/promise';
 import { ShokupanRequest } from './util/request';

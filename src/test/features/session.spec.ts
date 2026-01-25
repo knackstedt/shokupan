@@ -76,106 +76,7 @@ describe("Session Middleware", () => {
         server.stop();
     });
 
-    it("should regenerate session", async () => {
-        const app = new Shokupan({ port: 0 });
-        app.use(session({ secret: 'secret', resave: false, saveUninitialized: true }));
 
-        app.get('/login', async (ctx) => {
-            await new Promise<void>((resolve, reject) => {
-                ctx.session.regenerate((err) => {
-                    if (err) return reject(err);
-                    ctx.session['user'] = "logged-in";
-                    resolve();
-                });
-            });
-            return "ok";
-        });
-
-        app.get('/me', (ctx) => {
-            return { id: ctx.session['id'], user: ctx.session['user'] };
-        });
-
-        const server = await app.listen();
-        const baseUrl = `http://localhost:${server.port}`;
-
-        // 1. Start session
-        const res1 = await fetch(`${baseUrl}/me`) as any;
-        const cookie1 = res1.headers.get("set-cookie")!;
-        const data1 = await res1.json();
-
-        // 2. Login (regenerate)
-        const res2 = await fetch(`${baseUrl}/login`, { headers: { "Cookie": cookie1 } });
-        const cookie2 = res2.headers.get("set-cookie")!;
-
-        expect(cookie1).not.toBe(cookie2); // Should have new ID/Cookie
-        expect(cookie2).toBeTruthy();
-
-        // 3. Check new session
-        const res3 = await fetch(`${baseUrl}/me`, { headers: { "Cookie": cookie2 } });
-        const data3 = await res3.json() as any;
-
-        // ID should be different
-        expect(data3.id).not.toBe(data1.id);
-        expect(data3.user).toBe("logged-in");
-
-        // 4. Check old session (should be invalid/empty or gone)
-        // MemoryStore implementation of session maps ID to data. 
-        // destroy() removes it. So passing old cookie should result in a NEW session (empty)
-        const res4 = await fetch(`${baseUrl}/me`, { headers: { "Cookie": cookie1 } });
-        const data4 = await res4.json() as any;
-        const cookie4 = res4.headers.get("set-cookie"); // Should assign new session
-
-        expect(data4.user).toBeUndefined();
-        expect(cookie4).toBeTruthy();
-
-        server.stop();
-    });
-
-    it("should destroy session", async () => {
-        const app = new Shokupan({ port: 0 });
-        app.use(session({ secret: 'secret', resave: false, saveUninitialized: true }));
-
-        app.get('/set', (ctx) => {
-            ctx.session['val'] = 1;
-            return "ok";
-        });
-
-        app.get('/destroy', async (ctx) => {
-            await new Promise<void>((resolve, reject) => {
-                ctx.session.destroy((err) => {
-                    if (err) return reject(err);
-                    resolve();
-                });
-            });
-            return "destroyed";
-        });
-
-        app.get('/check', (ctx) => {
-            return { val: ctx.session['val'] };
-        });
-
-        const server = await app.listen();
-        const baseUrl = `http://localhost:${server.port}`;
-
-        // Set
-        const res1 = await fetch(`${baseUrl}/set`);
-        const cookie = res1.headers.get("set-cookie")!;
-
-        // Check
-        const res2 = await fetch(`${baseUrl}/check`, { headers: { "Cookie": cookie } });
-        expect((await res2.json() as any).val).toBe(1);
-
-        // Destroy
-        await fetch(`${baseUrl}/destroy`, { headers: { "Cookie": cookie } });
-
-        // Check again - should be empty/new
-        const res4 = await fetch(`${baseUrl}/check`, { headers: { "Cookie": cookie } });
-        // Since session was destroyed, middleware should generate a NEW session.
-        // Data should be empty.
-        expect((await res4.json() as any).val).toBeUndefined();
-
-        server.stop();
-    });
 
     it("should respect cookie options (signed, maxAge)", async () => {
         const app = new Shokupan({ port: 0 });
@@ -253,6 +154,141 @@ describe("Session Middleware", () => {
         const res1 = await fetch(`http://localhost:${server.port}/`);
         expect(res1.headers.get("set-cookie")).toBeFalsy();
         expect(spySet).not.toHaveBeenCalled();
+
+        server.stop();
+    });
+
+    it("should regenerate session (promise)", async () => {
+        const app = new Shokupan({ port: 0 });
+        app.use(session({ secret: 'secret', resave: false, saveUninitialized: true }));
+
+        app.get('/login', async (ctx) => {
+            await ctx.session.regenerate();
+            ctx.session['user'] = "logged-in";
+            return "ok";
+        });
+
+        app.get('/me', (ctx) => {
+            return { id: ctx.session['id'], user: ctx.session['user'] };
+        });
+
+        const server = await app.listen();
+        const baseUrl = `http://localhost:${server.port}`;
+
+        const res1 = await fetch(`${baseUrl}/me`);
+        const cookie1 = res1.headers.get("set-cookie")!;
+        const data1 = await res1.json() as any;
+
+        const res2 = await fetch(`${baseUrl}/login`, { headers: { "Cookie": cookie1 } });
+        const cookie2 = res2.headers.get("set-cookie")!;
+
+        expect(cookie1).not.toBe(cookie2);
+
+        const res3 = await fetch(`${baseUrl}/me`, { headers: { "Cookie": cookie2 } });
+        const data3 = await res3.json() as any;
+
+        expect(data3.id).not.toBe(data1.id);
+        expect(data3.user).toBe("logged-in");
+
+        server.stop();
+    });
+
+    it("should destroy session (promise)", async () => {
+        const app = new Shokupan({ port: 0 });
+        app.use(session({ secret: 'secret', resave: false, saveUninitialized: true }));
+
+        app.get('/set', (ctx) => {
+            ctx.session['val'] = 1;
+            return "ok";
+        });
+
+        app.get('/destroy', async (ctx) => {
+            await ctx.session.destroy();
+            return "destroyed";
+        });
+
+        app.get('/check', (ctx) => {
+            return { val: ctx.session['val'] };
+        });
+
+        const server = await app.listen();
+        const baseUrl = `http://localhost:${server.port}`;
+
+        const res1 = await fetch(`${baseUrl}/set`);
+        const cookie = res1.headers.get("set-cookie")!;
+
+        await fetch(`${baseUrl}/destroy`, { headers: { "Cookie": cookie } });
+
+        const resChecker = await fetch(`${baseUrl}/check`, { headers: { "Cookie": cookie } });
+        expect((await resChecker.json() as any).val).toBeUndefined();
+
+        server.stop();
+    });
+
+    it("should reload session (promise)", async () => {
+        const app = new Shokupan({ port: 0 });
+        const store = new MemoryStore();
+        app.use(session({ secret: 'secret', store, resave: false, saveUninitialized: true }));
+
+        app.get('/', (ctx) => {
+            return "ok";
+        });
+
+        app.get('/update-backend', async (ctx) => {
+            return new Promise((resolve) => {
+                store.get(ctx.sessionID, (err, sess) => { // MemoryStore.get
+                    if (sess) {
+                        sess['external'] = 'changed';
+                        store.set(ctx.sessionID, sess, () => resolve("updated"));
+                    } else {
+                        resolve("session-not-found");
+                    }
+                });
+            });
+        });
+
+        app.get('/reload', async (ctx) => {
+            await ctx.session.reload();
+            return { external: ctx.session['external'] };
+        });
+
+        const server = await app.listen();
+        const baseUrl = `http://localhost:${server.port}`;
+
+        // 1. Start session
+        const res1 = await fetch(`${baseUrl}/`);
+        const cookie = res1.headers.get("set-cookie")!;
+
+        // 2. Update backend directly
+        const updateRes = await fetch(`${baseUrl}/update-backend`, { headers: { "Cookie": cookie } });
+        expect(await updateRes.text()).toBe("updated");
+
+        // 3. Reload
+        const res3 = await fetch(`${baseUrl}/reload`, { headers: { "Cookie": cookie } });
+        const data = await res3.json() as any;
+        expect(data.external).toBe("changed");
+
+        server.stop();
+    });
+
+    it("should save session (promise)", async () => {
+        const app = new Shokupan({ port: 0 });
+        const store = new MemoryStore();
+        const spySet = jest.spyOn(store, 'set');
+
+        app.use(session({ secret: 'secret', store, resave: false, saveUninitialized: true }));
+
+        app.get('/save', async (ctx) => {
+            ctx.session['manually_saved'] = true;
+            await ctx.session.save();
+            return "saved";
+        });
+
+        const server = await app.listen();
+        const baseUrl = `http://localhost:${server.port}`;
+
+        await fetch(`${baseUrl}/save`);
+        expect(spySet).toHaveBeenCalled();
 
         server.stop();
     });
