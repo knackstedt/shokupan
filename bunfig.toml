@@ -1,4 +1,12 @@
 # bunfig.toml
 [test]
+coverage = true
 preload = ["./src/test/@pretest.ts"]
-timeout = 30000 # 30 seconds
+timeout = 30000                                                            # 30 seconds
+coverageReporter = ["text", "lcov"]
+coveragePathIgnorePatterns = ["dist/**", "node_modules/**", "src/test/**"]
+
+[install]
+optional = true
+dev = true
+peer = true

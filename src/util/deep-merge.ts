@@ -2,7 +2,7 @@
  * Simple object check.
  */
 export function isObject(item: any): item is Record<string, any> {
-    return (item && typeof item === 'object' && !Array.isArray(item));
+    return !!(item && typeof item === 'object' && !Array.isArray(item));
 }
 
 /**

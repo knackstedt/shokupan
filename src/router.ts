@@ -729,7 +729,6 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         requestTimeout?: number;
         renderer?: JSXRenderer;
         controller?: any;
-        metadata?: { file: string, line: number; };
         middleware?: Middleware[];
     }) {
         const { regex, keys } = customRegex

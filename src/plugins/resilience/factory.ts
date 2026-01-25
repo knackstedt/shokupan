@@ -79,6 +79,10 @@ export class ResilienceFactory {
         // policies.reverse() -> [Fallback, Bulkhead, Timeout, Breaker, Retry]
         // This looks correct order for wrap arguments.
 
+        if (policies.length === 0) {
+            return { execute: (fn: any) => fn() } as any;
+        }
+
         return wrap(...policies.reverse());
     }
 }

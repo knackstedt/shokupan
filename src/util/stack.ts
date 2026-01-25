@@ -9,7 +9,6 @@ export function getCallerInfo(skipFrames = 1): { file: string; line: number; } {
     try {
         const err = new Error();
         const stack = err.stack?.split('\n') || [];
-
         // Skip Error line and requested frames
         // Bun stack traces usually look like:
         // Error
@@ -22,7 +21,7 @@ export function getCallerInfo(skipFrames = 1): { file: string; line: number; } {
         for (let i = 1; i < stack.length; i++) {
             const l = stack[i];
 
-            // Ignore internals
+            // Ignore internals - These should NEVER be returned as caller info
             if (!l.includes(':')) continue; // likely not File:Line context
             if (l.includes('node_modules')) continue;
             if (l.includes('bun:main')) continue;
@@ -31,6 +30,7 @@ export function getCallerInfo(skipFrames = 1): { file: string; line: number; } {
             if (l.includes('src/router.ts')) continue; // Ignore router internals
             if (l.includes('src/util/decorators.ts')) continue; // Ignore decorators
             if (l.includes('src/shokupan.ts')) continue; // Ignore framework internals
+            if (l.includes('src/plugins/application/openapi/openapi.ts')) continue; // Ignore openapi internals
 
             found++;
             if (found >= skipFrames) {
@@ -38,11 +38,6 @@ export function getCallerInfo(skipFrames = 1): { file: string; line: number; } {
                 const match = l.match(/\((.*):(\d+):(\d+)\)/) || l.match(/at (.*):(\d+):(\d+)/);
                 if (match) {
                     file = match[1];
-                    // Clean up file path if it has "async " prefix or similar if regex was loose,
-                    // but the regex capture group 1 should be the path.
-                    // Sometimes match[1] might contain "functionName (/path...)" if the regex matched weirdly,
-                    // but the above regexes look for parenthesis wrap or clean "at path".
-
                     line = parseInt(match[2], 10);
                     return { file, line };
                 }

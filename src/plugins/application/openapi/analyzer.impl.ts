@@ -589,14 +589,13 @@ export class OpenAPIAnalyzer {
         } else {
             // Existing logic for app/router instances
             const visit = (node: ts.Node) => {
-                // ... (rest of the existing logic)
-                // Look for method calls: app.get(...), app.post(...), app.mount(...)
+                // Look for method calls: app.get(), router.post(), etc.
                 if (ts.isCallExpression(node)) {
-                    const expr = node.expression;
+                    if (ts.isPropertyAccessExpression(node.expression)) {
+                        const objName = node.expression.expression.getText(sourceFile);
+                        const methodName = node.expression.name.getText(sourceFile);
 
-                    if (ts.isPropertyAccessExpression(expr)) {
-                        const objName = expr.expression.getText(sourceFile);
-                        const methodName = expr.name.getText(sourceFile);
+                        // console.log(`[Analyzer] Visiting call ${objName}.${methodName}`);
 
                         // Check if this is our application instance
                         // For GenericModule, we accept any variable name as it's likely an argument (e.g. app.event)
@@ -1023,10 +1022,93 @@ export class OpenAPIAnalyzer {
                             }
                         } else if (propText === 'query') {
                             if (!requestTypes.query) requestTypes.query = {};
+
+                            let key: string | undefined;
+                            let parentExpr: ts.Node | undefined;
+
+                            if (ts.isPropertyAccessExpression(node.parent)) {
+                                key = node.parent.name.getText(sourceFile);
+                                parentExpr = node.parent;
+                            } else if (ts.isElementAccessExpression(node.parent)) {
+                                const arg = node.parent.argumentExpression;
+                                if (ts.isStringLiteral(arg)) {
+                                    key = arg.text;
+                                    parentExpr = node.parent;
+                                }
+                            }
+
+                            if (key && parentExpr) {
+                                let type = 'string';
+                                const parent = parentExpr.parent;
+
+                                if (ts.isCallExpression(parent) && ts.isIdentifier(parent.expression)) {
+                                    const fnName = parent.expression.getText(sourceFile);
+                                    if (fnName === 'parseInt') type = 'integer'; // Explicit integer
+                                    else if (fnName === 'parseFloat' || fnName === 'Number') type = 'number';
+                                    else if (fnName === 'Boolean') type = 'boolean';
+                                }
+                                // Check for Unary Expression: +ctx.query.page (number) or !ctx.query.flag (boolean)
+                                else if (ts.isPrefixUnaryExpression(parent)) {
+                                    if (parent.operator === ts.SyntaxKind.PlusToken) type = 'number';
+                                    else if (parent.operator === ts.SyntaxKind.ExclamationToken) type = 'boolean';
+                                }
+
+                                if (!requestTypes.query[key] || requestTypes.query[key] === 'string') {
+                                    requestTypes.query[key] = type;
+                                }
+                            }
                         } else if (propText === 'params') {
                             if (!requestTypes.params) requestTypes.params = {};
+
+                            let key: string | undefined;
+                            let parentExpr: ts.Node | undefined;
+
+                            if (ts.isPropertyAccessExpression(node.parent)) {
+                                key = node.parent.name.getText(sourceFile);
+                                parentExpr = node.parent;
+                            } else if (ts.isElementAccessExpression(node.parent)) {
+                                const arg = node.parent.argumentExpression;
+                                if (ts.isStringLiteral(arg)) {
+                                    key = arg.text;
+                                    parentExpr = node.parent;
+                                }
+                            }
+
+                            if (key && parentExpr) {
+                                let type = 'string';
+                                const parent = parentExpr.parent;
+
+                                if (ts.isCallExpression(parent) && ts.isIdentifier(parent.expression)) {
+                                    const fnName = parent.expression.getText(sourceFile);
+                                    if (fnName === 'parseInt') type = 'integer'; // Integer
+                                    else if (fnName === 'parseFloat' || fnName === 'Number') type = 'number';
+                                    else if (fnName === 'Boolean') type = 'boolean';
+                                }
+                                else if (ts.isPrefixUnaryExpression(parent)) {
+                                    if (parent.operator === ts.SyntaxKind.PlusToken) type = 'number';
+                                    else if (parent.operator === ts.SyntaxKind.ExclamationToken) type = 'boolean';
+                                }
+
+                                if (!requestTypes.params[key] || requestTypes.params[key] === 'string') {
+                                    requestTypes.params[key] = type;
+                                }
+                            }
                         } else if (propText === 'headers') {
                             if (!requestTypes.headers) requestTypes.headers = {};
+
+                            let key: string | undefined;
+                            if (ts.isPropertyAccessExpression(node.parent)) {
+                                key = node.parent.name.getText(sourceFile);
+                            } else if (ts.isElementAccessExpression(node.parent)) {
+                                const arg = node.parent.argumentExpression;
+                                if (ts.isStringLiteral(arg)) {
+                                    key = arg.text;
+                                }
+                            }
+
+                            if (key && !requestTypes.headers[key]) {
+                                requestTypes.headers[key] = 'string';
+                            }
                         }
                     }
                 }

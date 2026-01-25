@@ -268,7 +268,7 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
             pluginName = (router.metadata as any).pluginName;
             tag = pluginName.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
         }
-        else if (router.metadata?.file && router.metadata.file.includes('plugins/application/')) {
+        else if (router.metadata?.file && router.metadata.file.includes('plugins/application/') && !router.metadata.file.match(/\.(spec|test)\.ts$/)) {
             isBuiltinPlugin = true;
             // Extract plugin name from path .../plugins/application/<name>/...
             const match = router.metadata.file.match(/plugins\/application\/([^/]+)/);
@@ -477,9 +477,41 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                 const params: any[] = [];
                 if (astMatch.requestTypes?.query) {
                     for (const [name, _type] of Object.entries(astMatch.requestTypes.query)) {
-                        params.push({ name, in: 'query', schema: { type: 'string' } });
+                        let type = 'string';
+                        let format: string | undefined;
+                        if (_type === 'integer') { type = 'integer'; format = 'int32'; }
+                        else if (_type === 'number') { type = 'number'; format = 'float'; }
+                        else if (_type === 'boolean') type = 'boolean';
+
+                        const schema: any = { type };
+                        if (format) schema.format = format;
+
+                        params.push({ name, in: 'query', schema });
                     }
                 }
+
+                if (astMatch.requestTypes?.params) {
+                    for (const [name, _type] of Object.entries(astMatch.requestTypes.params)) {
+                        let type = 'string';
+                        let format: string | undefined;
+                        if (_type === 'integer') { type = 'integer'; format = 'int32'; }
+                        else if (_type === 'number') { type = 'number'; format = 'float'; }
+                        else if (_type === 'boolean') type = 'boolean';
+
+                        const schema: any = { type };
+                        if (format) schema.format = format;
+
+                        // Path params are always required
+                        params.push({ name, in: 'path', required: true, schema });
+                    }
+                }
+
+                if (astMatch.requestTypes?.headers) {
+                    for (const [name, _type] of Object.entries(astMatch.requestTypes.headers)) {
+                        params.push({ name, in: 'header', schema: { type: 'string' } });
+                    }
+                }
+
                 if (params.length > 0) {
                     operation.parameters = params;
                 }
@@ -553,11 +585,10 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
 
                 pathParams.forEach(p => {
                     const idx = mergedParams.findIndex(ep => ep.in === 'path' && ep.name === p.name);
-                    if (idx >= 0) {
-                        mergedParams[idx] = deepMerge(mergedParams[idx], p);
-                    } else {
+                    if (idx === -1) {
                         mergedParams.push(p);
                     }
+                    // If it exists (from AST), preserve AST version as it has richer type info
                 });
                 operation.parameters = mergedParams;
             }
