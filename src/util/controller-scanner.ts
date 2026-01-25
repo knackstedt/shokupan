@@ -1,10 +1,10 @@
 
 import { ShokupanContext } from '../context';
 import { compose } from '../middleware';
+import { traceHandler } from '../plugins/application/opentelemetry';
 import { ResilienceFactory } from '../plugins/resilience/factory';
 import type { ShokupanRouter } from '../router';
 import { Container } from './di';
-import { traceHandler } from './instrumentation';
 import { getCallerInfo } from './stack';
 import {
     $controllerPath,

@@ -19,8 +19,10 @@ export * from "./plugins/application/dashboard/plugin";
 export * from "./plugins/application/error-view/index";
 export * from "./plugins/application/graphql-apollo";
 export * from "./plugins/application/graphql-yoga";
+export * from "./plugins/application/htmx";
 export * from "./plugins/application/idempotency/plugin";
 export * from "./plugins/application/mcp-server/plugin";
+export * from "./plugins/application/opentelemetry";
 export * from "./plugins/application/scalar";
 export * from "./plugins/application/socket-io";
 
