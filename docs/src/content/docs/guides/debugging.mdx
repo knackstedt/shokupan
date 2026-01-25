@@ -1,0 +1,89 @@
+---
+title: Debugging
+description: Learn how to debug Shokupan applications, including tracking unhandled rejections.
+---
+
+Shokupan provides several tools to help you debug your applications and identifying the root cause of issues.
+
+## Built-in Debugging Tools
+
+Shokupan comes with several built-in plugins that can help you inspect and debug your application.
+
+### API Explorer (Scalar)
+
+The API Explorer (powered by Scalar) allows you to interactively test your API endpoints. It uses the generated OpenAPI specification to provide a rich UI for making requests and inspecting responses.
+
+To enable it, ensure `enableOpenApiGen` is set to `true` (default). You can access the explorer at `/reference` (or your configured path).
+
+```typescript
+const app = new Shokupan({
+    enableOpenApiGen: true
+});
+```
+
+### AsyncAPI
+
+If you are using event-driven architectures (WebSockets, SSE), the AsyncAPI generator provides documentation for your async endpoints.
+
+Enable it via configuration:
+
+```typescript
+const app = new Shokupan({
+    enableAsyncApiGen: true
+});
+```
+
+This generates an AsyncAPI specification that describes your event-driven API surface.
+
+### Dashboard
+
+The Shokupan Dashboard provides a visual overview of your application's health and metrics. It can be useful for monitoring real-time performance and identifying bottlenecks.
+
+To use the dashboard, register the plugin:
+
+```typescript
+import { Dashboard } from 'shokupan/plugins';
+
+app.register(Dashboard());
+```
+
+## Promise Monkeypatching
+
+One common issue in Node.js/Bun applications is "Unhandled Rejection" errors where the origin of the promise is lost. This happens because the stack trace of an unhandled rejection usually only points to where the error occurred, not where the Promise was originally created (the "dangling promise").
+
+Shokupan offers an optional monkeypatch for the global `Promise` constructor that solves this by:
+1.  Capturing the stack trace when a Promise is created.
+2.  Attaching the current Request Context (including `requestId`) to the Promise.
+
+When an unhandled rejection occurs, Shokupan can then log specifically which request caused it and where the promise was spawned.
+
+### Enabling the Patch
+
+To enable this feature, set `enablePromiseMonkeypatch` to `true` in your Shokupan configuration:
+
+```typescript
+const app = new Shokupan({
+    // ... other config
+    enablePromiseMonkeypatch: true,
+    enableAsyncLocalStorage: true // Required for request context tracking
+});
+```
+
+### How to looks
+
+When an unhandled rejection occurs, you will see a log entry similar to this:
+
+```json
+{
+  "level": "error",
+  "message": "Unhandled Rejection in Shokupan Request",
+  "requestId": "req-123456789",
+  "error": "Error: Something went wrong",
+  "creationStack": "Error: \n    at new PatchedPromise (/app/src/util/promise.ts:35:27)\n    at /app/src/routes/users.ts:25:20 ..."
+}
+```
+
+The `requestId` allows you to correlate the error with specific access logs, and the `creationStack` tells you exactly which line of code created the promise that eventually failed.
+
+> [!CAUTION]
+> This feature modifies the global `Promise` constructor. While it is designed to be non-intrusive, it is a global side effect that affects all Promises in the process. Ensure you test this in your environment before enabling it in production.

@@ -90,6 +90,7 @@ export default defineConfig({
                         { label: 'OpenAPI Validation', link: '/plugins/openapi-validation/' },
                         { label: 'Proxy', link: '/plugins/proxy/' },
                         { label: 'Rate Limiting', link: '/plugins/rate-limiting/' },
+                        { label: 'Resilience', link: '/plugins/resilience/' },
                         { label: 'Scalar (OpenAPI)', link: '/plugins/scalar/' },
                         { label: 'Security Headers', link: '/plugins/security-headers/' },
                         { label: 'Socket.IO', link: '/plugins/socket-io/' },
@@ -112,6 +113,7 @@ export default defineConfig({
                     label: 'Guides',
                     items: [
                         { label: 'Advanced Features', link: '/guides/advanced/' },
+                        { label: 'Debugging', link: '/guides/debugging/' },
                         { label: 'CLI Tools', link: '/guides/cli/' },
                         { label: 'Deployment', link: '/guides/deployment/' },
                         { label: 'Global Type Augmentation', link: '/guides/global-type-augmentation/' },
