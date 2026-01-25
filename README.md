@@ -67,6 +67,7 @@ Shokupan has a rich ecosystem of plugins.
 | Plugin | Description |
 | :--- | :--- |
 | **[Dashboard](https://shokupan.dev/plugins/dashboard)** | Visual dashboard for debugging and analysis. |
+| **[Error View](https://shokupan.dev/plugins/error-view)** | Beautiful, interactive error pages for development. |
 | **[CORS](https://shokupan.dev/plugins/cors)** | Configure Cross-Origin Resource Sharing. |
 | **[Compression](https://shokupan.dev/plugins/compression)** | Enable response compression (gzip, deflate, etc.). |
 | **[Rate Limiting](https://shokupan.dev/plugins/rate-limiting)** | Protect your API from abuse. |
