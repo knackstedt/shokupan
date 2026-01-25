@@ -54,6 +54,69 @@ app.use(Session({
 }));
 ```
 
+
+## External Stores (Redis, Database)
+For production, you should use an external store like [SurrealDB](https://www.npmjs.com/package/connect-surreal) or Redis. The Session plugin is compatible with stores that follow the [connect](https://github.com/senchalabs/connect) store interface. You can find most compatible stores [here](https://github.com/expressjs/session?tab=readme-ov-file#compatible-session-stores).
+
+
+### SurrealDB Example
+Using `connect-surreal`:
+
+```typescript
+import { SurrealDBStore } from "connect-surreal"
+import { Shokupan, Session } from "shokupan";
+
+const app = new Shokupan();
+
+app.use(Session({
+  store: new SurrealDBStore({
+    url: 'ws://localhost:8000',
+    signinOpts: {
+        username: 'root',
+        password: 'root',
+    },
+    connectionOpts: {
+        namespace: 'main',
+        database: 'main',
+    },
+    // SurrealDB doesn't support record TTL, this option regularly deletes expired sessions.
+    autoSweepExpired: true
+  }),
+  secret: "keyboard cat"
+}))
+```
+
+### Redis Example
+
+Using `connect-redis` and `ioredis`:
+
+```typescript
+import { RedisStore } from "connect-redis"
+import { Redis } from "ioredis"
+import { Shokupan, Session } from "shokupan";
+
+const app = new Shokupan();
+
+app.use(Session({
+    store: new RedisStore({
+        prefix: "myapp:",
+        client: new Redis(),
+    }),
+  secret: "keyboard cat",
+}));
+```
+
+:::tip[Security]
+The session secret is essentially a digital "tamper-proof seal" for your user's session cookies.
+
+Here is the layman's breakdown:
+
+1. The Problem: If you just gave a user a cookie that said ID=123, a hacker could change their cookie to ID=124 to pretend to be someone else.
+2. The Solution: When the server gives a user a cookie, it uses the Session Secret to mathematically "sign" that ID (like ID=123.Signature).
+3. The Verification: When the user sends the cookie back, the server checks the signature. If a hacker changed 123 to 124, the signature wouldn't match anymore, and the server would know the cookie was faked and reject it.
+:::
+
+
 ## Session Methods
 
 The session methods (`regenerate`, `destroy`, `save`, `reload`) are callback-based.
