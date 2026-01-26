@@ -64,7 +64,7 @@ function renderInfoSection(info) {
     const { title, description } = info;
     return `
         <div class="info-section">
-            <h1>${title || 'API Explorer'}</h1>
+            <h1>${escapeHtml(title || 'API Explorer')}</h1>
             ${description ? `<div class="markdown-content" data-markdown="true">${parseMarkdown(description)}</div>` : ''}
         </div>
     `;
@@ -74,9 +74,9 @@ function renderMiddlewareView(middleware, container) {
     const html = `
         <div class="middleware-detail-view">
             <div class="middleware-header">
-                <h1>${middleware.name}</h1>
+                <h1>${escapeHtml(middleware.name)}</h1>
                 <div class="middleware-meta">
-                    ${middleware.scope ? `<span class="badge">${middleware.scope}</span>` : ''}
+                    ${middleware.scope ? `<span class="badge">${escapeHtml(middleware.scope)}</span>` : ''}
                     ${middleware.file ? `
                         <a href="vscode://file/${middleware.file}:${middleware.startLine || 1}" class="doc-source-link">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -139,10 +139,10 @@ function renderMiddlewareView(middleware, container) {
         const route = explorerData.routes.find(r => r.path === routePath);
         if (route) {
             return `
-                                            <tr>
-                                                <td class="col-method"><span class="badge badge-${route.method.toUpperCase()}">${route.method.toUpperCase()}</span></td>
-                                                <td class="col-path"><a href="#${route.op.operationId}" class="route-link">${routePath}</a></td>
-                                                <td class="col-desc">${route.op.summary || route.op.description || '-'}</td>
+                                        <tr>
+                                                <td class="col-method"><span class="badge badge-${escapeHtml(route.method.toUpperCase())}">${escapeHtml(route.method.toUpperCase())}</span></td>
+                                                <td class="col-path"><a href="#${escapeHtml(route.op.operationId)}" class="route-link">${highlightPath(routePath)}</a></td>
+                                                <td class="col-desc">${escapeHtml(route.op.summary || route.op.description || '-')}</td>
                                             </tr>
                                         `;
         }
@@ -270,14 +270,14 @@ function renderSchema(schema, depth = 0, isResponse = false) {
             return `
                 <div style="margin-left: ${indent}px;">
                     <div class="property-heading" style="display: flex; align-items: center; gap: 8px; padding: 6px 0;">
-                        <div class="property-name" style="font-family: monospace; font-weight: 500; color: var(--text-primary);">${key}</div>
+                        <div class="property-name" style="font-family: monospace; font-weight: 500; color: var(--text-primary);">${escapeHtml(key)}</div>
                         <span class="property-detail" style="color: var(--text-secondary); font-size: 0.85rem;">
-                            <span class="property-detail-value">${propType}</span>
+                            <span class="property-detail-value">${escapeHtml(propType)}</span>
                             ${isUnknown ? '<span class="unknown-marker" title="Type could not be determined statically" style="color: #ff9800; margin-left: 4px;">⚠️</span>' : ''}
                         </span>
                         ${badgeHtml}
                     </div>
-                    ${prop.description ? `<div style="color: var(--text-secondary); font-size: 0.85rem; margin-left: 0; margin-top: -4px; margin-bottom: 4px;">${prop.description}</div>` : ''}
+                    ${prop.description ? `<div style="color: var(--text-secondary); font-size: 0.85rem; margin-left: 0; margin-top: -4px; margin-bottom: 4px;">${escapeHtml(prop.description)}</div>` : ''}
                     ${hasNested ? renderSchema(propType === 'array' ? prop.items : prop, depth + 1, isResponse) : ''}
                 </div>
             `;
@@ -296,18 +296,37 @@ function renderSchema(schema, depth = 0, isResponse = false) {
 
     return `
         <div style="margin-left: ${indent}px; padding: 4px 0;">
-            <span class="property-detail-value" style="color: var(--text-secondary); font-family: monospace;">${type}</span>
-            ${schema.format ? `<span style="color: var(--text-secondary); font-size: 0.85rem; margin-left: 6px;">(${schema.format})</span>` : ''}
-            ${schema.description ? `<div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px;">${schema.description}</div>` : ''}
+            <span class="property-detail-value" style="color: var(--text-secondary); font-family: monospace;">${escapeHtml(type)}</span>
+            ${schema.format ? `<span style="color: var(--text-secondary); font-size: 0.85rem; margin-left: 6px;">(${escapeHtml(schema.format)})</span>` : ''}
+            ${schema.description ? `<div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px;">${escapeHtml(schema.description)}</div>` : ''}
         </div>
     `;
+}
+
+// Helper to escape HTML
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
 // Helper to highlight path operators
 function highlightPath(path) {
     if (!path) return '';
 
-    return path
+    // specific pattern replacements on ESCAPED string
+    // {{...}} -> <span...>...</span>
+    // :param -> <span...>...</span>
+    // * -> <span...>...</span>
+
+    // We must escape the path first to prevent XSS
+    let safePath = escapeHtml(path);
+
+    return safePath
         // Highlight {{substitution}} patterns
         .replace(/\{\{([^}]+)\}\}/g, '<span style="color: #4caf50;">{{$1}}</span>')
         // Highlight :parameter patterns
@@ -322,9 +341,10 @@ function renderRequestView(route, container) {
     const { method, path, op } = route;
 
     // Extract metadata
+    // Extract metadata
     const source = op['x-shokupan-source'];
     const middlewares = op['x-shokupan-middleware'] || [];
-    const summary = op.summary || highlightPath(route.path);
+    const summary = op.summary ? escapeHtml(op.summary) : highlightPath(route.path);
 
     // Build tabs for Request Body, Params, Auth, etc.
     const uniqueParams = getUniqueParams(op);
@@ -337,7 +357,7 @@ function renderRequestView(route, container) {
                 <div class="request-panel-header">
                     <div class="request-header-main">
                         <div class="request-url-bar">
-                            <span class="url-method badge-${method}">${method.toUpperCase()}</span>
+                            <span class="url-method badge-${escapeHtml(method)}">${escapeHtml(method.toUpperCase())}</span>
                             <div class="url-input" style="display: flex; align-items: center; font-family: monospace; white-space: nowrap; overflow-x: auto;">${highlightPath(path)}</div>
                         </div>
                         <button class="send-btn" id="btn-send">Send</button>
@@ -422,7 +442,7 @@ function renderRequestView(route, container) {
                                 <div class="middleware-list" style="display: flex; flex-direction: column; gap: 4px;">
                                     ${middlewares.map((mw, idx) => `<div style="display: flex; align-items: center; gap: 8px;">
                                         <span style="font-family: monospace; color: var(--text-secondary); min-width: 20px;">${idx + 1}.</span>
-                                        <span class="middleware-badge" title="${mw.metadata ? JSON.stringify(mw.metadata).replace(/"/g, '&quot;') : ''}">${mw.name}</span>
+                                        <span class="middleware-badge" title="${mw.metadata ? escapeHtml(JSON.stringify(mw.metadata)) : ''}">${escapeHtml(mw.name)}</span>
                                     </div>`).join('')}
                                 </div>
                             </div>
@@ -432,8 +452,8 @@ function renderRequestView(route, container) {
                                 <h3 style="margin-top: 0; margin-bottom: 12px; font-size: 1rem;">Request</h3>
                                 <div style="display: grid; gap: 8px; font-size: 0.9rem;">
                                     <div style="display: flex; gap: 8px;">
-                                        <span class="badge badge-${method.toUpperCase()}">${method.toUpperCase()}</span>
-                                        <code style="background: var(--bg-primary); padding: 2px 6px; border-radius: 4px;">${path}</code>
+                                        <span class="badge badge-${escapeHtml(method.toUpperCase())}">${escapeHtml(method.toUpperCase())}</span>
+                                        <code style="background: var(--bg-primary); padding: 2px 6px; border-radius: 4px;">${escapeHtml(path)}</code>
                                     </div>
                                     ${op.parameters && op.parameters.length > 0 ? `
                                     <div style="display: grid; grid-template-columns: 120px 1fr; gap: 8px;">
@@ -441,12 +461,12 @@ function renderRequestView(route, container) {
                                         <div style="display: flex; flex-wrap: wrap; gap: 4px;">
                                             ${op.parameters.filter(p => p.in === 'query').map(p =>
         `<span style="background: var(--bg-primary); padding: 2px 6px; border-radius: 4px; font-size: 0.85rem;">
-                                                    <code>${p.name}</code>${p.required ? '*' : ''}
+                                                    <code>${escapeHtml(p.name)}</code>${p.required ? '*' : ''}
                                                 </span>`
     ).join('')}
                                             ${op.parameters.filter(p => p.in === 'path').map(p =>
         `<span style="background: var(--bg-primary); padding: 2px 6px; border-radius: 4px; font-size: 0.85rem;">
-                                                    <code>{${p.name}}</code>
+                                                    <code>{${escapeHtml(p.name)}}</code>
                                                 </span>`
     ).join('')}
                                         </div>
@@ -457,7 +477,7 @@ function renderRequestView(route, container) {
                                         <span style="color: var(--text-secondary);">Body:</span>
                                         <div style="display: flex; flex-wrap: wrap; gap: 4px;">
                                             ${Object.keys(op.requestBody.content || {}).map(ct =>
-        `<code style="background: var(--bg-primary); padding: 2px 6px; border-radius: 4px; font-size: 0.85rem;">${ct}</code>`
+        `<code style="background: var(--bg-primary); padding: 2px 6px; border-radius: 4px; font-size: 0.85rem;">${escapeHtml(ct)}</code>`
     ).join('')}
                                         </div>
                                     </div>
@@ -474,13 +494,13 @@ function renderRequestView(route, container) {
         return `
                                         <div style="border-left: 2px solid var(--text-secondary); padding-left: 12px;">
                                             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                                                <code style="background: var(--bg-primary); padding: 2px 8px; border-radius: 4px; font-weight: bold;">${code}</code>
-                                                <span style="color: var(--text-secondary);">${resp.description || 'Response'}</span>
+                                                <code style="background: var(--bg-primary); padding: 2px 8px; border-radius: 4px; font-weight: bold;">${escapeHtml(code)}</code>
+                                                <span style="color: var(--text-secondary);">${escapeHtml(resp.description || 'Response')}</span>
                                             </div>
                                             ${contentTypes.length > 0 ? `
                                                 <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;">
                                                     ${contentTypes.map(ct =>
-            `<code style="background: var(--bg-primary); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem;">${ct}</code>`
+            `<code style="background: var(--bg-primary); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem;">${escapeHtml(ct)}</code>`
         ).join('')}
                                                 </div>
                                             ` : ''}
@@ -894,9 +914,9 @@ function renderParamsTable(params) {
         <div class="params-table">
             ${params.map(p => `
                 <div class="param-row">
-                    <div class="param-key">${p.name}${p.required ? '*' : ''}</div>
+                    <div class="param-key">${escapeHtml(p.name)}${p.required ? '*' : ''}</div>
                     <div class="param-value">
-                        <input type="text" name="param-${p.name}" data-in="${p.in}" placeholder="${p.description || ''}" />
+                        <input type="text" name="param-${escapeHtml(p.name)}" data-in="${p.in}" placeholder="${escapeHtml(p.description || '')}" />
                     </div>
                 </div>
             `).join('')}
@@ -1267,7 +1287,13 @@ function parseMarkdown(text) {
         return originalBlockquote(quote);
     };
 
-    return marked.parse(text, { renderer });
+    const html = marked.parse(text, { renderer });
+
+    if (typeof DOMPurify !== 'undefined') {
+        return DOMPurify.sanitize(html);
+    }
+
+    return html;
 }
 
 

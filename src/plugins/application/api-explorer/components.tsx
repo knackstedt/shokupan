@@ -1,4 +1,5 @@
 
+import { escapeHtml, safeScriptJson } from '../../../util/html';
 
 // Type definitions for better clarity
 interface Route {
@@ -304,6 +305,7 @@ export function ApiExplorerApp({ spec, base, asyncSpec, config }: any) {
                 <link rel="stylesheet" href={`${base}/style.css`} />
                 <link rel="stylesheet" href={`${base}/theme.css`} />
                 <script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
+                <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.min.js"></script>
                 <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
                 <script dangerouslySetInnerHTML={{
                     __html: `
@@ -344,8 +346,11 @@ function Sidebar({ spec, hierarchicalGroups }: any) {
         // Convert {param} to :param
         const converted = path.replace(/\{([^}]+)\}/g, ':$1');
 
+        // Escape HTML to prevent XSS
+        const escaped = escapeHtml(converted);
+
         // Highlight :param with color
-        return converted.replace(/:([a-zA-Z0-9_]+)/g, '<span class="param-highlight">:$1</span>');
+        return escaped.replace(/:([a-zA-Z0-9_]+)/g, '<span class="param-highlight">:$1</span>');
     };
 
     // Recursive function to render navigation nodes
@@ -487,21 +492,19 @@ function Sidebar({ spec, hierarchicalGroups }: any) {
 
 function MainContent({ allRoutes, config, spec }: any) {
     // Serialize data for client-side consumption
-    const explorerData = JSON.stringify({
+    const explorerData = safeScriptJson({
         routes: allRoutes,
         config,
         info: spec.info,
         middlewareRegistry: spec['x-middleware-registry'] || {}
     });
 
-    const safeJson = explorerData.replace(/<\/script>/g, '<\\/script>');
-
     return (
         <main class="content" id="main-content">
             <div id="ide-container">
                 <div class="empty-state">Select a request to view details</div>
             </div>
-            <script id="explorer-data" type="application/json" dangerouslySetInnerHTML={{ __html: safeJson }}></script>
+            <script id="explorer-data" type="application/json" dangerouslySetInnerHTML={{ __html: explorerData }}></script>
         </main>
     );
 }

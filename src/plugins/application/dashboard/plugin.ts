@@ -122,6 +122,18 @@ class Collector implements DebugCollector {
     }
 }
 
+/**
+ * The Dashboard plugin provides a web interface for monitoring and debugging the Shokupan application.
+ * It allows you to view request logs, metrics, and other debugging information. Additionally,
+ * this plugin shows the scalar, asyncapi and openapi plugins if they are enabled.
+ * It uses WebSockets to push updates to the dashboard in real-time.
+ * 
+ * This plugin will automatically enable the metrics plugin and the fetch interceptor. These are 
+ * required for the dashboard to function. The fetch interceptor will track all requests and 
+ * responses for use in the dashboard and Network tab.
+ * 
+ * When enabled, enableMiddlewareTracking will automatically be enabled on the application.
+ */
 export class Dashboard implements ShokupanPlugin {
 
     private [$appRoot]: Shokupan;
@@ -167,13 +179,11 @@ export class Dashboard implements ShokupanPlugin {
         this.metricsCollector = new MetricsCollector(this.db, onCollect);
 
         if (app.applicationConfig) {
-            // TODO: if instability comment out line below?
             app.applicationConfig.enableMiddlewareTracking = true;
         }
 
         // Initialize Fetch Interceptor
         const fetchInterceptor = new FetchInterceptor();
-        // TODO: if instability comment out line below?
         fetchInterceptor.patch();
         fetchInterceptor.on((log: OutboundRequestLog) => {
             // Prevent infinite loop by ignoring DB requests

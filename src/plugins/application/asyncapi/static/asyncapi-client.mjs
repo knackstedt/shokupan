@@ -321,7 +321,7 @@ async function selectEvent(name, el) {
             sourceLinksHtml = sourceInfos.map(s => {
                 const filename = s.file ? s.file.split('/').pop() : 'unknown';
                 return `<a href="vscode://file/${s.file}:${s.line}" style="color: #fbbf24; text-decoration: none; display: block;" class="code-link">
-                            <code style="font-family: 'JetBrains Mono', monospace; background: rgba(251, 191, 36, 0.1); padding: 2px 4px; border-radius: 4px;">${filename}:${s.line}</code>
+                            <code style="font-family: 'JetBrains Mono', monospace; background: rgba(251, 191, 36, 0.1); padding: 2px 4px; border-radius: 4px;">${escapeHtml(filename)}:${s.line}</code>
                         </a>`;
             }).join('');
         }
@@ -336,10 +336,10 @@ async function selectEvent(name, el) {
             <div class="doc-body">
                 <div class="alert warning" style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 6px; padding: 16px; margin-bottom: 24px;">
                     <p style="margin: 0; color: #fbbf24; font-weight: 500;">
-                        ${op.summary || 'Possible Issue Detected'}
+                        ${escapeHtml(op.summary || 'Possible Issue Detected')}
                     </p>
                     <p style="margin: 8px 0 0 0; opacity: 0.8; line-height: 1.5;">
-                        ${desc}
+                        ${escapeHtml(desc)}
                     </p>
                     <p style="margin: 12px 0 0 0;">
                         ${sourceLinksHtml}
@@ -454,7 +454,7 @@ async function selectEvent(name, el) {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px">
                     <polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline>
                 </svg>
-                <code style="font-family: inherit;">${filename}:${s.line}</code>
+                <code style="font-family: inherit;">${escapeHtml(filename)}:${s.line}</code>
             </a>`;
         } else {
             sourceLinkHtml = `<div class="doc-source-link" title="Multiple sources">
@@ -469,16 +469,16 @@ async function selectEvent(name, el) {
     els.docPanel.innerHTML = `
         <div class="doc-header">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.5rem;">
-                    <h1 class="doc-title" style="margin:0">${item.name}</h1>
+                    <h1 class="doc-title" style="margin:0">${escapeHtml(item.name)}</h1>
                     ${sourceLinkHtml}
             </div>
             <div class="doc-meta">
                 <span class="badge badge-${item.type === 'publish' ? 'SEND' : 'RECV'}" style="font-size: 0.8rem; padding: 4px 8px;">${item.type === 'publish' ? 'SEND' : 'RECV'}</span>
-                <span>${op.operationId || ''}</span>
+                <span>${escapeHtml(op.operationId || '')}</span>
             </div>
         </div>
         <div class="doc-body">
-            ${desc ? `<p style="line-height: 1.6; margin-bottom: 2rem;">${desc}</p>` : ''}
+            ${desc ? `<p style="line-height: 1.6; margin-bottom: 2rem;">${escapeHtml(desc)}</p>` : ''}
             
             <div class="section-title">Payload Schema</div>
             ${payload ? renderSchemaToDOM(payload) : '<div class="empty-state-text" style="color:var(--text-muted); font-style:italic;">Payload Unused</div>'}
@@ -641,9 +641,20 @@ async function selectEvent(name, el) {
     }
 }
 
+// Helper to escape HTML
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 function renderSchemaToDOM(schema) {
     if (!schema || schema.type !== 'object') {
-        return `<div class="code-block">${JSON.stringify(schema, null, 2)}</div>`;
+        return `<div class="code-block">${escapeHtml(JSON.stringify(schema, null, 2))}</div>`;
     }
 
     let html = '<div class="schema-root">';
@@ -659,12 +670,12 @@ function renderSchemaToDOM(schema) {
             out += `
                     <div class="schema-row">
                         <div class="schema-prop">
-                            ${key} ${isReq ? '<span class="prop-req">*</span>' : ''}
+                            ${escapeHtml(key)} ${isReq ? '<span class="prop-req">*</span>' : ''}
                         </div>
                         <div style="flex: 1;">
                             <div style="display:flex; align-items:baseline;">
-                                <span class="schema-type">${type}</span>
-                                <span class="schema-desc">${desc}</span>
+                                <span class="schema-type">${escapeHtml(type)}</span>
+                                <span class="schema-desc">${escapeHtml(desc)}</span>
                             </div>
                             ${prop.properties ? `<div class="nested-schema">${renderProps(prop.properties, prop.required)}</div>` : ''}
                         </div>

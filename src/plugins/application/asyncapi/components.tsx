@@ -2,6 +2,8 @@
 
 
 
+import { safeScriptJson } from '../../../util/html';
+
 export function AsyncApiApp({ spec, serverUrl, base, disableSourceView, navTree }: any) {
     return (
         <html lang="en">
@@ -16,10 +18,10 @@ export function AsyncApiApp({ spec, serverUrl, base, disableSourceView, navTree 
                 <link rel="stylesheet" href={`${base}/style.css`} />
                 <script dangerouslySetInnerHTML={{
                     __html: `
-                    window.INITIAL_SPEC = ${JSON.stringify(spec)};
-                    window.INITIAL_SERVER_URL = "${serverUrl}";
-                    window.DISABLE_SOURCE_VIEW = ${JSON.stringify(disableSourceView)};
-                    window.BASE_PATH = "${base}";
+                    window.INITIAL_SPEC = ${safeScriptJson(spec)};
+                    window.INITIAL_SERVER_URL = ${safeScriptJson(serverUrl)};
+                    window.DISABLE_SOURCE_VIEW = ${safeScriptJson(disableSourceView)};
+                    window.BASE_PATH = ${safeScriptJson(base)};
                 `}} />
             </head>
             <body>

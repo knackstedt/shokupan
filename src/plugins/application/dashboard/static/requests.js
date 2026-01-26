@@ -164,7 +164,7 @@ function initRequests() {
                 } catch (e) { }
 
                 return `<div style="display: flex; flex-direction: column; line-height: 1.2;">
-                        <span style="color: var(--text-secondary);">${name}</span>
+                        <span style="color: var(--text-secondary);">${escapeHtml(name)}</span>
                     </div>`;
             },
             headerContextMenu: headerMenu
@@ -198,8 +198,8 @@ function initRequests() {
             formatter: function (cell) {
                 const row = cell.getData();
                 // Prefer explicit protocol version (e.g. 1.1, h2) if available
-                if (row.protocol && row.protocol !== 'http' && row.protocol !== 'https') return row.protocol;
-                return row.scheme || row.protocol || '-';
+                if (row.protocol && row.protocol !== 'http' && row.protocol !== 'https') return escapeHtml(row.protocol);
+                return escapeHtml(row.scheme || row.protocol || '-');
             },
             headerContextMenu: headerMenu
         },
@@ -238,7 +238,7 @@ function initRequests() {
                 if (r.type === 'fetch') return 'fetch';
                 if (r.type === 'xhr') return 'xhr';
                 if (r.type === 'ws') return 'ws';
-                return r.contentType || 'document';
+                return escapeHtml(r.contentType || 'document');
             },
             headerContextMenu: headerMenu
         },
@@ -816,6 +816,17 @@ function renderTabContent(tabId, request) {
     }
 }
 
+// Utility
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 function renderNameValueTable(items, emptyMessage = 'No items found') {
     if (!items || !items.length) return `<div style="padding: 8px; color: var(--text-secondary);">${emptyMessage}</div>`;
     return `
@@ -829,8 +840,8 @@ function renderNameValueTable(items, emptyMessage = 'No items found') {
             <tbody>
                 ${items.map(c => `
                     <tr style="border-bottom: 1px solid var(--border-color-dim, #33333333);">
-                        <td style="padding: 4px 8px; font-weight: 500;">${c.name}</td>
-                        <td style="padding: 4px 8px; word-break: break-all;">${c.value}</td>
+                        <td style="padding: 4px 8px; font-weight: 500;">${escapeHtml(c.name)}</td>
+                        <td style="padding: 4px 8px; word-break: break-all;">${escapeHtml(c.value)}</td>
                     </tr>
                 `).join('')}
             </tbody>
@@ -843,13 +854,13 @@ function renderHeadersTab(request) {
         if (!headers || Object.keys(headers).length === 0) return '';
         const rows = Object.entries(headers).map(([k, v]) => `
             <tr>
-                <td style="font-weight: 500; color: var(--text-flavor); padding: 4px 8px; vertical-align: top;">${k}:</td>
-                <td style="word-break: break-all; padding: 4px 8px;">${v}</td>
+                <td style="font-weight: 500; color: var(--text-flavor); padding: 4px 8px; vertical-align: top;">${escapeHtml(k)}:</td>
+                <td style="word-break: break-all; padding: 4px 8px;">${escapeHtml(v)}</td>
             </tr>
         `).join('');
         return `
             <details open style="margin-bottom: 1rem;">
-                <summary style="font-weight: bold; padding: 4px 0; cursor: pointer; color: var(--text-primary);">${title}</summary>
+                <summary style="font-weight: bold; padding: 4px 0; cursor: pointer; color: var(--text-primary);">${escapeHtml(title)}</summary>
                 <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
                     ${rows}
                 </table>
@@ -862,11 +873,11 @@ function renderHeadersTab(request) {
             <details open style="margin-bottom: 1rem;">
                 <summary style="font-weight: bold; padding: 4px 0; cursor: pointer; color: var(--text-primary);">General</summary>
                 <div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 0.9em; padding-left: 8px;">
-                     <div style="color: var(--text-flavor);">Request URL:</div><div style="word-break: break-all;">${request.url}</div>
-                     <div style="color: var(--text-flavor);">Request Method:</div><div>${request.method}</div>
-                     <div style="color: var(--text-flavor);">Status Code:</div><div>${request.status}</div>
-                     <div style="color: var(--text-flavor);">Remote Address:</div><div>${request.remoteIP || '-'}</div>
-                     <div style="color: var(--text-flavor);">Referrer Policy:</div><div>${request.requestHeaders?.['referrer-policy'] || 'strict-origin-when-cross-origin'}</div>
+                     <div style="color: var(--text-flavor);">Request URL:</div><div style="word-break: break-all;">${escapeHtml(request.url)}</div>
+                     <div style="color: var(--text-flavor);">Request Method:</div><div>${escapeHtml(request.method)}</div>
+                     <div style="color: var(--text-flavor);">Status Code:</div><div>${escapeHtml(request.status)}</div>
+                     <div style="color: var(--text-flavor);">Remote Address:</div><div>${escapeHtml(request.remoteIP || '-')}</div>
+                     <div style="color: var(--text-flavor);">Referrer Policy:</div><div>${escapeHtml(request.requestHeaders?.['referrer-policy'] || 'strict-origin-when-cross-origin')}</div>
                 </div>
             </details>
             ${formatHeaderSection('Response Headers', request.responseHeaders)}

@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { safeScriptJson } from '../../../util/html';
 
 
 
@@ -196,11 +197,11 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                 <script dangerouslySetInnerHTML={{
                     __html: `
                     // Injected function from server config
-                    const getRequestHeaders = ${getRequestHeadersSource};
+                    const getRequestHeaders = ${getRequestHeadersSource.replace(/<\/script>/g, '<\\/script>')};
                     window.SHOKUPAN_CONFIG = {
                         rootPath: "${rootPath || ""}",
                         linkPattern: "${linkPattern || ""}",
-                        ignorePaths: ${JSON.stringify(ignorePaths || [])}
+                        ignorePaths: ${safeScriptJson(ignorePaths || [])}
                     };
                 `}} />
 

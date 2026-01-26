@@ -1,4 +1,5 @@
 import type { ShokupanContext } from '../../../../context';
+import { escapeHtml } from '../../../../util/html';
 import { readSourceContext } from '../util/source-reader';
 
 interface StackFrame {
@@ -101,13 +102,14 @@ export async function renderErrorView(ctx: ShokupanContext, error: any) {
             frame === focusFrame ? 'active' : ''
         ].join(' ');
 
-        const fileLink = `vscode://file/${frame.file}:${frame.line}:${frame.column}`;
+        // Encode file path for URL, but keep line/col checks
+        const fileLink = `vscode://file/${encodeURI(frame.file)}:${frame.line}:${frame.column}`;
 
         return `
             <li class="${classes}">
                 <a href="${fileLink}" style="text-decoration:none; color:inherit; display:block">
-                    <div class="stack-method">${frame.method === '<anonymous>' ? 'Anonymous' : frame.method}</div>
-                    <div class="stack-file">${frame.relativeFile}:${frame.line}</div>
+                    <div class="stack-method">${escapeHtml(frame.method === '<anonymous>' ? 'Anonymous' : frame.method)}</div>
+                    <div class="stack-file">${escapeHtml(frame.relativeFile)}:${frame.line}</div>
                 </a>
             </li>
         `;
@@ -116,8 +118,7 @@ export async function renderErrorView(ctx: ShokupanContext, error: any) {
     // Code Block
     // Syntax Highlighter (Simple Regex-based)
     const highlightCode = (code: string) => {
-        return code
-            .replace(/</g, '&lt;').replace(/>/g, '&gt;') // Escape HTML first
+        return escapeHtml(code) // Use robust escaping first
             // Strings (double quoted)
             .replace(/(")(.*?)(")/g, '<span style="color:#a5d6ff">$1$2$3</span>')
             // Strings (single quoted)
@@ -173,8 +174,8 @@ export async function renderErrorView(ctx: ShokupanContext, error: any) {
 
             return `
                 <tr>
-                    <td class="kv-key">${k}</td>
-                    <td class="kv-val ${valClass}">${displayVal}</td>
+                    <td class="kv-key">${escapeHtml(k)}</td>
+                    <td class="kv-val ${valClass}">${escapeHtml(displayVal)}</td>
                 </tr>`;
         }).join('')}
         </table>`;
@@ -187,7 +188,7 @@ export async function renderErrorView(ctx: ShokupanContext, error: any) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>${errorName}: ${errorMessage}</title>
+    <title>${escapeHtml(errorName)}: ${escapeHtml(errorMessage)}</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.css" rel="stylesheet" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-highlight/prism-line-highlight.min.css" rel="stylesheet" />
     <link href="/_shokupan/error-view/prismjs.theme.css" rel="stylesheet" />
@@ -202,24 +203,24 @@ export async function renderErrorView(ctx: ShokupanContext, error: any) {
         <header class="chapter-header">
             <div class="chapter-meta">
                 <div class="meta-item">
-                     <span>${ctx.method}</span>
+                     <span>${escapeHtml(ctx.method)}</span>
                 </div>
                 <div class="meta-item">
-                     <span>${ctx.url.pathname}</span>
+                     <span>${escapeHtml(ctx.url.pathname)}</span>
                 </div>
                 <div class="meta-item">
                      <span>${ctx.response.status || 500}</span>
                 </div>
                 <div class="meta-item" style="margin-left:auto">
-                     <span class="id-badge" onclick="copyText('${errorId}')" title="Copy ID">ID: ${errorId}</span>
+                     <span class="id-badge" onclick="copyText('${escapeHtml(errorId)}')" title="Copy ID">ID: ${escapeHtml(errorId)}</span>
                 </div>
             </div>
             
-            <h1 class="error-title">${errorName}</h1>
+            <h1 class="error-title">${escapeHtml(errorName)}</h1>
             
             <div class="error-message-container">
-                <h2 class="error-message">${errorMessage}</h2>
-                <button class="action-btn" onclick="copyText('${(errorMessage || '').replace(/'/g, "\\'")}')" title="Copy Message" style="padding:4px 8px">
+                <h2 class="error-message">${escapeHtml(errorMessage)}</h2>
+                <button class="action-btn" onclick="copyText('${(escapeHtml(errorMessage) || '').replace(/'/g, "\\'")}')" title="Copy Message" style="padding:4px 8px">
                     ${ICON_COPY}
                 </button>
             </div>
@@ -237,11 +238,11 @@ export async function renderErrorView(ctx: ShokupanContext, error: any) {
         <!-- CODE FIGURE -->
         <section class="figure">
             <div class="figure-caption">
-                ${focusFrame ? `<a href="vscode://file${focusFrame.file}:${focusFrame.line}" style="color:var(--text-muted); text-decoration:none">${focusFrame ? focusFrame.relativeFile : (sourceContext?.file || 'Unknown Source')}</a>` : ''}
+                ${focusFrame ? `<a href="vscode://file${encodeURI(focusFrame.file)}:${focusFrame.line}" style="color:var(--text-muted); text-decoration:none">${focusFrame ? escapeHtml(focusFrame.relativeFile) : (sourceContext?.file ? escapeHtml(sourceContext.file) : 'Unknown Source')}</a>` : ''}
             </div>
             <div class="figure-body">
                 ${sourceContext ? `
-                <pre class="line-numbers" data-line="${sourceContext.lines.find(l => l.isTarget)?.line}" data-start="${sourceContext.lines[0].line}"><code class="language-typescript">${sourceContext.lines.map(l => l.code.replace(/</g, '&lt;').replace(/>/g, '&gt;')).join('\n')}</code></pre>
+                <pre class="line-numbers" data-line="${sourceContext.lines.find(l => l.isTarget)?.line}" data-start="${sourceContext.lines[0].line}"><code class="language-typescript">${sourceContext.lines.map(l => highlightCode(l.code)).join('\n')}</code></pre>
                 ` : `<div style="padding: 2rem; color: var(--text-muted); text-align: center;">Source code not available.</div>`}
             </div>
         </section>
@@ -339,7 +340,7 @@ export async function renderErrorView(ctx: ShokupanContext, error: any) {
                     // Filter out redundant large stack
                     if (key === 'structuredStack') return undefined;
                     return value;
-                }, 2);
+                }, 2).replace(/<\/script>/g, '<\\/script>');
             };
             // EXECUTE on Server Side
             return serializeError(error);
@@ -362,3 +363,4 @@ export async function renderErrorView(ctx: ShokupanContext, error: any) {
 </body>
 </html>`;
 }
+

@@ -1,9 +1,10 @@
 import type { ShokupanContext } from '../../../../context';
+import { escapeHtml } from '../../../../util/html';
 
 export function renderStatusView(ctx: ShokupanContext, status: number, error: Error) {
-    const title = `${status} ${error.message || 'Error'}`;
-    const method = ctx.method;
-    const path = ctx.url.pathname;
+    const title = `${status} ${escapeHtml(error.message || 'Error')}`;
+    const method = escapeHtml(ctx.method);
+    const path = escapeHtml(ctx.url.pathname);
 
     // Additional CSS to supplement theme
     const css = `
@@ -80,7 +81,7 @@ export function renderStatusView(ctx: ShokupanContext, status: number, error: Er
 <body>
     <div class="container">
         <h1>${status}</h1>
-        <h2>${error.message || 'An error occurred'}</h2>
+        <h2>${escapeHtml(error.message || 'An error occurred')}</h2>
         <div class="meta">
             <span class="method badge-${method}">${method}</span>
             <span class="path">${path}</span>
@@ -89,3 +90,4 @@ export function renderStatusView(ctx: ShokupanContext, status: number, error: Er
 </body>
 </html>`;
 }
+
