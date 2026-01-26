@@ -1,3 +1,4 @@
+import { parseQuery } from './util/query-string';
 import type { BodyInit, Server, ServerWebSocket } from 'bun';
 import { nanoid } from 'nanoid';
 import { readFile } from 'node:fs/promises';
@@ -284,43 +285,11 @@ export class ShokupanContext<
     get query() {
         if (this[$cachedQuery]) return this[$cachedQuery];
 
-        // Security: Use Object.create(null) to prevent prototype pollution
-        const q: Record<string, any> = Object.create(null);
-
-        // Security: Blocklist dangerous property names
-        const blocklist = ['__proto__', 'constructor', 'prototype'];
         const mode = this.app?.applicationConfig?.queryParserMode || 'extended';
+        // Use optimized parser
+        this[$cachedQuery] = parseQuery(this.request.url, mode);
 
-        this.url.searchParams.forEach((value, key) => {
-            // Security: Skip dangerous keys
-            if (blocklist.includes(key)) return;
-
-            // Use hasOwnProperty to avoid prototype chain issues
-            if (Object.prototype.hasOwnProperty.call(q, key)) {
-                if (mode === 'strict') {
-                    throw new Error(`Duplicate query parameter '${key}' is not allowed in strict mode.`);
-                } else if (mode === 'simple') {
-                    // Start of list? End of list? Usually first occurrence wins or last. 
-                    // Let's stick to "first wins" or "last wins". 
-                    // URLSearchParams iteration order is insertion order.
-                    // If we want "last wins" (standard JS object behavior), we just overwrite.
-                    // If we want "first wins", we skip.
-                    // Let's do "last wins" (overwrite) to match standard `Object.fromEntries` behavior usually expected if not handling arrays.
-                    q[key] = value;
-                } else {
-                    // Extended (Array)
-                    if (Array.isArray(q[key])) {
-                        q[key].push(value);
-                    } else {
-                        q[key] = [q[key], value];
-                    }
-                }
-            } else {
-                q[key] = value;
-            }
-        });
-        this[$cachedQuery] = q;
-        return q;
+        return this[$cachedQuery];
     }
 
     /**
