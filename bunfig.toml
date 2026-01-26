@@ -1,6 +1,5 @@
 # bunfig.toml
 [test]
-coverage = true
 preload = ["./src/test/@pretest.ts"]
 timeout = 30000                                                            # 30 seconds
 coverageReporter = ["text", "lcov"]

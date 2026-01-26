@@ -53,10 +53,28 @@ export class NodeAdapter implements ServerAdapter {
             res.statusCode = response.status;
             response.headers.forEach((v, k) => res.setHeader(k, v));
 
+            // Optimized Stream Handling
+            const nodeStream = (response as any).nodeStream;
+            if (nodeStream) {
+                if (typeof nodeStream.pipe === 'function') {
+                    nodeStream.pipe(res);
+                } else {
+                    // Fallback if not a stream?
+                    nodeStream.pipe(res);
+                }
+                return;
+            }
+
             if (response.body) {
-                // Optimize: Use arrayBuffer for direct conversion
-                const buffer = await response.arrayBuffer();
-                res.end(Buffer.from(buffer));
+                if (response.body instanceof ReadableStream) {
+                    // @ts-ignore - Readable.fromWeb exists in Node 18+
+                    const { Readable } = await import('node:stream');
+                    Readable.fromWeb(response.body as any).pipe(res);
+                } else {
+                    // Optimize: Use arrayBuffer for direct conversion
+                    const buffer = await response.arrayBuffer();
+                    res.end(Buffer.from(buffer));
+                }
             } else {
                 res.end();
             }
