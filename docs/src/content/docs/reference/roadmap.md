@@ -3,63 +3,47 @@ title: Roadmap
 description: Future features and development plans
 ---
 
-## Current Features ✅
+## Features
 
-- **Built for Bun** - Native performance
-- **Express Ecosystem** - Middleware support
-- **TypeScript First** - Decorators, Generics, Type Safety
-- **Auto OpenAPI** - Scalar documentation
-- **Rich Plugin System** - CORS, Session, Validation, Rate Limiting
-- **Dependency Injection** - Container for dependency injection
-- **OpenTelemetry** - Built-in traces
-- **OAuth2** - Built-in OAuth2 support
-- **Request-Scoped Globals** - Via AsyncLocalStorage
+### Frontend Support (Partially Implemented)
+- Built-in support for next.js, remix, nuxt, angular SSR, and sveltekit
+- OpenAPI client generation (e.g. Orval, superagent, typed-rest-client)
 
-## Future Features 🔄
+### Runtime Compatibility (Partially Implemented)
+- Improved support for Deno, Node.js, and WinterCG
+- Better Cross-runtime testing
 
-### Runtime Compatibility
-- Support for Deno and Node.js
-- Cross-runtime testing
+### Framework Plugins (Partially Implemented)
+- Drop-in adapters for Express, Koa, Hono, Fastify, Elysia etc.
 
-### Framework Plugins
-- Drop-in adapters for Express, Koa, and Elysia
-
-### Enhanced WebSockets
-- Event support
-- HTTP simulation
-
-### Deep Introspection
-- Type analysis for enhanced OpenAPI generation
-- Automatic schema generation from TypeScript types
-
-### Benchmarks
-- Comprehensive performance comparisons
-- CI/CD performance tracking
+## Plugins
+- Better GraphQL support (sse, ws, endpoints, subscriptions)
+- ODataV4
+- Database plugin integration (e.g. Prisma, Sequelize, mongoose, redis, knex, pg etc)
+- .env file loading, k8s secret mount path loading, environment variable loading
+- InversifyJS
+- profiling (e.g. 0x)
+- superjson
+- mime
 
 ### Scaling
-- Automatic clustering support
+- Automatic clustering
 - Load balancing
 
-### RPC Support
+### Transmission Format Support
 - tRPC integration
-- gRPC support
+- gRPC
+- CBOR
+- SSE
+- Protobuf
+- MessagePack
+- Streaming JSON/Form-data
+- BullMQ
+- Nats.js
 
-### Binary Formats
-- Protobuf support
-- MessagePack support
-
-### Reliability
-- Circuit breaker pattern
-- Retry mechanisms
-- Health checks
-
-### Strict Mode
-- Enforced controller patterns
-- Compile-time route validation
-
-### Standardized Errors
-- Consistent 4xx/5xx error formats
-- Error cataloging
+### Performance
+- Improved NodeJS performance
+- Improved multiprocessing support
 
 ## Contributing
 
