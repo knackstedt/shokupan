@@ -730,6 +730,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         renderer?: JSXRenderer;
         controller?: any;
         middleware?: Middleware[];
+        metadata?: { file: string; line: number; };
     }) {
         const { regex, keys } = customRegex
             ? { regex: customRegex, keys: [] }
