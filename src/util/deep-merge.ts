@@ -20,6 +20,12 @@ export function deepMerge<T extends Record<string, any>>(target: T, ...sources: 
         const sourceKeys = Object.keys(source);
         for (let i = 0; i < sourceKeys.length; i++) {
             const key = sourceKeys[i];
+
+            // Security: Prevent prototype pollution
+            if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+                continue;
+            }
+
             if (isObject(source[key])) {
                 if (!target[key]) Object.assign(target, { [key]: {} });
                 deepMerge(target[key], source[key]);
