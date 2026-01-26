@@ -603,6 +603,15 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
                 // The "next" at the end of the middleware chain is the router dispatch
                 const result = await fn(ctx, async () => {
+                    // Check for WebSocket upgrade BEFORE route matching
+                    // This ensures WebSocket handshakes take precedence over HTTP GET handlers
+                    const upgradeHeader = req.headers.get('upgrade');
+                    if (upgradeHeader?.toLowerCase() === 'websocket') {
+                        if (ctx.upgrade()) {
+                            return undefined as unknown as Response;
+                        }
+                    }
+
                     // Start body parsing early for applicable HTTP methods to overlap with route lookup
                     let bodyParsing: Promise<void> | undefined;
                     if (req.method !== 'GET' && req.method !== 'HEAD') {

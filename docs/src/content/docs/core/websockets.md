@@ -112,6 +112,79 @@ app.listen(3000);
 
 ---
 
+## Middleware and WebSocket Upgrades
+
+**Important**: Middleware runs **before** WebSocket upgrade handling. This is generally desirable (e.g., authentication, CORS, rate limiting should apply to WebSocket connections), but middleware authors need to be aware of this behavior.
+
+### Request Flow
+
+When a WebSocket upgrade request arrives:
+
+1. **Middleware chain executes** (CORS, auth, rate limiting, etc.)
+2. **WebSocket upgrade check** (if `Upgrade: websocket` header present)
+3. **Route matching** (only if not upgraded)
+
+### Best Practices for Middleware
+
+If your middleware needs to handle WebSocket upgrade requests specially, check for the `Upgrade` header:
+
+```typescript
+export function MyMiddleware() {
+    return async (ctx, next) => {
+        const isWebSocket = ctx.req.headers.get('upgrade')?.toLowerCase() === 'websocket';
+        
+        if (isWebSocket) {
+            // Skip certain operations for WebSocket upgrades
+            // e.g., don't parse body, don't set certain headers
+            return next();
+        }
+        
+        // Normal HTTP request handling
+        // ...
+        return next();
+    };
+}
+```
+
+### Common Middleware Scenarios
+
+**✅ Safe for WebSocket upgrades:**
+- **CORS**: Works correctly with WebSocket handshakes
+- **Authentication**: Can validate tokens in upgrade requests
+- **Rate Limiting**: Applies to connection attempts
+- **Logging**: Records upgrade requests
+
+**⚠️ Requires awareness:**
+- **Body parsing**: Don't parse bodies on GET requests (including WebSocket handshakes)
+- **Response modification**: Don't set response headers/body before calling `next()`
+- **Early returns**: Ensure middleware calls `next()` for upgrade requests
+
+### Example: Auth Middleware for WebSockets
+
+```typescript
+export function WebSocketAuth() {
+    return async (ctx, next) => {
+        const isWebSocket = ctx.req.headers.get('upgrade')?.toLowerCase() === 'websocket';
+        
+        if (isWebSocket) {
+            // Check token in query params or custom header
+            const token = ctx.query.token || ctx.req.headers.get('sec-websocket-protocol');
+            
+            if (!isValidToken(token)) {
+                // Reject the upgrade
+                return ctx.text('Unauthorized', 401);
+            }
+        }
+        
+        return next();
+    };
+}
+```
+
+> **Note**: WebSocket upgrade requests use the HTTP GET method with an `Upgrade: websocket` header. They cannot have a request body, so authentication must use headers, query parameters, or cookies.
+
+---
+
 ## Socket.IO Integration
 
 Shokupan provides a helper utility to easily integrate Socket.IO, wiring up your `@Event` handlers to Socket.IO events automatically.
