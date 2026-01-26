@@ -321,15 +321,7 @@ export function Session(options: SessionOptions): Middleware {
         let reqSessionId: string | null = null;
         let isSigned = false;
 
-        // Simple cookie parser
-        const cookieHeader = ctx.req.headers.get("cookie");
-        const cookies: Record<string, string> = {};
-        if (cookieHeader) {
-            cookieHeader.split(';').forEach(c => {
-                const [k, v] = c.split('=').map(s => s.trim());
-                if (k && v) cookies[k] = decodeURIComponent(v);
-            });
-        }
+        const cookies = ctx.cookies;
 
         const rawCookie = cookies[name];
 

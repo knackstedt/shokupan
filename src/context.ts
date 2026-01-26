@@ -1,4 +1,3 @@
-import { parseQuery } from './util/query-string';
 import type { BodyInit, Server, ServerWebSocket } from 'bun';
 import { nanoid } from 'nanoid';
 import { readFile } from 'node:fs/promises';
@@ -6,7 +5,9 @@ import { inspect } from 'node:util';
 import type { Socket, Server as SocketServer } from 'socket.io';
 import type { Shokupan } from './shokupan';
 import { BodyParser } from './util/body-parser';
+import { parseCookies } from './util/cookie-parser';
 import { VALID_HTTP_STATUSES, VALID_REDIRECT_STATUSES } from './util/http-status';
+import { parseQuery } from './util/query-string';
 import type { ShokupanRequest } from './util/request';
 import { ShokupanResponse } from './util/response';
 import { $bodyParsed, $bodyParseError, $bodyType, $cachedBody, $cachedCookies, $cachedHost, $cachedHostname, $cachedOrigin, $cachedProtocol, $cachedQuery, $debug, $finalResponse, $io, $rawBody, $requestId, $routeMatched, $socket, $url, $ws } from './util/symbol';
@@ -298,24 +299,11 @@ export class ShokupanContext<
     get cookies() {
         if (this[$cachedCookies]) return this[$cachedCookies];
 
-        const c: Record<string, string> = Object.create(null);
         const cookieHeader = this.request.headers.get("cookie");
+        // Use optimized parser
+        this[$cachedCookies] = parseCookies(cookieHeader || '');
 
-        if (cookieHeader) {
-            const pairs = cookieHeader.split(";");
-            for (let i = 0; i < pairs.length; i++) {
-                const pair = pairs[i];
-                const index = pair.indexOf("=");
-                if (index > 0) {
-                    const key = pair.slice(0, index).trim();
-                    const value = pair.slice(index + 1).trim();
-                    c[key] = decodeURIComponent(value);
-                }
-            }
-        }
-
-        this[$cachedCookies] = c;
-        return c;
+        return this[$cachedCookies]!;
     }
 
     /**
