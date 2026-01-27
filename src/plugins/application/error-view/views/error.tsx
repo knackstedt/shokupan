@@ -104,11 +104,11 @@ const CodeFigure = ({ focusFrame, sourceContext }: CodeFigureProps) => (
         <div class="figure-body">
             {sourceContext ? (
                 <pre
-                    class="line-numbers"
+                    class="shj-lang-ts"
                     data-line={sourceContext.lines.find(l => l.isTarget)?.line}
                     data-start={sourceContext.lines[0].line}
                 >
-                    <code class="language-typescript">
+                    <code>
                         {sourceContext.lines.map(l => l.code).join('\n')}
                     </code>
                 </pre>
@@ -347,9 +347,7 @@ const ErrorPage = ({
         <head>
             <meta charset="UTF-8" />
             <title>{errorName}: {errorMessage}</title>
-            <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.css" rel="stylesheet" />
-            <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-highlight/prism-line-highlight.min.css" rel="stylesheet" />
-            <link href="/_shokupan/error-view/prismjs.theme.css" rel="stylesheet" />
+            <link href="https://unpkg.com/@speed-highlight/core@latest/dist/themes/visual-studio-dark.css" rel="stylesheet" />
             <link href="/_shokupan/error-view/styles.css" rel="stylesheet" />
             <link href="/_shokupan/error-view/theme.css" rel="stylesheet" />
         </head>
@@ -378,10 +376,35 @@ const ErrorPage = ({
             </div>
             <RawErrorModal error={error} />
 
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-highlight/prism-line-highlight.min.js"></script>
+            <script type="module" dangerouslySetInnerHTML={{
+                __html: `
+                    import { highlightAll } from 'https://unpkg.com/@speed-highlight/core@latest/dist/index.js';
+                    // Initialize speed-highlight
+                    document.addEventListener('DOMContentLoaded', () => {
+                        highlightAll();
+                        
+                        // Add line numbers
+                        document.querySelectorAll('pre[data-start]').forEach(pre => {
+                            const startLine = parseInt(pre.getAttribute('data-start')) || 1;
+                            const targetLine = parseInt(pre.getAttribute('data-line'));
+                            const code = pre.querySelector('code');
+                            if (!code) return;
+                            
+                            const lines = code.textContent.split('\\n');
+                            let html = '';
+                            lines.forEach((line, idx) => {
+                                const lineNum = startLine + idx;
+                                const isTarget = lineNum === targetLine;
+                                html += \`<span class="line-wrapper\${isTarget ? ' highlight-line' : ''}">\`;
+                                html += \`<span class="line-number">\${lineNum}</span>\`;
+                                html += \`<span class="line-code">\${line || ' '}</span>\`;
+                                html += '</span>';
+                            });
+                            code.innerHTML = html;
+                        });
+                    });
+                `
+            }} />
         </body>
     </html>
 );

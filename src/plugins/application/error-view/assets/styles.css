@@ -458,3 +458,14 @@ body:not(.show-dependencies) .stack-entry.dependency {
 body {
     overflow-y: scroll;
 }
+
+.shj-lang-ts {
+    counter-reset: line-counter calc(attr(data-start number) - 1);
+    margin: 0;
+    padding: 0;
+}
+
+.shj-numbers div:before {
+    content: counter(line-counter);
+    counter-increment: line-counter;
+}

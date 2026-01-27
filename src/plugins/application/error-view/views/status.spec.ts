@@ -12,7 +12,7 @@ describe("Status View Template", () => {
 
         expect(html).toContain("404");
         expect(html).toContain("Oops! Missing Ingredient");
-        expect(html).toContain("missing-ingredient.jpg");
+        expect(html).toContain("missing-ingredient.webp");
         expect(html).toContain("bread-image");
     });
 
@@ -27,7 +27,7 @@ describe("Status View Template", () => {
         expect(html).toContain("403");
         expect(html).toContain("Forbidden");
         expect(html).not.toContain("Oops! Missing Ingredient");
-        expect(html).not.toContain("missing-ingredient.jpg");
+        expect(html).not.toContain("missing-ingredient.webp");
     });
 
     it("should escape HTML in paths", () => {
