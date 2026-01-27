@@ -101,6 +101,7 @@ export default defineConfig({
                 {
                     label: 'Migration Guides',
                     items: [
+                        { label: 'Guides', link: '/migration/' },
                         { label: 'From Express', link: '/migration/from-express/' },
                         { label: 'From Koa', link: '/migration/from-koa/' },
                         { label: 'From NestJS', link: '/migration/from-nestjs/' },
