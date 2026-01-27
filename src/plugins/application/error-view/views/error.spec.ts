@@ -1,6 +1,5 @@
-
 import { describe, expect, it } from "bun:test";
-import { renderErrorView } from "./error";
+import { renderErrorView } from "./error.tsx";
 
 describe("Error View Template", () => {
     it("should render error view", async () => {
@@ -31,8 +30,11 @@ describe("Error View Template", () => {
             message: malicious,
             stack: "Stack"
         });
+        // Should not contain unescaped malicious code
         expect(html).not.toContain(malicious);
-        expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+        // Should escape the opening tag (Preact escapes < to &lt;)
+        expect(html).toContain("&lt;script");
+        expect(html).toContain("&lt;/script");
     });
 
     it("should escape XSS in query params", async () => {
@@ -47,7 +49,9 @@ describe("Error View Template", () => {
             message: "Error",
             stack: "Stack"
         });
+        // Should not contain unescaped malicious code  
         expect(html).not.toContain("<img src=x onerror=alert(1)>");
-        expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+        // Should escape the opening tag (Preact escapes < to &lt;)
+        expect(html).toContain("&lt;img");
     });
 });
