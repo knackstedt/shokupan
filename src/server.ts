@@ -1,6 +1,5 @@
-
 import type { Shokupan } from './shokupan';
-import { BunAdapter, NodeAdapter, type ServerAdapter } from './util/adapter';
+import { BunAdapter, H3Adapter, NodeAdapter, type ServerAdapter } from './util/adapter';
 
 /**
  * Shokupan Server
@@ -47,6 +46,8 @@ export class ShokupanServer {
             adapter = new BunAdapter();
         } else if (adapterName === 'node') {
             adapter = new NodeAdapter();
+        } else if (adapterName === 'h3') {
+            adapter = new H3Adapter();
         } else if (adapterName === 'wintercg') {
             throw new Error("WinterCG adapter does not support listen(). Use fetch directly.");
         } else {

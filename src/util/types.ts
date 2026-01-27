@@ -615,7 +615,7 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      * The server adapter to use.
      * overrides `serverFactory`.
      */
-    adapter?: 'bun' | 'node' | 'wintercg' | ServerAdapter;
+    adapter?: 'bun' | 'node' | 'wintercg' | 'h3' | ServerAdapter;
 
     /**
      * The file system adapter to use for `ctx.file`.
