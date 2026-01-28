@@ -5,7 +5,9 @@ describe("H3 Adapter", () => {
     it("should support swapping the server engine to h3", async () => {
         const app = new Shokupan({
             port: 0,
-            adapter: 'h3'
+            adapter: 'h3',
+            blockOnOpenApiGen: true, // Wait for AST analysis
+            enableAsyncAstScanning: false // Avoid potential interference
         });
 
         app.get("/", ctx => ctx.text("Hello from H3"));
@@ -27,7 +29,9 @@ describe("H3 Adapter", () => {
     it("should support POST requests with body parsing", async () => {
         const app = new Shokupan({
             port: 0,
-            adapter: 'h3'
+            adapter: 'h3',
+            blockOnOpenApiGen: true, // Wait for AST analysis
+            enableAsyncAstScanning: false // Avoid potential interference
         });
 
         app.post("/echo", async ctx => {
@@ -52,7 +56,9 @@ describe("H3 Adapter", () => {
     it("should handle middleware correctly", async () => {
         const app = new Shokupan({
             port: 0,
-            adapter: 'h3'
+            adapter: 'h3',
+            blockOnOpenApiGen: true, // Wait for AST analysis
+            enableAsyncAstScanning: false // Avoid potential interference
         });
 
         // Add middleware
