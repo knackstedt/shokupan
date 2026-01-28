@@ -29,6 +29,10 @@ const defaults: ShokupanConfig = {
     enableAsyncLocalStorage: false,
     enableHttpBridge: false,
     enableOpenApiGen: true,
+    enableAsyncAstScanning: true,
+    blockOnOpenApiGen: false,
+    blockOnAsyncApiGen: false,
+    astAnalysisTimeout: 30000,
     reusePort: false,
 };
 
@@ -284,6 +288,39 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     public async start() {
         // Run startup hooks
         await Promise.all(this.startupHooks.map(hook => hook()));
+
+        // Initialize AST analyzer early if async scanning is enabled
+        if (this.applicationConfig.enableAsyncAstScanning !== false &&
+            (this.applicationConfig.enableOpenApiGen || this.applicationConfig.enableAsyncApiGen)) {
+            try {
+                const { getGlobalAnalyzer } = await import('./util/ast-analyzer-worker');
+                const entrypoint = this.metadata?.file;
+                const timeout = this.applicationConfig.astAnalysisTimeout ?? 30000;
+
+                const analyzer = getGlobalAnalyzer(process.cwd(), entrypoint, timeout);
+
+                // Start analysis in background (don't await unless blocking is enabled)
+                const shouldBlock = this.applicationConfig.blockOnOpenApiGen !== false ||
+                    this.applicationConfig.blockOnAsyncApiGen !== false;
+
+                if (!shouldBlock) {
+                    // Start analysis but don't wait
+                    analyzer.analyze().catch(err => {
+                        this.logger?.error("AST analysis failed", { error: err });
+                    });
+                } else {
+                    // Block on analysis if required by config
+                    try {
+                        await analyzer.analyze();
+                    } catch (err) {
+                        this.logger?.error("AST analysis failed", { error: err });
+                    }
+                }
+            } catch (err) {
+                this.logger?.debug("Failed to initialize AST analyzer", { error: err });
+            }
+        }
+
 
         if (this.applicationConfig.enableOpenApiGen) {
             // --- Well-Known Files Implementation ---

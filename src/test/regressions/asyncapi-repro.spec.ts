@@ -11,6 +11,8 @@ describe("AsyncAPI Payload Introspection", () => {
     beforeAll(async () => {
         app = new Shokupan({
             enableAsyncApiGen: true,
+            blockOnAsyncApiGen: true, // Wait for AST analysis in tests
+            enableAsyncAstScanning: false, // Use sync analyzer for reliable tests
             enableHttpBridge: true
         });
 

@@ -1,6 +1,6 @@
 
 import type { ShokupanRouter } from '../../../router';
-import { $childRouters, $isApplication, $mountPath, $routes } from '../../../util/symbol';
+import { $appRoot, $childRouters, $isApplication, $mountPath, $routes } from '../../../util/symbol';
 import type { AsyncAPIOptions } from '../../../util/types';
 import { getAstRoutes } from '../shared/ast-utils';
 
@@ -40,33 +40,89 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
     let astRoutes: any[] = [];
     let astMiddlewareRegistry: Record<string, any> = {};
     let applications: any[] = [];
-    try {
-        const { OpenAPIAnalyzer } = await import('../openapi/analyzer');
-        const entrypoint = (globalThis as any).Bun?.main || require.main?.filename || process.argv[1];
-        const analyzer = new OpenAPIAnalyzer(process.cwd(), entrypoint);
-        const analysisResult = await analyzer.analyze();
-        applications = analysisResult.applications;
-        astRoutes = await getAstRoutes(applications, {
-            includePrefix: false,
-            pathTransform: (p) => p.startsWith('/') ? p.slice(1) : p
-        });
+    let astStatus: 'analyzing' | 'completed' | 'failed' | 'disabled' = 'disabled';
 
-        // Build middleware registry from AST-analyzed applications
-        let middlewareId = 0;
-        for (const app of applications) {
-            if (app.middleware && app.middleware.length > 0) {
-                for (const mw of app.middleware) {
-                    const id = `middleware-${middlewareId++}`;
-                    astMiddlewareRegistry[id] = {
-                        ...mw,
-                        id,
-                        usedBy: [] // Will be populated when processing events
-                    };
+    try {
+        // Check if async AST scanning is enabled
+        const rootApp = (rootRouter as any)[$appRoot] || rootRouter;
+        const useAsyncScanning = rootApp?.applicationConfig?.enableAsyncAstScanning ?? true;
+
+        if (useAsyncScanning) {
+            // Use async worker-based analyzer
+            const { getGlobalAnalyzer } = await import('../../../util/ast-analyzer-worker');
+            const entrypoint = (globalThis as any).Bun?.main || require.main?.filename || process.argv[1];
+            const timeout = rootApp?.applicationConfig?.astAnalysisTimeout ?? 30000;
+
+            const analyzer = getGlobalAnalyzer(process.cwd(), entrypoint, timeout);
+
+            // Check current state
+            const state = analyzer.getState();
+
+            if (state === 'completed') {
+                // Use cached results
+                const result = analyzer.getResult();
+                if (result) {
+                    applications = result.applications;
+                    astStatus = 'completed';
+                }
+            } else if (state === 'analyzing') {
+                // Analysis in progress
+                astStatus = 'analyzing';
+                // Don't wait, return partial spec
+            } else if (state === 'failed') {
+                // Previous analysis failed
+                astStatus = 'failed';
+                if (options.warnings) {
+                    const error = analyzer.getError();
+                    options.warnings.push({
+                        type: 'ast-analysis-failed',
+                        message: 'AST Analysis failed',
+                        detail: error?.message || 'Unknown error'
+                    });
+                }
+            } else {
+                // Not started yet - start it but don't wait
+                analyzer.analyze().then(result => {
+                    // Analysis completed in background
+                }).catch(err => {
+                    // Analysis failed, but we've already returned the spec
+                });
+                astStatus = 'analyzing';
+            }
+        } else {
+            // Use synchronous analyzer (old behavior)
+            const { OpenAPIAnalyzer } = await import('../openapi/analyzer');
+            const entrypoint = (globalThis as any).Bun?.main || require.main?.filename || process.argv[1];
+            const analyzer = new OpenAPIAnalyzer(process.cwd(), entrypoint);
+            const analysisResult = await analyzer.analyze();
+            applications = analysisResult.applications;
+            astStatus = 'completed';
+        }
+
+        if (applications.length > 0) {
+            astRoutes = await getAstRoutes(applications, {
+                includePrefix: false,
+                pathTransform: (p) => p.startsWith('/') ? p.slice(1) : p
+            });
+
+            // Build middleware registry from AST-analyzed applications
+            let middlewareId = 0;
+            for (const app of applications) {
+                if (app.middleware && app.middleware.length > 0) {
+                    for (const mw of app.middleware) {
+                        const id = `middleware-${middlewareId++}`;
+                        astMiddlewareRegistry[id] = {
+                            ...mw,
+                            id,
+                            usedBy: [] // Will be populated when processing events
+                        };
+                    }
                 }
             }
         }
     } catch (e) {
         // Silently fail if analysis cannot run
+        astStatus = 'failed';
         if (options.warnings) {
             options.warnings.push({
                 type: 'ast-analysis-failed',
@@ -457,6 +513,7 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
         asyncapi: "3.0.0",
         info: { title: "Shokupan AsyncAPI", version: "1.0.0", ...options.info },
         channels,
-        "x-middleware-registry": astMiddlewareRegistry
+        "x-middleware-registry": astMiddlewareRegistry,
+        "x-ast-status": astStatus
     };
 };

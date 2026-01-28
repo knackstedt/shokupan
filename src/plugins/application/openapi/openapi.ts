@@ -1,6 +1,6 @@
 import type { ShokupanRouter } from '../../../router';
 import { deepMerge } from '../../../util/deep-merge';
-import { $childControllers, $childRouters, $mountPath, $parent, $routes } from '../../../util/symbol';
+import { $appRoot, $childControllers, $childRouters, $mountPath, $parent, $routes } from '../../../util/symbol';
 import type { OpenAPIOptions, ShokupanHandler } from '../../../util/types';
 import { getAstRoutes } from '../shared/ast-utils';
 
@@ -202,32 +202,86 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
     let astRoutes: any[] = [];
     let astMiddlewareRegistry: Record<string, any> = {};
     let applications: any[] = [];
-    try {
-        const { OpenAPIAnalyzer } = await import('./analyzer');
-        // Use the application entrypoint if available to restrict analysis scope
-        const entrypoint = rootRouter.metadata?.file;
-        const analyzer = new OpenAPIAnalyzer(process.cwd(), entrypoint);
-        const analysisResult = await analyzer.analyze();
-        applications = analysisResult.applications;
-        astRoutes = await getAstRoutes(applications);
+    let astStatus: 'analyzing' | 'completed' | 'failed' | 'disabled' = 'disabled';
 
-        // Build middleware registry from AST-analyzed applications
-        let middlewareId = 0;
-        for (const app of applications) {
-            if (app.middleware && app.middleware.length > 0) {
-                for (const mw of app.middleware) {
-                    const id = `middleware-${middlewareId++}`;
-                    astMiddlewareRegistry[id] = {
-                        ...mw,
-                        id,
-                        usedBy: [] // Will be populated when processing routes
-                    };
+    try {
+        // Check if async AST scanning is enabled (will be controlled by config)
+        const useAsyncScanning = (rootRouter as any)[$appRoot]?.applicationConfig?.enableAsyncAstScanning ?? true;
+
+        if (useAsyncScanning) {
+            // Use async worker-based analyzer
+            const { getGlobalAnalyzer } = await import('../../../util/ast-analyzer-worker');
+            const entrypoint = rootRouter.metadata?.file;
+            const timeout = (rootRouter as any)[$appRoot]?.applicationConfig?.astAnalysisTimeout ?? 30000;
+
+            const analyzer = getGlobalAnalyzer(process.cwd(), entrypoint, timeout);
+
+            // Check current state
+            const state = analyzer.getState();
+
+            if (state === 'completed') {
+                // Use cached results
+                const result = analyzer.getResult();
+                if (result) {
+                    applications = result.applications;
+                    astStatus = 'completed';
+                }
+            } else if (state === 'analyzing') {
+                // Analysis in progress
+                astStatus = 'analyzing';
+                // Don't wait, return partial spec
+            } else if (state === 'failed') {
+                // Previous analysis failed
+                astStatus = 'failed';
+                if (options.warnings) {
+                    const error = analyzer.getError();
+                    options.warnings.push({
+                        type: 'ast-analysis-failed',
+                        message: 'AST Analysis failed',
+                        detail: error?.message || 'Unknown error'
+                    });
+                }
+            } else {
+                // Not started yet - start it but don't wait
+                analyzer.analyze().then(result => {
+                    // Analysis completed in background
+                }).catch(err => {
+                    // Analysis failed, but we've already returned the spec
+                });
+                astStatus = 'analyzing';
+            }
+        } else {
+            // Use synchronous analyzer (old behavior)
+            const { OpenAPIAnalyzer } = await import('./analyzer');
+            const entrypoint = rootRouter.metadata?.file;
+            const analyzer = new OpenAPIAnalyzer(process.cwd(), entrypoint);
+            const analysisResult = await analyzer.analyze();
+            applications = analysisResult.applications;
+            astStatus = 'completed';
+        }
+
+        if (applications.length > 0) {
+            astRoutes = await getAstRoutes(applications);
+
+            // Build middleware registry from AST-analyzed applications
+            let middlewareId = 0;
+            for (const app of applications) {
+                if (app.middleware && app.middleware.length > 0) {
+                    for (const mw of app.middleware) {
+                        const id = `middleware-${middlewareId++}`;
+                        astMiddlewareRegistry[id] = {
+                            ...mw,
+                            id,
+                            usedBy: [] // Will be populated when processing routes
+                        };
+                    }
                 }
             }
         }
     } catch (e) {
         // Silently fail if analysis cannot run (e.g. runtime environment issues)
         // console.warn("OpenAPI AST analysis skipped:", e);
+        astStatus = 'failed';
         if (options.warnings) {
             options.warnings.push({
                 type: 'ast-analysis-failed',
@@ -713,7 +767,8 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
         tags: options.tags,
         externalDocs: options.externalDocs,
         "x-tagGroups": xTagGroups,
-        "x-middleware-registry": astMiddlewareRegistry
+        "x-middleware-registry": astMiddlewareRegistry,
+        "x-ast-status": astStatus
     };
 
     if (options.compliant) {

@@ -53,7 +53,10 @@ export function getSharedSpec() {
 }
 
 async function generateSharedSpec() {
-    const app = new Shokupan();
+    const app = new Shokupan({
+        blockOnOpenApiGen: true, // Wait for AST analysis in tests
+        enableAsyncAstScanning: false // Use sync analyzer for reliable tests
+    });
 
     // --- Inference Tests ---
 

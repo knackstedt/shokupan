@@ -455,6 +455,18 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      */
     blockOnAsyncApiGen: boolean;
     /**
+     * Whether to use async AST scanning with worker threads.
+     * When enabled, AST analysis runs in a separate thread to avoid blocking server startup.
+     * @default true
+     */
+    enableAsyncAstScanning?: boolean;
+    /**
+     * Maximum time (ms) to wait for AST analysis before timing out.
+     * Only applies when enableAsyncAstScanning is true.
+     * @default 30000 (30 seconds)
+     */
+    astAnalysisTimeout?: number;
+    /**
      * Whether to reuse the port.
      * @default false
      */

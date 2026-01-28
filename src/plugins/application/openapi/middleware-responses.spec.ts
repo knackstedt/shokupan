@@ -7,7 +7,9 @@ describe("OpenAPI Middleware Response Tracking", () => {
     it("should detect middleware and merge their response types into routes", async () => {
         const app = new Shokupan({
             port: 0,
-            enableOpenApiGen: true
+            enableOpenApiGen: true,
+            blockOnOpenApiGen: true, // Wait for AST analysis in tests
+            enableAsyncAstScanning: false // Use sync analyzer for reliable tests
         });
 
         // Add a middleware that returns 429
@@ -53,7 +55,12 @@ describe("OpenAPI Middleware Response Tracking", () => {
     });
 
     it("should create virtual paths for each detected middleware", async () => {
-        const app = new Shokupan({ port: 0, enableOpenApiGen: true });
+        const app = new Shokupan({
+            port: 0,
+            enableOpenApiGen: true,
+            blockOnOpenApiGen: true,
+            enableAsyncAstScanning: false // Use sync analyzer for reliable tests
+        });
 
         app.use(RateLimitMiddleware({ max: 50 }));
         app.get("/api/users", (ctx) => ctx.json([]));
