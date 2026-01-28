@@ -211,22 +211,22 @@ const NotFoundPage = ({ method, path }: { method: string; path: string; }) => (
             <div class="container">
                 <div class="bread-container">
                     <img
-                        src="/_shokupan/error-view/missing-ingredient.webp"
+                        src="/_shokupan/error-view/404.webp"
                         alt="Bread character looking for missing ingredients"
                         class="bread-image"
                     />
                     <img
-                        src="/_shokupan/error-view/missing-ingredient_overlay-1.webp"
+                        src="/_shokupan/error-view/404_overlay-1.webp"
                         class="bread-image-overlay"
                         style={{ 'animationDelay': '.75s' }}
                     />
                     <img
-                        src="/_shokupan/error-view/missing-ingredient_overlay-2.webp"
+                        src="/_shokupan/error-view/404_overlay-2.webp"
                         class="bread-image-overlay"
                         style={{ 'animationDelay': '1.5s' }}
                     />
                     <img
-                        src="/_shokupan/error-view/missing-ingredient_overlay-3.webp"
+                        src="/_shokupan/error-view/404_overlay-3.webp"
                         class="bread-image-overlay"
                         style={{ 'animationDelay': '2.25s' }}
                     />
