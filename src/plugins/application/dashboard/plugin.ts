@@ -1,4 +1,5 @@
 import type { ServerWebSocket } from 'bun';
+import { Glob } from 'bun';
 import { nanoid } from 'nanoid';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -67,9 +68,22 @@ export interface DashboardConfig {
     getRequestHeaders?: () => HeadersInit;
     path?: string;
     /**
-     * Glob patterns to ignore in the request list
+     * patterns to ignore in the request list.
+     * Can be a glob pattern (string), regex, or a custom callback function.
      */
-    ignorePaths?: string[];
+    ignorePatterns?: (string | RegExp | ((req: RequestLog) => boolean))[];
+    /**
+     * If true, the replay endpoint will be disabled.
+     */
+    disableReplay?: boolean;
+    /**
+     * Array of status codes to not record.
+     */
+    ignoreStatusCodes?: number[];
+    /**
+     * Array of HTTP methods to not record (e.g. ['OPTIONS', 'HEAD'])
+     */
+    ignoreMethods?: string[];
     /**
      * Retention time in milliseconds
      */
@@ -215,9 +229,11 @@ export class Dashboard implements ShokupanPlugin {
                 cookies: log.cookies,
                 transferred: log.transferred,
                 requestHeaders: log.requestHeaders,
-                responseHeaders: log.responseHeaders,
                 // No handler stack for outbound
             };
+
+            // Check ignore options
+            if (this.shouldIgnoreRequest(requestData)) return;
 
             // Enforce log limit
             const maxLogs = this.dashboardConfig.maxLogEntries ?? 1000;
@@ -605,65 +621,69 @@ export class Dashboard implements ShokupanPlugin {
             return ctx.json({ failures: result[0] });
         });
 
-        this.router.post("/replay", async (ctx) => {
-            const body = await ctx.body();
-            // Logic to replay request:
-            // If direction is outbound, we fetch from the server.
-            // If inbound, we process via app.internalRequest.
 
-            const direction = body.direction || 'inbound';
 
-            if (direction === 'outbound') {
-                // Replay outbound request
-                const start = performance.now();
-                try {
-                    const res = await fetch(body.url, {
-                        method: body.method,
-                        headers: body.headers,
-                        body: body.body ? (typeof body.body === 'object' ? JSON.stringify(body.body) : body.body) : undefined
-                    });
+        if (!this.dashboardConfig.disableReplay) {
+            this.router.post("/replay", async (ctx) => {
+                const body = await ctx.body();
+                // Logic to replay request:
+                // If direction is outbound, we fetch from the server.
+                // If inbound, we process via app.internalRequest.
 
-                    // Read response text
-                    const text = await res.text();
-                    const duration = performance.now() - start;
+                const direction = body.direction || 'inbound';
 
-                    const resHeaders: Record<string, string> = {};
-                    res.headers.forEach((v, k) => resHeaders[k] = v);
+                if (direction === 'outbound') {
+                    // Replay outbound request
+                    const start = performance.now();
+                    try {
+                        const res = await fetch(body.url, {
+                            method: body.method,
+                            headers: body.headers,
+                            body: body.body ? (typeof body.body === 'object' ? JSON.stringify(body.body) : body.body) : undefined
+                        });
 
-                    return ctx.json({
-                        status: res.status,
-                        statusText: res.statusText,
-                        headers: resHeaders,
-                        data: text,
-                        duration
-                    });
-                } catch (e) {
-                    return ctx.json({ error: String(e) }, 500);
+                        // Read response text
+                        const text = await res.text();
+                        const duration = performance.now() - start;
+
+                        const resHeaders: Record<string, string> = {};
+                        res.headers.forEach((v, k) => resHeaders[k] = v);
+
+                        return ctx.json({
+                            status: res.status,
+                            statusText: res.statusText,
+                            headers: resHeaders,
+                            data: text,
+                            duration
+                        });
+                    } catch (e) {
+                        return ctx.json({ error: String(e) }, 500);
+                    }
+                } else {
+                    // Replay inbound request against the app
+                    const app = this[$appRoot];
+                    if (!app) return unknownError(ctx);
+
+                    // Construct request
+                    try {
+                        // body should contain method, url, headers, body
+                        const result = await app.internalRequest({
+                            method: body.method,
+                            path: body.url, // or path
+                            headers: body.headers,
+                            body: body.body
+                        });
+                        return ctx.json({
+                            status: result.status,
+                            headers: result.headers,
+                            data: result.body
+                        });
+                    } catch (e) {
+                        return ctx.json({ error: String(e) }, 500);
+                    }
                 }
-            } else {
-                // Replay inbound request against the app
-                const app = this[$appRoot];
-                if (!app) return unknownError(ctx);
-
-                // Construct request
-                try {
-                    // body should contain method, url, headers, body
-                    const result = await app.internalRequest({
-                        method: body.method,
-                        path: body.url, // or path
-                        headers: body.headers,
-                        body: body.body
-                    });
-                    return ctx.json({
-                        status: result.status,
-                        headers: result.headers,
-                        data: result.body
-                    });
-                } catch (e) {
-                    return ctx.json({ error: String(e) }, 500);
-                }
-            }
-        });
+            });
+        }
 
         this.router.get("/**", async (ctx) => {
             // Determine relative path by stripping the mount path
@@ -702,8 +722,8 @@ export class Dashboard implements ShokupanPlugin {
 
             const getRequestHeadersSource = this.dashboardConfig.getRequestHeaders ? this.dashboardConfig.getRequestHeaders.toString() : "undefined";
 
+
             const ignorePaths = [
-                ...(this.dashboardConfig.ignorePaths || []),
                 // Add default ignores for integrations
                 ...Object.values(integrations).filter(p => !!p).flatMap(p => {
                     const clean = p!.endsWith('/') ? p!.slice(0, -1) : p!;
@@ -723,6 +743,29 @@ export class Dashboard implements ShokupanPlugin {
             }));
             return ctx.html(`<!DOCTYPE html>${html}`);
         });
+    }
+
+    private shouldIgnoreRequest(req: RequestLog): boolean {
+        // Status Codes
+        if (this.dashboardConfig.ignoreStatusCodes?.includes(req.status)) return true;
+
+        // Methods
+        if (this.dashboardConfig.ignoreMethods?.includes(req.method)) return true;
+
+        // Patterns
+        if (this.dashboardConfig.ignorePatterns) {
+            for (const pattern of this.dashboardConfig.ignorePatterns) {
+                if (typeof pattern === 'string') {
+                    const glob = new Glob(pattern);
+                    if (glob.match(req.url) || glob.match(req.path || '')) return true;
+                } else if (pattern instanceof RegExp) {
+                    if (pattern.test(req.url) || (req.path && pattern.test(req.path))) return true;
+                } else if (typeof pattern === 'function') {
+                    if (pattern(req)) return true;
+                }
+            }
+        }
+        return false;
     }
 
     private getUptime() {
@@ -952,6 +995,17 @@ export class Dashboard implements ShokupanPlugin {
                         return;
                     }
                 }
+
+
+                // Check ignore options
+                const checkLog = {
+                    method: ctx.method,
+                    url: ctx.url.toString(),
+                    path: ctx.path,
+                    status: response.status
+                } as RequestLog;
+
+                if (this.shouldIgnoreRequest(checkLog)) return;
 
                 // Record in MetricsCollector
                 const isError = response.status >= 400;
