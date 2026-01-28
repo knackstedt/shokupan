@@ -329,6 +329,8 @@ interface ErrorPageProps {
     focusFrame: StackFrame | undefined;
     sourceContext: SourceContext | null;
     error: any;
+    hideCode?: boolean;
+    hideStacktrace?: boolean;
 }
 
 const ErrorPage = ({
@@ -341,7 +343,9 @@ const ErrorPage = ({
     frames,
     focusFrame,
     sourceContext,
-    error
+    error,
+    hideCode = false,
+    hideStacktrace = false
 }: ErrorPageProps) => (
     <html lang="en">
         <head>
@@ -359,14 +363,18 @@ const ErrorPage = ({
                     errorMessage={errorMessage}
                     errorId={errorId}
                 />
-                <CodeFigure
-                    focusFrame={focusFrame}
-                    sourceContext={sourceContext}
-                />
-                <StackTrace
-                    frames={frames}
-                    focusFrame={focusFrame}
-                />
+                {!hideCode && (
+                    <CodeFigure
+                        focusFrame={focusFrame}
+                        sourceContext={sourceContext}
+                    />
+                )}
+                {!hideStacktrace && (
+                    <StackTrace
+                        frames={frames}
+                        focusFrame={focusFrame}
+                    />
+                )}
                 <ContextData
                     errorId={errorId}
                     errorTimestamp={errorTimestamp}
@@ -409,7 +417,7 @@ const ErrorPage = ({
     </html>
 );
 
-export async function renderErrorView(ctx: ShokupanContext, error: any) {
+export async function renderErrorView(ctx: ShokupanContext, error: any, options: { hideCode?: boolean, hideStacktrace?: boolean; } = {}) {
     const frames: StackFrame[] = [];
     const cwd = process.cwd();
 
@@ -484,7 +492,9 @@ export async function renderErrorView(ctx: ShokupanContext, error: any) {
         frames,
         focusFrame,
         sourceContext,
-        error
+        error,
+        hideCode: options.hideCode,
+        hideStacktrace: options.hideStacktrace
     });
 
     return '<!DOCTYPE html>\n' + renderToString(element);

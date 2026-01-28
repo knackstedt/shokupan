@@ -12,7 +12,7 @@ describe("Status View Template", () => {
 
         expect(html).toContain("404");
         expect(html).toContain("Oops! Missing Ingredient");
-        expect(html).toContain("missing-ingredient.webp");
+        expect(html).toContain("404.webp");
         expect(html).toContain("bread-image");
     });
 
@@ -27,7 +27,7 @@ describe("Status View Template", () => {
         expect(html).toContain("403");
         expect(html).toContain("Forbidden");
         expect(html).not.toContain("Oops! Missing Ingredient");
-        expect(html).not.toContain("missing-ingredient.webp");
+        expect(html).toContain("403.webp");
     });
 
     it("should escape HTML in paths", () => {
@@ -52,5 +52,25 @@ describe("Status View Template", () => {
 
         expect(html).toContain("POST");
         expect(html).toContain("/api/users");
+    });
+
+
+    it("should display request ID", () => {
+        const html = renderStatusView({
+            url: { pathname: "/test" },
+            method: "GET"
+        } as any, 500, new Error("Boom"), { requestId: "req-123" });
+
+        expect(html).toContain("req-123");
+    });
+
+    it("should hide error message when configured", () => {
+        const html = renderStatusView({
+            url: { pathname: "/test" },
+            method: "GET"
+        } as any, 500, new Error("Secret Error"), { hideErrorMessage: true });
+
+        expect(html).not.toContain("Secret Error");
+        expect(html).toContain("500");
     });
 });

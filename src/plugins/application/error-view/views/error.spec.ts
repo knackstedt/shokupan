@@ -54,4 +54,33 @@ describe("Error View Template", () => {
         // Should escape the opening tag (Preact escapes < to &lt;)
         expect(html).toContain("&lt;img");
     });
+
+    it("should hide code when configured", async () => {
+        const error = new Error("Test Error");
+        const html = await renderErrorView({
+            url: { pathname: "/error" },
+            method: "GET",
+            requestId: "req-1",
+            headers: new Map(),
+            response: { status: 500 }
+        } as any, error, { hideCode: true });
+
+        expect(html).not.toContain("CodeFigure"); // It's a component name, but in HTML it renders as <section class="figure">...
+        // Better check for the HTML structure
+        expect(html).not.toContain('class="figure"');
+    });
+
+    it("should hide stacktrace when configured", async () => {
+        const error = new Error("Test Error");
+        const html = await renderErrorView({
+            url: { pathname: "/error" },
+            method: "GET",
+            requestId: "req-1",
+            headers: new Map(),
+            response: { status: 500 }
+        } as any, error, { hideStacktrace: true });
+
+        expect(html).not.toContain("Stack Trace");
+        expect(html).not.toContain('class="narrative"');
+    });
 });

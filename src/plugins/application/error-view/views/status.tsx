@@ -1,19 +1,36 @@
 import renderToString from 'preact-render-to-string';
 import type { ShokupanContext } from '../../../../context';
+import { getReasonPhrase } from '../reason-phrases';
 
 interface StatusPageProps {
     status: number;
     message: string;
     method: string;
     path: string;
+    image?: string;
+    requestId?: string;
+    hideErrorMessage?: boolean;
 }
 
-const NotFoundPage = ({ method, path }: { method: string; path: string; }) => (
+const statusImages: Record<number, string> = {
+    400: '400.webp',
+    401: '401.webp',
+    403: '403.webp',
+    404: '404.webp',
+    418: '418.webp',
+    429: '429.webp',
+    500: '500.webp',
+    502: '502.webp',
+    503: '503.webp',
+};
+
+
+const StatusPage = ({ method, status, image, message, path, requestId, hideErrorMessage = false }: StatusPageProps) => (
     <html lang="en">
         <head>
             <meta charset="UTF-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-            <title>404 - Oops! Missing Ingredient</title>
+            <title>{status} - {message}</title>
             <link href="/_shokupan/error-view/theme.css" rel="stylesheet" />
             <style dangerouslySetInnerHTML={{
                 __html: `
@@ -197,6 +214,37 @@ const NotFoundPage = ({ method, path }: { method: string; path: string; }) => (
                     .bread-image { max-width: 280px; }
                     .info-card { padding: 1rem; }
                 }
+
+                .meta {
+                    color: var(--text-muted);
+                    font-family: var(--shokupan-font-mono);
+                    padding: 0.75rem 1.5rem;
+                    border-radius: 8px;
+                    display: inline-block;
+                }
+
+                .request-id {
+                    color: #8B7355;
+                    cursor: pointer;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 4px;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    transition: background 0.2s;
+                }
+
+                .request-id:hover {
+                    background: rgba(139, 69, 19, 0.1);
+                }
+            `}} />
+            <script dangerouslySetInnerHTML={{
+                __html: `
+                function copyText(text) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        // Could show a toast here
+                    });
+                }
             `}} />
         </head>
         <body>
@@ -210,38 +258,57 @@ const NotFoundPage = ({ method, path }: { method: string; path: string; }) => (
 
             <div class="container">
                 <div class="bread-container">
-                    <img
-                        src="/_shokupan/error-view/404.webp"
-                        alt="Bread character looking for missing ingredients"
-                        class="bread-image"
-                    />
-                    <img
-                        src="/_shokupan/error-view/404_overlay-1.webp"
-                        class="bread-image-overlay"
-                        style={{ 'animationDelay': '.75s' }}
-                    />
-                    <img
-                        src="/_shokupan/error-view/404_overlay-2.webp"
-                        class="bread-image-overlay"
-                        style={{ 'animationDelay': '1.5s' }}
-                    />
-                    <img
-                        src="/_shokupan/error-view/404_overlay-3.webp"
-                        class="bread-image-overlay"
-                        style={{ 'animationDelay': '2.25s' }}
-                    />
+                    {status === 404 ? (
+                        <>
+                            <img
+                                src="/_shokupan/error-view/404.webp"
+                                alt="Bread character looking for missing ingredients"
+                                class="bread-image"
+                            />
+                            <img
+                                src="/_shokupan/error-view/404_overlay-1.webp"
+                                class="bread-image-overlay"
+                                style={{ 'animationDelay': '.75s' }}
+                            />
+                            <img
+                                src="/_shokupan/error-view/404_overlay-2.webp"
+                                class="bread-image-overlay"
+                                style={{ 'animationDelay': '1.5s' }}
+                            />
+                            <img
+                                src="/_shokupan/error-view/404_overlay-3.webp"
+                                class="bread-image-overlay"
+                                style={{ 'animationDelay': '2.25s' }}
+                            />
+                        </>
+                    ) : (
+                        <img src={`/_shokupan/error-view/${statusImages[status]}`} alt={`${status} illustration`} class="bread-image" style={{ animation: 'none' }} />
+                    )}
                 </div>
-                <h1>404</h1>
-                <div class="message">Oops! Missing Ingredient</div>
+                <h1>{status}</h1>
+                <div class="message">{message || getReasonPhrase(status) || 'Oops! Something went wrong'}</div>
                 <p class="subtitle">
-                    We searched high and low, but this page seems to have wandered off...<br />
-                    Perhaps it's still rising in the oven? 🍞
+                    {status == 404 ? 'We searched high and low, but this page seems to have wandered off...<br />Perhaps it\'s still rising in the oven? 🍞' : 'Something went wrong. Please try again later.'}
                 </p>
+                {!hideErrorMessage && message && message !== 'Not Found' && (
+                    <p class="subtitle" style="color: #A0522D; margin-top: -1rem;">
+                        {message}
+                    </p>
+                )}
 
                 <div class="info-card">
-                    <div class="request-info">
+                    <div class="request-info meta">
                         <span class="method-badge">{method}</span>
                         <span class="path">{path}</span>
+                        {requestId && (
+                            <span
+                                class="request-id"
+                                onclick={`copyText('${requestId}')`}
+                                title="Click to copy Request ID"
+                            >
+                                ID: {requestId}
+                            </span>
+                        )}
                     </div>
                 </div>
 
@@ -253,78 +320,15 @@ const NotFoundPage = ({ method, path }: { method: string; path: string; }) => (
     </html>
 );
 
-const GenericStatusPage = ({ status, message, method, path }: StatusPageProps) => (
-    <html lang="en">
-        <head>
-            <meta charset="UTF-8" />
-            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-            <title>{status} {message}</title>
-            <link href="/_shokupan/error-view/theme.css" rel="stylesheet" />
-            <style dangerouslySetInnerHTML={{
-                __html: `
-                body {
-                    background: var(--bg-primary);
-                    color: var(--text-primary);
-                    font-family: var(--shokupan-font);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    height: 100vh;
-                    margin: 0;
-                }
-                .container {
-                    text-align: center;
-                    background: var(--bg-card);
-                    padding: 3rem 4rem;
-                    border-radius: 16px;
-                    border: 1px solid var(--card-border);
-                    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-                    max-width: 600px;
-                }
-                h1 {
-                    font-size: 6rem;
-                    margin: 0;
-                    color: var(--primary);
-                    font-weight: 800;
-                }
-                h2 {
-                    font-size: 1.5rem;
-                    margin: 1rem 0 2rem 0;
-                    color: var(--text-secondary);
-                }
-                .meta {
-                    color: var(--text-muted);
-                    font-family: var(--shokupan-font-mono);
-                    background: var(--bg-primary);
-                    padding: 0.75rem 1.5rem;
-                    border-radius: 8px;
-                    display: inline-block;
-                }
-            `}} />
-        </head>
-        <body>
-            <div class="container">
-                <h1>{status}</h1>
-                <h2>{message}</h2>
-                <div class="meta">
-                    <span>{method}</span> {path}
-                </div>
-            </div>
-        </body>
-    </html>
-);
-
-export function renderStatusView(ctx: ShokupanContext, status: number, error: Error) {
+export function renderStatusView(ctx: ShokupanContext, status: number, error: Error, options: { requestId?: string, hideErrorMessage?: boolean; } = {}) {
     const props = {
         status,
         message: error.message || 'Error',
         method: ctx.method,
-        path: ctx.url.pathname
+        path: ctx.url.pathname,
+        requestId: options.requestId || ctx.requestId,
+        hideErrorMessage: options.hideErrorMessage
     };
 
-    const element = status === 404
-        ? NotFoundPage({ method: props.method, path: props.path })
-        : GenericStatusPage(props);
-
-    return '<!DOCTYPE html>\n' + renderToString(element);
+    return '<!DOCTYPE html>\n' + renderToString(StatusPage(props));
 }
