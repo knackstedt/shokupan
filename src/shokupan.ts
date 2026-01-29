@@ -22,7 +22,7 @@ import { type ResponseTransformer, ResponseTransformerRegistry } from './util/re
 import { getCallerInfo } from './util/stack';
 import { $appRoot, $childRouters, $dispatch, $finalResponse, $isApplication, $mountPath, $routeMatched, $routes } from './util/symbol';
 import { RouterTrie } from './util/trie';
-import type { Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig, ShokupanPlugin } from './util/types';
+import type { ErrorHandler, Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig, ShokupanPlugin } from './util/types';
 
 
 const defaults: ShokupanConfig = {
@@ -119,6 +119,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     private datastore?: SurrealDatastore;
     public dbPromise?: Promise<any>;
     public responseTransformerRegistry: ResponseTransformerRegistry;
+    private errorHandlers: { type: any, handler: ErrorHandler; }[] = [];
 
     // Performance: Flattened Router Trie
     private rootTrie?: RouterTrie<T>;
@@ -242,6 +243,18 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
      */
     public registerResponseTransformer(transformer: ResponseTransformer): this {
         this.responseTransformerRegistry.register(transformer);
+        return this;
+    }
+
+    /**
+     * Register a global error handler for a specific error type.
+     * Handlers are checked in reverse order of registration (LIFO).
+     * 
+     * @param type The error class constructor (e.g., Error, CustomError)
+     * @param handler The handler function
+     */
+    public onStrictError<T>(type: new (...args: any[]) => T, handler: ErrorHandler<T>): this {
+        this.errorHandlers.unshift({ type, handler });
         return this;
     }
 
@@ -890,6 +903,25 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             catch (err: any) {
                 const span = asyncContext.getStore()?.span;
                 if (span) span.setStatus({ code: 2 }); // Error
+
+                // Check for registered error handlers
+                for (let i = 0; i < this.errorHandlers.length; i++) {
+                    const { type, handler } = this.errorHandlers[i];
+                    if (err instanceof type) {
+                        try {
+                            const result = await handler(err, ctx);
+                            // Response Start Hook - About to send response
+                            if (this.hasOnResponseStartHook) await this.runHooks('onResponseStart', ctx, result);
+                            return result;
+                        } catch (handlerErr) {
+                            // If the error handler itself fails, fall through to default handling
+                            // but log the new error
+                            console.error("Error in error handler:", handlerErr);
+                            err = handlerErr;
+                            break; // Avoid infinite loops if handlerErr is same type
+                        }
+                    }
+                }
 
                 // Extract status from error object (supports both .status and .statusCode)
                 let status = getErrorStatus(err);

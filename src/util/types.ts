@@ -282,6 +282,10 @@ export interface ServerFactory {
     (options: any): Server<any> | Promise<Server<any>> | NodeServer | Promise<NodeServer>;
 }
 
+export interface ErrorHandler<T = any> {
+    (err: T, ctx: ShokupanContext): Response | Promise<Response>;
+}
+
 export type NextFn = () => Promise<any>;
 export type Middleware = ((ctx: ShokupanContext<unknown>, next: NextFn) => Promise<any> | any) & {
     isBuiltin?: boolean;
