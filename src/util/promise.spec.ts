@@ -61,10 +61,9 @@ describe("Promise Monkeypatching", () => {
     test("should log unhandled rejection with context", async () => {
         let logOutput: any = null;
         const mockLogger = {
-            verbose: false,
-            info: () => { },
             debug: () => { },
-            warning: () => { },
+            info: () => { },
+            warn: () => { },
             error: (msg: string, props: any) => {
                 logOutput = { msg, props };
             },

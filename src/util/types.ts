@@ -5,6 +5,7 @@ import type { ConnectOptions, Engines } from 'surrealdb';
 import type { ShokupanContext } from '../context';
 import type { ServerAdapter } from './adapter';
 import type { FileSystemAdapter } from './adapter/filesystem';
+import type { Logger } from './logger';
 import { $isRouter } from "./symbol";
 
 export type HeadersInit = Headers | Record<string, string> | [string, string][];
@@ -12,6 +13,7 @@ export type HeadersInit = Headers | Record<string, string> | [string, string][];
 export interface ShokupanPluginOptions {
     path?: string;
 }
+
 
 export interface ShokupanPlugin {
     onInit: (app: any, options?: ShokupanPluginOptions) => void | Promise<void>;
@@ -589,17 +591,7 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
     /**
      * Logger object.
      */
-    logger: {
-        verbose: boolean;
-        info: (msg: string, props: Record<string, any>) => void;
-        debug: (msg: string, props: Record<string, any>) => void;
-        warning: (msg: string, props: Record<string, any>) => void;
-        error: (msg: string, props: Record<string, any>) => void;
-        /**
-         * Something fatally went wrong and the application cannot continue.
-         */
-        fatal: (msg: string, props: Record<string, any>) => void;
-    };
+    logger: Logger;
     /**
      * Timeout for reading the request body (milliseconds).
      * Maps to Bun's `idleTimeout`.

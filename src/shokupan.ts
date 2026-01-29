@@ -13,6 +13,7 @@ import { SurrealDatastore } from './util/datastore';
 import { getErrorStatus, NotFoundError } from "./util/http-error";
 import { HTTP_STATUS } from "./util/http-status";
 import { configureIde } from './util/ide';
+import { createLogger } from './util/logger';
 
 import { MiddlewareTracker } from './util/middleware-tracker';
 import { enablePromisePatch, kContext } from './util/promise';
@@ -150,6 +151,11 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         this[$isApplication] = true;
         this[$appRoot] = this;
         this.applicationConfig = config;
+
+        // Initialize logger if not provided
+        if (!this.applicationConfig.logger) {
+            this.applicationConfig.logger = createLogger(this.applicationConfig.development ? 'development' : 'production');
+        }
 
         // Initialize response transformer registry
         this.responseTransformerRegistry = new ResponseTransformerRegistry();
