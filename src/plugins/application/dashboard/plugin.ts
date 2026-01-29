@@ -9,6 +9,7 @@ import { RecordId } from 'surrealdb';
 import type { DebugCollector } from "../../../context";
 import { ShokupanRouter } from "../../../router";
 import type { Shokupan } from '../../../shokupan';
+import { getEditorLinkPattern } from '../../../util/ide';
 import { $appRoot, $childRouters, $debug, $mountPath } from "../../../util/symbol";
 import type { ShokupanHooks, ShokupanPlugin } from "../../../util/types";
 import { DashboardApp } from './components';
@@ -944,12 +945,7 @@ export class Dashboard implements ShokupanPlugin {
     }
 
     private getLinkPattern(): string {
-        const term = process.env['TERM_PROGRAM'] || '';
-        if (['vscode', 'cursor', 'antigravity'].some(t => term.includes(t))) {
-            return 'vscode://file/{{absolute}}:{{line}}';
-        }
-
-        return 'vscode://file/{{absolute}}:{{line}}';
+        return getEditorLinkPattern();
     }
 
     public getHooks(): ShokupanHooks {

@@ -1,6 +1,7 @@
 import renderToString from 'preact-render-to-string';
 import type { ShokupanContext } from '../../../../context';
 import { escapeHtml } from '../../../../util/html';
+import { generateEditorLink } from '../../../../util/ide';
 import { readSourceContext } from '../util/source-reader';
 
 interface StackFrame {
@@ -94,7 +95,7 @@ const CodeFigure = ({ focusFrame, sourceContext }: CodeFigureProps) => (
         <div class="figure-caption">
             {focusFrame && (
                 <a
-                    href={`vscode://file${encodeURI(focusFrame.file)}:${focusFrame.line}`}
+                    href={generateEditorLink(focusFrame.file, focusFrame.line)}
                     style="color:var(--text-muted); text-decoration:none"
                 >
                     {focusFrame.relativeFile}
@@ -136,7 +137,7 @@ const StackTrace = ({ frames, focusFrame }: StackTraceProps) => {
             frame === focusFrame ? 'active' : ''
         ].join(' ');
 
-        const fileLink = `vscode://file/${encodeURI(frame.file)}:${frame.line}:${frame.column}`;
+        const fileLink = generateEditorLink(frame.file, frame.line, frame.column);
 
         return (
             <li class={classes}>

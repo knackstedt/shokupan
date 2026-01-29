@@ -1,8 +1,5 @@
-
-
-
-
 import { safeScriptJson } from '../../../util/html';
+import { generateEditorLink } from '../../../util/ide';
 
 export function AsyncApiApp({ spec, serverUrl, base, disableSourceView, navTree }: any) {
     return (
@@ -171,7 +168,7 @@ function LeafNode({ item, label, disableSourceView }: any) {
         <div class="tree-item" data-event={opId} style={isWarning ? "color: #fbbf24" : ""}>
             {content}
             {sourceInfo && !disableSourceView && (
-                <a href={`vscode://file/${sourceInfo.file}:${sourceInfo.line}`}
+                <a href={generateEditorLink(sourceInfo.file, sourceInfo.line)}
                     class="source-link"
                     onClick={(e) => { e.stopPropagation(); }} // This won't work in SSR string, handled in client script
                     title={`${sourceInfo.file}:${sourceInfo.line}`}>

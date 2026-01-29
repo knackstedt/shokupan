@@ -738,6 +738,20 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      * @deprecated
      */
     [key: string]: any;
+
+    /**
+     * IDE configuration for file links.
+     * Can be a specific editor name (vscode, intellij, etc.) or an autodetection mode.
+     * Overrides process.env.IDE.
+     * 
+     * Options:
+     * - 'vscode', 'vscode-insiders', 'vscodium', 'cursor', 'intellij', 'sublime', 'neovim'
+     * - 'vscode.dev': Force generic vscode.dev links
+     * - 'autodetect-vscode.dev': Auto-detect git remote and generate specific vscode.dev links
+     * - 'autodetect-repo': Auto-detect git remote and generate web repository links
+     */
+    ide?: string;
+
 }>;
 
 

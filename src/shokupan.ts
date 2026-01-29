@@ -12,6 +12,7 @@ import { SystemCpuMonitor } from "./util/cpu-monitor";
 import { SurrealDatastore } from './util/datastore';
 import { getErrorStatus, NotFoundError } from "./util/http-error";
 import { HTTP_STATUS } from "./util/http-status";
+import { configureIde } from './util/ide';
 
 import { MiddlewareTracker } from './util/middleware-tracker';
 import { enablePromisePatch, kContext } from './util/promise';
@@ -137,6 +138,9 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
         // Initialize Default FileSystem Adapter if not provided
         config.fileSystem ??= new DefaultFileSystemAdapter();
+
+        // Configure IDE Links
+        configureIde({ ide: config.ide });
 
         // Exclude hooks from the router config passed to super() to avoid double execution
         // The application handles app-level hooks in handleRequest()

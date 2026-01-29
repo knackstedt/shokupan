@@ -1,5 +1,6 @@
 
 import { escapeHtml, safeScriptJson } from '../../../util/html';
+import { generateEditorLink } from '../../../util/ide';
 
 // Type definitions for better clarity
 interface Route {
@@ -385,7 +386,7 @@ function Sidebar({ spec, hierarchicalGroups }: any) {
                     </a>
                     {source?.file && (
                         <a
-                            href={`vscode://file/${source.file}:${source.line || 1}`}
+                            href={generateEditorLink(source.file, source.line || 1)}
                             class="nav-source-link"
                             title={`${source.file}:${source.line || 1}`}
                         >
@@ -464,7 +465,7 @@ function Sidebar({ spec, hierarchicalGroups }: any) {
                                             )}
                                             {mw.file && (
                                                 <a
-                                                    href={`vscode://file/${mw.file}:${mw.startLine || 1}`}
+                                                    href={generateEditorLink(mw.file, mw.startLine || 1)}
                                                     class="nav-source-link"
                                                     title={`${mw.file}:${mw.startLine || 1}`}
                                                 >
