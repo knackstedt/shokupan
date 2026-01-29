@@ -520,6 +520,22 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
     autoBackpressureLevel?: number;
 
     /**
+     * Whether to enable automatic content negotiation for ctx.json() and other response methods.
+     * When enabled, ctx.json() will use the response transformer registry to negotiate the best
+     * response format based on the Accept header.
+     * @default false
+     */
+    enableAutoContentNegotiation?: boolean;
+
+    /**
+     * Default response transformer content type.
+     * If set, ctx.respond() and auto-negotiated ctx.json() will use this transformer
+     * when no Accept header matches or when Accept is any.
+     * @default 'application/json'
+     */
+    defaultResponseTransformer?: string;
+
+    /**
      * Whether to enable middleware and handler tracking.
      * When enabled, `ctx.handlerStack` will be populated with the handlers the request has passed through.
      * Also, `ctx.state` will be a Proxy that tracks changes made by each handler.
@@ -537,15 +553,15 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      * This enables websocket messages to run through the HTTP server.
      * e.g. 
      * ```json
-     * {
-     *  "method": "POST",
-     *  "path": "/api/v1/myHttpEndpoint",
-     *  "headers": {},
-     *  "body": {
+        * {
+        *  "method": "POST",
+        *  "path": "/api/v1/myHttpEndpoint",
+        *  "headers": {},
+        *  "body": {
      *      "type": "text",
-     *      "data": "Hello, world!"
+        *      "data": "Hello, world!"
      *  }
-     * }
+        * }
      * ```
      * @default false
      */
@@ -794,4 +810,4 @@ export interface StaticServeOptions<T extends Record<string, any>> {
      * OpenAPI specification for the static route.
      */
     openapi?: MethodAPISpec;
-}
+};

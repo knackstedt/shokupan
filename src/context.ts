@@ -557,6 +557,61 @@ export class ShokupanContext<
 
 
     /**
+     * Respond with automatic content negotiation
+     * Uses Accept header to determine the best response format
+     * @param data Data to respond with
+     * @param status HTTP status code
+     * @param headers Additional headers
+     */
+    async respond(data: any, status?: number, headers?: HeadersInit): Promise<Response> {
+        const registry = this.app?.responseTransformerRegistry;
+
+        // If no registry or app (should be rare), fallback to JSON
+        if (!registry) {
+            return this.json(data, status, headers);
+        }
+
+        const acceptHeader = this.request.headers.get('accept') || '*/*';
+        let transformer = registry.negotiate(acceptHeader);
+
+        // If negotiation failed to find a match, check if there's a default transformer
+        // But registry.negotiate() already falls back to default if * / * or no match found?
+        // Actually registry.negotiate returns undefined if no match and no default.
+
+        if (!transformer) {
+            // Fallback to JSON if negotiation completely fails
+            // This ensures we always send something
+            return this.json(data, status, headers);
+        }
+
+        // Serialize data
+        const resolvedData = data instanceof Promise ? await data : data;
+        const { body, headers: transformerHeaders } = await transformer.serialize(resolvedData);
+
+        const finalStatus = status ?? this.response.status ?? 200;
+
+        // Validate redirect status code
+        if (this.app?.applicationConfig?.validateStatusCodes && !VALID_HTTP_STATUSES.has(finalStatus)) {
+            throw new Error(`Invalid HTTP status code: ${finalStatus}`);
+        }
+        this.response.status = finalStatus;
+
+        // Store raw body for compression
+        if (typeof body === "string" || body instanceof ArrayBuffer || body instanceof Uint8Array) {
+            this[$rawBody] = body;
+        }
+
+        // Merge headers
+        const finalHeaders = this.mergeHeaders(headers);
+        if (transformerHeaders) {
+            Object.entries(transformerHeaders).forEach(([k, v]) => finalHeaders.set(k, v));
+        }
+
+        this[$finalResponse] = new Response(body as any, { status: finalStatus, headers: finalHeaders });
+        return this[$finalResponse];
+    }
+
+    /**
      * Send a response
      * @param body Response body
      * @param options Response options
@@ -597,6 +652,11 @@ export class ShokupanContext<
      * Respond with a JSON object
      */
     async json(data: object | Promise<object>, status?: number, headers?: HeadersInit) {
+        // Auto-negotiation check
+        if (this.app?.applicationConfig?.enableAutoContentNegotiation) {
+            return this.respond(data, status, headers);
+        }
+
         const finalStatus = status ?? this.response.status ?? 200;
         // Validate redirect status code
         if (!VALID_HTTP_STATUSES.has(finalStatus)) {

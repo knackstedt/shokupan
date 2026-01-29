@@ -16,6 +16,7 @@ import { HTTP_STATUS } from "./util/http-status";
 import { MiddlewareTracker } from './util/middleware-tracker';
 import { enablePromisePatch, kContext } from './util/promise';
 import { ShokupanRequest } from './util/request';
+import { type ResponseTransformer, ResponseTransformerRegistry } from './util/response-transformer';
 import { getCallerInfo } from './util/stack';
 import { $appRoot, $childRouters, $dispatch, $finalResponse, $isApplication, $mountPath, $routeMatched, $routes } from './util/symbol';
 import { RouterTrie } from './util/trie';
@@ -34,6 +35,8 @@ const defaults: ShokupanConfig = {
     blockOnAsyncApiGen: false,
     astAnalysisTimeout: 30000,
     reusePort: false,
+    enableAutoContentNegotiation: false,
+    defaultResponseTransformer: 'application/json'
 };
 
 
@@ -113,6 +116,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     private httpServer?: ShokupanServer;
     private datastore?: SurrealDatastore;
     public dbPromise?: Promise<any>;
+    public responseTransformerRegistry: ResponseTransformerRegistry;
 
     // Performance: Flattened Router Trie
     private rootTrie?: RouterTrie<T>;
@@ -142,6 +146,39 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         this[$isApplication] = true;
         this[$appRoot] = this;
         this.applicationConfig = config;
+
+        // Initialize response transformer registry
+        this.responseTransformerRegistry = new ResponseTransformerRegistry();
+
+        // Set default transformer
+        if (this.applicationConfig.defaultResponseTransformer) {
+            this.responseTransformerRegistry.setDefault(this.applicationConfig.defaultResponseTransformer);
+        }
+
+        // Register built-in transformers
+        this.responseTransformerRegistry.register({
+            contentType: 'application/json',
+            serialize: (data) => ({
+                body: JSON.stringify(data),
+                headers: { 'content-type': 'application/json' }
+            })
+        });
+
+        this.responseTransformerRegistry.register({
+            contentType: 'text/plain',
+            serialize: (data) => ({
+                body: String(data),
+                headers: { 'content-type': 'text/plain; charset=utf-8' }
+            })
+        });
+
+        this.responseTransformerRegistry.register({
+            contentType: 'text/html',
+            serialize: (data) => ({
+                body: String(data),
+                headers: { 'content-type': 'text/html; charset=utf-8' }
+            })
+        });
 
         // Capture metadata for the application instance
         const { file, line } = getCallerInfo();
@@ -187,6 +224,24 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 });
             }
         }
+    }
+
+    /**
+     * Register a custom response transformer
+     * @param transformer The transformer to register
+     */
+    public registerResponseTransformer(transformer: ResponseTransformer): this {
+        this.responseTransformerRegistry.register(transformer);
+        return this;
+    }
+
+    /**
+     * Set the default response transformer content type
+     * @param contentType The content type to use as default
+     */
+    public setDefaultResponseType(contentType: string): this {
+        this.responseTransformerRegistry.setDefault(contentType);
+        return this;
     }
 
     private async initDatastore() {
