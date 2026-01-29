@@ -28,6 +28,9 @@ let maxRequestTime = 0;
 function initRequests() {
     console.log('[requests.js] Initializing...');
 
+    if (window.updateRequestsList) console.log('[requests.js] updateRequestsList is already defined!');
+    else console.log('[requests.js] Defining updateRequestsList...');
+
     // Initialize Filter Listeners
     const txtFilter = document.getElementById('network-filter-text');
     const typeFilter = document.getElementById('network-filter-type');
@@ -327,44 +330,7 @@ function initRequests() {
                 label: "Replay Request",
                 action: function (e, row) {
                     const data = row.getData();
-                    const basePath = window.location.pathname.endsWith('/') ? window.location.pathname.slice(0, -1) : window.location.pathname;
-
-                    // Determine direction if not explicit
-                    const direction = data.direction || 'inbound';
-
-                    fetch(basePath + '/replay', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            method: data.method,
-                            url: data.url,
-                            headers: data.requestHeaders,
-                            body: data.requestBody,
-                            direction: direction
-                        })
-                    })
-                        .then(res => res.json())
-                        .then(result => {
-                            if (result.error) {
-                                alert('Replay Failed: ' + result.error);
-                            } else {
-                                // Show result in a simplified details view or just alert success?
-                                // User requirement: "presents the response data to the user"
-                                // Let's create a temporary object mimicking a request log and show it in details view
-                                const replayLog = {
-                                    ...data,
-                                    id: 'replay-' + Date.now(),
-                                    status: result.status,
-                                    duration: result.duration || 0,
-                                    timestamp: Date.now(),
-                                    responseHeaders: result.headers,
-                                    responseBody: result.data,
-                                    size: result.data ? result.data.length : 0
-                                };
-                                showRequestDetails(replayLog);
-                            }
-                        })
-                        .catch(err => console.error("Replay fetch failed", err));
+                    openReplayModal(data);
                 }
             },
             {
@@ -674,7 +640,12 @@ function updateTimestamps(requests) {
 
 // Global handler for Client.js
 window.updateRequestsList = function (newRequests) {
-    if (!window.requestsTable || !newRequests || !newRequests.length) return;
+    console.log('[requests.js] updateRequestsList called with', newRequests ? newRequests.length : 0, 'items');
+    if (!window.requestsTable) {
+        console.warn('[requests.js] requestsTable is missing!');
+        return;
+    }
+    if (!newRequests || !newRequests.length) return;
 
     // Update Timestamps
     const changed = updateTimestamps(newRequests);
@@ -735,6 +706,11 @@ function showRequestDetails(request) {
         { id: 'timings', label: 'Timings' },
         // { id: 'security', label: 'Security' } // Enable if we have data
     ];
+
+    // Add Middleware tab if we have handler stack data with state changes
+    if (request.handlerStack && request.handlerStack.some(h => h.stateChanges && Object.keys(h.stateChanges).length > 0)) {
+        tabs.splice(5, 0, { id: 'middleware', label: 'Middleware' });
+    }
 
     if (request.scheme === 'https' || request.scheme === 'wss') {
         tabs.push({ id: 'security', label: 'Security' });
@@ -809,6 +785,8 @@ function renderTabContent(tabId, request) {
             return renderResponseTab(request);
         case 'timings':
             return renderTimingsTab(request);
+        case 'middleware':
+            return renderMiddlewareTab(request);
         case 'security':
             return renderSecurityTab(request);
         default:
@@ -1007,6 +985,116 @@ function renderSecurityTab(request) {
             </div>
         </div>
     `;
+}
+
+function renderMiddlewareTab(request) {
+    if (!request.handlerStack || request.handlerStack.length === 0) {
+        return `
+            <div style="padding: 2rem; text-align: center; color: var(--text-secondary);">
+                No middleware tracking data available.
+                <br><br>
+                Enable middleware tracking by setting <code style="background: var(--bg-primary); padding: 2px 6px; border-radius: 3px;">enableMiddlewareTracking: true</code> in your application config.
+            </div>
+        `;
+    }
+
+    const totalDuration = request.duration || 1;
+    const formatValue = (val) => {
+        if (val === undefined) return '<span style="color: var(--text-secondary); font-style: italic;">undefined</span>';
+        if (val === null) return '<span style="color: var(--text-secondary); font-style: italic;">null</span>';
+        if (typeof val === 'string') return `"<span style="color: var(--color-success);">${escapeHtml(val)}</span>"`;
+        if (typeof val === 'number') return `<span style="color: var(--color-info);">${val}</span>`;
+        if (typeof val === 'boolean') return `<span style="color: var(--color-warning);">${val}</span>`;
+        if (typeof val === 'object') {
+            try {
+                return `<span style="color: var(--text-secondary);">${escapeHtml(JSON.stringify(val, null, 2))}</span>`;
+            } catch (e) {
+                return `<span style="color: var(--text-secondary);">[Object]</span>`;
+            }
+        }
+        return escapeHtml(String(val));
+    };
+
+    let html = '<div style="padding: 1rem;">';
+    html += '<div style="margin-bottom: 1rem;">';
+    html += '<div style="font-size: 0.9em; color: var(--text-secondary); margin-bottom: 0.5rem;">';
+    html += 'This tab shows state mutations made by each middleware handler during request processing.';
+    html += '</div>';
+    html += '</div>';
+
+    html += '<div style="display: flex; flex-direction: column; gap: 12px;">';
+
+    request.handlerStack.forEach((item, index) => {
+        const duration = item.duration > 0 ? item.duration : 0.01;
+        const percent = Math.min(100, Math.max(1, (duration / totalDuration) * 100));
+        const isSlow = percent > 15;
+        const hasStateChanges = item.stateChanges && Object.keys(item.stateChanges).length > 0;
+
+        const detailsId = `middleware-${index}`;
+
+        html += `
+        <details ${hasStateChanges ? 'open' : ''} id="${detailsId}" style="border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; background: var(--bg-primary);">
+            <summary style="padding: 12px; cursor: pointer; background: var(--bg-secondary); border-left: 3px solid ${hasStateChanges ? 'var(--primary-color, #3b82f6)' : 'var(--border-color)'}; display: flex; justify-content: space-between; align-items: center;">
+                <div style="flex: 1;">
+                    <div style="font-weight: 500; margin-bottom: 4px;">
+                        ${hasStateChanges ? '🔹 ' : '⚪ '}${escapeHtml(item.name)}
+                    </div>
+                    <div style="font-size: 0.85em; color: var(--text-secondary); font-family: monospace;">
+                        ${escapeHtml(item.file)}:${item.line}
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-family: monospace; font-size: 0.9em; color: ${isSlow ? 'var(--color-warning)' : 'var(--text-secondary)'};">
+                        ${printDuration(duration)}
+                    </div>
+                    ${hasStateChanges ? `<div style="font-size: 0.8em; color: var(--primary-color, #3b82f6); margin-top: 2px;">${Object.keys(item.stateChanges).length} change${Object.keys(item.stateChanges).length === 1 ? '' : 's'}</div>` : '<div style="font-size: 0.8em; color: var(--text-secondary); margin-top: 2px;">No changes</div>'}
+                </div>
+            </summary>
+            
+            <div style="padding: 12px; border-top: 1px solid var(--border-color);">`;
+
+        if (hasStateChanges) {
+            html += '<div style="margin-bottom: 8px; font-weight: 500; color: var(--text-primary);">State Changes:</div>';
+            html += '<table style="width: 100%; border-collapse: collapse; font-size: 0.9em; font-family: monospace;">';
+
+            Object.entries(item.stateChanges).forEach(([key, value]) => {
+                html += `
+                <tr style="border-bottom: 1px solid var(--border-color-dim, #33333333);">
+                    <td style="padding: 6px 8px; color: var(--text-flavor); font-weight: 500; vertical-align: top; width: 30%;">
+                        ${escapeHtml(key)}
+                    </td>
+                    <td style="padding: 6px 8px; color: var(--text-secondary); vertical-align: top; width: 10%; text-align: center;">
+                        →
+                    </td>
+                    <td style="padding: 6px 8px; word-break: break-all; vertical-align: top;">
+                        ${formatValue(value)}
+                    </td>
+                </tr>
+                `;
+            });
+
+            html += '</table>';
+        } else {
+            html += '<div style="color: var(--text-secondary); font-style: italic; text-align: center; padding: 1rem;">';
+            html += 'This middleware did not modify ctx.state';
+            html += '</div>';
+        }
+
+        html += '<div style="margin-top: 12px;">';
+        html += '<div style="font-size: 0.8em; color: var(--text-secondary); margin-bottom: 4px;">Execution Time</div>';
+        html += '<div style="height: 6px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden;">';
+        html += `<div style="height: 100%; width: ${percent}%; background: ${isSlow ? 'var(--color-warning)' : 'var(--color-success)'}; transition: width 0.3s ease;"></div>`;
+        html += '</div>';
+        html += '</div>';
+
+        html += '</div>';
+        html += '</details>';
+    });
+
+    html += '</div>';
+    html += '</div>';
+
+    return html;
 }
 
 function closeRequestDetails() {
@@ -1223,3 +1311,368 @@ function formatBytes(bytes, decimals = 2) {
 }
 
 
+
+// --- Replay Modal Implementation ---
+
+function injectReplayStyles() {
+    if (document.getElementById('replay-modal-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'replay-modal-styles';
+    style.textContent = `
+        #replay-modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000;
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(2px);
+        }
+        #replay-modal {
+            background: var(--bg-secondary); width: 800px; max-width: 95vw; height: 80vh;
+            border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            display: flex; flex-direction: column; border: 1px solid var(--border-color);
+        }
+        .replay-header {
+            padding: 1rem; border-bottom: 1px solid var(--border-color);
+            display: flex; justify-content: space-between; align-items: center;
+            font-weight: 600; font-size: 1.1rem;
+        }
+        .replay-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+        .replay-toolbar {
+            padding: 1rem; display: flex; gap: 0.5rem; border-bottom: 1px solid var(--border-color);
+            background: var(--bg-primary);
+        }
+        .replay-input {
+            flex: 1; padding: 0.5rem; border-radius: 4px; border: 1px solid var(--border-color);
+            background: var(--bg-secondary); color: var(--text-primary);
+        }
+        .replay-method {
+            padding: 0.5rem; border-radius: 4px; border: 1px solid var(--border-color);
+            background: var(--bg-secondary); color: var(--text-primary); font-weight: bold;
+        }
+        .replay-btn {
+            padding: 0.5rem 1rem; border-radius: 4px; border: none; cursor: pointer;
+            font-weight: 500; display: flex; align-items: center; gap: 0.5rem;
+        }
+        .btn-primary { background: var(--primary-color, #3b82f6); color: white; }
+        .btn-secondary { background: var(--bg-primary, #e5e7eb); color: var(--text-primary); }
+        .dark .btn-secondary { background: #374151; }
+        
+        .replay-tabs { display: flex; border-bottom: 1px solid var(--border-color); background: var(--bg-primary); }
+        .replay-tab {
+            padding: 0.75rem 1rem; cursor: pointer; border-bottom: 2px solid transparent;
+            color: var(--text-secondary);
+        }
+        .replay-tab.active {
+            border-color: var(--primary-color, #3b82f6); color: var(--text-primary);
+        }
+        
+        .replay-content { flex: 1; overflow-y: auto; padding: 1rem; position: relative; }
+        .code-editor {
+            width: 100%; height: 100%; font-family: monospace; border: none; resize: none;
+            background: transparent; color: var(--text-primary); outline: none;
+        }
+        
+        .kv-editor-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+        .kv-key, .kv-val { flex: 1; padding: 0.4rem; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary); border-radius: 4px; }
+        .kv-remove { padding: 0.4rem; cursor: pointer; color: #ef4444; }
+        
+        .response-status-badge {
+            padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.85rem; font-weight: bold;
+        }
+        .status-2xx { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .status-4xx { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+        .status-5xx { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    `;
+    document.head.appendChild(style);
+}
+
+let currentReplayState = {
+    method: 'GET',
+    url: '',
+    headers: [],
+    body: '',
+    activeTab: 'body'
+};
+
+function openReplayModal(request) {
+    injectReplayStyles();
+
+    // Initialize State
+    currentReplayState = {
+        method: request.method || 'GET',
+        url: request.url || '',
+        headers: Object.entries(request.requestHeaders || {}).map(([k, v]) => ({ key: k, value: v })),
+        body: typeof (request.requestBody) === 'string' ? request.requestBody : (request.requestBody ? JSON.stringify(request.requestBody || {}, null, 2) : ''),
+        direction: request.direction || 'outbound',
+        activeTab: 'body',
+        response: null
+    };
+
+    renderReplayModal();
+}
+
+function closeReplayModal() {
+    const el = document.getElementById('replay-modal-overlay');
+    if (el) el.remove();
+}
+
+function renderReplayModal() {
+    let el = document.getElementById('replay-modal-overlay');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'replay-modal-overlay';
+        document.body.appendChild(el);
+
+        // Close on backdrop click
+        el.addEventListener('click', (e) => {
+            if (e.target === el) closeReplayModal();
+        });
+    }
+
+    const { method, url, headers, body, activeTab, response } = currentReplayState;
+    const isResponse = activeTab === 'response';
+
+    const tabs = ['body', 'headers', 'params', 'response'];
+
+    el.innerHTML = `
+        <div id="replay-modal">
+            <div class="replay-header">
+                <span>Replay Request</span>
+                <div style="display:flex; gap: 0.5rem">
+                    <button class="replay-btn btn-secondary" onclick="document.getElementById('replay-import-file').click()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Import
+                    </button>
+                    <input type="file" id="replay-import-file" style="display:none" onchange="handleReplayImport(this)">
+                    <button class="replay-btn btn-secondary" onclick="copyReplayCurl()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        Copy Curl
+                    </button>
+                    <button class="replay-btn" style="background: transparent; color: var(--text-secondary)" onclick="closeReplayModal()">✕</button>
+                </div>
+            </div>
+            
+            <div class="replay-toolbar">
+                <select class="replay-method" onchange="updateReplayState('method', this.value)">
+                    <option value="GET" ${method === 'GET' ? 'selected' : ''}>GET</option>
+                    <option value="POST" ${method === 'POST' ? 'selected' : ''}>POST</option>
+                    <option value="PUT" ${method === 'PUT' ? 'selected' : ''}>PUT</option>
+                    <option value="DELETE" ${method === 'DELETE' ? 'selected' : ''}>DELETE</option>
+                    <option value="PATCH" ${method === 'PATCH' ? 'selected' : ''}>PATCH</option>
+                </select>
+                <input class="replay-input" value="${escapeHtml(url)}" oninput="updateReplayState('url', this.value)" placeholder="https://api.example.com/v1/...">
+                <button class="replay-btn btn-primary" onclick="executeReplay()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Send
+                </button>
+            </div>
+            
+            <div class="replay-tabs">
+                <div class="replay-tab ${activeTab === 'body' ? 'active' : ''}" onclick="updateReplayState('activeTab', 'body')">Body</div>
+                <div class="replay-tab ${activeTab === 'headers' ? 'active' : ''}" onclick="updateReplayState('activeTab', 'headers')">Headers</div>
+                <div class="replay-tab ${activeTab === 'response' ? 'active' : ''}" onclick="updateReplayState('activeTab', 'response')">
+                    Response ${response ? `<span style="font-size: 0.8em; opacity: 0.8">(${response.status})</span>` : ''}
+                </div>
+            </div>
+            
+            <div class="replay-content">
+                ${activeTab === 'body' ? `
+                    <textarea class="code-editor" spellcheck="false" oninput="updateReplayState('body', this.value)">${escapeHtml(body)}</textarea>
+                ` : ''}
+                
+                ${activeTab === 'headers' ? `
+                    <div id="replay-headers-list">
+                        ${headers.map((h, i) => `
+                            <div class="kv-editor-row">
+                                <input class="kv-key" value="${escapeHtml(h.key)}" oninput="updateReplayHeader(${i}, 'key', this.value)" placeholder="Key">
+                                <input class="kv-val" value="${escapeHtml(h.value)}" oninput="updateReplayHeader(${i}, 'value', this.value)" placeholder="Value">
+                                <div class="kv-remove" onclick="removeReplayHeader(${i})">✕</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button class="replay-btn btn-secondary" style="margin-top: 1rem" onclick="addReplayHeader()">+ Add Header</button>
+                ` : ''}
+                
+                ${activeTab === 'response' ? renderReplayResponsePlaceholder(response) : ''}
+            </div>
+        </div>
+    `;
+
+    if (activeTab === 'response' && response) {
+        setTimeout(() => {
+            const el = document.getElementById('replay-response-editor');
+            if (el) {
+                let content = response.body || '';
+                if (typeof content === 'object') content = JSON.stringify(content, null, 2);
+
+                let lang = 'json'; // default
+                // try to sniff
+                if (typeof content === 'string' && !content.trim().startsWith('{') && !content.trim().startsWith('[')) {
+                    lang = 'plaintext';
+                }
+
+                renderMonacoEditor(el, content, lang, true);
+            }
+        }, 0);
+    }
+}
+
+function renderReplayResponsePlaceholder(response) {
+    if (!response) return `<div style="color: var(--text-secondary); text-align: center; margin-top: 2rem;">No response yet. Click Send to replay.</div>`;
+
+    let colorClass = response.status >= 500 ? 'status-5xx' : response.status >= 400 ? 'status-4xx' : 'status-2xx';
+
+    return `
+        <div style="margin-bottom: 1rem; display: flex; gap: 1rem; align-items: center;">
+            <span class="response-status-badge ${colorClass}">${response.status} ${response.statusText || ''}</span>
+            <span style="color: var(--text-secondary)">${formatBytes(response.size || 0)}</span>
+            <span style="color: var(--text-secondary)">${response.duration || 0}ms</span>
+            <div style="flex:1"></div>
+            <button class="replay-btn btn-secondary" onclick="copyToClipboard(currentReplayState.responseBodyStr)">Copy</button>
+        </div>
+        <div style="border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; height: calc(100% - 40px)">
+             <div id="replay-response-editor" style="flex: 1;"></div>
+        </div>
+    `;
+}
+
+function updateReplayState(key, value) {
+    currentReplayState[key] = value;
+    if (key === 'activeTab') renderReplayModal(); // Re-render for tab switch
+}
+
+function updateReplayHeader(index, field, value) {
+    currentReplayState.headers[index][field] = value;
+}
+
+function addReplayHeader() {
+    currentReplayState.headers.push({ key: '', value: '' });
+    renderReplayModal();
+}
+
+function removeReplayHeader(index) {
+    currentReplayState.headers.splice(index, 1);
+    renderReplayModal();
+}
+
+function executeReplay() {
+    const { method, url, headers, body, direction } = currentReplayState;
+
+    // Construct headers object
+    const headersObj = {};
+    headers.forEach(h => {
+        if (h.key) headersObj[h.key] = h.value;
+    });
+
+    // Parse body if JSON
+    let bodyData = body;
+    try {
+        bodyData = JSON.parse(body);
+    } catch (e) {
+        // Keep as string
+    }
+
+    // Using dashboard replay endpoint
+    const basePath = window.location.pathname.endsWith('/') ? window.location.pathname.slice(0, -1) : window.location.pathname;
+
+    // Show loading?
+    const btn = document.querySelector('.replay-toolbar .btn-primary');
+    if (btn) btn.innerText = 'Sending...';
+
+    console.log('[Dashboard] Replaying request:', { method, url, direction });
+
+    fetch(basePath + '/replay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            method,
+            url,
+            headers: headersObj,
+            body: bodyData,
+            direction: direction || 'outbound'
+        })
+    })
+        .then(res => res.json())
+        .then(result => {
+            console.log('[Dashboard] Replay result:', result);
+            if (result.error) {
+                alert("Error: " + result.error);
+            } else {
+                let bodyStr = result.data;
+                if (typeof bodyStr === 'object') bodyStr = JSON.stringify(bodyStr, null, 2);
+
+                currentReplayState.response = {
+                    status: result.status,
+                    headers: result.headers,
+                    body: result.data,
+                    duration: result.duration,
+                    size: bodyStr ? bodyStr.length : 0
+                };
+                currentReplayState.responseBodyStr = bodyStr; // Store for copy
+                currentReplayState.activeTab = 'response';
+                renderReplayModal();
+            }
+        })
+        .catch(err => {
+            console.error('[Dashboard] Replay failed:', err);
+            alert("Replay failed: " + err);
+        })
+        .finally(() => {
+            if (btn) btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Send`;
+        });
+}
+
+function copyReplayCurl() {
+    // Generate Curl
+    const { method, url, headers, body } = currentReplayState;
+    let cmd = `curl -X ${method} "${url}"`;
+    headers.forEach(h => {
+        if (h.key) cmd += ` \\\n  -H "${h.key}: ${h.value}"`;
+    });
+    if (body) {
+        // Escape body for shell
+        const escaped = body.replace(/"/g, '\\"');
+        cmd += ` \\\n  -d "${escaped}"`;
+    }
+
+    copyToClipboard(cmd);
+}
+
+function handleReplayImport(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const data = JSON.parse(e.target.result);
+            // Try to map HAR or simple JSON
+            if (data.log && data.log.entries) {
+                // HAR
+                const entry = data.log.entries[0];
+                if (entry && entry.request) {
+                    currentReplayState.method = entry.request.method;
+                    currentReplayState.url = entry.request.url;
+                    currentReplayState.headers = entry.request.headers.map(h => ({ key: h.name, value: h.value }));
+                    if (entry.request.postData && entry.request.postData.text) {
+                        currentReplayState.body = entry.request.postData.text;
+                    }
+                }
+            } else {
+                // Simple format
+                currentReplayState.method = data.method || 'GET';
+                currentReplayState.url = data.url || '';
+                if (data.headers) {
+                    if (Array.isArray(data.headers)) currentReplayState.headers = data.headers;
+                    else currentReplayState.headers = Object.entries(data.headers).map(([k, v]) => ({ key: k, value: v }));
+                }
+                if (data.body) {
+                    currentReplayState.body = typeof data.body === 'string' ? data.body : JSON.stringify(data.body, null, 2);
+                }
+            }
+            renderReplayModal();
+        } catch (err) {
+            alert("Failed to parse file: " + err.message);
+        }
+    };
+    reader.readAsText(file);
+    input.value = ''; // Reset
+}

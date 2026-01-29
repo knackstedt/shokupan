@@ -110,6 +110,13 @@ export interface DashboardConfig {
      * @default 1000
      */
     maxLogEntries?: number;
+    /**
+     * Track and display state mutations made by middleware.
+     * Requires enableMiddlewareTracking to be enabled on the application.
+     * When enabled, the dashboard will show what properties each middleware added/modified on ctx.state.
+     * @default true (if enableMiddlewareTracking is enabled)
+     */
+    trackStateMutations?: boolean;
 }
 
 class Collector implements DebugCollector {
@@ -1201,7 +1208,7 @@ export class Dashboard implements ShokupanPlugin {
             duration: item.duration,
             startTime: item.startTime,
             isBuiltin: item.isBuiltin,
-            // stateChanges: item.stateChanges // Exclude complex objects for now
+            stateChanges: item.stateChanges
         }));
     }
 
