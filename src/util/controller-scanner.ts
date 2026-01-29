@@ -7,6 +7,7 @@ import type { ShokupanRouter } from '../router';
 import { Container } from './di';
 import { getCallerInfo } from './stack';
 import {
+    $controllerHooks,
     $controllerPath,
     $eventMethods,
     $isMounted,
@@ -89,6 +90,7 @@ export class ControllerScanner {
 
         const mcpResources = (instance as any)[$mcpResources] || (proto && (proto as any)[$mcpResources]);
         const resilienceConfigMap = (instance as any)[$resilienceConfig] || (proto && (proto as any)[$resilienceConfig]);
+        const hooksMap = (instance as any)[$controllerHooks] || (proto && (proto as any)[$controllerHooks]);
 
         let routesAttached = 0;
         for (let i = 0; i < Array.from(methods).length; i++) {
@@ -240,7 +242,35 @@ export class ControllerScanner {
                         ? traceHandler(originalHandler, normalizedPath)
                         : originalHandler;
 
-                    return tracedOriginalHandler.apply(instance, args);
+                    // Execute Hooks: onRequestStart
+                    if (hooksMap?.has('onRequestStart')) {
+                        const hooks = hooksMap.get('onRequestStart');
+                        for (let k = 0; k < hooks.length; k++) {
+                            await (instance as any)[hooks[k]](ctx);
+                        }
+                    }
+
+                    try {
+                        const result = await tracedOriginalHandler.apply(instance, args);
+
+                        // Execute Hooks: onRequestEnd
+                        if (hooksMap?.has('onRequestEnd')) {
+                            const hooks = hooksMap.get('onRequestEnd');
+                            for (let k = 0; k < hooks.length; k++) {
+                                await (instance as any)[hooks[k]](ctx);
+                            }
+                        }
+                        return result;
+                    } catch (err: any) {
+                        // Execute Hooks: onError
+                        if (hooksMap?.has('onError')) {
+                            const hooks = hooksMap.get('onError');
+                            for (let k = 0; k < hooks.length; k++) {
+                                await (instance as any)[hooks[k]](ctx, err);
+                            }
+                        }
+                        throw err;
+                    }
                 };
 
                 // Apply Middleware wrapping
