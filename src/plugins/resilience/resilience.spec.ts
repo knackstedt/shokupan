@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { CircuitBreaker, Fallback, Retry, Timeout } from "./decorators";
+import { Controller, Get } from '../../decorators';
 import { Shokupan } from "../../shokupan";
-import { Controller, Get } from "../../util/decorators";
+import { CircuitBreaker, Fallback, Retry, Timeout } from "./decorators";
 
 describe("Resilience Policies", () => {
 

@@ -1,7 +1,7 @@
 
 import { afterAll, describe, expect, it } from "bun:test";
+import { Controller, Get } from "../../../decorators/http";
 import { Shokupan } from "../../../shokupan";
-import { Controller, Get } from "../../../util/decorators";
 import { MCPServerPlugin } from "../mcp-server/plugin";
 
 @Controller('/test')

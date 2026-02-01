@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Shokupan } from '../../shokupan';
-import { $dispatch } from '../../decorators/symbol';
+import { $dispatch } from '../../util/symbol';
 
 describe("Streaming Support", () => {
     describe("ctx.stream()", () => {

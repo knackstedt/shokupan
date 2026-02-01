@@ -1,7 +1,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { Controller, Get } from "../../../decorators/http";
 import { Shokupan } from "../../../shokupan";
-import { Controller, Get } from "../../../util/decorators";
 import { FetchInterceptor } from "../dashboard/fetch-interceptor";
 import { MCPServerPlugin } from "../mcp-server/plugin";
 

@@ -318,50 +318,6 @@ export class ControllerScanner {
                 });
             }
 
-            // 3. Check for Event Decorator
-            const eventConfig = decoratedEvents?.get(name);
-            if (eventConfig !== undefined) {
-                routesAttached++;
-                const routeArgs = decoratedArgs?.get(name);
-
-                const wrappedHandler = async (ctx: ShokupanContext<T>) => {
-                    let args: any[] = [ctx];
-                    if (routeArgs?.length > 0) {
-                        args = [];
-                        const sortedArgs = [...routeArgs].sort((a: any, b: any) => a.index - b.index);
-                        for (let k = 0; k < sortedArgs.length; k++) {
-                            const arg = sortedArgs[k];
-                            switch (arg.type) {
-                                case RouteParamType.BODY:
-                                    args[arg.index] = await ctx.body();
-                                    break;
-                                case RouteParamType.CONTEXT:
-                                    args[arg.index] = ctx;
-                                    break;
-                                case RouteParamType.REQUEST:
-                                    args[arg.index] = ctx.req;
-                                    break;
-                                case RouteParamType.HEADER:
-                                    args[arg.index] = arg.name ? ctx.req.headers.get(arg.name) : ctx.req.headers;
-                                    break;
-                                default:
-                                    args[arg.index] = undefined;
-                            }
-                        }
-                    }
-                    return originalHandler.apply(instance, args);
-                };
-
-                // Attach metadata to the handler for AsyncAPI generator
-                const decoratedSpecs = (instance as any)[$routeSpec] || (proto && (proto as any)[$routeSpec]);
-                const userSpec = decoratedSpecs && decoratedSpecs.get(name);
-
-                const spec = { tags: [{ name: instance.constructor.name }], ...userSpec };
-                (wrappedHandler as any).spec = spec;
-                (wrappedHandler as any).originalHandler = originalHandler;
-
-                router.event(eventConfig.eventName, wrappedHandler);
-            }
 
             // 4. Check for MCP Tools
             const toolConfig = mcpTools?.get(name);
