@@ -33,7 +33,7 @@ export function Injectable(scope: 'singleton' | 'instanced' = 'singleton'): Clas
  * Used on class properties or constructor parameters.
  */
 export function Inject(token: any): PropertyDecorator & ParameterDecorator {
-    return (target: any, propertyKey: string | symbol | undefined, indexOrDescriptor?: number | PropertyDescriptor) => {
+    return (target: any, propertyKey: string | symbol | undefined, indexOrDescriptor?: number | PropertyDescriptor): any => {
         // Property Decorator
         if (typeof indexOrDescriptor === 'undefined' || (typeof indexOrDescriptor === 'object' && indexOrDescriptor !== null)) {
             const key = String(propertyKey);
@@ -61,8 +61,8 @@ export function Inject(token: any): PropertyDecorator & ParameterDecorator {
  * - Class/Method: Middleware
  * - Property/Parameter: Dependency Injection
  */
-export function Use(tokenOrMiddleware?: any | Middleware, ...moreMiddleware: Middleware[]) {
-    return (target: any, propertyKey?: string, indexOrDescriptor?: PropertyDescriptor | number) => {
+export function Use(tokenOrMiddleware?: any | Middleware, ...moreMiddleware: Middleware[]): any {
+    return (target: any, propertyKey?: string | symbol, indexOrDescriptor?: PropertyDescriptor | number): any => {
         // 1. Parameter Decorator (DI)
         if (typeof indexOrDescriptor === 'number') {
             const index = indexOrDescriptor;
