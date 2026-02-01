@@ -1,7 +1,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { Shokupan } from "../shokupan";
-import { Body, Controller, Get, Post, Query } from "../util/decorators";
+import { Body, Controller, Get, Post, Query } from "../decorators";
 
 
 describe("Core Fixes Implementation", () => {

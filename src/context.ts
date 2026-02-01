@@ -14,6 +14,16 @@ import { $bodyParsed, $bodyParseError, $bodyType, $cachedBody, $cachedCookies, $
 import type { CookieOptions, HeadersInit, JSXRenderer, SSEMessage, SSEStreamErrorHandler, SSEStreamHelper, StreamErrorHandler, StreamHelper, TextStreamErrorHandler, TextStreamHelper } from './util/types';
 
 /**
+ * Inline WebSocket handlers for ctx.upgrade()
+ */
+export interface InlineWebSocketHandlers<T = any> {
+    open?: (ctx: ShokupanContext<T>, ws: ServerWebSocket<any>) => void | Promise<void>;
+    message?: (ctx: ShokupanContext<T>, ws: ServerWebSocket<any>, message: string | Buffer) => void | Promise<void>;
+    close?: (ctx: ShokupanContext<T>, ws: ServerWebSocket<any>, code?: number, reason?: string) => void | Promise<void>;
+    error?: (ctx: ShokupanContext<T>, ws: ServerWebSocket<any>, error: Error) => void | Promise<void>;
+}
+
+/**
  * Security: Validate if a cookie domain is safe to use
 */
 function isValidCookieDomain(domain: string, currentHost: string): boolean {
@@ -394,12 +404,63 @@ export class ShokupanContext<
 
     /**
      * Upgrades the request to a WebSocket connection.
-     * @param options Upgrade options
+     * 
+     * @param options Upgrade options or inline WebSocket handlers
      * @returns true if upgraded, false otherwise
+     * 
+     * @example Inline handlers
+     * ```ts
+     * app.get('/ws', (ctx) => {
+     *   ctx.upgrade({
+     *     open: (ctx, ws) => ws.send("Connected"),
+     *     message: (ctx, ws, msg) => ws.send(msg),
+     *     close: (ctx, ws) => console.log("Disconnected")
+     *   });
+     * });
+     * ```
      */
-    public upgrade(options?: { data?: any; headers?: HeadersInit; }) {
+    public upgrade(options?: Parameters<Server<State>["upgrade"]>[1] | InlineWebSocketHandlers<State>) {
         if (!this.server) return false;
-        const success = this.server.upgrade(this.req as any, options);
+
+        let wsOptions;
+
+        // Check if inline handlers are provided
+        if (options !== undefined && (
+            (options as any).open !== undefined ||
+            (options as any).message !== undefined ||
+            (options as any).close !== undefined ||
+            (options as any).error !== undefined)
+        ) {
+            const handlers = options as InlineWebSocketHandlers<State>;
+            const ctx = this;
+
+            // Wrap handlers to match Bun's WebSocket handler signature
+            wsOptions = {
+                data: {
+                    handler: {
+                        open: handlers.open ? (ws: ServerWebSocket<any>) => {
+                            // Link ws.data and ctx.state
+                            ws.data = ws.data || {};
+                            ctx.state = ws.data as State;
+                            ctx[$ws] = ws;
+                            return handlers.open(ctx, ws);
+                        } : undefined,
+                        message: handlers.message ? (ws: ServerWebSocket<any>, message: string | Buffer) => {
+                            return handlers.message(ctx, ws, message);
+                        } : undefined,
+                        close: handlers.close ? (ws: ServerWebSocket<any>, code?: number, reason?: string) => {
+                            return handlers.close(ctx, ws, code, reason);
+                        } : undefined,
+                        error: handlers.error ? (ws: ServerWebSocket<any>, error: Error) => {
+                            return handlers.error(ctx, ws, error);
+                        } : undefined
+                    }
+                }
+            };
+        }
+
+        // Standard upgrade with data/headers
+        const success = this.server.upgrade(this.req as any, wsOptions ?? options);
         if (success) {
             this.isUpgraded = true;
         }

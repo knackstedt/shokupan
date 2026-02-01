@@ -1,10 +1,10 @@
 import { RateLimitMiddleware, type RateLimitOptions } from "../plugins/middleware/rate-limit";
+import { $controllerHooks, $controllerPath, $mcpPrompts, $mcpResources, $mcpTools, $middleware, $routeArgs, $routeMethods, $routeSpec } from "../util/symbol";
+import type { AsyncAPISpec, GuardAPISpec, MethodAPISpec } from "../util/types";
+import { type Method, type Middleware, RouteParamType } from "../util/types";
 import { Container } from "./di";
 import './metadata';
 import { getCallerInfo } from "./stack";
-import { $controllerHooks, $controllerPath, $eventMethods, $mcpPrompts, $mcpResources, $mcpTools, $middleware, $routeArgs, $routeMethods, $routeSpec } from "./symbol";
-import type { AsyncAPISpec, GuardAPISpec, MethodAPISpec } from "./types";
-import { type Method, type Middleware, RouteParamType } from "./types";
 
 /**
  * Class Decorator: Defines the base path for a controller.
@@ -293,18 +293,6 @@ export const Head = createMethodDecorator("HEAD");
  */
 export const All = createMethodDecorator("ALL");
 
-/**
- * Decorator: Binds a method to the WebSocket event.
- * @param eventName The name of the event to listen for.
- */
-export function Event(eventName: string) {
-    return (target: any, propertyKey: string, descriptor: PropertyDescriptor) => {
-        target[$eventMethods] ??= new Map();
-        target[$eventMethods].set(propertyKey, {
-            eventName
-        });
-    };
-}
 
 /**
  * Decorator: Applies a rate limit to a class or method.
@@ -393,7 +381,7 @@ export const OnRequestEnd = createHookDecorator('onRequestEnd');
 /**
  * Decorator: Hook that runs when an error occurs during request processing.
  */
-export const OnError = createHookDecorator('onError');
+export const OnRequestError = createHookDecorator('onError');
 
 /**
  * Decorator: Hook that runs when the response starts sending (headers).

@@ -12,20 +12,14 @@ describe("Idempotency Plugin", async () => {
 
     beforeAll(() => {
         // Mock datastore methods
-        getSpy = spyOn(app.db, 'select').mockImplementation(async (recordId) => {
-            // RecordId toString gives us "table:id" format
-            const recordStr = recordId.toString();
-            const [table, key] = recordStr.split(':');
+        getSpy = spyOn(app.db, 'get').mockImplementation(async (table, id) => {
             if (table !== 'idempotency') return null as any;
-            return (store[key] || null) as any;
+            return (store[id] || null) as any;
         });
 
-        setSpy = spyOn(app.db, 'upsert').mockImplementation(async (recordId, value) => {
-            // RecordId toString gives us "table:id" format
-            const recordStr = recordId.toString();
-            const [table, key] = recordStr.split(':');
+        setSpy = spyOn(app.db, 'upsert').mockImplementation(async (table, id, value) => {
             if (table === 'idempotency') {
-                store[key] = value;
+                store[id] = value;
             }
             return {} as any;
         });
@@ -74,14 +68,16 @@ describe("Idempotency Plugin", async () => {
         // Should have checked storage
         expect(getSpy).toHaveBeenCalled();
         const getCallArgs = getSpy.mock.calls[0];
-        expect(getCallArgs[0].toString()).toBe('idempotency:⟨key-1⟩');
+        expect(getCallArgs[0]).toBe('idempotency');
+        expect(getCallArgs[1]).toBe('key-1');
 
         // Should have stored result
         expect(setSpy).toHaveBeenCalled();
         const setCallArgs = setSpy.mock.calls[0];
-        expect(setCallArgs[0].toString()).toBe('idempotency:⟨key-1⟩');
-        expect(JSON.parse(setCallArgs[1].body)).toEqual({ message: "ok" });
-        expect(setCallArgs[1].status).toBe(200);
+        expect(setCallArgs[0]).toBe('idempotency');
+        expect(setCallArgs[1]).toBe('key-1');
+        expect(JSON.parse(setCallArgs[2].body)).toEqual({ message: "ok" });
+        expect(setCallArgs[2].status).toBe(200);
     });
 
     test("Returns stored response on second hit with same key", async () => {

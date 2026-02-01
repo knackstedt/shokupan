@@ -1,11 +1,14 @@
+import axios from 'axios';
 import { ApiExplorerPlugin } from '../../src/plugins/application/api-explorer/plugin';
 import { AsyncApiPlugin } from '../../src/plugins/application/asyncapi/plugin';
 import { Dashboard } from '../../src/plugins/application/dashboard/plugin';
+import { ErrorView } from '../../src/plugins/application/error-view';
 import { MCPServerPlugin } from '../../src/plugins/application/mcp-server/plugin';
 import { ScalarPlugin } from '../../src/plugins/application/scalar';
 import { Cors } from '../../src/plugins/middleware/cors';
 import { RateLimitMiddleware } from '../../src/plugins/middleware/rate-limit';
 import { Shokupan } from '../../src/shokupan';
+import { ShokupanWebsocketRouter } from '../../src/websocket';
 import { NestedRouter } from '../full/routes/nested_router';
 import { ServiceFetchRouter } from '../full/routes/service_fetch';
 
@@ -24,7 +27,9 @@ const app = new Shokupan({
     enableOpenApiGen: true,
     enableAsyncLocalStorage: true,
     enableAsyncApiGen: true,
+    enableAsyncAstScanning: false,
     enableMiddlewareTracking: true,
+    captureStackTrace: true,
     surreal: {
         connectOptions: {
             authentication: {
@@ -36,22 +41,31 @@ const app = new Shokupan({
     }
 });
 
-app.use(RateLimitMiddleware({
-    windowMs: 60 * 1000, // 1 minute
-    max: 500, // 100 requests per minute
-    message: { error: 'Too many requests, please try again later.' },
-    headers: true
-}));
+app.use((ctx, next) => {
+    ctx.state['test'] = Date.now();
+    return next();
+});
+app.use((ctx, next) => {
+    ctx.state['test'] = Date.now();
+    return next();
+});
 
-app.event("trivial", (ctx) => {
+app.get("/", ctx => ctx.text("Hello World!"));
+
+
+
+// WebSocket Router
+const wsRouter = new ShokupanWebsocketRouter();
+
+wsRouter.event("trivial", (ctx) => {
     console.log("Trivial event received. We will now hug your face!");
 });
-app.event("warning", (ctx) => {
+wsRouter.event("warning", (ctx) => {
     ctx.emit(process.env['FOO'] || 'bar');
 });
 
 // Simple websocket echo server
-app.event("simple", (ctx) => {
+wsRouter.event("simple", (ctx) => {
     if (true) {
         ctx.emit("simpleResponse", { message: Date.now() });
     }
@@ -61,22 +75,25 @@ app.event("simple", (ctx) => {
 
     ctx.emit("error", { message: "Bad things happened here." });
 });
-app.event("simple.specialAction", (ctx) => {
+wsRouter.event("simple.specialAction", (ctx) => {
     ctx.emit("simpleResponse", { message: Date.now() });
     ctx.emit("simple.specialResponse", { message: Date.now() });
 });
-app.event("simple/otherDomains", (ctx) => {
+wsRouter.event("simple/otherDomains", (ctx) => {
     ctx.emit("simple/otherDomainsResponse", { message: Date.now() });
 });
 
-app.event("complex/action1", async (ctx) => {
+wsRouter.event("complex/action1", async (ctx) => {
     console.log(await ctx.body());
     ctx.emit("complex/action1Result", { message: Date.now() });
 });
-app.event("complex/action2", async (ctx) => {
+wsRouter.event("complex/action2", async (ctx) => {
     console.log(await ctx.body());
     ctx.emit("complex/action2Result", { message: Date.now() });
 });
+
+// Mount WebSocket router
+app.mount('/ws', wsRouter);
 
 app.mount("/nested", NestedRouter);
 app.mount("/service", ServiceFetchRouter);
@@ -86,13 +103,27 @@ app.get(Math.random().toString(), ctx => {
     ctx.text(ctx.params.param);
 });
 
-app.get("/path/:param", ctx => {
-    ctx.text(ctx.params.param);
+const myfn = (ctx) => {
+    throw new Error("This is a test error");
+};
+
+app.get("/error", ctx => {
+    myfn(ctx);
 });
-app.static("/files", {
-    root: __dirname + "/static/files",
-    listDirectory: true
+app.get("/error2", ctx => {
+    // This doesn't use the builtin app.internalRequest in order to show an actual axios error.
+    return axios.get("http://localhost:8372/api/thispathisnotdefined");
 });
+app.get("/error/400", ctx => ctx.status(400));
+app.get("/error/401", ctx => ctx.status(401));
+app.get("/error/403", ctx => ctx.status(403));
+app.get("/error/404", ctx => ctx.status(404));
+app.get("/error/429", ctx => ctx.status(429));
+app.get("/error/500", ctx => ctx.status(500));
+app.get("/error/502", ctx => ctx.status(502));
+app.get("/error/503", ctx => ctx.status(503));
+
+app.get("/path/:param", ctx => ctx.text(ctx.params.param));
 
 app.get("/health", {
     summary: "Health Check",
@@ -137,10 +168,23 @@ app.get("multipleResponsesAtOnce", (ctx) => {
 app.use(Cors({ origin: "*" }));
 app.register(new Dashboard({ path: "/admin" }));
 app.register(new ApiExplorerPlugin({ path: "/openapi" }));
-app.register(new AsyncApiPlugin({ path: "/asyncapi" }));
+app.register(new AsyncApiPlugin({
+    path: "/asyncapi",
+    serverUrl: `localhost:${port}/ws`
+}));
 app.register(new ScalarPlugin({ path: "/scalar" }));
 app.register(new MCPServerPlugin({
     rootDir: './examples/api_paths'
+}));
+app.register(new ErrorView({ developmentErrorView: false }));
+
+// Apply rate limiting AFTER plugins to avoid conflicts with plugin routes
+app.use(RateLimitMiddleware({
+    windowMs: 60 * 1000, // 1 minute
+    max: 500, // 500 requests per minute
+    message: { error: 'Too many requests, please try again later.' },
+    headers: true,
+    skip: (ctx) => ctx.path.startsWith('/admin') // Exclude dashboard from rate limiting
 }));
 
 console.log(`

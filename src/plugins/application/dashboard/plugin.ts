@@ -5,7 +5,6 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import renderToString from 'preact-render-to-string';
-import { RecordId } from 'surrealdb';
 import type { DebugCollector } from "../../../context";
 import { ShokupanRouter } from "../../../router";
 import type { Shokupan } from '../../../shokupan';
@@ -253,14 +252,13 @@ export class Dashboard implements ShokupanPlugin {
             // Persist
             // We use 'request' table for both inbound and outbound.
             // ID generation: 'req_out_<timestamp>_<random>'
-
-            const recordId = new RecordId("request", nanoid());
-            const idString = recordId.toString();
+            const idString = `req_${Date.now()}_${nanoid()}`;
 
             // Fire and forget save
-            this.db.query('UPSERT $id CONTENT $data', {
-                id: recordId,
-                data: requestData
+            // We strip 'id' from data if we are passing it separately to create/upsert
+            this.db.upsert('request', idString, {
+                ...requestData,
+                id: idString
             }).catch(e => console.error("Failed to save outbound request", e));
 
             // Broadcast
@@ -381,34 +379,26 @@ export class Dashboard implements ShokupanPlugin {
     }
 
     private setupRoutes() {
+        // WebSocket endpoint for dashboard live updates
         this.router.get("/ws", (ctx) => {
-            const success = ctx.upgrade({
-                data: {
-                    handler: {
-                        open: (ws: ServerWebSocket<any>) => {
-                            this.clients.add(ws);
-                            console.log(`[Dashboard] Client connected. Total clients: ${this.clients.size}`);
-                            // Send default 1m history
-                            this.sendHistory(ws, '1m');
-                        },
-                        close: (ws: ServerWebSocket<any>) => {
-                            this.clients.delete(ws);
-                            console.log(`[Dashboard] Client disconnected. Total clients: ${this.clients.size}`);
-                        },
-                        message: (ws: ServerWebSocket<any>, message: string) => {
-                            try {
-                                const msg = JSON.parse(message);
-                                if (msg.type === 'get-history') {
-                                    this.sendHistory(ws, msg.interval || '1m');
-                                }
-                            } catch (e) { }
+            ctx.upgrade({
+                open: (ctx, ws) => {
+                    this.clients.add(ws);
+                    // Send default 1m history
+                    this.sendHistory(ws, '1m');
+                },
+                message: (ctx, ws, message) => {
+                    try {
+                        const msg = JSON.parse(message as string);
+                        if (msg.type === 'get-history') {
+                            this.sendHistory(ws, msg.interval || '1m');
                         }
-                    }
+                    } catch (e) { }
+                },
+                close: (ctx, ws) => {
+                    this.clients.delete(ws);
                 }
             });
-
-            if (success) return undefined;
-            return ctx.text("WebSocket upgrade failed", 400);
         });
 
         this.router.get("/metrics", async (ctx) => {
@@ -432,41 +422,29 @@ export class Dashboard implements ShokupanPlugin {
                 const ms = intervalMap[interval] || 60 * 1000;
                 const startTime = Date.now() - ms;
 
-                // For accuracy, query the requests table for the specific window
-                let stats;
-                try {
-                    stats = await this.db.query(`
-                        SELECT 
-                            count() as total,
-                            count(IF status < 400 THEN 1 END) as success,
-                            count(IF status >= 400 THEN 1 END) as failed,
-                            math::mean(duration) as avg_latency
-                        FROM request 
-                        WHERE timestamp >= $start
-                        GROUP ALL
-                    `, { start: startTime });
-                } catch (error) {
-                    console.error('[Dashboard] Query failed at plugin.ts:180-191', {
-                        error,
-                        errorMessage: error.message,
-                        errorStack: error.stack,
-                        interval,
-                        startTime,
-                        query: 'metrics interval stats',
-                        stack: new Error().stack
-                    });
-                    throw error;
-                }
+                // Helper to perform in-memory aggregation if DB doesn't support complex query
+                const requests = await this.db.findMany<any>('request', {
+                    where: {
+                        // Generic adapter doesn't support complex where clauses like "timestamp >" easily in `where` object unless extended.
+                        // Our QueryOptions support `gt: { timestamp: startTime }`.
+                    },
+                    gt: { timestamp: startTime }
+                });
 
-                const s = stats[0] || { total: 0, success: 0, failed: 0, avg_latency: 0 };
+                const total = requests.length;
+                const success = requests.filter(r => r.status < 400).length;
+                const failed = requests.filter(r => r.status >= 400).length;
+                const avg_latency = total > 0
+                    ? requests.reduce((acc, r) => acc + (r.duration || 0), 0) / total
+                    : 0;
 
                 return ctx.json({
                     metrics: {
-                        totalRequests: this.metrics.totalRequests,
+                        totalRequests: this.metrics.totalRequests, // Current instance metrics
                         successfulRequests: this.metrics.successfulRequests,
                         failedRequests: this.metrics.failedRequests,
                         activeRequests: this.metrics.activeRequests,
-                        averageTotalTime_ms: s.avg_latency || 0,
+                        averageTotalTime_ms: avg_latency, // Calculated from window
                         recentTimings: this.metrics.recentTimings,
                         logs: [],
                         rateLimitedCounts: this.metrics.rateLimitedCounts,
@@ -482,10 +460,16 @@ export class Dashboard implements ShokupanPlugin {
                 uptime
             });
         });
-        this.router.get("/metrics/history", async (ctx) => {
-            const interval = ctx.query['interval'] || '1m';
 
-            // Map interval to milliseconds
+        this.router.get("/metrics/history", async (ctx) => {
+            // For history, we usually want `metrics` table points.
+            // But if we are calculating on the fly, we don't store snapshots.
+            // Assuming MetricsCollector stores snapshots in 'metrics' table.
+
+            // The MetricsCollector logic needs verification if it uses `create` or `insert`.
+            // Assuming it uses standard adapter logic now.
+
+            const interval = ctx.query['interval'] || '1m';
             const intervalMap: Record<string, number> = {
                 '10s': 10 * 1000,
                 '1m': 60 * 1000,
@@ -500,22 +484,19 @@ export class Dashboard implements ShokupanPlugin {
                 '7d': 7 * 24 * 60 * 60 * 1000,
                 '30d': 30 * 24 * 60 * 60 * 1000,
             };
-
             const periodMs = intervalMap[interval] || 60 * 1000;
-            // Expand window to 3x the requested period to ensure we catch the aligned start points.
             const startTime = Date.now() - (periodMs * 3);
-            const endTime = Date.now();
 
-            const result = await this.db.query(
-                "SELECT * FROM metrics WHERE timestamp >= $start AND timestamp <= $end AND interval = $interval ORDER BY timestamp ASC",
-                { start: startTime, end: endTime, interval }
-            );
-
-            return ctx.json({
-                metrics: result[0] || [],
+            const metrics = await this.db.findMany<any>('metrics', {
+                gt: { timestamp: startTime },
+                where: { interval },
+                sort: { timestamp: 'asc' }
             });
+
+            return ctx.json({ metrics });
         });
 
+        // Helper for start time calculation
         const getIntervalStartTime = (interval?: string) => {
             if (!interval) return 0;
             const intervalMap: Record<string, number> = {
@@ -539,41 +520,85 @@ export class Dashboard implements ShokupanPlugin {
         // Top Requests Endpoint
         this.router.get("/requests/top", async (ctx) => {
             const startTime = getIntervalStartTime(ctx.query['interval']);
-            const result = await this.db.query(
-                "SELECT method, url, count() as count FROM request WHERE timestamp >= $start GROUP BY method, url ORDER BY count DESC LIMIT 10",
-                { start: startTime }
-            );
-            return ctx.json({ top: result[0] || [] });
+
+            const requests = await this.db.findMany<any>('request', {
+                gt: { timestamp: startTime }
+            });
+
+            // Aggregate in-memory
+            const counts: Record<string, { method: string, url: string, count: number; }> = {};
+            for (const req of requests) {
+                const key = `${req.method}:${req.url}`;
+                if (!counts[key]) counts[key] = { method: req.method, url: req.url, count: 0 };
+                counts[key].count++;
+            }
+
+            const top = Object.values(counts)
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 10);
+
+            return ctx.json({ top });
         });
 
         // Top Errors Endpoint
         this.router.get("/errors/top", async (ctx) => {
             const startTime = getIntervalStartTime(ctx.query['interval']);
-            const result = await this.db.query(
-                "SELECT status, count() as count FROM failed_request WHERE timestamp >= $start GROUP BY status ORDER BY count DESC LIMIT 10",
-                { start: startTime }
-            );
-            return ctx.json({ top: result[0] || [] });
+
+            // Note: failed_request table logic is same as request table but filtering?
+            // Or does app specifically write to failed_request table?
+            // "FailedRequestRecorder" plugin usually does.
+            // If we use separate table:
+            const requests = await this.db.findMany<any>('failed_request', {
+                gt: { timestamp: startTime }
+            });
+
+            const counts: Record<string, { status: number, count: number; }> = {};
+            for (const req of requests) {
+                const key = String(req.status);
+                if (!counts[key]) counts[key] = { status: req.status, count: 0 };
+                counts[key].count++;
+            }
+
+            const top = Object.values(counts)
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 10);
+
+            return ctx.json({ top });
         });
 
         // Failing Requests Endpoint
         this.router.get("/requests/failing", async (ctx) => {
             const startTime = getIntervalStartTime(ctx.query['interval']);
-            const result = await this.db.query(
-                "SELECT method, url, count() as count FROM failed_request WHERE timestamp >= $start GROUP BY method, url ORDER BY count DESC LIMIT 10",
-                { start: startTime }
-            );
-            return ctx.json({ top: result[0] || [] });
+            const requests = await this.db.findMany<any>('failed_request', {
+                gt: { timestamp: startTime }
+            });
+
+            const counts: Record<string, { method: string, url: string, count: number; }> = {};
+            for (const req of requests) {
+                const key = `${req.method}:${req.url}`;
+                if (!counts[key]) counts[key] = { method: req.method, url: req.url, count: 0 };
+                counts[key].count++;
+            }
+
+            const top = Object.values(counts)
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 10);
+
+            return ctx.json({ top });
         });
 
         // Slowest Requests Endpoint
         this.router.get("/requests/slowest", async (ctx) => {
             const startTime = getIntervalStartTime(ctx.query['interval']);
-            const result = await this.db.query(
-                "SELECT method, url, duration, status, timestamp FROM request WHERE timestamp >= $start ORDER BY duration DESC LIMIT 10",
-                { start: startTime }
-            );
-            return ctx.json({ slowest: result[0] || [] });
+
+            // If adapter supports sort, let's use it.
+            const requests = await this.db.findMany<any>('request', {
+                gt: { timestamp: startTime },
+                sort: { duration: 'desc' },
+                limit: 10
+            });
+
+            return ctx.json({ slowest: requests });
         });
 
         this.router.get("/registry", (ctx) => {
@@ -591,15 +616,17 @@ export class Dashboard implements ShokupanPlugin {
         // Requests Listing Endpoint
         this.router.get("/requests", async (ctx) => {
             console.log(`[Dashboard] Handling /requests from ${ctx.ip} ${ctx.get('User-Agent')}`);
-            const result = await this.db.query("SELECT * FROM request ORDER BY timestamp DESC LIMIT 100");
-            const items: any[] = result[0] as any[] || [];
-            console.log(`[Dashboard] /requests returning ${items.length} items`);
-            return ctx.json({ requests: items });
+            const result = await this.db.findMany('request', {
+                sort: { timestamp: 'desc' },
+                limit: 100
+            });
+            return ctx.json({ requests: result });
         });
 
         this.router.delete("/requests", async (ctx) => {
             console.log(`[Dashboard] Purging all requests`);
-            await this.db.query("DELETE request; DELETE failed_request;");
+            await this.db.deleteMany('request');
+            await this.db.deleteMany('failed_request');
             this.metrics.logs = [];
             this.metrics.totalRequests = 0;
             this.metrics.activeRequests = 0;
@@ -609,24 +636,22 @@ export class Dashboard implements ShokupanPlugin {
             this.metrics.rateLimitedCounts = {};
             this.metrics.nodeMetrics = {};
             this.metrics.edgeMetrics = {};
-            // Broadcast clear event? Or just let next update handle it?
-            // Sending an empty list via requests-update might work if client handles it.
-            // But we should probably send a specific "purge" event or just rely on client refresh.
-            // Let's send a requests-update with empty list if validation shows it helps.
-            // For now just return success.
             return ctx.json({ success: true });
         });
 
         // Request Details Endpoint
         this.router.get("/requests/:id", async (ctx) => {
-            const result = await this.db.query("SELECT * FROM request WHERE id = $id", { id: ctx.params['id'] });
-            return ctx.json({ request: result[0]?.[0] });
+            const result = await this.db.get('request', ctx.params['id']);
+            return ctx.json({ request: result });
         });
 
         // Replay/Failed Requests Endpoints
         this.router.get("/failures", async (ctx) => {
-            const result = await this.db.query("SELECT * FROM failed_request ORDER BY timestamp DESC LIMIT 50");
-            return ctx.json({ failures: result[0] });
+            const result = await this.db.findMany('failed_request', {
+                sort: { timestamp: 'desc' },
+                limit: 50
+            });
+            return ctx.json({ failures: result });
         });
 
 
@@ -811,6 +836,7 @@ export class Dashboard implements ShokupanPlugin {
     }
 
     private async sendHistory(ws: ServerWebSocket<any>, interval: string) {
+        console.log(`[Dashboard] sendHistory called for interval: ${interval}`);
         // Map interval to milliseconds
         const intervalMap: Record<string, number> = {
             '10s': 10 * 1000,
@@ -829,25 +855,31 @@ export class Dashboard implements ShokupanPlugin {
 
         const periodMs = intervalMap[interval] || 60 * 1000;
         const startTime = Date.now() - (periodMs * 30); // Get 30 points of history
-        const endTime = Date.now();
+
+        console.log(`[Dashboard] Fetching history from timestamp ${startTime}, period: ${periodMs}ms`);
 
         let history: any[] = [];
         try {
-            const result = await this.db.query<[any[]]>(
-                "SELECT * FROM metric WHERE timestamp >= $start AND timestamp <= $end AND interval = $interval ORDER BY timestamp ASC",
-                { start: startTime, end: endTime, interval }
-            );
-            history = result[0] || [];
+            history = await this.db.findMany<any>('metrics', {
+                gt: { timestamp: startTime },
+                where: { interval },
+                sort: { timestamp: 'asc' }
+            });
+            console.log(`[Dashboard] Fetched ${history.length} history points for interval ${interval}`);
         } catch (e) {
             console.error('[Dashboard] Failed to fetch history for WS', e);
         }
 
-        ws.send(JSON.stringify({
+        const message = {
             type: 'init',
             metrics: { ...this.metrics, logs: [] },
             uptime: this.getUptime(),
             history
-        }));
+        };
+
+        console.log(`[Dashboard] Sending init message with ${history.length} history points`);
+        ws.send(JSON.stringify(message));
+        console.log(`[Dashboard] Init message sent successfully`);
     }
 
     private broadcastMetrics() {
@@ -1013,6 +1045,7 @@ export class Dashboard implements ShokupanPlugin {
                 // Record in MetricsCollector
                 const isError = response.status >= 400;
                 this.metricsCollector.recordRequest(duration, isError);
+                this.updateTiming(duration);
 
                 // Broadcast updates immediately
                 if (!this.broadcastTimer) {
@@ -1044,7 +1077,9 @@ export class Dashboard implements ShokupanPlugin {
                             });
                         }
 
-                        await this.db.upsert(new RecordId(`failed_request`, ctx.requestId), {
+                        const id = `failed_${ctx.requestId}`;
+                        await this.db.upsert('failed_request', id, {
+                            id,
                             method: ctx.method,
                             url: ctx.url.toString(),
                             headers: headers,
@@ -1115,9 +1150,9 @@ export class Dashboard implements ShokupanPlugin {
                 this.metrics.logs.push(logEntry);
 
                 // Persist to datastore for detailed view
-                // Use query explicitly to avoid driver/RecordId issues
-                this.db.create(new RecordId("request", ctx.requestId), {
+                this.db.create('request', ctx.requestId, {
                     ...logEntry,
+                    id: ctx.requestId,
                     direction: "inbound"
                 }).catch(e => {
                     console.error("Failed to record request log", e);

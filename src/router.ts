@@ -1,4 +1,15 @@
 import { ShokupanContext } from './context';
+import { getCallerInfo } from './decorators/stack';
+import {
+    getCloseHandler,
+    getErrorHandler,
+    getEventHandlers,
+    getEventMiddlewareHandler,
+    getMessageHandler,
+    getOpenHandler,
+    getUpgradeHandler,
+    isWebSocketController
+} from './decorators/websocket';
 import { compose } from './middleware';
 import { generateOpenApi } from './plugins/application/openapi/openapi';
 import { serveStatic } from './plugins/middleware/serve-static';
@@ -9,10 +20,10 @@ import { HTTP_STATUS } from './util/http-status';
 import { McpProtocol, type McpPrompt } from './util/mcp-protocol';
 import { MiddlewareTracker } from './util/middleware-tracker';
 import { ShokupanRequest } from './util/request';
-import { getCallerInfo } from './util/stack';
-import { $appRoot, $childControllers, $childRouters, $debug, $dispatch, $isApplication, $isMounted, $isRouter, $mountPath, $parent, $routes } from './util/symbol';
+import { $appRoot, $childControllers, $childRouters, $debug, $dispatch, $isApplication, $isMounted, $isRouter, $mountPath, $parent, $routeSpec, $routes, $ws } from './util/symbol';
 import { RouterTrie } from './util/trie';
 import { type GuardAPISpec, type HeadersInit, type JSXRenderer, type Method, type MethodAPISpec, type Middleware, type OpenAPIOptions, type ProcessResult, type RequestOptions, type RouteMetadata, type RouteParams, type ShokupanController, type ShokupanHandler, type ShokupanHooks, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions } from './util/types';
+import { ShokupanWebsocketRouter } from './websocket';
 
 
 export const RouterRegistry = new Map<string, ShokupanRouter<any>>();
@@ -253,9 +264,18 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     }
 
     /**
+     * @deprecated Use ShokupanWebsocketRouter.event() instead.
      * Registers an event handler for WebSocket.
+     * 
+     * This method is deprecated. Use the new WebSocket API:
+     * ```ts
+     * const wsRouter = new ShokupanWebsocketRouter();
+     * wsRouter.event("eventName", handler);
+     * app.mount('/ws', wsRouter);
+     * ```
      */
     public event(name: string, handler: ShokupanHandler<T>) {
+        console.warn('[Shokupan] router.event() is deprecated. Use ShokupanWebsocketRouter instead.');
         const info = getCallerInfo();
         (handler as any).source = { file: info.file, line: info.line };
 
@@ -371,9 +391,9 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     }
 
     /**
-     * Mounts a controller instance to a path prefix.
+     * Mounts a controller instance or WebSocket router to a path prefix.
      * 
-     * Controller can be a convection router or an arbitrary class.
+     * Controller can be a convention router, WebSocket router, or an arbitrary class.
      * 
      * Routes are derived from method names:
      * - get(ctx) -> GET /prefix/
@@ -381,6 +401,24 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * - postCreate(ctx) -> POST /prefix/create
      */
     public mount(prefix: string, controller: ShokupanController | ShokupanController<T> | ShokupanRouter | ShokupanRouter<T> | Record<string, any>) {
+        // Check if it's a WebSocket router
+        if (ShokupanWebsocketRouter.isWebSocketRouter(controller)) {
+            this.mountWebSocketRouter(prefix, controller);
+            return this;
+        }
+
+        // Check if it's a WebSocket controller (class with decorators)
+        // Wrap in try-catch to handle cases where reflect-metadata isn't loaded yet
+        try {
+            if (isWebSocketController(controller)) {
+                this.mountWebSocketController(prefix, controller);
+                return this;
+            }
+        } catch (e) {
+            // reflect-metadata not available or other error - continue with normal mounting
+            // This allows the framework to work even if decorators aren't used
+        }
+
         // strict controller check
         const isRouter = this.isRouterInstance(controller);
         const isFunction = typeof controller === 'function';
@@ -399,6 +437,226 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         }
 
         return this;
+    }
+
+    /**
+     * Mount a WebSocket router.
+     * @internal
+     */
+    private mountWebSocketRouter(prefix: string, wsRouter: any) {
+        // Register wsRouter as a child router for generator traversal
+        if (!wsRouter[$mountPath]) {
+            wsRouter[$mountPath] = prefix;
+        }
+        (this as any)[$childRouters].push(wsRouter);
+
+        const handlers = wsRouter.getHandlers();
+        const events = wsRouter.getEvents();
+
+        // Register WebSocket route using .socket() method
+        this.socket(prefix, (ctx) => {
+            // Call onUpgrade for validation
+            if (handlers.onUpgrade) {
+                const result = handlers.onUpgrade(ctx);
+                if (result === false) {
+                    return ctx.text("Upgrade rejected", 403);
+                }
+            }
+
+            return ctx.upgrade({
+                open: async (ctx, ws) => {
+                    // Call onOpen and set return value to ws.data and ctx.state
+                    if (handlers.onOpen) {
+                        const sessionData = await handlers.onOpen(ctx, ws);
+                        if (sessionData !== undefined) {
+                            ws.data = sessionData;
+                            ctx.state = sessionData;
+                        }
+                        ctx[$ws] = ws;
+                    }
+                },
+                message: async (ctx, ws, message) => {
+                    // Call onMessage
+                    if (handlers.onMessage) {
+                        await handlers.onMessage(ctx, ws, message);
+                    }
+
+                    // Try to parse as JSON for event routing
+                    if (typeof message === 'string' && message.startsWith('{')) {
+                        try {
+                            const payload = JSON.parse(message);
+                            const event = payload.event || payload.type;
+
+                            if (event) {
+                                // Call onEvent middleware
+                                if (handlers.onEvent) {
+                                    const shouldContinue = await handlers.onEvent(ctx, ws, event, payload.data);
+                                    if (shouldContinue === false) {
+                                        return; // Prevent event routing
+                                    }
+                                }
+
+                                // Route to event handler
+                                const eventHandler = events.get(event);
+                                if (eventHandler) {
+                                    await eventHandler(ctx, payload.data);
+                                }
+                            }
+                        } catch (e) {
+                            // Not JSON or parse error, ignore
+                        }
+                    }
+                },
+                close: async (ctx, ws, code?: number, reason?: string) => {
+                    if (handlers.onClose) {
+                        await handlers.onClose(ctx, ws, code, reason);
+                    }
+                }
+            });
+        });
+    }
+
+    /**
+     * Mount a WebSocket controller (decorated with @WebsocketController).
+     * @internal
+     */
+    private mountWebSocketController(prefix: string, controller: any) {
+        // Create instance if it's a class constructor
+        const instance = typeof controller === 'function' ? new controller() : controller;
+        const constructor = instance.constructor;
+
+        // Get handler method names from metadata
+        const upgradeMethodName = getUpgradeHandler(constructor);
+        const openMethodName = getOpenHandler(constructor);
+        const eventMiddlewareMethodName = getEventMiddlewareHandler(constructor);
+        const messageMethodName = getMessageHandler(constructor);
+        const closeMethodName = getCloseHandler(constructor);
+        const errorMethodName = getErrorHandler(constructor);
+        const eventHandlers = getEventHandlers(constructor);
+
+
+        // Register WebSocket route
+        this.socket(prefix, (ctx) => {
+            // Call onUpgrade for validation (if defined)
+            if (upgradeMethodName) {
+                const upgradeMethod = instance[upgradeMethodName as string];
+                if (upgradeMethod) {
+                    const result = upgradeMethod.call(instance, ctx);
+                    if (result === false) {
+                        return ctx.text("Upgrade rejected", 403);
+                    }
+                }
+            }
+
+            return ctx.upgrade({
+                open: async (ctx, ws) => {
+                    // Call onOpen (if defined)
+                    if (openMethodName) {
+                        const openMethod = instance[openMethodName as string];
+                        if (openMethod) {
+                            const sessionData = await openMethod.call(instance, ctx, ws);
+                            if (sessionData !== undefined) {
+                                ws.data = sessionData;
+                                ctx.state = sessionData;
+                            }
+                        }
+                    }
+                },
+                message: async (ctx, ws, message) => {
+                    // Call onMessage (if defined)
+                    if (messageMethodName) {
+                        const messageMethod = instance[messageMethodName as string];
+                        if (messageMethod) {
+                            await messageMethod.call(instance, ctx, ws, message);
+                        }
+                    }
+
+                    // Try to parse as JSON for event routing
+                    if (typeof message === 'string' && message.startsWith('{')) {
+                        try {
+                            const payload = JSON.parse(message);
+                            const event = payload.event || payload.type;
+
+                            if (event) {
+                                // Call onEvent middleware (if defined)
+                                if (eventMiddlewareMethodName) {
+                                    const eventMiddlewareMethod = instance[eventMiddlewareMethodName as string];
+                                    if (eventMiddlewareMethod) {
+                                        const shouldContinue = await eventMiddlewareMethod.call(instance, ctx, ws, event, payload.data);
+                                        if (shouldContinue === false) {
+                                            return; // Prevent event routing
+                                        }
+                                    }
+                                }
+
+                                // Route to event handler
+                                const eventHandler = eventHandlers.find(eh => eh.event === event);
+                                if (eventHandler) {
+                                    const eventMethod = instance[eventHandler.methodName as string];
+                                    if (eventMethod) {
+                                        await eventMethod.call(instance, ctx, payload.data);
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            // Not JSON or parse error, ignore
+                        }
+                    }
+                },
+                close: async (ctx, ws, code?: number, reason?: string) => {
+                    // Call onClose (if defined)
+                    if (closeMethodName) {
+                        const closeMethod = instance[closeMethodName as string];
+                        if (closeMethod) {
+                            await closeMethod.call(instance, ctx, ws, code, reason);
+                        }
+                    }
+                },
+                error: async (ctx, ws, error) => {
+                    // Call onError (if defined)
+                    if (errorMethodName) {
+                        const errorMethod = instance[errorMethodName as string];
+                        if (errorMethod) {
+                            await errorMethod.call(instance, ctx, ws, error);
+                        }
+                    }
+                }
+            });
+        });
+
+        // Register events for AsyncAPI generation
+        // We directly access eventHandlers to avoid deprecation warning of .event()
+        eventHandlers.forEach(eh => {
+            const eventMethod = instance[eh.methodName as string];
+            if (!eventMethod) return;
+
+            // Create a dummy handler solely for metadata extraction in AsyncAPI generator
+            const trackingHandler: ShokupanHandler<T> = async (ctx, data) => {
+                return eventMethod.call(instance, ctx, data);
+            };
+
+            // Attach Spec metadata
+            // We need to retrieve @Spec from the method if it exists
+            const proto = Object.getPrototypeOf(instance);
+            const decoratedSpecs = (constructor as any)[$routeSpec] || (proto && (proto as any)[$routeSpec]);
+            if (decoratedSpecs) {
+                const userSpec = decoratedSpecs.get(eh.methodName);
+                if (userSpec) {
+                    (trackingHandler as any).spec = userSpec;
+                }
+            }
+
+            // Attach source info
+            const info = getCallerInfo(); // This might be wrong, we want the source of the method
+            // But we don't have it easily unless we stored it in metadata.
+            // For now, let's just register it.
+
+            if (this.eventHandlers.has(eh.event)) {
+                this.eventHandlers.get(eh.event)!.push(trackingHandler);
+            } else {
+                this.eventHandlers.set(eh.event, [trackingHandler]);
+            }
+        });
     }
 
     /**
@@ -997,6 +1255,63 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     public head<Path extends string>(path: Path, spec: MethodAPISpec, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
     public head(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
         this.attachVerb("HEAD", path, ...args);
+        return this;
+    }
+
+    /**
+     * Adds a WebSocket route that handles its own upgrade logic.
+     * 
+     * Unless you need to handle the upgrade manually, you should use a `ShokupanWebsocketRouter` or `WebsocketController` instead.
+     * 
+     * Routes registered with `.socket()` will NOT be automatically upgraded by Shokupan's WebSocket handling. You must implement
+     * all event handlers manually. You have been warned.
+     * 
+     * @param path - URL path for the WebSocket endpoint
+     * @param handler - Route handler that will manually handle the upgrade
+     * 
+     * @example
+     * ```ts
+     * router.socket("/ws", (ctx) => {
+     *   const success = ctx.upgrade({
+     *     data: {
+     *       handler: {
+     *         open: (ws) => console.log("Connected"),
+     *         message: (ws, msg) => ws.send(msg),
+     *         close: (ws) => console.log("Disconnected")
+     *       }
+     *     }
+     *   });
+     *   if (!success) return ctx.text("Upgrade failed", 400);
+     * });
+     * ```
+     */
+    public socket<Path extends string>(path: Path, handler: ShokupanHandler<T, RouteParams<Path>>): this {
+        const { regex, keys } = this.parsePath(path);
+
+        // Mark handler with a flag to prevent auto-upgrade
+        (handler as any).__isSocketRoute = true;
+
+        this[$routes].push({
+            method: "GET",
+            path,
+            regex,
+            keys,
+            handler,
+            bakedHandler: handler,
+            handlerSpec: undefined,
+            group: undefined,
+            hooks: this.config?.hooks as any,
+            requestTimeout: this.requestTimeout,
+            renderer: this.config?.renderer,
+            metadata: getCallerInfo(),
+            controller: undefined,
+            middleware: [],
+            isSocket: true  // Add flag to route metadata
+        });
+
+        // Insert into Trie with socket marker
+        this.trie.insert("GET", path, handler);
+
         return this;
     }
 

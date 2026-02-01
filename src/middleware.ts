@@ -1,4 +1,3 @@
-import { RecordId } from 'surrealdb';
 import type { ShokupanContext } from "./context";
 import { $debug } from './util/symbol';
 import type { Middleware, NextFn } from './util/types';
@@ -82,10 +81,10 @@ export const compose = (middleware: Middleware[]) => {
                             if (!db) return;
 
                             const timestamp = Date.now();
-                            await db.upsert(new RecordId('middleware_tracking', {
-                                timestamp,
-                                name: meta.name
-                            }), {
+                            const id = `${timestamp}:${meta.name}`;
+
+                            await db.upsert('middleware_tracking', id, {
+                                id,
                                 name: meta.name,
                                 path: context.path,
                                 timestamp,
@@ -122,10 +121,9 @@ export const compose = (middleware: Middleware[]) => {
                             if (!db) return;
 
                             const timestamp = Date.now();
-                            await db.upsert(new RecordId('middleware_tracking', {
-                                timestamp,
-                                name: meta.name
-                            }), {
+                            const id = `${timestamp}:${meta.name}`;
+
+                            await db.upsert('middleware_tracking', id, {
                                 name: meta.name,
                                 path: context.path,
                                 timestamp,

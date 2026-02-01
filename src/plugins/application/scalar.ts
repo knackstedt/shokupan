@@ -85,18 +85,12 @@ export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin 
         const bootId = Date.now().toString();
 
         this.get("/_lifecycle", (ctx) => {
-            const success = ctx.upgrade({
-                data: {
-                    bootId,
-                    handler: {
-                        open: (ws: any) => {
-                            ws.send(JSON.stringify({ type: 'hello', bootId }));
-                        }
-                    }
+            ctx.upgrade({
+                data: { bootId },  // Still pass bootId in data
+                open: (ctx, ws) => {
+                    ws.send(JSON.stringify({ type: 'hello', bootId }));
                 }
             });
-            if (success) return undefined;
-            return ctx.json({ boot: bootId });
         });
 
         this.get("/", async (ctx) => {

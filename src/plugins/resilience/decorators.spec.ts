@@ -1,6 +1,6 @@
 
 import { describe, expect, it } from "bun:test";
-import { $resilienceConfig } from "../../util/symbol";
+import { $resilienceConfig } from "../../decorators/symbol";
 import { Bulkhead, CircuitBreaker, Fallback, Retry, Timeout } from "./decorators";
 
 describe("Resilience Decorators", () => {

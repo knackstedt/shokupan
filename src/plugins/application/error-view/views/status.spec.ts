@@ -11,7 +11,7 @@ describe("Status View Template", () => {
         } as Error);
 
         expect(html).toContain("404");
-        expect(html).toContain("Oops! Missing Ingredient");
+        expect(html).toContain("We searched high and low");
         expect(html).toContain("404.webp");
         expect(html).toContain("bread-image");
     });
@@ -26,7 +26,8 @@ describe("Status View Template", () => {
 
         expect(html).toContain("403");
         expect(html).toContain("Forbidden");
-        expect(html).not.toContain("Oops! Missing Ingredient");
+        expect(html).toContain("Forbidden");
+        expect(html).not.toContain("We searched high and low");
         expect(html).toContain("403.webp");
     });
 

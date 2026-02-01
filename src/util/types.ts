@@ -1,7 +1,6 @@
 import type { OpenAPI } from '@scalar/openapi-types';
 import type { Server } from 'bun';
 import type { Server as NodeServer } from 'node:http';
-import type { ConnectOptions, Engines } from 'surrealdb';
 import type { ShokupanContext } from '../context';
 import type { ServerAdapter } from './adapter';
 import type { FileSystemAdapter } from './adapter/filesystem';
@@ -404,6 +403,10 @@ export type ShokupanRoute = {
      * Middleware stack metadata for this route (Controller/Method level)
      */
     middleware?: Middleware[];
+    /**
+     * Whether this route is a WebSocket route
+     */
+    isSocket?: boolean;
 };
 
 export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> = Partial<{
@@ -658,32 +661,23 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
     validateStatusCodes: boolean;
 
     /**
-     * Configuration for SurrealDB.
+     * @deprecated Use `datastore` config instead.
      */
-    surreal?: {
+    surreal?: any;
+
+    datastore?: {
+        adapter: 'surreal' | 'sqlite' | 'level' | 'knex';
         /**
-         * SurrealDB engines.
-         * @default Embedded
+         * Options for the specific adapter.
+         * - For 'surreal', this matches SurrealAdapterOptions
+         * - For 'sqlite', this matches SqliteAdapterOptions
+         * - For 'level', this matches LevelAdapterOptions
+         * - For 'knex', this matches KnexAdapterOptions (Knex.Config)
          */
-        engines?: Engines;
-        /**
-         * SurrealDB connection URL.
-         * @default 'rocksdb://database'
-         */
-        url?: string;
-        /**
-         * SurrealDB connection options.
-         */
-        connectOptions?: ConnectOptions;
-        /**
-         * SurrealDB namespace.
-         */
-        namespace?: string;
-        /**
-         * SurrealDB database.
-         */
-        database?: string;
+        options?: any;
     };
+
+
 
     /**
      * Configuration for the AI Plugin manifest (.well-known/ai-plugin.json).
@@ -820,4 +814,17 @@ export interface StaticServeOptions<T extends Record<string, any>> {
      * OpenAPI specification for the static route.
      */
     openapi?: MethodAPISpec;
+    /**
+     * Enable ETags for static files.
+     */
+    etag?: boolean;
+    /**
+     * Maximum age for the cache.
+     */
+    maxAge?: number;
+    /**
+     * Whether the file is immutable.
+     * maxAge must be set to a value > 0 for this to have any effect.
+     */
+    immutable?: boolean;
 };

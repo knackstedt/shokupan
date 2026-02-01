@@ -184,6 +184,7 @@ export class ResponseTransformerRegistry {
 
         // Handle type/* wildcard (e.g., application/*)
         if (accept.subtype === '*') {
+            // TODO: replace this with a map so we aren't unnecessarily iterating over the transformers
             for (const [contentType, transformer] of this.transformers) {
                 const [type] = contentType.split('/');
                 if (type === accept.type.toLowerCase()) {

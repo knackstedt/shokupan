@@ -1,8 +1,6 @@
-
 import * as os from 'node:os';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
-import { RecordId } from 'surrealdb';
-import type { SurrealDatastore } from '../../../util/datastore';
+import type { DatastoreAdapter } from '../../../util/adapter/datastore';
 
 interface AggregatedMetric {
     timestamp: number;
@@ -59,10 +57,10 @@ export class MetricsCollector {
     private eventLoopHistogram = monitorEventLoopDelay({ resolution: 10 });
     private timer: NodeJS.Timeout | null = null;
 
-    public db?: SurrealDatastore;
+    public db?: DatastoreAdapter;
 
     constructor(
-        db?: SurrealDatastore,
+        db?: DatastoreAdapter,
         private onCollect?: (metric: AggregatedMetric) => void
     ) {
         this.db = db;
@@ -186,7 +184,7 @@ export class MetricsCollector {
         }
 
         try {
-            await this.db.upsert(new RecordId("metric", timestamp), metric);
+            await this.db.upsert('metrics', `${label}_${timestamp}`, metric);
         } catch (e) {
             console.error(`[MetricsCollector] ✗ Failed to save metrics for ${label}:`, e);
         }

@@ -3,8 +3,8 @@ function switchTab(tabId) {
     console.log('Switching to tab:', tabId);
     // Update buttons
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    // Find the button that was clicked
-    const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick') === `switchTab('${tabId}')`);
+    // Find the button that was clicked using robust data-tab attribute
+    const btn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
     if (btn) btn.classList.add('active');
 
     // Update content

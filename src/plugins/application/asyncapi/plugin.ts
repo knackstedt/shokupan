@@ -11,6 +11,7 @@ import { generateAsyncApi } from './generator';
 
 export interface AsyncApiPluginOptions {
     path?: string;
+    serverUrl?: string; // Override the default server URL (host:port)
     spec?: DeepPartial<any>;
     disableSourceView?: boolean;
 }
@@ -72,7 +73,7 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
                 deepMerge(spec, this.pluginOptions.spec);
             }
 
-            const serverUrl = `${ctx.hostname}:${ctx.app?.applicationConfig.port}`;
+            const serverUrl = this.pluginOptions.serverUrl || `${ctx.hostname}:${ctx.app?.applicationConfig.port}`;
             const base = this.pluginOptions.path!;
 
             const disableSourceView = this.pluginOptions.disableSourceView;

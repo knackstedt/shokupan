@@ -30,7 +30,7 @@ const StatusPage = ({ method, status, image, message, path, requestId, hideError
         <head>
             <meta charset="UTF-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-            <title>{status} - {message}</title>
+            <title>{status} - {(!hideErrorMessage && message) || getReasonPhrase(status)}</title>
             <link href="/_shokupan/error-view/theme.css" rel="stylesheet" />
             <style dangerouslySetInnerHTML={{
                 __html: `
@@ -286,7 +286,7 @@ const StatusPage = ({ method, status, image, message, path, requestId, hideError
                     )}
                 </div>
                 <h1>{status}</h1>
-                <div class="message">{message || getReasonPhrase(status) || 'Oops! Something went wrong'}</div>
+                <div class="message">{(!hideErrorMessage && message) || getReasonPhrase(status) || 'Oops! Something went wrong'}</div>
                 <p class="subtitle">
                     {status == 404 ? 'We searched high and low, but this page seems to have wandered off...<br />Perhaps it\'s still rising in the oven? 🍞' : 'Something went wrong. Please try again later.'}
                 </p>

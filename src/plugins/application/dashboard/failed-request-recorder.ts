@@ -1,5 +1,4 @@
 import { trace } from '@opentelemetry/api';
-import { RecordId } from 'surrealdb';
 import type { ShokupanContext } from '../../../context';
 import type { Middleware } from '../../../util/types';
 
@@ -79,15 +78,16 @@ async function recordFailedRequest(ctx: ShokupanContext, error: any, maxCapacity
 
         // Store
         try {
-            await ctx.app.db.upsert(new RecordId('failed_requests', {
-                method,
-                path: requestPath,
-                error: errorMsg,
-                timestamp
-            }), data);
+            // Use random ID since timestamp provides enough uniqueness scope usually
+            const id = `${timestamp}-${Math.random().toString(36).slice(2, 8)}`;
+
+            await ctx.app.db.upsert('failed_requests', id, {
+                id,
+                ...data
+            });
         } catch (err: any) {
-            // If it already exists, we can ignore it (duplicate failure)
-            if (err.message && err.message.includes("already exists")) {
+            // Duplicate handling if any
+            if (err.message && err.message.includes("exists")) {
                 return;
             }
             throw err;
@@ -105,20 +105,18 @@ async function cleanup(ctx: ShokupanContext, maxCapacity: number, ttl: number) {
     const cutoff = Date.now() - ttl;
 
     // Delete expired
-    await ctx.app.db.query(`DELETE failed_requests WHERE timestamp < ${cutoff}`);
+    await ctx.app.db.deleteMany('failed_requests', {
+        lt: { timestamp: cutoff }
+    });
 
     // Check capacity
-    const results = await ctx.app.db.query<[{ count: number; }]>('SELECT count() FROM failed_requests GROUP ALL');
-
-    // Results is [{ result: [{ count: N }], status: 'OK', ... }]
-    const countRecords = results?.[0];
-
-    if (!countRecords || !Array.isArray(countRecords) || countRecords.length === 0) return;
-
-    const count = countRecords[0].count || 0;
+    const count = await ctx.app.db.count('failed_requests');
 
     if (count > maxCapacity) {
         const toDelete = count - maxCapacity;
-        await ctx.app.db.query(`DELETE failed_requests ORDER BY timestamp ASC LIMIT ${toDelete}`);
+        await ctx.app.db.deleteMany('failed_requests', {
+            sort: { timestamp: 'asc' },
+            limit: toDelete
+        });
     }
 }

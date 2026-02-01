@@ -39,17 +39,17 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                         </div>
                         <div style="flex: 1;"></div>
                         <div class="tabs">
-                            <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
-                            <button class="tab-btn" onclick="switchTab('application')">Application</button>
-                            <button class="tab-btn" onclick="switchTab('network')">Network</button>
+                            <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
+                            <button class="tab-btn" data-tab="application" onclick="switchTab('application')">Application</button>
+                            <button class="tab-btn" data-tab="network" onclick="switchTab('network')">Network</button>
                             {integrations.scalar && (
-                                <button class="tab-btn" onclick="switchTab('scalar')">Scalar</button>
+                                <button class="tab-btn" data-tab="scalar" onclick="switchTab('scalar')">Scalar</button>
                             )}
                             {integrations.apiExplorer && (
-                                <button class="tab-btn" onclick="switchTab('api-explorer')">REST API</button>
+                                <button class="tab-btn" data-tab="api-explorer" onclick="switchTab('api-explorer')">REST API</button>
                             )}
                             {integrations.asyncapi && (
-                                <button class="tab-btn" onclick="switchTab('asyncapi')">WS API</button>
+                                <button class="tab-btn" data-tab="asyncapi" onclick="switchTab('asyncapi')">WS API</button>
                             )}
                         </div>
                     </header>

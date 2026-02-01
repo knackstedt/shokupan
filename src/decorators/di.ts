@@ -41,9 +41,19 @@ export class Container {
             // 3. Check metadata cache
             let meta = this.cache.get(target);
             if (!meta) {
-                const scope = Reflect.getMetadata('di:scope', target) || 'singleton';
-                const paramTypes = Reflect.getMetadata('design:paramtypes', target) || [];
-                const manualTokens = Reflect.getMetadata('di:constructor:params', target) || [];
+                let scope = 'singleton';
+                let paramTypes: any[] = [];
+                let manualTokens: any[] = [];
+
+                // Try to get metadata, but handle gracefully if reflect-metadata isn't available
+                try {
+                    scope = Reflect.getMetadata('di:scope', target) || 'singleton';
+                    paramTypes = Reflect.getMetadata('design:paramtypes', target) || [];
+                    manualTokens = Reflect.getMetadata('di:constructor:params', target) || [];
+                } catch (reflectError) {
+                    // reflect-metadata not available or not properly initialized
+                    // Fall back to defaults: singleton scope with no dependencies
+                }
 
                 const dependencies = paramTypes.map((param: any, index: number) => {
                     const manual = manualTokens.find((t: any) => t.index === index);

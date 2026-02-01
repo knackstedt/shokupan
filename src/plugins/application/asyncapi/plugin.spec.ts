@@ -1,11 +1,11 @@
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { ShokupanContext } from "../../../context";
+import { Event, Spec, WebsocketController } from '../../../decorators';
 import { Shokupan } from "../../../shokupan";
-import { Controller, Event, Spec } from "../../../util/decorators";
 import { AsyncApiPlugin } from "../asyncapi/plugin";
 
-@Controller("/")
+@WebsocketController("/")
 class TestController {
     @Event("ping")
     @Spec({
@@ -37,6 +37,7 @@ describe("AsyncAPI Generator & Plugin", () => {
     let app: Shokupan;
     let server: any;
     let port = 0;
+
 
     beforeAll(async () => {
         app = new Shokupan({

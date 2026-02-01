@@ -26,9 +26,9 @@ export function getCallerInfo(skipFrames = 1): { file: string; line: number; } {
             if (l.includes('node_modules')) continue;
             if (l.includes('bun:main')) continue;
             if (l.includes('bun:wrap')) continue;
-            if (l.includes('src/util/stack.ts')) continue; // Ignore self
+            if (l.includes('src/decorators/stack.ts')) continue; // Ignore self
             if (l.includes('src/router.ts')) continue; // Ignore router internals
-            if (l.includes('src/util/decorators.ts')) continue; // Ignore decorators
+            if (l.includes('src/decorators/http.ts')) continue; // Ignore decorators
             if (l.includes('src/shokupan.ts')) continue; // Ignore framework internals
             if (l.includes('src/plugins/application/openapi/openapi.ts')) continue; // Ignore openapi internals
 

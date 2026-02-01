@@ -2,7 +2,7 @@
 import { describe, expect, spyOn, test } from "bun:test";
 import { ShokupanContext } from "../context";
 import { Shokupan } from "../shokupan";
-import { Controller, Get, OnError, OnRequestEnd, OnRequestStart } from "../util/decorators";
+import { Controller, Get, OnError, OnRequestEnd, OnRequestStart } from "../decorators";
 
 describe("Controller Hooks", () => {
     test("should execute onRequestStart, onRequestEnd hooks", async () => {

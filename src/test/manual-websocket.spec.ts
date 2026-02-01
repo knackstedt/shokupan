@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { ShokupanContext } from "../context";
 import { Shokupan } from "../shokupan";
-import { Event } from "../util/decorators";
+import { Event } from "../decorators";
 
 class WebSocketController {
     @Event("ping")

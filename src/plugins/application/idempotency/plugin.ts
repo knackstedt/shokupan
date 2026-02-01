@@ -1,4 +1,3 @@
-import type { RecordId } from 'surrealdb';
 import type { ShokupanContext } from "../../../context";
 import { $finalResponse } from '../../../util/symbol';
 import type { Middleware } from "../../../util/types";
@@ -33,8 +32,6 @@ export function Idempotency(options: IdempotencyOptions = {}): Middleware {
     const headerName = options.header || "Idempotency-Key";
     const ttl = options.ttl || 24 * 60 * 60 * 1000;
 
-    let RecordIdClass: typeof RecordId;
-
     const idempotencyMiddleware: Middleware = async function IdempotencyMiddleware(ctx: ShokupanContext, next) {
         const key = ctx.headers.get(headerName);
 
@@ -42,36 +39,21 @@ export function Idempotency(options: IdempotencyOptions = {}): Middleware {
             return next();
         }
 
-        // Check if key exists
-        // Check if key exists
         try {
-            if (!RecordIdClass) {
-                const mod = await import('surrealdb');
-                RecordIdClass = mod.RecordId;
-            }
-            const stored = await ctx.app.db.select<StoredResponse>(new RecordIdClass('idempotency', key));
+            const stored = await ctx.app.db.get<StoredResponse>('idempotency', key);
             if (stored) {
-                // Check TTL (though database cleaning might happen elsewhere, good to check here too if needed, 
-                // but usually we rely on DB or just return if found. 
-                // Let's rely on finding it = valid for now, or check timestamp if we care about explicit expiry logic 
-                // beyond just "record exists". SurrealDB might not auto-expire without events, 
-                // but let's check timestamp manually for safety or just assume if it's there it's valid.
-                // Should we implement cleanup? For now, we'll return what we found.
-
                 const responseHeaders = new Headers(stored.headers);
                 responseHeaders.set('X-Idempotency-Hit', 'true');
 
-                // Return stored response
                 return new Response(stored.body, {
                     status: stored.status,
                     headers: responseHeaders
                 });
             }
         } catch (e) {
-            // If error reading, log and proceed? Or fail?
             console.error("Idempotency read error:", e);
-            // safe default: proceed as if new
         }
+
 
         // Not found, execute
         const result = await next();
@@ -116,7 +98,7 @@ export function Idempotency(options: IdempotencyOptions = {}): Middleware {
             // Fire and forget storage? Or await?
             // Await to ensure persistence before returning to client (safer for "guarantee")
             try {
-                await ctx.app.db.upsert(new RecordIdClass('idempotency', key), toStore);
+                await ctx.app.db.upsert('idempotency', key, toStore);
             } catch (e) {
                 console.error("Idempotency write error:", e);
             }
@@ -125,6 +107,7 @@ export function Idempotency(options: IdempotencyOptions = {}): Middleware {
         }
 
         return result;
+
     };
 
     idempotencyMiddleware.isBuiltin = true;

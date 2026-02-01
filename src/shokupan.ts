@@ -1,25 +1,25 @@
 import type { Server } from 'bun';
 import { nanoid } from 'nanoid';
-import { RecordId, Surreal } from 'surrealdb';
 import { ShokupanContext } from "./context";
 import { compose } from "./middleware";
 import { generateOpenApi } from "./plugins/application/openapi/openapi";
 import { ShokupanRouter } from './router';
 import { ShokupanServer } from './server';
+import type { DatastoreAdapter } from './util/adapter/datastore';
 import { DefaultFileSystemAdapter } from './util/adapter/filesystem';
 import { asyncContext, RequestContextStore } from "./util/async-hooks";
 import { SystemCpuMonitor } from "./util/cpu-monitor";
-import { SurrealDatastore } from './util/datastore';
 import { getErrorStatus, NotFoundError } from "./util/http-error";
 import { HTTP_STATUS } from "./util/http-status";
 import { configureIde } from './util/ide';
 import { createLogger } from './util/logger';
 
+import { Container } from './decorators';
+import { getCallerInfo } from './decorators/stack';
 import { MiddlewareTracker } from './util/middleware-tracker';
 import { enablePromisePatch, kContext } from './util/promise';
 import { ShokupanRequest } from './util/request';
 import { type ResponseTransformer, ResponseTransformerRegistry } from './util/response-transformer';
-import { getCallerInfo } from './util/stack';
 import { $appRoot, $childRouters, $dispatch, $finalResponse, $isApplication, $mountPath, $routeMatched, $routes } from './util/symbol';
 import { RouterTrie } from './util/trie';
 import type { ErrorHandler, Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig, ShokupanPlugin } from './util/types';
@@ -116,7 +116,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     private cpuMonitor?: SystemCpuMonitor;
     public server?: Server<any>;
     private httpServer?: ShokupanServer;
-    private datastore?: SurrealDatastore;
+    private datastore?: DatastoreAdapter;
     public dbPromise?: Promise<any>;
     public responseTransformerRegistry: ResponseTransformerRegistry;
     private errorHandlers: { type: any, handler: ErrorHandler; }[] = [];
@@ -124,7 +124,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     // Performance: Flattened Router Trie
     private rootTrie?: RouterTrie<T>;
 
-    public get db(): SurrealDatastore | undefined {
+    public get db(): DatastoreAdapter | undefined {
         return this.datastore;
     }
 
@@ -268,31 +268,55 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     }
 
     private async initDatastore() {
-        let engines = this.applicationConfig.surreal?.engines;
+        // Default to 'surrealdb' for backward compatibility
+        const adapterName = this.applicationConfig.datastore?.adapter || 'surrealdb';
+        const options = this.applicationConfig.datastore?.options || {};
 
-        if (!engines && !this.applicationConfig.surreal?.url?.match(/^(?:wss?|https?):\/\//)) {
-            engines = (await import('@surrealdb/node')).createNodeEngines();
+        try {
+            switch (adapterName) {
+                case 'sqlite': {
+                    const { SqliteAdapter } = await import('./util/adapter/datastore/sqlite');
+                    this.datastore = new SqliteAdapter(options);
+                    break;
+                }
+                case 'level': {
+                    const { LevelAdapter } = await import('./util/adapter/datastore/level');
+                    // For leveldb we might need more setup or injection if it's not just a location string
+                    // But let's assume options has what it needs or we default reasonable values
+                    this.datastore = new LevelAdapter(options);
+                    break;
+                }
+                case 'surrealdb': {
+                    const { SurrealAdapter } = await import('./util/adapter/datastore/surreal');
+                    // Forward legacy config if present
+                    const legacyConfig = this.applicationConfig.surreal || {};
+                    const effectiveOptions = { ...legacyConfig, ...options };
+                    this.datastore = new SurrealAdapter(effectiveOptions);
+                    break;
+                }
+                case 'knex': {
+                    const { KnexAdapter } = await import('./util/adapter/datastore/knex');
+                    this.datastore = new KnexAdapter(options || {});
+                    break;
+                }
+                default: {
+                    // Determine default behavior if adapter not specified
+                    // Old default: SurrealDB
+                    const { SurrealAdapter } = await import('./util/adapter/datastore/surreal');
+                    // Support legacy config
+                    const legacy = this.applicationConfig.surreal;
+                    this.datastore = new SurrealAdapter(options || legacy || {});
+                }
+            }
+
+            if (this.datastore) {
+                await this.datastore.connect();
+                await this.datastore.setupSchema();
+            }
+        } catch (err) {
+            this.logger?.error("Failed to initialize datastore", { error: err });
+            throw err;
         }
-
-        const db = new Surreal({ engines });
-        this.datastore = new SurrealDatastore(db);
-
-        await db.connect(
-            this.applicationConfig.surreal?.url ?? (process.env.NODE_ENV === 'test' ? 'mem://' : 'surrealkv://database'),
-            this.applicationConfig.surreal?.connectOptions
-        ).catch(err => {
-            this.logger?.error("Failed to connect to SurrealDB", { error: err });
-        });
-
-        await db.use({
-            namespace: this.applicationConfig.surreal?.namespace ?? "vendor",
-            database: this.applicationConfig.surreal?.database ?? "shokupan"
-        });
-
-        await db.query("DEFINE TABLE OVERWRITE request;");
-        await db.query("DEFINE TABLE OVERWRITE failed_request;");
-        await db.query("DEFINE TABLE OVERWRITE metric;");
-
     }
 
     /**
@@ -569,8 +593,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         }
         this.server = undefined;
 
-        // Teardown DI Container
-        const { Container } = await import("./util/di");
         await Container.teardown();
     }
 
@@ -718,14 +740,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
                 // The "next" at the end of the middleware chain is the router dispatch
                 const result = await fn(ctx, async () => {
-                    // Check for WebSocket upgrade BEFORE route matching
-                    // This ensures WebSocket handshakes take precedence over HTTP GET handlers
-                    const upgradeHeader = req.headers.get('upgrade');
-                    if (upgradeHeader?.toLowerCase() === 'websocket') {
-                        if (ctx.upgrade()) {
-                            return undefined as unknown as Response;
-                        }
-                    }
 
                     // Start body parsing early for applicable HTTP methods to overlap with route lookup
                     let bodyParsing: Promise<void> | undefined;
@@ -775,7 +789,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                                             if (!db) return;
 
                                             const timestamp = Date.now();
-                                            await db.upsert(new RecordId('middleware_tracking', {
+                                            await db.upsert('middleware_tracking', JSON.stringify({
                                                 timestamp,
                                                 name: handlerName
                                             }), {
@@ -806,7 +820,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                                             if (!db) return;
 
                                             const timestamp = Date.now();
-                                            await db.upsert(new RecordId('middleware_tracking', {
+                                            await db.upsert('middleware_tracking', JSON.stringify({
                                                 timestamp,
                                                 name: handlerName
                                             }), {
@@ -832,11 +846,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                         return match.handler(ctx);
                     }
 
-                    // Fallback: If no route matched, check if it's a WebSocket upgrade request that can be handled by default handlers
-                    // This supports Shokupan's Native WebSocket Events if no specific middleware/route handled it
-                    if (ctx.upgrade()) {
-                        return undefined as unknown as Response;
-                    }
+                    // No fallback auto-upgrade - WebSocket routes must be explicitly defined
 
                     // No route matched - return 404 Not Found
                     // Exception: If middleware manually changed the status from default 200,

@@ -57,7 +57,7 @@ interface DependencyInfo {
 export interface ApplicationInstance {
     name: string;
     filePath: string;
-    className: 'Shokupan' | 'ShokupanRouter' | 'Controller';
+    className: 'Shokupan' | 'ShokupanRouter' | 'Controller' | 'ShokupanWebsocketRouter';
     controllerPrefix?: string;
     routes: RouteInfo[];
     mounted: MountInfo[];
@@ -451,19 +451,18 @@ export class OpenAPIAnalyzer {
             }
         }
 
-        // Look for: new Shokupan() or new ShokupanRouter()
         if (ts.isVariableDeclaration(node) && node.initializer) {
             if (ts.isNewExpression(node.initializer)) {
                 const expr = node.initializer;
                 const className = expr.expression.getText(sourceFile);
 
-                if (className === 'Shokupan' || className === 'ShokupanRouter') {
+                if (className === 'Shokupan' || className === 'ShokupanRouter' || className === 'ShokupanWebsocketRouter') {
                     const varName = node.name.getText(sourceFile);
 
                     this.applications.push({
                         name: varName,
                         filePath: sourceFile.fileName,
-                        className: className as 'Shokupan' | 'ShokupanRouter',
+                        className: className as 'Shokupan' | 'ShokupanRouter' | 'ShokupanWebsocketRouter',
                         routes: [],
                         mounted: [],
                         middleware: []
@@ -554,7 +553,7 @@ export class OpenAPIAnalyzer {
                 const handlerName = `${app.name}.${methodNode.name.getText(sourceFile)}`;
 
                 // Analyze the method body
-                const analysis = this.analyzeHandler(methodNode, sourceFile);
+                const analysis = this.analyzeHandler(methodNode, sourceFile, httpMethod);
 
                 app.routes.push({
                     method: httpMethod,
@@ -750,7 +749,7 @@ export class OpenAPIAnalyzer {
 
         // Extract handler information
         const handlerArg = args[args.length - 1];
-        const handlerInfo = this.analyzeHandler(handlerArg, sourceFile);
+        const handlerInfo = this.analyzeHandler(handlerArg, sourceFile, method);
 
         return {
             method,
@@ -774,7 +773,7 @@ export class OpenAPIAnalyzer {
     /**
      * Analyze a route handler to extract type information
      */
-    private analyzeHandler(handler: ts.Node, sourceFile: ts.SourceFile): {
+    private analyzeHandler(handler: ts.Node, sourceFile: ts.SourceFile, method?: string): {
         requestTypes?: RouteInfo['requestTypes'];
         responseType?: string;
         responseSchema?: any;
@@ -796,7 +795,7 @@ export class OpenAPIAnalyzer {
 
         // Pre-populate scope with function parameters
         if (ts.isFunctionLike(handler)) {
-            handler.parameters.forEach(param => {
+            handler.parameters.forEach((param, index) => {
                 if (ts.isIdentifier(param.name) && param.type) {
                     const paramName = param.name.getText(sourceFile);
                     // Resolving TypeReference for parameters (e.g. User) would require partial type checker or expanded scope logic
@@ -804,6 +803,11 @@ export class OpenAPIAnalyzer {
                     const paramType = this.convertTypeNodeToSchema(param.type, sourceFile);
                     if (paramType) {
                         scope.set(paramName, paramType);
+
+                        // If this is an event/on handler, the second parameter is likely the payload
+                        if ((method === 'EVENT' || method === 'ON') && index === 1) {
+                            requestTypes.body = paramType;
+                        }
                     }
                 }
             });
@@ -978,6 +982,12 @@ export class OpenAPIAnalyzer {
                                 scope.set(varName, schema);
                             }
                         }
+                    }
+                }
+                // Check for untyped ctx.body() or await ctx.body() calls
+                else if (this.isCtxBodyCall(node, sourceFile) || (ts.isAwaitExpression(node) && this.isCtxBodyCall(node.expression, sourceFile))) {
+                    if (!requestTypes.body) {
+                        requestTypes.body = { type: 'object', description: 'Request Body' };
                     }
                 }
 
@@ -1170,7 +1180,16 @@ export class OpenAPIAnalyzer {
                                         const eventName = eventNameArg.text;
                                         let payload = { type: 'object' };
 
-                                        if (expr.arguments.length >= 2) {
+                                        // Special case: If the argument is `await ctx.body()`, we know it's the request body
+                                        // Even if untyped, we should treat it as "body payload" rather than "unknown inference failure"
+                                        if (this.isCtxBodyCall(expr.arguments[1], sourceFile) ||
+                                            (ts.isAwaitExpression(expr.arguments[1]) && this.isCtxBodyCall(expr.arguments[1].expression, sourceFile))) {
+                                            payload = { type: 'object', description: 'Request Body' };
+                                            // If requestTypes.body is not set, set it to generic object so generator picks it up
+                                            if (!requestTypes.body) {
+                                                requestTypes.body = { type: 'object' };
+                                            }
+                                        } else {
                                             payload = this.convertExpressionToSchema(expr.arguments[1], sourceFile, scope, typeChecker);
                                         }
 
