@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { safeScriptJson } from '../../../util/html';
 
 
@@ -39,17 +38,17 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                         </div>
                         <div style="flex: 1;"></div>
                         <div class="tabs">
-                            <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
-                            <button class="tab-btn" data-tab="application" onclick="switchTab('application')">Application</button>
-                            <button class="tab-btn" data-tab="network" onclick="switchTab('network')">Network</button>
+                            <button class="tab-btn active" data-tab="overview" {...{ onclick: "switchTab('overview')" }}>Overview</button>
+                            <button class="tab-btn" data-tab="application" {...{ onclick: "switchTab('application')" }}>Application</button>
+                            <button class="tab-btn" data-tab="network" {...{ onclick: "switchTab('network')" }}>Network</button>
                             {integrations.scalar && (
-                                <button class="tab-btn" data-tab="scalar" onclick="switchTab('scalar')">Scalar</button>
+                                <button class="tab-btn" data-tab="scalar" {...{ onclick: "switchTab('scalar')" }}>Scalar</button>
                             )}
                             {integrations.apiExplorer && (
-                                <button class="tab-btn" data-tab="api-explorer" onclick="switchTab('api-explorer')">REST API</button>
+                                <button class="tab-btn" data-tab="api-explorer" {...{ onclick: "switchTab('api-explorer')" }}>REST API</button>
                             )}
                             {integrations.asyncapi && (
-                                <button class="tab-btn" data-tab="asyncapi" onclick="switchTab('asyncapi')">WS API</button>
+                                <button class="tab-btn" data-tab="asyncapi" {...{ onclick: "switchTab('asyncapi')" }}>WS API</button>
                             )}
                         </div>
                     </header>
@@ -60,7 +59,7 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
 
                             <div id="chart-container" style="display: flex; flex-direction: column; gap: 1rem;">
                                 <div style="display: flex; justify-content: flex-end;">
-                                    <select id="time-range-selector" onchange="updateCharts(); updateDashboard(); fetchTopStats();" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px; border-radius: 4px;">
+                                    <select id="time-range-selector" {...{ onchange: "updateCharts(); updateDashboard(); fetchTopStats();" }} style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px; border-radius: 4px;">
                                         <option value="1m">1 Minute</option>
                                         <option value="5m">5 Minutes</option>
                                         <option value="30m">30 Minutes</option>
@@ -104,8 +103,8 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                         <div id="tab-application" class="tab-content">
                             <div style="margin: 2rem 2rem 0 2rem; display: flex; gap: 1rem; align-items: center;">
                                 <div class="button-group">
-                                    <button class="view-btn active" onclick="switchApplicationView('registry')">Registry</button>
-                                    <button class="view-btn" onclick="switchApplicationView('graph')">Graph</button>
+                                    <button class="view-btn active" {...{ onclick: "switchApplicationView('registry')" }}>Registry</button>
+                                    <button class="view-btn" {...{ onclick: "switchApplicationView('graph')" }}>Graph</button>
                                 </div>
                             </div>
                             {/* Registry Sub-View */}
@@ -151,8 +150,8 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                                         <input type="checkbox" id="network-filter-ignore" checked />
                                         <label for="network-filter-ignore" style="cursor: pointer; font-size: 0.9em; user-select: none;">Excl. Ignored</label>
                                     </div>
-                                    <button onclick="fetchRequests()" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 4px 8px; border-radius: 4px; cursor: pointer;">Refresh</button>
-                                    <button onclick="purgeRequests()" style="background: var(--bg-primary); color: var(--color-error, #ef4444); border: 1px solid var(--card-border); padding: 4px 8px; border-radius: 4px; cursor: pointer;">Purge</button>
+                                    <button {...{ onclick: "fetchRequests()" }} style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 4px 8px; border-radius: 4px; cursor: pointer;">Refresh</button>
+                                    <button {...{ onclick: "purgeRequests()" }} style="background: var(--bg-primary); color: var(--color-error, #ef4444); border: 1px solid var(--card-border); padding: 4px 8px; border-radius: 4px; cursor: pointer;">Purge</button>
                                 </div>
                             </div>
 
@@ -164,7 +163,7 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                                         <div id="details-drag-handle" style="position: absolute; left: 0; top: 0; bottom: 0; width: 5px; cursor: col-resize; z-index: 11; background: transparent;"></div>
                                         <div style="display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: var(--bg-secondary); padding: 0.5rem 1rem; border-bottom: 1px solid var(--border-color); z-index: 10;">
                                             <div class="card-title" style="margin: 0; padding: 0">Request Details</div>
-                                            <button onclick="closeRequestDetails()" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.2rem;">×</button>
+                                            <button {...{ onclick: "closeRequestDetails()" }} style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.2rem;">×</button>
                                         </div>
                                         <div style="display: flex; flex-direction: column; overflow: hidden; height: 100%">
                                             <div id="request-details-content" style="flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden"></div>

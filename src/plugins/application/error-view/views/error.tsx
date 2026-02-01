@@ -54,7 +54,7 @@ const ErrorHeader = ({ ctx, errorName, errorMessage, errorId }: ErrorHeaderProps
                 <span>{ctx.response.status || 500}</span>
             </div>
             <div class="meta-item" style="margin-left:auto">
-                <span class="id-badge" onclick={`copyText('${escapeHtml(errorId)}')`} title="Copy ID">
+                <span class="id-badge" {...{ onclick: `copyText('${escapeHtml(errorId)}')` }} title="Copy ID">
                     ID: {errorId}
                 </span>
             </div>
@@ -66,7 +66,7 @@ const ErrorHeader = ({ ctx, errorName, errorMessage, errorId }: ErrorHeaderProps
             <h2 class="error-message">{errorMessage}</h2>
             <button
                 class="action-btn"
-                onclick={`copyText('${(escapeHtml(errorMessage) || '').replace(/'/g, "\\'")}')`}
+                {...{ onclick: `copyText('${(escapeHtml(errorMessage) || '').replace(/'/g, "\\'")}')` }}
                 title="Copy Message"
                 style="padding:4px 8px"
             >
@@ -75,10 +75,10 @@ const ErrorHeader = ({ ctx, errorName, errorMessage, errorId }: ErrorHeaderProps
         </div>
 
         <div class="actions-bar">
-            <button class="action-btn" onclick="copyText()">
+            <button class="action-btn" {...{ onclick: "copyText()" }}>
                 <CopyIcon /> Copy Error
             </button>
-            <button class="action-btn" onclick="document.getElementById('raw-modal').style.display='flex'">
+            <button class="action-btn" {...{ onclick: "document.getElementById('raw-modal').style.display='flex'" }}>
                 View Raw Error
             </button>
         </div>
@@ -156,13 +156,13 @@ const StackTrace = ({ frames, focusFrame }: StackTraceProps) => {
             <div class="section-title">
                 <span>Stack Trace</span>
                 <div class="filter-group">
-                    <span class="badge" onclick="this.classList.toggle('active'); document.body.classList.toggle('show-internals')">
+                    <span class="badge" {...{ onclick: "this.classList.toggle('active'); document.body.classList.toggle('show-internals')" }}>
                         Internals
                     </span>
-                    <span class="badge" onclick="this.classList.toggle('active'); document.body.classList.toggle('show-shokupan')">
+                    <span class="badge" {...{ onclick: "this.classList.toggle('active'); document.body.classList.toggle('show-shokupan')" }}>
                         Framework
                     </span>
-                    <span class="badge" onclick="this.classList.toggle('active'); document.body.classList.toggle('show-dependencies')">
+                    <span class="badge" {...{ onclick: "this.classList.toggle('active'); document.body.classList.toggle('show-dependencies')" }}>
                         Dependencies
                     </span>
                 </div>
@@ -275,11 +275,11 @@ const RawErrorModal = ({ error }: RawErrorModalProps) => {
 
     return (
         <>
-            <div id="raw-modal" class="modal-overlay" onclick="if(event.target === this) this.style.display='none'">
+            <div id="raw-modal" class="modal-overlay" {...{ onclick: "if(event.target === this) this.style.display='none'" }}>
                 <div class="modal-content">
                     <div class="modal-header">
                         <span>Raw Error Object</span>
-                        <button class="action-btn" onclick="document.getElementById('raw-modal').style.display='none'">
+                        <button class="action-btn" {...{ onclick: "document.getElementById('raw-modal').style.display='none'" }}>
                             Close
                         </button>
                     </div>
