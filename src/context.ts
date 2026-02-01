@@ -408,6 +408,9 @@ export class ShokupanContext<
      * @param options Upgrade options or inline WebSocket handlers
      * @returns true if upgraded, false otherwise
      * 
+     * This method will link the WebSocket connection to the context object, 
+     * allowing you to access the connection in your handlers.
+     * 
      * @example Inline handlers
      * ```ts
      * app.get('/ws', (ctx) => {
@@ -419,7 +422,7 @@ export class ShokupanContext<
      * });
      * ```
      */
-    public upgrade(options?: Parameters<Server<State>["upgrade"]>[1] | InlineWebSocketHandlers<State>) {
+    public upgrade(options?: Parameters<Server<State>["upgrade"]>[1] | InlineWebSocketHandlers<State> & { data?: any; }) {
         if (!this.server) return false;
 
         let wsOptions;

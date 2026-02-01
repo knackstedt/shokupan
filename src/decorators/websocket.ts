@@ -1,4 +1,5 @@
-import './metadata'; // Use Shokupan's lightweight polyfill
+import { $eventMethods } from '../util/symbol';
+import './util/metadata'; // Use Shokupan's lightweight polyfill
 
 // Metadata keys for WebSocket decorators
 const WS_METADATA_KEY = Symbol.for('Shokupan.websocket:metadata');
@@ -179,6 +180,10 @@ export function OnError(): MethodDecorator {
  */
 export function Event(event: string): MethodDecorator {
     return function (target: any, propertyKey: string | symbol) {
+        // Native Shokupan metadata for ControllerScanner
+        target[$eventMethods] ??= new Map();
+        target[$eventMethods].set(propertyKey, { eventName: event });
+
         const events = Reflect.getMetadata(WS_EVENTS_KEY, target.constructor) || [];
         events.push({ event, methodName: propertyKey });
         Reflect.defineMetadata(WS_EVENTS_KEY, events, target.constructor);

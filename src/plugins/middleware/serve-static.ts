@@ -18,7 +18,7 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
     const rootPath = resolve(config.root || ".");
     const normalizedPrefix = prefix.endsWith('/') && prefix !== '/' ? prefix.slice(0, -1) : prefix;
     const isEtag = !!config.etag;
-    const extensions = config.extensions || ['html', 'htm'];
+    const extensions = config.extensions || ['html', 'htm', 'htmx'];
     const FILES: Record<string, FileData> = {};
 
     // Helper: Generate Headers
@@ -39,7 +39,7 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
     }
 
     // Optimization: Pre-load files in production
-    if (!config.dev) {
+    if (!config.useCache) {
         // Simple recursive walker
         async function walk(dir: string) {
             const entries = await readdir(dir, { withFileTypes: true });
@@ -76,7 +76,7 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
         let file: FileData | undefined;
 
         // 1. Lookup in Cache (if !dev)
-        if (!config.dev) {
+        if (!config.useCache) {
             file = FILES[reqPath];
             if (!file) {
                 // Try extensions

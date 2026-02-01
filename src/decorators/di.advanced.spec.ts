@@ -1,8 +1,10 @@
 
 import { describe, expect, test } from "bun:test";
 import { Shokupan } from "../shokupan";
-import { Controller, Get, Injectable, Use } from "./decorators";
-import { Container } from "./di";
+import { ControllerScanner } from '../util/controller-scanner';
+import { Injectable, Use } from './di';
+import { Controller, Get } from './http';
+import { Container } from "./util/container";
 
 describe("Advanced Dependency Injection", () => {
     // 1. Define Services
@@ -82,33 +84,7 @@ describe("Advanced Dependency Injection", () => {
 
         const app = new Shokupan();
 
-        // Shokupan.register implies direct controller registration? 
-        // Shokupan doesn't have .register() for controllers directly in the standard way shown in scanner?
-        // Usually .bindController() on router is internal.
-        // App.ts passes .listen() -> ...
-        // Wait, current Shokupan API for adding controllers?
-        // app.use? app.controller?
-        // Looking at `controller-scanner.ts`, it's static scan.
-        // Looking at `shokupan.ts`... let's check how to register a controller class.
-        // Ah, typically `app.bind(Controller)` or similar?
-        // Shokupan usually uses router.get/post...
-        // Does Shokupan support Class Controllers at app level?
-        // `controller-scanner` is used where?
-        // Let's check `shokupan.ts` for controller registration methods.
-        // `router.ts` has `bindController`.
-        // `Shokupan` extends `ShokupanRouter`? No.
-        // `Shokupan` has `public router: ShokupanRouter`.
-        // `router.bindController` is what we renamed.
-
-        // But `bindController` just pushes to `childControllers`.
-        // Who calls `ControllerScanner.scan`?
-        // `shokupan.ts` -> `handleRequest` -> `find`?
-        // No, `scan` parses the class and adds routes to the router.
-        // We need to call `ControllerScanner.scan(app.router, '/', new DIController())` or similar.
-        // Or strictly: `ControllerScanner.scan(app, '/', new DIController())`.
-
         // Let's manually scan for the test since we are testing internal logic mostly.
-        const { ControllerScanner } = await import("./controller-scanner");
         ControllerScanner.scan(app as any, "/", new DIController());
 
         // Test Singleton

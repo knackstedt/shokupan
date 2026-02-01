@@ -1,7 +1,7 @@
 
 import { describe, expect, test } from "bun:test";
-import { Container } from "./di";
-import { Inject, Injectable } from "./http";
+import { Inject, Injectable } from './di';
+import { Container } from './util/container';
 
 describe("Dependency Injection", () => {
     test("should support manual registration", () => {

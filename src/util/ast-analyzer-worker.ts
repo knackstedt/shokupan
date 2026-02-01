@@ -157,7 +157,7 @@ export class ASTAnalyzerWorker extends EventEmitter {
             });
 
             // Handle worker errors
-            this.worker.on('error', (err) => {
+            this.worker.on('error', (err: Error) => {
                 clearTimeout(timeoutId);
                 this.state = 'failed';
                 this.error = err;

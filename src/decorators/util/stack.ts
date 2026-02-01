@@ -26,6 +26,7 @@ export function getCallerInfo(skipFrames = 1): { file: string; line: number; } {
             if (l.includes('node_modules')) continue;
             if (l.includes('bun:main')) continue;
             if (l.includes('bun:wrap')) continue;
+            // TODO: The following checks are highly fragile and will not work when packaged.
             if (l.includes('src/decorators/stack.ts')) continue; // Ignore self
             if (l.includes('src/router.ts')) continue; // Ignore router internals
             if (l.includes('src/decorators/http.ts')) continue; // Ignore decorators

@@ -42,11 +42,6 @@ export class SurrealAdapter implements DatastoreAdapter {
         }
 
         if (!this.options.engines && !url.match(/^(?:wss?|https?):\/\//)) {
-            // Auto-load engines if using embedded kv/mem (and not explicitly passed engines)
-            // But we can't easily auto-load inside shared adapter without heavy deps? 
-            // The original code did `import('@surrealdb/node')`.
-            // We'll rely on user passing engines or us handling it in factory slightly higher up if possible,
-            // or we do it here dynamically.
             try {
                 const mod = await import('@surrealdb/node');
                 this.db = new Surreal({ engines: mod.createNodeEngines() });
@@ -101,7 +96,7 @@ export class SurrealAdapter implements DatastoreAdapter {
             // Recent JS SDK: select returns T (single) or T[] (if variable).
             // But if it returns undefined/null, we return null.
             if (Array.isArray(result)) return result[0] || null;
-            return result || null;
+            return result as T || null;
         } catch (error) {
             // If it throws because of not found (some older versions), return null.
             // Or log real error? generic get should probably return null if not found.
@@ -110,17 +105,17 @@ export class SurrealAdapter implements DatastoreAdapter {
     }
 
     async create<T>(table: string, id: string, data: T): Promise<T> {
-        return this.retry(() => this.db.create(new RecordId(table, id)).content(data as any));
+        return this.retry(() => this.db.create(new RecordId(table, id)).content(data as any)) as any;
     }
 
     async update<T>(table: string, id: string, data: Partial<T>): Promise<T> {
-        return this.retry(() => this.db.update(new RecordId(table, id)).merge(data as any));
+        return this.retry(() => this.db.update(new RecordId(table, id)).merge(data as any)) as any;
     }
 
     async upsert<T>(table: string, id: string, data: T): Promise<T> {
         // SurrealDB .upsert() replaces content. If we want merge-like upsert behavior we might need logic,
         // but typically upsert means "insert or replace".
-        return this.retry(() => this.db.upsert(new RecordId(table, id)).content(data as any));
+        return this.retry(() => this.db.upsert(new RecordId(table, id)).content(data as any)) as any;
     }
 
     async delete(table: string, id: string): Promise<void> {
@@ -130,31 +125,7 @@ export class SurrealAdapter implements DatastoreAdapter {
     async count(table: string, query?: QueryOptions): Promise<number> {
         const q = this.buildQuery(table, query, true);
         const res = await this.db.query<[{ count: number; }]>(q.statement, q.vars);
-        // query<T> returns T.
-        // console.error("Surreal Count Query:", q.statement, q.vars);
-        // console.error("Surreal Count Result:", JSON.stringify(res));
 
-        // SurrealDB 2.0 query result structure:
-        // [ { result: [ { count: 3 } ], status: "OK", time: ... } ] ?
-        // Or if using specific client methods?
-        // this.db.query returns Result<T>[] usually.
-        // If T is [{ count: number }], then res[0] is the Result object.
-        // res[0].result is the actual data array?
-        // Let's inspect via logging or fix access pattern.
-
-        // Assuming SDK v2:
-        // res is array of results.
-        // res[0] is result of first statement.
-        // If successful, result is implicit generic T? 
-        // No, query<T> returns T.
-        // Wait, check SDK docs/source.
-        // "query<T>(query: string, vars?: any): Promise<T>"
-        // So generic T IS the return type.
-        // If I typed it as `[{ count: number }]`, then `res` is that array.
-        // count is res[0].count.
-
-        // BUT if query returns multiple results wrappers...
-        // Let's log it.
         const result = res as any; // Cast to inspect
         this.logger.debug("Surreal Count Result", { result });
 

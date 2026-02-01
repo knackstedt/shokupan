@@ -985,7 +985,7 @@ export class OpenAPIAnalyzer {
                     }
                 }
                 // Check for untyped ctx.body() or await ctx.body() calls
-                else if (this.isCtxBodyCall(node, sourceFile) || (ts.isAwaitExpression(node) && this.isCtxBodyCall(node.expression, sourceFile))) {
+                else if (this.isCtxBodyCall(node, sourceFile)) {
                     if (!requestTypes.body) {
                         requestTypes.body = { type: 'object', description: 'Request Body' };
                     }
@@ -1178,12 +1178,11 @@ export class OpenAPIAnalyzer {
                                     const eventNameArg = expr.arguments[0];
                                     if (ts.isStringLiteral(eventNameArg)) {
                                         const eventName = eventNameArg.text;
-                                        let payload = { type: 'object' };
+                                        let payload: Record<string, unknown> = { type: 'object' };
 
                                         // Special case: If the argument is `await ctx.body()`, we know it's the request body
                                         // Even if untyped, we should treat it as "body payload" rather than "unknown inference failure"
-                                        if (this.isCtxBodyCall(expr.arguments[1], sourceFile) ||
-                                            (ts.isAwaitExpression(expr.arguments[1]) && this.isCtxBodyCall(expr.arguments[1].expression, sourceFile))) {
+                                        if (this.isCtxBodyCall(expr.arguments[1], sourceFile)) {
                                             payload = { type: 'object', description: 'Request Body' };
                                             // If requestTypes.body is not set, set it to generic object so generator picks it up
                                             if (!requestTypes.body) {
@@ -1510,7 +1509,7 @@ export class OpenAPIAnalyzer {
     /**
      * Check if an expression is a call to ctx.body()
      */
-    private isCtxBodyCall(node: ts.Expression, sourceFile: ts.SourceFile): boolean {
+    private isCtxBodyCall(node: ts.Node, sourceFile: ts.SourceFile): boolean {
         // Handle await ctx.body()
         if (ts.isAwaitExpression(node)) {
             return this.isCtxBodyCall(node.expression, sourceFile);

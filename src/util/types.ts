@@ -827,4 +827,9 @@ export interface StaticServeOptions<T extends Record<string, any>> {
      * maxAge must be set to a value > 0 for this to have any effect.
      */
     immutable?: boolean;
+    /**
+     * Whether to use the cache.
+     * @default true
+     */
+    useCache?: boolean;
 };

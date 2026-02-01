@@ -303,7 +303,7 @@ const StatusPage = ({ method, status, image, message, path, requestId, hideError
                         {requestId && (
                             <span
                                 class="request-id"
-                                onclick={`copyText('${requestId}')`}
+                                {...{ onclick: `copyText('${requestId}')` }}
                                 title="Click to copy Request ID"
                             >
                                 ID: {requestId}

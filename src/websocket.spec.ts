@@ -108,6 +108,7 @@ describe('WebSocket API - Router Pattern', () => {
             if (event.startsWith('_')) {
                 return false; // Prevent routing
             }
+            return true;
         });
 
         wsRouter.event('_private', () => {
@@ -301,7 +302,7 @@ describe('WebSocket API - Inline Handlers', () => {
         // Only open and close
         app.get('/simple', (ctx) => {
             ctx.upgrade({
-                open: (ctx, ws) => ws.send('connected'),
+                open: (ctx, ws) => ws.send('connected') as any,
                 close: (ctx, ws) => console.log('disconnected')
             });
         });
