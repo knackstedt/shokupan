@@ -1,6 +1,6 @@
 
 import { describe, expect, test } from "bun:test";
-import { Injectable } from "./decorators";
+import { Injectable } from './di';
 import { Container } from "./util/container";
 
 describe("DI Reliability", () => {

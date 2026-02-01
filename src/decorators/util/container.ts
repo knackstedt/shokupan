@@ -6,6 +6,9 @@ import './metadata'; // Apply polyfill
  */
 export class Container {
     private static services = new Map<any, any>();
+    private static cache = new Map<any, { scope: string, dependencies: any[]; }>();
+
+    private static resolvingStack = new Set<any>();
 
     /**
      * Register a service instance in the container.
@@ -33,10 +36,6 @@ export class Container {
     public static has(target: any): boolean {
         return this.services.has(target);
     }
-
-    private static cache = new Map<any, { scope: string, dependencies: any[]; }>();
-
-    private static resolvingStack = new Set<any>();
 
     /**
      * Resolve a service instance from the container.
@@ -112,7 +111,8 @@ export class Container {
      * Teardown the container, destroying all singletons and clearing the cache.
      */
     public static async teardown() {
-        for (const [target, instance] of this.services.entries()) {
+        const entries = this.services.entries();
+        for (const [target, instance] of entries) {
             if (typeof instance.onDestroy === 'function') {
                 await instance.onDestroy();
             }
