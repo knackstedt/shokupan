@@ -63,6 +63,76 @@ export type RouteParams<Path extends string> =
     ? Record<string, string>
     : ParsePathParams<Path>;
 
+/**
+ * Type guard to check if a state property exists and narrow its type.
+ * 
+ * @example
+ * ```typescript
+ * if (hasStateProperty(ctx, 'userId')) {
+ *     // ctx.state.userId is now typed as defined (not undefined)
+ *     console.log(ctx.state.userId);
+ * }
+ * ```
+ */
+export function hasStateProperty<
+    S extends Record<string, any>,
+    K extends string
+>(
+    state: S,
+    key: K
+): key is K & keyof S {
+    return key in state && state[key] !== undefined;
+}
+
+/**
+ * Runtime assertion that a state property exists.
+ * Throws an error if the property is missing.
+ * 
+ * @example
+ * ```typescript
+ * requireStateProperty(ctx.state, 'userId');
+ * // Now TypeScript knows ctx.state.userId exists
+ * const id = ctx.state.userId;
+ * ```
+ */
+export function requireStateProperty<
+    S extends Record<string, any>,
+    K extends keyof S
+>(
+    state: S,
+    key: K,
+    message?: string
+): asserts state is S & Record<K, NonNullable<S[K]>> {
+    if (!(key in state) || state[key] == null) {
+        throw new Error(
+            message ?? `Required state property "${String(key)}" is not set`
+        );
+    }
+}
+
+/**
+ * Type-safe state getter with optional default value.
+ * 
+ * @example
+ * ```typescript
+ * const userId = getStateProperty(ctx.state, 'userId', 'anonymous');
+ * ```
+ */
+export function getStateProperty<
+    S extends Record<string, any>,
+    K extends keyof S,
+    D = undefined
+>(
+    state: S,
+    key: K,
+    defaultValue?: D
+): S[K] | D {
+    if (key in state && state[key] !== undefined) {
+        return state[key];
+    }
+    return defaultValue as D;
+}
+
 export interface RouteMetadata {
     file: string;
     line: number;

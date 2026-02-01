@@ -1,6 +1,8 @@
 
+
 import { describe, expect, test } from "bun:test";
-import { Get } from './util/decorators';
+import { Get } from './decorators/http';
+
 import { ShokupanRouter } from './router';
 import { Shokupan } from './shokupan';
 

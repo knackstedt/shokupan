@@ -158,7 +158,109 @@ app.use(async (ctx, next) => {
 
 **Best for:** Router-based architecture, type-strict apps
 
+## Decision Tree: Which Approach Should You Use?
+
+Use this decision tree to choose the best state typing approach for your needs:
+
+```mermaid
+graph TD
+    A[Start: How do you define routes?] --> B{Using Decorators?}
+    B -->|Yes| C[Use Declaration Merging]
+    B -->|No| D{Multiple routers with<br/>different state shapes?}
+    D -->|Yes| E[Use Generic Types]
+    D -->|No| F{Do you use ctx.state<br/>at all?}
+    F -->|No| G[Use EmptyState]
+    F -->|Yes| H{Need type safety?}
+    H -->|No| I[Use Default<br/>Record&lt;string, any&gt;]
+    H -->|Yes| J{Building a plugin or<br/>reusable library?}
+    J -->|Yes| C
+    J -->|No| E
+
+    C --> K[declare module 'shokupan']
+    E --> L[new Shokupan&lt;YourState&gt;]
+    G --> M[new Shokupan&lt;EmptyState&gt;]
+    I --> N[new Shokupan]
+
+    style C fill:#90EE90
+    style E fill:#87CEEB
+    style G fill:#FFB6C1
+    style I fill:#DDA0DD
+```
+
+### Quick Reference
+
+| Your Situation | Recommendation |
+|----------------|----------------|
+| Decorator-based controllers | ✅ Declaration Merging |
+| Router-based architecture with different states | ✅ Generic Types |
+| App that doesn't use `ctx.state` | ✅ `EmptyState` |
+| Quick prototype/simple API | ✅ Default (no generics) |
+| Plugin development | ✅ Declaration Merging |
+| Large modular application | ✅ Hybrid (both approaches) |
+
+## Type Safety Utilities
+
+Shokupan provides runtime utilities to safely access state properties, especially useful with optional state properties:
+
+### `hasStateProperty(state, key)`
+
+Type guard to check if a property exists:
+
+```typescript
+if (hasStateProperty(ctx.state, 'userId')) {
+    // TypeScript knows userId exists here
+    console.log(ctx.state.userId);
+}
+```
+
+### `requireStateProperty(state, key, message?)`
+
+Assert that a property exists (throws if missing):
+
+```typescript
+requireStateProperty(ctx.state, 'userId');
+// TypeScript now knows userId is defined
+const id: string = ctx.state.userId;
+```
+
+### `getStateProperty(state, key, default?)`
+
+Get a property with an optional default:
+
+```typescript
+const userId = getStateProperty(ctx.state, 'userId', 'anonymous');
+const permissions = getStateProperty(ctx.state, 'permissions', []);
+```
+
+### Example Usage
+
+```typescript
+interface AppState {
+    requestId: string;
+    userId?: string; // Optional - set by auth middleware
+}
+
+app.get('/profile', (ctx) => {
+    // Option 1: Type guard
+    if (hasStateProperty(ctx.state, 'userId')) {
+        return ctx.json({ userId: ctx.state.userId });
+    }
+    
+    // Option 2: Default value
+    const userId = getStateProperty(ctx.state, 'userId', 'anonymous');
+    
+    // Option 3: Assertion
+    try {
+        requireStateProperty(ctx.state, 'userId', 'Login required');
+        return ctx.json({ userId: ctx.state.userId });
+    } catch (e) {
+        return ctx.json({ error: e.message }, 401);
+    }
+});
+```
+
 ## Hybrid Approach (Recommended)
+
 
 You can use **both** approaches:
 
