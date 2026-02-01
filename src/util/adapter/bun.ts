@@ -30,10 +30,6 @@ export class BunAdapter implements ServerAdapter {
                 },
                 // @ts-ignore
                 async message(ws, message) {
-                    if (ws.data?.handler?.message) {
-                        return ws.data.handler.message(ws, message);
-                    }
-
                     // Buffer vs Uint8Array handling for cross-platform compatibility
                     let msgString: string = "";
                     if (typeof message === "string") {
@@ -43,53 +39,56 @@ export class BunAdapter implements ServerAdapter {
                     } else if (typeof Buffer !== "undefined" && message instanceof Buffer) {
                         // @ts-ignore
                         msgString = message.toString();
-                    } else {
-                        return; // Unknown format
                     }
-
-                    if (typeof msgString !== "string") return;
 
                     let payload: any;
                     let isJSONPayload = false;
-                    if (msgString.startsWith('{')) {
+                    if (typeof msgString === "string" && msgString.startsWith('{')) {
                         try {
                             payload = JSON.parse(msgString);
                             isJSONPayload = true;
                         } catch { /* Ignore JSON parsing errors */ }
                     }
 
+                    const self = app;
+                    // HTTP Bridge - Check BEFORE custom handler
+                    if (isJSONPayload && self.applicationConfig['enableHttpBridge'] && payload.type === 'HTTP') {
+                        const { id, method, path, headers, body } = payload;
+                        // Use 127.0.0.1 to avoid localhost lookup issues in some environments, though localhost is usually fine
+                        const hostname = self.applicationConfig.hostname || 'localhost';
+                        const url = new URL(path, `http://${hostname}:${port}`);
+
+                        const req = new Request(url.toString(), {
+                            method,
+                            headers,
+                            body: typeof body === 'object' ? JSON.stringify(body) : body
+                        });
+
+                        const res = await self.fetch(req);
+
+                        const resBody: any = await res.json()
+                            .catch(err => res.text());
+
+                        const resHeaders: Record<string, string> = {};
+                        res.headers.forEach((v, k) => resHeaders[k] = v);
+
+                        ws.send(JSON.stringify({
+                            type: 'RESPONSE',
+                            id,
+                            status: res.status,
+                            headers: resHeaders,
+                            body: resBody
+                        }));
+                        return;
+                    }
+
+                    // Delegate to Custom Handler (if present)
+                    if (ws.data?.handler?.message) {
+                        return ws.data.handler.message(ws, message);
+                    }
+
+                    // Default Event Handling (Shokupan Default Router logic)
                     if (payload) {
-                        const self = app;
-                        // HTTP Bridge
-                        if (isJSONPayload && self.applicationConfig['enableHttpBridge'] && payload.type === 'HTTP') {
-                            const { id, method, path, headers, body } = payload;
-                            const url = new URL(path, `http://${self.applicationConfig.hostname || 'localhost'}:${port}`);
-
-                            const req = new Request(url.toString(), {
-                                method,
-                                headers,
-                                body: typeof body === 'object' ? JSON.stringify(body) : body
-                            });
-
-                            const res = await self.fetch(req);
-
-                            const resBody: any = await res.json()
-                                .catch(err => res.text());
-
-                            const resHeaders: Record<string, string> = {};
-                            res.headers.forEach((v, k) => resHeaders[k] = v);
-
-                            ws.send(JSON.stringify({
-                                type: 'RESPONSE',
-                                id,
-                                status: res.status,
-                                headers: resHeaders,
-                                body: resBody
-                            }));
-                            return;
-                        }
-
-                        // Event Handling
                         const eventName = payload.event || (payload.type === 'EVENT' ? payload.name : undefined);
                         if (eventName) {
                             const handlers = self.findEvent(eventName);

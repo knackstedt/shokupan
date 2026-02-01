@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { ShokupanContext } from "../context";
+import { Event, WebsocketController } from "../decorators";
 import { Shokupan } from "../shokupan";
-import { Event } from "../decorators";
 
+@WebsocketController("/")
 class WebSocketController {
     @Event("ping")
     onPing(ctx: ShokupanContext) {
@@ -11,8 +12,7 @@ class WebSocketController {
     }
 
     @Event("echo")
-    async onEcho(ctx: ShokupanContext) {
-        const data = await ctx.body();
+    async onEcho(ctx: ShokupanContext, data: any) {
         ctx.emit("echo-reply", data);
     }
 }

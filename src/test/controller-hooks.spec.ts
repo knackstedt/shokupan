@@ -1,8 +1,8 @@
 
 import { describe, expect, spyOn, test } from "bun:test";
 import { ShokupanContext } from "../context";
+import { Controller, Get, OnRequestEnd, OnRequestError, OnRequestStart } from "../decorators";
 import { Shokupan } from "../shokupan";
-import { Controller, Get, OnError, OnRequestEnd, OnRequestStart } from "../decorators";
 
 describe("Controller Hooks", () => {
     test("should execute onRequestStart, onRequestEnd hooks", async () => {
@@ -49,7 +49,7 @@ describe("Controller Hooks", () => {
 
         @Controller('/hooks-error')
         class ErrorController {
-            @OnError()
+            @OnRequestError()
             onError(ctx: ShokupanContext, err: any) {
                 console.log('error');
                 errorCaught = err;

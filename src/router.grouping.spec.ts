@@ -1,6 +1,6 @@
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdir, rmdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from 'path';
 import { ShokupanRouter } from './router';
 import { Shokupan } from './shokupan';
@@ -9,15 +9,15 @@ describe("Static Route Grouping", () => {
     const testDir = join(process.cwd(), "test_static_grouping");
 
     beforeAll(async () => {
+        await rm(testDir, { recursive: true, force: true }).catch(() => { });
         await mkdir(testDir, { recursive: true });
         await writeFile(join(testDir, "test.txt"), "Hello World");
-        await mkdir(join(testDir, "subdir"));
+        await mkdir(join(testDir, "subdir"), { recursive: true });
+        await writeFile(join(testDir, "subdir", ".keep"), "");
     });
 
     afterAll(async () => {
-        await unlink(join(testDir, "test.txt"));
-        await rmdir(join(testDir, "subdir"));
-        await rmdir(testDir);
+        await rm(testDir, { recursive: true, force: true });
     });
 
     test("should handle root and child paths with single registration", async () => {

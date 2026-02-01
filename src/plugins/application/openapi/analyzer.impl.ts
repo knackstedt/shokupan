@@ -194,6 +194,13 @@ export class OpenAPIAnalyzer {
         const initialCount = this.applications.length;
         this.applications = this.applications.filter(app => {
             if (app.name === 'GenericModule' && !reachable.has(app.filePath)) {
+                // EXEMPTION: If file is likely a test or fixture, keep it.
+                // This allows testing generated routes without mounting them to a main app
+                const isTest = app.filePath.includes('.spec.ts') || app.filePath.includes('.test.ts') || app.filePath.includes('/fixtures/');
+                if (isTest) {
+                    return true;
+                }
+
                 // console.log(`[Analyzer] Pruning unreachable module: ${app.filePath}`);
                 return false;
             }
@@ -330,7 +337,7 @@ export class OpenAPIAnalyzer {
             moduleResolution: ts.ModuleResolutionKind.Node10,
             rootDir: this.rootDir,
             skipLibCheck: true,
-            skipDefaultLibCheck: true,
+            skipDefaultLibCheck: false,
         });
 
         // If using entrypoint, update this.files with what TS found in the project
@@ -594,12 +601,9 @@ export class OpenAPIAnalyzer {
                         const objName = node.expression.expression.getText(sourceFile);
                         const methodName = node.expression.name.getText(sourceFile);
 
-                        // console.log(`[Analyzer] Visiting call ${objName}.${methodName}`);
-
                         // Check if this is our application instance
                         // For GenericModule, we accept any variable name as it's likely an argument (e.g. app.event)
                         if (objName === app.name || (app.name === 'GenericModule' && node.arguments.length >= 2)) {
-                            // console.log(`[Analyzer] Inspecting route call: ${objName}.${methodName} in ${app.name}`);
                             if (['get', 'post', 'put', 'delete', 'patch', 'options', 'head', 'on', 'event'].includes(methodName.toLowerCase())) {
                                 // Extract route info
                                 const route = this.extractRouteFromCall(node, sourceFile, methodName.toUpperCase());
@@ -1257,6 +1261,7 @@ export class OpenAPIAnalyzer {
      * Convert an Expression node to an OpenAPI schema (best effort)
      */
     private convertExpressionToSchema(node: ts.Expression, sourceFile: ts.SourceFile, scope: Map<string, any>, typeChecker?: ts.TypeChecker): any {
+
         // Object Literal: { a: 1, b: "text" }
         if (ts.isObjectLiteralExpression(node)) {
             const schema: any = {
@@ -1427,7 +1432,7 @@ export class OpenAPIAnalyzer {
         }
 
         // PropertyAccessExpression (e.g., process.env, performance.now)
-        if (ts.isPropertyAccessExpression(node) && typeChecker) {
+        if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) && typeChecker) {
             try {
                 const type = typeChecker.getTypeAtLocation(node);
                 const schema = this.convertTypeToSchema(type, typeChecker);

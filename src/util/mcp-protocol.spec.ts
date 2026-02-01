@@ -1,7 +1,8 @@
 
 import { describe, expect, it } from "bun:test";
+import { Controller } from "../decorators/http";
+import { Prompt, Resource, Tool } from "../decorators/mcp";
 import { Shokupan } from "../shokupan";
-import { Controller, Prompt, Resource, Tool } from "./decorators";
 
 @Controller('/mcp-test')
 class McpController {
