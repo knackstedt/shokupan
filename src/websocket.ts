@@ -1,6 +1,6 @@
 import type { ServerWebSocket } from 'bun';
 import type { ShokupanContext } from './context';
-import { getCallerInfo } from './decorators/stack';
+import { getCallerInfo } from './decorators/util/stack';
 import { $childControllers, $childRouters, $routes } from './util/symbol';
 
 /**

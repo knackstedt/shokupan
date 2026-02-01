@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import './decorators/metadata'; // Use Shokupan's lightweight polyfill
+import './decorators/util/metadata'; // Use Shokupan's lightweight polyfill
 import { Event, OnClose, OnError, OnEvent, OnMessage, OnOpen, OnUpgrade, WebsocketController } from './decorators/websocket';
 import { Shokupan } from './shokupan';
 import { ShokupanWebsocketRouter } from './websocket';

@@ -1,7 +1,7 @@
 
 import { ShokupanContext } from '../context';
-import { Container } from '../decorators/di';
-import { getCallerInfo } from '../decorators/stack';
+import { Container } from '../decorators/util/container';
+import { getCallerInfo } from '../decorators/util/stack';
 import { compose } from '../middleware';
 import { traceHandler } from '../plugins/application/opentelemetry';
 import { ResilienceFactory } from '../plugins/resilience/factory';

@@ -15,7 +15,7 @@ import { configureIde } from './util/ide';
 import { createLogger } from './util/logger';
 
 import { Container } from './decorators';
-import { getCallerInfo } from './decorators/stack';
+import { getCallerInfo } from './decorators/util/stack';
 import { MiddlewareTracker } from './util/middleware-tracker';
 import { enablePromisePatch, kContext } from './util/promise';
 import { ShokupanRequest } from './util/request';

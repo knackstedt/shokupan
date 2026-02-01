@@ -1,5 +1,5 @@
 import { ShokupanContext } from './context';
-import { getCallerInfo } from './decorators/stack';
+import { getCallerInfo } from './decorators/util/stack';
 import {
     getCloseHandler,
     getErrorHandler,
@@ -15,7 +15,7 @@ import { generateOpenApi } from './plugins/application/openapi/openapi';
 import { serveStatic } from './plugins/middleware/serve-static';
 import type { Shokupan } from './shokupan';
 import { ControllerScanner } from './util/controller-scanner';
-import { EventError, getErrorStatus } from './util/http-error';
+import { getErrorStatus } from './util/http-error';
 import { HTTP_STATUS } from './util/http-status';
 import { McpProtocol, type McpPrompt } from './util/mcp-protocol';
 import { MiddlewareTracker } from './util/middleware-tracker';
@@ -263,34 +263,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         return typeof target === 'object' && target !== null && $isRouter in target;
     }
 
-    /**
-     * @deprecated Use ShokupanWebsocketRouter.event() instead.
-     * Registers an event handler for WebSocket.
-     * 
-     * This method is deprecated. Use the new WebSocket API:
-     * ```ts
-     * const wsRouter = new ShokupanWebsocketRouter();
-     * wsRouter.event("eventName", handler);
-     * app.mount('/ws', wsRouter);
-     * ```
-     */
-    public event(name: string, handler: ShokupanHandler<T>) {
-        console.warn('[Shokupan] router.event() is deprecated. Use ShokupanWebsocketRouter instead.');
-        const info = getCallerInfo();
-        (handler as any).source = { file: info.file, line: info.line };
 
-        if (this.eventHandlers.has(name)) {
-            const err = new EventError(`Event handler \`${name}\` already exists.`);
-            console.warn(err);
-            const handlers = this.eventHandlers.get(name)!;
-            handlers.push(handler);
-            this.eventHandlers.set(name, handlers);
-        }
-        else {
-            this.eventHandlers.set(name, [handler]);
-        }
-        return this;
-    }
 
     /**
      * Registers a lifecycle hook dynamically.
