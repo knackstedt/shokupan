@@ -1,6 +1,7 @@
 import type { IncomingMessage } from 'node:http';
 import { createRequire } from 'node:module';
 import { URL } from 'node:url';
+import { createLogger, type Logger } from '../../../util/logger';
 
 const require = createRequire(import.meta.url);
 const http = require('node:http');
@@ -99,8 +100,10 @@ export class FetchInterceptor {
     private originalHttpsRequest: typeof https.request;
     private callbacks: OutboundRequestCallback[] = [];
     private isPatched: boolean = false;
+    private logger: Logger;
 
-    constructor() {
+    constructor(logger?: Logger) {
+        this.logger = logger || createLogger();
         // Capture originals on first instantiation if not already captured
         if (!FetchInterceptor.originalFetch) {
             // Prevent capturing already patched fetch if module was reloaded but global stays dirty
@@ -109,7 +112,11 @@ export class FetchInterceptor {
                 // If we can't find original, we might be stuck.
                 // But hopefully we don't reload module while patched.
                 // Assuming standard behavior:
-                console.warn('[FetchInterceptor] Global fetch is already patched! Cannot capture original.');
+                // We use process.stderr directly for this static warning since we don't have an instance logger context easily available
+                // and we want to avoid console object.
+                if (process.env.NODE_ENV !== 'test') {
+                    process.stderr.write('[FetchInterceptor] Global fetch is already patched! Cannot capture original.\n');
+                }
             } else {
                 FetchInterceptor.originalFetch = global.fetch;
                 FetchInterceptor.originalHttpRequest = http.request;
@@ -147,7 +154,9 @@ export class FetchInterceptor {
         if (FetchInterceptor.originalHttpsRequest) {
             https.request = FetchInterceptor.originalHttpsRequest;
         }
-        console.log('[FetchInterceptor] Network layer restored (static).');
+        if (process.env.NODE_ENV !== 'test') {
+            process.stdout.write('[FetchInterceptor] Network layer restored (static).\n');
+        }
     }
 
     /**
@@ -161,7 +170,7 @@ export class FetchInterceptor {
         this.patchNodeRequests();
 
         this.isPatched = true;
-        console.log('[FetchInterceptor] Network layer patched.');
+        this.logger.debug('FetchInterceptor', 'Network layer patched.');
     }
 
     private patchGlobalFetch() {
@@ -216,7 +225,7 @@ export class FetchInterceptor {
                     duration,
                     status: response.status,
                     ...self.extractRequestMeta(url, requestHeaders)
-                }).catch(err => console.error("[FetchInterceptor] Error processing response:", err));
+                }).catch(err => self.logger.error('FetchInterceptor', "Error processing response:", { error: err }));
 
                 return response;
             } catch (error) {
@@ -350,7 +359,7 @@ export class FetchInterceptor {
         https.request = this.originalHttpsRequest;
 
         this.isPatched = false;
-        console.log('[FetchInterceptor] Network layer restored.');
+        this.logger.debug('FetchInterceptor', 'Network layer restored.');
     }
 
     /**
@@ -431,7 +440,7 @@ export class FetchInterceptor {
             try {
                 cb(log);
             } catch (e) {
-                console.error('[FetchInterceptor] Callback failed', e);
+                this.logger.error('FetchInterceptor', 'Callback failed', { error: e });
             }
         });
     }

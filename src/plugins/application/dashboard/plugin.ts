@@ -197,14 +197,14 @@ export class Dashboard implements ShokupanPlugin {
             this.broadcastMetricUpdate(metric);
         };
 
-        this.metricsCollector = new MetricsCollector(this.db, onCollect);
+        this.metricsCollector = new MetricsCollector(this.db, onCollect, app.logger);
 
         if (app.applicationConfig) {
             app.applicationConfig.enableMiddlewareTracking = true;
         }
 
         // Initialize Fetch Interceptor
-        const fetchInterceptor = new FetchInterceptor();
+        const fetchInterceptor = new FetchInterceptor(app.logger);
         fetchInterceptor.patch();
         fetchInterceptor.on((log: OutboundRequestLog) => {
             // Prevent infinite loop by ignoring DB requests
@@ -259,7 +259,7 @@ export class Dashboard implements ShokupanPlugin {
             this.db.upsert('request', idString, {
                 ...requestData,
                 id: idString
-            }).catch(e => console.error("Failed to save outbound request", e));
+            }).catch(e => this[$appRoot]?.logger?.error('Dashboard', "Failed to save outbound request", { error: e }));
 
             // Broadcast
             const strategy = this.dashboardConfig.updateStrategy || 'immediate';
@@ -276,7 +276,7 @@ export class Dashboard implements ShokupanPlugin {
                     await app.dbPromise;
                     if (app.db) {
                         this.metricsCollector.db = app.db;
-                        console.log('[Dashboard] Attached datastore to MetricsCollector');
+                        app.logger?.debug('Dashboard', 'Attached datastore to MetricsCollector');
                     }
                 }
             });
@@ -615,7 +615,6 @@ export class Dashboard implements ShokupanPlugin {
 
         // Requests Listing Endpoint
         this.router.get("/requests", async (ctx) => {
-            console.log(`[Dashboard] Handling /requests from ${ctx.ip} ${ctx.get('User-Agent')}`);
             const result = await this.db.findMany('request', {
                 sort: { timestamp: 'desc' },
                 limit: 100
@@ -624,7 +623,7 @@ export class Dashboard implements ShokupanPlugin {
         });
 
         this.router.delete("/requests", async (ctx) => {
-            console.log(`[Dashboard] Purging all requests`);
+            this[$appRoot]?.logger?.debug('Dashboard', `Purging all requests`);
             await this.db.deleteMany('request');
             await this.db.deleteMany('failed_request');
             this.metrics.logs = [];
@@ -823,7 +822,7 @@ export class Dashboard implements ShokupanPlugin {
 
     private broadcastMetricUpdate(metric: any) {
         if (this.clients.size === 0) return;
-        // console.log(`[Dashboard] Broadcasting metric update to ${this.clients.size} clients`);
+        // this[$appRoot]?.logger?.debug('Dashboard', `Broadcasting metric update to ${this.clients.size} clients`);
 
         const data = JSON.stringify({
             type: 'metric-update',
@@ -836,7 +835,7 @@ export class Dashboard implements ShokupanPlugin {
     }
 
     private async sendHistory(ws: ServerWebSocket<any>, interval: string) {
-        console.log(`[Dashboard] sendHistory called for interval: ${interval}`);
+        this[$appRoot]?.logger?.debug('Dashboard', `sendHistory called for interval: ${interval}`);
         // Map interval to milliseconds
         const intervalMap: Record<string, number> = {
             '10s': 10 * 1000,
@@ -856,7 +855,7 @@ export class Dashboard implements ShokupanPlugin {
         const periodMs = intervalMap[interval] || 60 * 1000;
         const startTime = Date.now() - (periodMs * 30); // Get 30 points of history
 
-        console.log(`[Dashboard] Fetching history from timestamp ${startTime}, period: ${periodMs}ms`);
+        this[$appRoot]?.logger?.debug('Dashboard', `Fetching history from timestamp ${startTime}, period: ${periodMs}ms`);
 
         let history: any[] = [];
         try {
@@ -865,9 +864,9 @@ export class Dashboard implements ShokupanPlugin {
                 where: { interval },
                 sort: { timestamp: 'asc' }
             });
-            console.log(`[Dashboard] Fetched ${history.length} history points for interval ${interval}`);
+            this[$appRoot]?.logger?.debug('Dashboard', `Fetched ${history.length} history points for interval ${interval}`);
         } catch (e) {
-            console.error('[Dashboard] Failed to fetch history for WS', e);
+            this[$appRoot]?.logger?.error('Dashboard', 'Failed to fetch history for WS', { error: e });
         }
 
         const message = {
@@ -877,14 +876,14 @@ export class Dashboard implements ShokupanPlugin {
             history
         };
 
-        console.log(`[Dashboard] Sending init message with ${history.length} history points`);
+        this[$appRoot]?.logger?.debug('Dashboard', `Sending init message with ${history.length} history points`);
         ws.send(JSON.stringify(message));
-        console.log(`[Dashboard] Init message sent successfully`);
+        this[$appRoot]?.logger?.debug('Dashboard', `Init message sent successfully`);
     }
 
     private broadcastMetrics() {
         if (this.clients.size === 0) return;
-        console.log(`[Dashboard] Broadcasting metrics to ${this.clients.size} clients`);
+        this[$appRoot]?.logger?.debug('Dashboard', `Broadcasting metrics to ${this.clients.size} clients`);
 
         const data = JSON.stringify({
             type: 'metrics',
@@ -1155,7 +1154,7 @@ export class Dashboard implements ShokupanPlugin {
                     id: ctx.requestId,
                     direction: "inbound"
                 }).catch(e => {
-                    console.error("Failed to record request log", e);
+                    this[$appRoot]?.logger?.error('Dashboard', "Failed to record request log", { error: e });
                 });
                 const retention = this.dashboardConfig.retentionMs ?? 7200000;
                 const cutoff = Date.now() - retention;
@@ -1206,7 +1205,7 @@ export class Dashboard implements ShokupanPlugin {
         if (requests.length === 0) return;
 
         // Debug log
-        console.log(`[Dashboard] Broadcasting ${requests.length} requests. Sample ID: ${requests[0].id}`);
+        this[$appRoot]?.logger?.debug('Dashboard', `Broadcasting ${requests.length} requests. Sample ID: ${requests[0].id}`);
 
         const data = JSON.stringify({
             type: 'requests-update',

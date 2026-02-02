@@ -1,58 +1,74 @@
+import { createConsola, type ConsolaInstance } from "consola";
+
 export interface Logger {
-    debug(msg: string, props?: Record<string, any>): void;
-    info(msg: string, props?: Record<string, any>): void;
-    warn(msg: string, props?: Record<string, any>): void;
-    error(msg: string, props?: Record<string, any>): void;
-    fatal(msg: string, props?: Record<string, any>): void;
+    debug(module: string, msg: string, props?: Record<string, any>): void;
+    info(module: string, msg: string, props?: Record<string, any>): void;
+    warn(module: string, msg: string, props?: Record<string, any>): void;
+    error(module: string, msg: string, props?: Record<string, any>): void;
+    fatal(module: string, msg: string, props?: Record<string, any>): void;
 }
 
 export class JsonLogger implements Logger {
-    private write(level: string, msg: string, props?: Record<string, any>) {
-        console.log(JSON.stringify({
+    private write(level: string, module: string, msg: string, props?: Record<string, any>) {
+        const output = JSON.stringify({
             level,
-            message: msg,
             timestamp: new Date().toISOString(),
+            module,
+            message: msg,
             ...props
-        }));
+        }) + '\n';
+
+        if (level === 'error' || level === 'fatal') {
+            process.stderr.write(output);
+        } else {
+            process.stdout.write(output);
+        }
     }
 
-    debug(msg: string, props?: Record<string, any>) { this.write('debug', msg, props); }
-    info(msg: string, props?: Record<string, any>) { this.write('info', msg, props); }
-    warn(msg: string, props?: Record<string, any>) { this.write('warn', msg, props); }
-    error(msg: string, props?: Record<string, any>) { this.write('error', msg, props); }
-    fatal(msg: string, props?: Record<string, any>) { this.write('fatal', msg, props); }
+    debug(module: string, msg: string, props?: Record<string, any>) { this.write('debug', module, msg, props); }
+    info(module: string, msg: string, props?: Record<string, any>) { this.write('info', module, msg, props); }
+    warn(module: string, msg: string, props?: Record<string, any>) { this.write('warn', module, msg, props); }
+    error(module: string, msg: string, props?: Record<string, any>) { this.write('error', module, msg, props); }
+    fatal(module: string, msg: string, props?: Record<string, any>) { this.write('fatal', module, msg, props); }
 }
 
-export class PrettyLogger implements Logger {
-    private getTimestamp() {
-        return new Date().toLocaleTimeString();
+export class ConsolaLogger implements Logger {
+    private consola: ConsolaInstance;
+
+    constructor(level: number = 4) {
+        this.consola = createConsola({
+            level,
+            reporters: [
+                // This forces Consola to use the standard console.log/error methods
+                // which VS Code's debugger will actually see.
+                {
+                    log: (logObj) => {
+                        const method = logObj.type in console ? logObj.type : "log";
+                        console[method](...logObj.args);
+                    }
+                }
+            ]
+        });
     }
 
-    private formatProps(props?: Record<string, any>): string {
-        if (!props || Object.keys(props).length === 0) return '';
-        return '\n' + Object.entries(props)
-            .map(([key, value]) => `    ${key}: ${value instanceof Error ? value.stack : typeof value === 'object' ? JSON.stringify(value) : value}`)
-            .join('\n');
+    debug(module: string, msg: string, props?: Record<string, any>) {
+        this.consola.withTag(module).debug(msg, props || '');
     }
 
-    debug(msg: string, props?: Record<string, any>) {
-        console.log(`\x1b[90m[DEBUG] ${this.getTimestamp()} - ${msg}\x1b[0m${this.formatProps(props)}`);
+    info(module: string, msg: string, props?: Record<string, any>) {
+        this.consola.withTag(module).info(msg, props || '');
     }
 
-    info(msg: string, props?: Record<string, any>) {
-        console.log(`\x1b[36m[INFO]  ${this.getTimestamp()} - ${msg}\x1b[0m${this.formatProps(props)}`);
+    warn(module: string, msg: string, props?: Record<string, any>) {
+        this.consola.withTag(module).warn(msg, props || '');
     }
 
-    warn(msg: string, props?: Record<string, any>) {
-        console.log(`\x1b[33m[WARN]  ${this.getTimestamp()} - ${msg}\x1b[0m${this.formatProps(props)}`);
+    error(module: string, msg: string, props?: Record<string, any>) {
+        this.consola.withTag(module).error(msg, props || '');
     }
 
-    error(msg: string, props?: Record<string, any>) {
-        console.log(`\x1b[31m[ERROR] ${this.getTimestamp()} - ${msg}\x1b[0m${this.formatProps(props)}`);
-    }
-
-    fatal(msg: string, props?: Record<string, any>) {
-        console.log(`\x1b[41m\x1b[37m[FATAL] ${this.getTimestamp()} - ${msg}\x1b[0m${this.formatProps(props)}`);
+    fatal(module: string, msg: string, props?: Record<string, any>) {
+        this.consola.withTag(module).fatal(msg, props || '');
     }
 }
 
@@ -60,5 +76,6 @@ export function createLogger(env: string = process.env.NODE_ENV || 'development'
     if (env === 'production') {
         return new JsonLogger();
     }
-    return new PrettyLogger();
+    return new ConsolaLogger();
 }
+

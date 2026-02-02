@@ -346,7 +346,7 @@ export class ControllerScanner {
         }
 
         if (routesAttached === 0) {
-            console.warn(`No routes attached to controller ${instance.constructor.name}`);
+            router.root?.logger?.warn("ControllerScanner", `No routes attached to controller ${instance.constructor.name}`);
         }
         instance[$isMounted] = true;
     }

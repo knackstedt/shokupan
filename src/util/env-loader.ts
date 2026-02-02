@@ -1,5 +1,6 @@
 import { existsSync, promises as fs, watch } from 'node:fs';
 import * as path from 'node:path';
+import { createLogger, type Logger } from './logger';
 
 export type EnvLoaderOptions = {
     /**
@@ -12,6 +13,10 @@ export type EnvLoaderOptions = {
      * @default []
      */
     k8sConfigMapMountPaths?: string[];
+    /**
+     * Optional logger instance
+     */
+    logger?: Logger;
 };
 
 type Listener<T> = (value: T) => void;
@@ -83,6 +88,7 @@ const $secretSubjects = Symbol('secretSubjects');
 const $options = Symbol('options');
 const $watchers = Symbol('watchers');
 const $watchersStarted = Symbol('watchersStarted');
+const $logger = Symbol('logger');
 
 const $getSecretValueInternal = Symbol('getSecretValueInternal');
 const $getOrCreateSubject = Symbol('getOrCreateSubject');
@@ -100,6 +106,7 @@ export abstract class EnvLoader {
     private [$options]: EnvLoaderOptions;
     private [$watchers]: ReturnType<typeof watch>[] = [];
     private [$watchersStarted] = false;
+    private [$logger]: Logger;
 
     constructor(options?: EnvLoaderOptions) {
         this[$options] = {
@@ -107,6 +114,7 @@ export abstract class EnvLoader {
             k8sConfigMapMountPaths: [],
             ...options
         };
+        this[$logger] = options?.logger || createLogger();
     }
 
     /**
@@ -242,7 +250,7 @@ export abstract class EnvLoader {
                 });
                 this[$watchers].push(watcher);
             } catch (e) {
-                console.warn(`[EnvLoader] Failed to watch ${mountPath}:`, e);
+                this[$logger].warn(`[EnvLoader]`, `Failed to watch ${mountPath}:`, { error: e });
             }
         }
     }

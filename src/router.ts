@@ -138,6 +138,10 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         return this[$appRoot];
     }
 
+    get logger() {
+        return this[$appRoot]?.logger;
+    }
+
     public [$routes]: ShokupanRoute[] = []; // Public via Symbol for OpenAPI generator
     private trie = new RouterTrie<T>();
     public metadata?: RouteMetadata; // Metadata for the router itself

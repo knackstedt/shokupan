@@ -15,7 +15,6 @@ export interface ApiExplorerOptions {
 export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin {
 
     constructor(private readonly pluginOptions: ApiExplorerOptions = {}) {
-        console.log('ApiExplorerPlugin: CONSTRUCTOR CALLED');
         super({ renderer: renderToString });
         pluginOptions.path ??= '/explorer';
 
@@ -66,7 +65,6 @@ export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin 
                         delete op['x-source-info'].snippet;
                     }
                     if (op['x-shokupan-source']?.code) {
-                        console.log('Deleting x-shokupan-source.code');
                         delete op['x-shokupan-source'].code;
                     }
                 });

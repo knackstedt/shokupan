@@ -136,6 +136,13 @@ export class ShokupanContext<
     public [$finalResponse]?: Response;
     public [$rawBody]?: string | ArrayBuffer | Uint8Array; // Raw body for compression optimization
 
+    /**
+     * Application logger instance
+     */
+    get logger() {
+        return this.app?.logger;
+    }
+
     // Body caching to avoid double parsing
     private [$url]?: URL;
     private [$cachedBody]?: any;

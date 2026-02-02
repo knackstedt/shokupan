@@ -23,7 +23,7 @@ export class KnexAdapter implements DatastoreAdapter {
             await this.db.raw('SELECT 1');
             this.detectDialectFeatures();
         } catch (e) {
-            this.logger.error("Failed to connect to IO SQL database", e);
+            this.logger.error('KnexAdapter', "Failed to connect to IO SQL database", e);
             throw e;
         }
     }

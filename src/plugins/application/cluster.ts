@@ -71,7 +71,7 @@ export class ClusterPlugin implements ShokupanPlugin {
         }
 
         // PRIMARY MODE
-        console.log(`[Cluster] Starting ${workers} Bun workers on port ${port}...`);
+        app.logger?.info('Cluster', `Starting ${workers} Bun workers on port ${port}...`);
 
         const spawnWorker = (id: string) => {
             // In Bun, we re-run the same script.
@@ -80,7 +80,7 @@ export class ClusterPlugin implements ShokupanPlugin {
                 env: { ...process.env, SHOKUPAN_WORKER_ID: id },
                 stdio: ['inherit', 'inherit', 'inherit'],
                 onExit(proc, exitCode, signalCode, error) {
-                    console.log(`[Cluster] Worker ${id} died (code: ${exitCode}). Restarting...`);
+                    app.logger?.info('Cluster', `Worker ${id} died (code: ${exitCode}). Restarting...`);
                     spawnWorker(id);
                 }
             });
@@ -105,7 +105,7 @@ export class ClusterPlugin implements ShokupanPlugin {
 
     private async handleNode(app: Shokupan, port: number, workers: number, originalListen: Function, silent: boolean, sticky: boolean) {
         if (cluster.isPrimary) {
-            console.log(`[Cluster] Master ${process.pid} is running`);
+            app.logger?.info('Cluster', `Master ${process.pid} is running`);
 
             // Fork workers
             const fork = () => cluster.fork(process.env);
@@ -115,7 +115,7 @@ export class ClusterPlugin implements ShokupanPlugin {
             }
 
             cluster.on('exit', (worker, code, signal) => {
-                console.log(`[Cluster] Worker ${worker.process.pid} died. Restarting...`);
+                app.logger?.info('Cluster', `Worker ${worker.process.pid} died. Restarting...`);
                 fork();
             });
 
@@ -142,7 +142,7 @@ export class ClusterPlugin implements ShokupanPlugin {
                 });
 
                 server.listen(port, () => {
-                    console.log(`[Cluster] Sticky Load Balancer listening on port ${port}`);
+                    app.logger?.info('Cluster', `Sticky Load Balancer listening on port ${port}`);
                 });
 
                 // Return dummy server

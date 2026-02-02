@@ -26,9 +26,6 @@ function createMethodDecorator(method: Method) {
                 path,
                 source: getCallerInfo(2)
             });
-            if (path.includes('/user')) {
-                console.log(`[Decorator] Captured source for ${propertyKey}:`, getCallerInfo());
-            }
         };
     };
 }

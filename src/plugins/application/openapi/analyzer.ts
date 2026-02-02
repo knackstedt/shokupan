@@ -1,6 +1,7 @@
 
 // Re-export types used in public API
 export type { ApplicationInstance, RouteInfo } from './analyzer.impl';
+import type { Logger } from '../../../util/logger';
 import type { ApplicationInstance } from './analyzer.impl';
 
 /**
@@ -13,7 +14,7 @@ import type { ApplicationInstance } from './analyzer.impl';
 export class OpenAPIAnalyzer {
     private analyzerImpl: any;
 
-    constructor(private rootDir: string, private entrypoint?: string) { }
+    constructor(private rootDir: string, private entrypoint?: string, private logger?: Logger) { }
 
     /**
      * Main analysis entry point.
@@ -22,7 +23,7 @@ export class OpenAPIAnalyzer {
     public async analyze(): Promise<{ applications: ApplicationInstance[]; }> {
         // Dynamic import to avoid loading 'typescript' peer dependency if not needed (e.g. at runtime)
         const { OpenAPIAnalyzer: AnalyzerImpl } = await import('./analyzer.impl');
-        this.analyzerImpl = new AnalyzerImpl(this.rootDir, this.entrypoint);
+        this.analyzerImpl = new AnalyzerImpl(this.rootDir, this.entrypoint, this.logger);
         return this.analyzerImpl.analyze();
     }
 
@@ -42,6 +43,6 @@ export class OpenAPIAnalyzer {
  * Analyze a directory and generate OpenAPI spec
  */
 export async function analyzeDirectory(directory: string): Promise<any> {
-    const analyzer = new OpenAPIAnalyzer(directory);
+    const analyzer = new OpenAPIAnalyzer(directory, undefined, undefined);
     return await analyzer.analyze();
 }

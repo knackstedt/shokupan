@@ -1,6 +1,7 @@
 import * as os from 'node:os';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import type { DatastoreAdapter } from '../../../util/adapter/datastore';
+import type { Logger } from '../../../util/logger';
 
 interface AggregatedMetric {
     timestamp: number;
@@ -61,7 +62,8 @@ export class MetricsCollector {
 
     constructor(
         db?: DatastoreAdapter,
-        private onCollect?: (metric: AggregatedMetric) => void
+        private onCollect?: (metric: AggregatedMetric) => void,
+        private logger?: Logger
     ) {
         this.db = db;
         this.eventLoopHistogram.enable();
@@ -105,7 +107,7 @@ export class MetricsCollector {
                 }
             }
         } catch (error) {
-            console.error('[MetricsCollector] Error in collect():', error);
+            this.logger?.error('MetricsCollector', 'Error in collect():', { error });
         }
     }
 
@@ -186,7 +188,7 @@ export class MetricsCollector {
         try {
             await this.db.upsert('metrics', `${label}_${timestamp}`, metric);
         } catch (e) {
-            console.error(`[MetricsCollector] ✗ Failed to save metrics for ${label}:`, e);
+            this.logger?.error('MetricsCollector', `Failed to save metrics for ${label}:`, { error: e });
         }
 
         // Notify Listeners

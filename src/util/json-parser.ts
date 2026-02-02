@@ -22,7 +22,7 @@ export function getJSONParser(parserType: 'native' | 'parse-json' | 'secure-json
                     // parse-json exports a default function
                     parseJsonLib = lib.default || lib;
                 } catch (e) {
-                    console.warn('parse-json not installed, falling back to native JSON.parse. Install with: bun add parse-json');
+                    if (process.env.NODE_ENV !== 'test') process.stderr.write('parse-json not installed, falling back to native JSON.parse. Install with: bun add parse-json\n');
                     return JSON.parse;
                 }
             }
@@ -34,7 +34,7 @@ export function getJSONParser(parserType: 'native' | 'parse-json' | 'secure-json
                     const lib = require('secure-json-parse');
                     secureJsonParseLib = lib.parse || lib.default?.parse || lib;
                 } catch (e) {
-                    console.warn('secure-json-parse not installed, falling back to native JSON.parse. Install with: bun add secure-json-parse');
+                    if (process.env.NODE_ENV !== 'test') process.stderr.write('secure-json-parse not installed, falling back to native JSON.parse. Install with: bun add secure-json-parse\n');
                     return JSON.parse;
                 }
             }

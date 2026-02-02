@@ -97,7 +97,7 @@ async function recordFailedRequest(ctx: ShokupanContext, error: any, maxCapacity
         cleanup(ctx, maxCapacity, ttl).catch(() => { });
 
     } catch (e) {
-        console.error("Failed to record failed request:", e);
+        ctx.logger?.error('FailedRequestRecorder', "Failed to record failed request:", { error: e });
     }
 }
 

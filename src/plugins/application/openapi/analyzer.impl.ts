@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
+import type { Logger } from '../../../util/logger';
 
 /**
  * File information collected during scan
@@ -110,7 +111,7 @@ export class OpenAPIAnalyzer {
     // Track imports per file: filePath -> { importedName -> { modulePath, exportName } }
     private imports: Map<string, Map<string, { modulePath: string; exportName?: string; }>> = new Map();
 
-    constructor(private rootDir: string, entrypoint?: string) {
+    constructor(private rootDir: string, entrypoint?: string, private logger?: Logger) {
         if (entrypoint) {
             this.entrypoint = path.resolve(entrypoint);
         }
@@ -258,7 +259,7 @@ export class OpenAPIAnalyzer {
                 // We have .js + .map but no .ts file
                 // For now, we'll just parse the JS file directly
                 // Full source map reconstruction would require the 'source-map' library
-                console.log(`Note: Found ${jsFile.path} with source map but no .ts file. Will parse JS directly.`);
+                this.logger?.debug('OpenAPIAnalyzer', `Note: Found ${jsFile.path} with source map but no .ts file. Will parse JS directly.`);
             }
         }
     }

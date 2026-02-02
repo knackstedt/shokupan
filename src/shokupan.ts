@@ -128,10 +128,9 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         return this.datastore;
     }
 
-    get logger() {
+    override get logger() {
         return this.applicationConfig.logger;
     }
-
 
     constructor(
         applicationConfig: ShokupanConfig = {}
@@ -208,7 +207,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         if (this.applicationConfig.adapter !== 'wintercg') {
             this.dbPromise = this.initDatastore().catch(err => {
                 // Log but don't crash if optional datastore init fails
-                this.logger?.debug("Failed to initialize default datastore", { error: err });
+                this.logger?.debug('Shokupan', "Failed to initialize default datastore", { error: err });
             });
         }
 
@@ -226,7 +225,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                     // Check if this promise belongs to this app's context
                     if (ctx && ctx.store && ctx.store.app === this) {
                         const { requestId } = ctx.store;
-                        this.logger.error("Unhandled Rejection in Shokupan Request", {
+                        this.logger.error('Shokupan', "Unhandled Rejection in Shokupan Request", {
                             error: reason,
                             requestId,
                             creationStack: ctx.stack
@@ -314,7 +313,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 await this.datastore.setupSchema();
             }
         } catch (err) {
-            this.logger?.error("Failed to initialize datastore", { error: err });
+            this.logger?.error('Shokupan', "Failed to initialize datastore", { error: err });
             throw err;
         }
     }
@@ -408,18 +407,18 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 if (!shouldBlock) {
                     // Start analysis but don't wait
                     analyzer.analyze().catch(err => {
-                        this.logger?.error("AST analysis failed", { error: err });
+                        this.logger?.error('Shokupan', "AST analysis failed", { error: err });
                     });
                 } else {
                     // Block on analysis if required by config
                     try {
                         await analyzer.analyze();
                     } catch (err) {
-                        this.logger?.error("AST analysis failed", { error: err });
+                        this.logger?.error("Shokupan", "AST analysis failed", { error: err });
                     }
                 }
             } catch (err) {
-                this.logger?.debug("Failed to initialize AST analyzer", { error: err });
+                this.logger?.debug('Shokupan', "Failed to initialize AST analyzer", { error: err });
             }
         }
 
@@ -436,7 +435,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                     const yaml = dump(this.openApiSpec);
                     return ctx.send(yaml, { status: 200, headers: { 'content-type': 'application/yaml' } });
                 } catch (e) {
-                    this.logger?.error("Failed to generate OpenAPI YAML", { error: e });
+                    this.logger?.error('Shokupan', "Failed to generate OpenAPI YAML", { error: e });
                     return ctx.text("Internal Server Error", 500);
                 }
             });
@@ -516,7 +515,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 this.openApiSpecPromise.then(spec => {
                     return Promise.all(this.specAvailableHooks.map(hook => hook(spec)));
                 }).catch(err => {
-                    this.logger?.error("Error running spec available hooks", { error: err });
+                    this.logger?.error('Shokupan', "Error running spec available hooks", { error: err });
                 });
             }
         }
@@ -926,7 +925,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                         } catch (handlerErr) {
                             // If the error handler itself fails, fall through to default handling
                             // but log the new error
-                            console.error("Error in error handler:", handlerErr);
+                            this.logger?.error("Shokupan", "Error in error handler:", { error: handlerErr });
                             err = handlerErr;
                             break; // Avoid infinite loops if handlerErr is same type
                         }
@@ -980,7 +979,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 if (err.message === "Request Timeout") {
                     return ctx.text("Request Timeout", HTTP_STATUS.REQUEST_TIMEOUT);
                 }
-                console.error("Unexpected error in request execution:", err);
+                this.logger?.error("Shokupan", "Unexpected error in request execution:", { error: err });
                 return ctx.text("Internal Server Error", HTTP_STATUS.INTERNAL_SERVER_ERROR);
             })
             .then(async (res) => {

@@ -46,7 +46,7 @@ export class SurrealAdapter implements DatastoreAdapter {
                 const mod = await import('@surrealdb/node');
                 this.db = new Surreal({ engines: mod.createNodeEngines() });
             } catch (e) {
-                this.logger.warn("Could not load @surrealdb/node engines. Embedded protocols might fail.", { error: e });
+                this.logger.warn('SurrealAdapter', "Could not load @surrealdb/node engines. Embedded protocols might fail.", { error: e });
             }
         }
 
@@ -127,7 +127,7 @@ export class SurrealAdapter implements DatastoreAdapter {
         const res = await this.db.query<[{ count: number; }]>(q.statement, q.vars);
 
         const result = res as any; // Cast to inspect
-        this.logger.debug("Surreal Count Result", { result });
+        this.logger.debug('SurrealAdapter', "Count Result", { result });
 
         // Defensive coding:
         if (Array.isArray(result) && result.length > 0) {
@@ -171,7 +171,7 @@ export class SurrealAdapter implements DatastoreAdapter {
 
             return (Array.isArray(result) ? result : []) as T[];
         } catch (e) {
-            this.logger.error(`[SurrealAdapter] findMany ${table} failed`, e);
+            this.logger.error('SurrealAdapter', `findMany ${table} failed`, e);
             throw e;
         }
     }

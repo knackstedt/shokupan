@@ -38,9 +38,10 @@ export class LevelAdapter implements DatastoreAdapter {
 
     async setupSchema(): Promise<void> {
         // Ensure fresh state for tests that might reuse instances (though we try not to)
-        console.error("LevelAdapter clearing DB");
+        // Ensure fresh state for tests that might reuse instances (though we try not to)
+        if (process.env.NODE_ENV !== 'test') this.logger.debug('LevelAdapter', "Clearing DB");
         await this.db.clear();
-        console.error("LevelAdapter DB cleared");
+        if (process.env.NODE_ENV !== 'test') this.logger.debug('LevelAdapter', "DB cleared");
     }
 
     private getKey(table: string, id: string) {
@@ -63,14 +64,14 @@ export class LevelAdapter implements DatastoreAdapter {
         try {
             const val = await this.db.get(key);
             if (val !== undefined) {
-                this.logger.error(`LevelDB Record ${key} found unexpectedly`);
+                this.logger.error('LevelAdapter', `Record ${key} found unexpectedly`);
                 throw new Error(`Record ${id} already exists`);
             }
         } catch (e: any) {
             // Check for various not found error codes/flags
             const isNotFound = e.code === 'LEVEL_NOT_FOUND' || e.notFound;
             if (!isNotFound) {
-                this.logger.error(`LevelDB create error for ${key}:`, e);
+                this.logger.error('LevelAdapter', `Create error for ${key}:`, e);
                 throw e;
             }
         }

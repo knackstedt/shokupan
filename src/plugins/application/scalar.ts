@@ -245,15 +245,15 @@ export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin 
                 if (this.pluginOptions.enableStaticAnalysis) {
                     try {
                         const entrypoint = process.argv[1];
-                        console.log(`[ScalarPlugin] Running eager static analysis on entrypoint: ${entrypoint}`);
-                        const analyzer = new OpenAPIAnalyzer(process.cwd(), entrypoint);
+                        (parent as any).logger?.info('ScalarPlugin', `Running eager static analysis on entrypoint: ${entrypoint}`);
+                        const analyzer = new OpenAPIAnalyzer(process.cwd(), entrypoint, (parent as any).logger);
                         let staticSpec = await analyzer.analyze();
 
                         if (!this.pluginOptions.baseDocument) this.pluginOptions.baseDocument = {};
                         deepMerge(this.pluginOptions.baseDocument as any, staticSpec);
-                        console.log('[ScalarPlugin] Static analysis completed successfully.');
+                        (parent as any).logger?.info('ScalarPlugin', 'Static analysis completed successfully.');
                     } catch (err) {
-                        console.error('[ScalarPlugin] Failed to run static analysis:', err);
+                        (parent as any).logger?.error('ScalarPlugin', 'Failed to run static analysis:', { error: err });
                     }
                 }
             });

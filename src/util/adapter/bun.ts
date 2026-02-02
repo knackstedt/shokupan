@@ -128,7 +128,7 @@ export class BunAdapter implements ServerAdapter {
                                     if (self.applicationConfig['websocketErrorHandler']) {
                                         await self.applicationConfig['websocketErrorHandler'](err, ctx as any);
                                     } else {
-                                        console.error(`Error in event ${eventName}:`, err);
+                                        app.logger?.error('BunAdapter', `Error in event ${eventName}:`, { error: err });
                                     }
                                 }
                             }
@@ -148,7 +148,7 @@ export class BunAdapter implements ServerAdapter {
                         const callbacks = ctx.getDisconnectCallbacks();
                         if (Array.isArray(callbacks) && callbacks.length > 0) {
                             Promise.all(callbacks.map((cb: Function) => cb())).catch(err => {
-                                console.error("Error executing socket disconnect hook:", err);
+                                app.logger?.error('BunAdapter', "Error executing socket disconnect hook:", { error: err });
                             });
                         }
                     }
