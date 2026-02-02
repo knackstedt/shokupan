@@ -179,7 +179,6 @@
         "@opentelemetry/semantic-conventions": "^1.38.0",
         "@scalar/api-reference": "^1.43.1",
         "@scalar/openapi-types": "^0.5.3",
-        "@sentry/node": "^10.36.0",
         "@sinclair/typebox": "^0.34.47",
         "@surrealdb/node": "^2.4.0",
         "@tsconfig/bun": "^1.0.10",
