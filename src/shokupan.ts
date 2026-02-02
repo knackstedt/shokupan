@@ -858,7 +858,11 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 });
 
                 let response: Response | Promise<Response>;
-                if (result instanceof Response) {
+
+                if (ctx.isUpgraded) {
+                    response = undefined as unknown as Response;
+                }
+                else if (result instanceof Response) {
                     response = result;
                 }
                 // Check explicit void return but response set in context

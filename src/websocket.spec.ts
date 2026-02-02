@@ -394,4 +394,45 @@ describe('WebSocket API - Context Helpers', () => {
         const routes = app.getRoutes();
         expect(routes.length).toBeGreaterThan(0);
     });
+
+    test('ctx.upgrade() - throws on non-GET method', async () => {
+        const app = new Shokupan();
+
+        app.post('/ws-post', (ctx) => {
+            try {
+                ctx.upgrade({
+                    open: () => { }
+                });
+            } catch (e: any) {
+                return ctx.json({ error: e.message }, 400);
+            }
+        });
+
+        const mockServer = {
+            upgrade: () => true
+        } as any;
+        const res = await app.fetch(new Request('http://localhost/ws-post', { method: 'POST' }), mockServer);
+        expect(res.status).toBe(400);
+        const data = await res.json();
+        expect(data.error).toBe('WebSocket upgrade requires GET method');
+    });
+
+    test('ctx.upgrade() - should not return "true" body', async () => {
+        const app = new Shokupan();
+        app.get('/ws-repro', (ctx) => {
+            // Returning the boolean result
+            return ctx.upgrade({
+                open: () => { }
+            });
+        });
+
+        const mockServer = {
+            upgrade: () => true
+        } as any;
+
+        const res = await app.fetch(new Request('http://localhost/ws-repro'), mockServer);
+
+        // Should return undefined (as per Bun's upgrade expectation)
+        expect(res).toBeUndefined();
+    });
 });

@@ -432,6 +432,11 @@ export class ShokupanContext<
     public upgrade(options?: Parameters<Server<State>["upgrade"]>[1] | InlineWebSocketHandlers<State> & { data?: any; }) {
         if (!this.server) return false;
 
+        // WebSocket upgrades must be GET requests
+        if (this.request.method !== 'GET') {
+            throw new Error('WebSocket upgrade requires GET method');
+        }
+
         let wsOptions;
 
         // Check if inline handlers are provided

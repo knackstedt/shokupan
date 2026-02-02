@@ -1122,7 +1122,7 @@ export class Dashboard implements ShokupanPlugin {
                 const remoteIP = ctx.request.headers.get('x-forwarded-for') || (ctx.req as any)?.socket?.remoteAddress;
 
                 const logEntry: RequestLog = {
-                    method: ctx.method,
+                    method: response.status === 101 ? 'WS' : ctx.method,
                     url: ctx.url.toString(),
                     status: response.status,
                     duration,
