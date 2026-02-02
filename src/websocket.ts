@@ -215,6 +215,32 @@ export class ShokupanWebsocketRouter<T = any> {
     }
 
     /**
+     * Registry Accessor to support Dashboard Graph
+     */
+    public get registry() {
+        // Collect event handlers
+        const events: any[] = [];
+        this.events.forEach((handler, name) => {
+            events.push({
+                type: 'event',
+                name,
+                handlerName: handler.name,
+                metadata: (handler as any).source ? { file: (handler as any).source.file, line: (handler as any).source.line } : undefined,
+                _fn: handler
+            });
+        });
+
+        return {
+            metadata: undefined,
+            middleware: [],
+            routes: [],
+            routers: [],
+            controllers: [],
+            events
+        };
+    }
+
+    /**
      * Check if this is a WebSocket router instance.
      * @internal
      */
