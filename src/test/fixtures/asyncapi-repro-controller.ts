@@ -1,8 +1,8 @@
 
 import { ShokupanContext } from "../../context";
-import { Controller, Event } from "../../util/decorators";
+import { Event, WebsocketController } from '../../decorators';
 
-@Controller("/")
+@WebsocketController("/")
 export class ReproController {
     @Event("ping")
     async onPing(ctx: ShokupanContext) {

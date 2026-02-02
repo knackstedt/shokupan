@@ -37,7 +37,6 @@ describe("Resilience Policies", () => {
             @CircuitBreaker({ threshold: 2, resetTimeout: 100 })
             async handle() {
                 attempts++;
-                console.log(`CB Handler called. Attempt: ${attempts}`);
                 throw new Error("Always Fail");
             }
         }
