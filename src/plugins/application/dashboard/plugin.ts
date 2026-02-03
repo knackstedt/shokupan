@@ -62,6 +62,7 @@ export interface RequestLog {
     requestHeaders?: Record<string, string>;
     responseHeaders?: Record<string, string>;
     requestBody?: any;
+    wsMessages?: any[];
 }
 
 export interface DashboardConfig {
@@ -1142,9 +1143,43 @@ export class Dashboard implements ShokupanPlugin {
                     transferred: responseSize + responseHeadersSize,
                     remoteIP,
                     requestHeaders: headers,
-                    responseHeaders: resHeaders
+                    responseHeaders: resHeaders,
+                    wsMessages: (ctx as any)._wsMessages
                 };
                 // console.log(`[Dashboard Debug] Captured ${ctx.method} ${ctx.path} -> Status: ${response.status}`); // Removed debug log
+
+                const idString = ctx.requestId;
+                if (logEntry.wsMessages) {
+                    console.log(`[Dashboard Debug] WS Messages for ${logEntry.url}:`, logEntry.wsMessages.length);
+
+                    // Attach listener for live updates
+                    let updateTimer: any;
+                    (ctx as any)._onWsMessage = (msg: any) => {
+                        console.log('[Dashboard Debug] _onWsMessage fired', msg.type, 'Total:', (ctx as any)._wsMessages.length);
+                        // Update duration
+                        const now = Date.now();
+                        const duration = now - logEntry.timestamp;
+                        logEntry.duration = duration;
+
+                        // Debounce updates
+                        if (updateTimer) return;
+                        updateTimer = setTimeout(() => {
+                            updateTimer = null;
+                            // console.log(`[Dashboard Debug] Broadcasting update for ${logEntry.url}, messages: ${logEntry.wsMessages?.length}`);
+
+                            // Re-save to DB
+                            this.db.upsert('request', idString, {
+                                ...logEntry,
+                                id: idString
+                            }).catch(() => { });
+
+                            // Broadcast
+                            // Note: broadcasting full log is heavy if messages array is huge.
+                            // But for now it's fine.
+                            this.broadcastRequestUpdates([{ ...logEntry, id: idString }]);
+                        }, 100); // 100ms debounce
+                    };
+                }
 
                 this.metrics.logs.push(logEntry);
 

@@ -439,39 +439,113 @@ export class ShokupanContext<
 
         let wsOptions;
 
-        // Check if inline handlers are provided
-        if (options !== undefined && (
-            (options as any).open !== undefined ||
-            (options as any).message !== undefined ||
-            (options as any).close !== undefined ||
-            (options as any).error !== undefined)
-        ) {
-            const handlers = options as InlineWebSocketHandlers<State>;
-            const ctx = this;
+        // Initialize tracking array
+        (this as any)._wsMessages = [];
 
-            // Wrap handlers to match Bun's WebSocket handler signature
-            wsOptions = {
-                data: {
-                    handler: {
-                        open: handlers.open ? (ws: ServerWebSocket<any>) => {
-                            // Link ws.data and ctx.state
-                            ws.data = ws.data || {};
-                            ctx.state = ws.data as State;
-                            ctx[$ws] = ws;
-                            return handlers.open(ctx, ws);
-                        } : undefined,
-                        message: handlers.message ? (ws: ServerWebSocket<any>, message: string | Buffer) => {
-                            return handlers.message(ctx, ws, message);
-                        } : undefined,
-                        close: handlers.close ? (ws: ServerWebSocket<any>, code?: number, reason?: string) => {
-                            return handlers.close(ctx, ws, code, reason);
-                        } : undefined,
-                        error: handlers.error ? (ws: ServerWebSocket<any>, error: Error) => {
-                            return handlers.error(ctx, ws, error);
-                        } : undefined
+        // Check if inline handlers are provided
+        if (options !== undefined) {
+
+            if (typeof options === 'function') {
+                // Function options not supported by Bun upgrade
+                return false;
+            }
+            else if (options && typeof (options as any).open === 'function') {
+                // It's InlineWebSocketHandlers
+                const handlers = options as InlineWebSocketHandlers<State>;
+
+                // Construct wrapped handlers
+                const wrappedHandlers = {
+                    open: (ws: ServerWebSocket<any>) => {
+                        // Method to track messages
+                        const track = (type: 'open' | 'close' | 'message', dir: 'in' | 'out', size?: number) => {
+                            const msg = {
+                                type,
+                                dir,
+                                size: size || 0,
+                                timestamp: Date.now()
+                            };
+                            (this as any)._wsMessages.push(msg);
+                            if ((this as any)._onWsMessage) {
+                                console.log('[Context Debug] calling _onWsMessage for', type);
+                                (this as any)._onWsMessage(msg);
+                            } else {
+                                console.log('[Context Debug] _onWsMessage NOT FOUND on context', (this as any)._onWsMessage);
+                            }
+                        };
+
+                        track('open', 'in');
+
+                        // Proxy send methods to capture outgoing messages
+                        const originalSend = ws.send.bind(ws);
+                        ws.send = (data, compress) => {
+                            const size = typeof data === 'string' ? data.length : (data as any)?.byteLength || 0;
+                            track('message', 'out', size);
+                            return originalSend(data, compress);
+                        };
+
+                        const originalPublish = ws.publish.bind(ws);
+                        ws.publish = (topic, data, compress) => {
+                            const size = typeof data === 'string' ? data.length : (data as any)?.byteLength || 0;
+                            track('message', 'out', size); // Note: this tracks strictly publish calls from this socket instance
+                            return originalPublish(topic, data, compress);
+                        };
+
+                        if (handlers.open) handlers.open(this, ws);
+                    },
+                    message: (ws: ServerWebSocket<any>, message: string | Buffer) => {
+                        const size = typeof message === 'string' ? message.length : (message as any)?.byteLength || 0;
+                        const msg = {
+                            type: 'message',
+                            dir: 'in',
+                            size,
+                            timestamp: Date.now()
+                        };
+                        (this as any)._wsMessages.push(msg);
+                        if ((this as any)._onWsMessage) (this as any)._onWsMessage(msg);
+
+                        if (handlers.message) handlers.message(this, ws, message);
+                    },
+                    close: (ws: ServerWebSocket<any>, code: number, message: string) => {
+                        const msg = {
+                            type: 'close',
+                            dir: 'in',
+                            size: 0,
+                            timestamp: Date.now()
+                        };
+                        (this as any)._wsMessages.push(msg);
+                        if ((this as any)._onWsMessage) (this as any)._onWsMessage(msg);
+
+                        if (handlers.close) handlers.close(this, ws, code, message);
+                    },
+                    drain: (ws: ServerWebSocket<any>) => {
+                        // Handler interface does not support drain
+                    },
+                    error: (ws: ServerWebSocket<any>, error: Error) => {
+                        const msg = {
+                            type: 'error',
+                            dir: 'in',
+                            size: 0,
+                            timestamp: Date.now()
+                        };
+                        (this as any)._wsMessages.push(msg);
+                        if ((this as any)._onWsMessage) (this as any)._onWsMessage(msg);
+
+                        if (handlers.error) handlers.error(this, ws, error);
                     }
-                }
-            };
+                };
+
+                // Inject wrappedHandlers into data.handler for BunAdapter
+                wsOptions = {
+                    data: {
+                        ...((options as any).data || {}),
+                        ctx: this,
+                        createdAt: Date.now(),
+                        ...this.state,
+                        handler: wrappedHandlers
+                    }
+                };
+            }
+
         }
 
         // Standard upgrade with data/headers

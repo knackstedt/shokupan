@@ -1,4 +1,3 @@
-
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { AsyncApiPlugin } from "../../plugins/application/asyncapi/plugin";
 import { Shokupan } from "../../shokupan";

@@ -2,6 +2,22 @@
 // Initialize Requests Table
 window.requestsTable = null;
 
+// Helper for duration
+function formatDurationPretty(ms) {
+    if (ms === undefined || ms === null) return 'Pending';
+    if (ms < 1000) return Math.round(ms) + 'ms';
+    const s = ms / 1000;
+    if (s < 60) return parseFloat(s.toFixed(1)) + 's';
+    const m = Math.floor(s / 60);
+    const remS = Math.floor(s % 60);
+    if (m < 60) {
+        return m + 'm' + (remS > 0 ? remS + 's' : '');
+    }
+    const h = Math.floor(m / 60);
+    const remM = m % 60;
+    return h + 'h' + (remM > 0 ? remM + 'm' : '');
+}
+
 // Filter State
 // Initialize Filter State
 let filterText = '';
@@ -272,7 +288,7 @@ function initRequests() {
             field: "duration",
             width: 90,
             visible: savedColumns['duration'] !== undefined ? savedColumns['duration'] : true,
-            formatter: (cell) => cell.getValue() ? Math.round(cell.getValue()) + ' ms' : 'Pending',
+            formatter: (cell) => formatDurationPretty(cell.getValue()),
             headerContextMenu: headerMenu
         },
         {
@@ -565,37 +581,164 @@ function customFilter(data) {
     return true;
 }
 
-function waterfallFormatter(cell) {
+function waterfallFormatter(cell, formatterParams, onRendered) {
     const data = cell.getData();
-    // Default to duration bar if no range yet
+
     const duration = data.duration || 0;
+    const start = data.timestamp;
 
-    // Safety check
-    if (minRequestTime === Infinity || maxRequestTime === 0) {
-        // Just show a simple bar based on some 2s default
-        const pct = Math.min(100, (duration / 2000) * 100);
-        const color = duration > 1000 ? '#ef4444' : duration > 500 ? '#f59e0b' : '#3b82f6';
-        return `<div style="width: 100%; height: 100%; display: flex; align-items: center;">
-            <div style="height: calc(100% - 4px); width: ${pct}%; background: ${color}; border-radius: 3px; min-width: 2px;"></div>
-        </div>`;
-    }
+    // Calculate percentages
+    const safeRange = Math.max(1, maxRequestTime - minRequestTime);
 
-    const totalRange = maxRequestTime - minRequestTime;
-    // Prevent divide by zero
-    const safeRange = totalRange <= 0 ? 1 : totalRange;
-
-    // Calculate start offset relative to minRequestTime
-    // We treat minRequestTime as 0%
-    // If a request started before minRequestTime (unlikely given logic), clamp to 0
-    const startTimeResult = data.timestamp - minRequestTime;
-    const startPct = Math.max(0, (startTimeResult / safeRange) * 100);
-
-    // Calculate width relative to totalRange
-    // Use a min width of 0.5% so it's visible
+    // If request is outside current view (shouldn't happen with filter, but okay)
+    // Clip
+    const startTimeResult = Math.max(0, start - minRequestTime);
+    const startPct = (startTimeResult / safeRange) * 100;
     const widthPct = Math.max(0.5, (duration / safeRange) * 100);
 
-    // Color
     const color = duration > 1000 ? '#ef4444' : duration > 500 ? '#f59e0b' : '#3b82f6';
+
+    // WebSocket Sparkline Visualization
+    // if (data.wsMessages) {
+    //      console.log('[Dashboard FE Debug] wsMessages present:', data.wsMessages.length, data.wsMessages);
+    // }
+
+    if (data.wsMessages && data.wsMessages.length > 0) {
+        const openEvent = data.wsMessages.find(m => m.type === 'open');
+        const closeEvent = data.wsMessages.find(m => m.type === 'close');
+
+        let wsStart = data.timestamp;
+        let wsEnd = data.timestamp + duration;
+        let isOpen = false;
+
+        if (openEvent) wsStart = openEvent.timestamp;
+
+        if (closeEvent) {
+            wsEnd = closeEvent.timestamp;
+        } else {
+            // Socket is still open (or at least we haven't seen a close event)
+            isOpen = true;
+            // Extend line to the current view edge (maxRequestTime) or at least current time
+            // If we rely on maxRequestTime, it will stretch to the right edge of the chart
+            wsEnd = Math.max(wsEnd, maxRequestTime);
+            // Or verify if data.duration is updating? 
+            // If data.duration is updating, wsEnd calculation using duration above is roughly correct for "time so far".
+            // But let's ensure it stretches if it's the active view time.
+        }
+
+        const wsStartPct = Math.max(0, ((wsStart - minRequestTime) / safeRange) * 100);
+        const wsEndPct = Math.min(100, ((wsEnd - minRequestTime) / safeRange) * 100);
+        const wsWidthPct = Math.max(0.5, wsEndPct - wsStartPct);
+
+        // Render pixels
+        let pixels = '';
+        const pixelMap = new Map(); // Track occupied slots for shuffling
+
+        // Debug: Check message types
+        // console.log('[requests.js] Rendering WS Messages:', data.wsMessages.length, data.wsMessages.map(m => m.type));
+
+        data.wsMessages.forEach(msg => {
+            if (msg.type !== 'message') return;
+
+            const msgTime = msg.timestamp;
+            const msgPct = ((msgTime - minRequestTime) / safeRange) * 100;
+            const isOut = msg.dir === 'out';
+            const baseColor = isOut ? '#10b981' : '#3b82f6'; // Green for out, Blue for in
+
+            // console.log(`[requests.js] Msg Pixel: time=${msgTime}, min=${minRequestTime}, range=${safeRange}, pct=${msgPct}`);
+
+            // Basic overlap handling (shuffle up/down)
+            // Just random perturbation for now or simple stack? 
+            // Let's do simple stack check ideally, but simplified: 
+            // outgoing above line, incoming below line.
+            // 2px height pixels. center line is at 50%.
+            // out: bottom at 50% + offset. in: top at 50% + offset.
+
+            // Simple stacking: if multiple messages at same approx pct (pixel bucket?), offset them
+            const bucket = Math.round(msgPct * 10); // 0.1% resolution
+            let offset = (pixelMap.get(bucket) || 0);
+            pixelMap.set(bucket, offset + 1);
+
+            // Limit stack height to avoid overflow (max 3-4 stack)
+            const stackIdx = Math.min(offset, 4);
+
+            // Vertical positioning relative to center (50%)
+            // Out: goes Up (bottom: 50%). In: goes Down (top: 50%)
+            // Pixel height 3px. spacing 1px.
+            const pixelHeight = 8;
+            const gap = 2;
+
+            let style = `
+                position: absolute;
+                left: ${msgPct}%;
+                width: 2px;
+                height: ${pixelHeight}px;
+                background: ${baseColor};
+                border-radius: 1px;
+            `;
+
+            if (isOut) {
+                // Above the line
+                style += `bottom: calc(50% + 1px + ${(pixelHeight + gap) * stackIdx}px);`;
+            } else {
+                // Below the line
+                style += `top: calc(50% + 1px + ${(pixelHeight + gap) * stackIdx}px);`;
+            }
+
+            pixels += `<div style="${style}" title="${isOut ? 'Send' : 'Recv'}: ${formatBytes(msg.size)} @ +${Math.round(msgTime - data.timestamp)}ms"></div>`;
+        });
+
+        return `<div style="width: 100%; height: 100%; display: flex; align-items: center; position: relative;">
+            <!-- Connection Line -->
+            <div style="
+                position: absolute;
+                left: ${wsStartPct}%;
+                width: ${wsWidthPct}%;
+                top: calc(50% - 1px);
+                height: 2px; 
+                background: #e5e7eb; 
+                border-radius: 1px;
+            "></div>
+
+            <!-- Start Marker -->
+            <div style="
+                position: absolute;
+                left: ${wsStartPct}%;
+                top: 50%;
+                transform: translate(-50%, -50%);
+                width: 4px;
+                height: 4px;
+                background: #6b7280;
+                border-radius: 50%;
+            " title="Open: +${Math.round(wsStart - data.timestamp)}ms"></div>
+
+            <!-- End Marker (only if closed) -->
+            ${!isOpen ? `<div style="
+                position: absolute;
+                left: ${wsEndPct}%;
+                top: 50%;
+                transform: translate(-50%, -50%);
+                width: 4px;
+                height: 4px;
+                background: #6b7280;
+                border-radius: 50%;
+            " title="Close: +${Math.round(wsEnd - data.timestamp)}ms"></div>` :
+                `<div style="
+                position: absolute;
+                left: ${wsEndPct}%;
+                top: 50%;
+                transform: translate(-50%, -50%);
+                width: 0; 
+                height: 0; 
+                border-top: 6px solid transparent;
+                border-bottom: 6px solid transparent;
+                border-left: 6px solid #10b981;
+            " title="Open / Live"></div>`
+            }
+
+            ${pixels}
+        </div>`;
+    }
 
     return `<div style="width: 100%; height: 100%; display: flex; align-items: center; position: relative;">
         <div style="
