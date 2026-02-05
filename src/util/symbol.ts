@@ -46,6 +46,9 @@ export const $mcpTools = Symbol.for("Shokupan.mcp.tools");
 export const $mcpPrompts = Symbol.for("Shokupan.mcp.prompts");
 export const $mcpResources = Symbol.for("Shokupan.mcp.resources");
 
+export const $wsMessages = Symbol.for("Shokupan.ctx.wsMessages");
+export const $onWsMessage = Symbol.for("Shokupan.ctx.onWsMessage");
+
 export const $resilienceConfig = Symbol.for("Shokupan.resilience.config");
 
 

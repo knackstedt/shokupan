@@ -41,9 +41,8 @@
     ],
     "exclude": [
         "node_modules",
-        "**/*.spec.ts",
-        "**/*.test.ts",
         "**/fixtures/**",
+        "src/**/*.spec.ts",
         "dist",
         "benchmarking",
         "src/test",

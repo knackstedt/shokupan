@@ -88,7 +88,9 @@ export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin 
             ctx.upgrade({
                 data: { bootId },  // Still pass bootId in data
                 open: (ctx, ws) => {
-                    ws.send(JSON.stringify({ type: 'hello', bootId }));
+                    if (ws) {
+                        ws.send(JSON.stringify({ type: 'hello', bootId }));
+                    }
                 }
             });
         });

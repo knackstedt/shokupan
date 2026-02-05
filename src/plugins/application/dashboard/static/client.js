@@ -55,16 +55,10 @@
         // Determine WS URL
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         // Handle relative path for dashboard mount
-        let path = window.location.pathname;
+        // Use configured base path if available, otherwise fallback to location logic
+        let path = (window.SHOKUPAN_CONFIG && window.SHOKUPAN_CONFIG.base) ? window.SHOKUPAN_CONFIG.base : window.location.pathname;
         if (!path.endsWith('/')) path += '/';
-        // remove "dashboard/" or "dashboard" from end if present to get root? 
-        // No, the plugin mounted the router at /dashboard usually. 
-        // But the WS route is on the SAME router.
-        // So if dashboard is at /dashboard, ws is at /dashboard/ws.
 
-        // Actually, window.location.pathname includes the mount path. 
-        // If we are at /dashboard/, we want /dashboard/ws.
-        // If we are at /admin/dashboard/, we want /admin/dashboard/ws.
         const wsUrl = protocol + '//' + window.location.host + path + 'ws';
 
         console.log("Connecting to WebSocket:", wsUrl);

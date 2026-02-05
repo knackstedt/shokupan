@@ -599,6 +599,13 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
     autoBackpressureLevel?: number;
 
     /**
+     * Whether to enable tracking of WebSocket messages on the Context.
+     * Required for dashboard visualization of WebSocket data.
+     * @default false
+     */
+    enableWebSocketTracking?: boolean;
+
+    /**
      * Whether to enable automatic content negotiation for ctx.json() and other response methods.
      * When enabled, ctx.json() will use the response transformer registry to negotiate the best
      * response format based on the Accept header.

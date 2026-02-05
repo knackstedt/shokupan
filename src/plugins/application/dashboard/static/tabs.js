@@ -1,33 +1,45 @@
 // --- Tabs Logic ---
 function switchTab(tabId) {
     console.log('Switching to tab:', tabId);
-    // Update buttons
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    // Find the button that was clicked using robust data-tab attribute
-    const btn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
-    if (btn) btn.classList.add('active');
+    try {
+        // Update buttons
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        // Find the button that was clicked using robust data-tab attribute
+        const btn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+        if (btn) btn.classList.add('active');
 
-    // Update content
-    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    document.getElementById('tab-' + tabId).classList.add('active');
-
-    if (tabId === 'overview') {
-        if (typeof fetchTopStats === 'function') fetchTopStats();
-    }
-    else if (tabId === 'application') {
-        const activeView = document.querySelector('.app-view.active');
-        if (!activeView || activeView.id === 'app-view-registry') {
-            switchApplicationView('registry');
-        } else {
-            switchApplicationView('graph');
+        // Update content
+        const tabContent = document.getElementById('tab-' + tabId);
+        if (!tabContent) {
+            console.error(`Tab content #tab-${tabId} not found`);
+            return;
         }
-    }
-    else if (tabId === 'network') {
-        if (typeof fetchRequests === 'function') fetchRequests();
-        // Redraw table if it exists to fix layout issues when unhiding
-        setTimeout(() => {
-            if (window.requestsTable) window.requestsTable.redraw();
-        }, 50);
+
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        tabContent.classList.add('active');
+
+        if (tabId === 'overview') {
+            if (typeof fetchTopStats === 'function') fetchTopStats();
+        }
+        else if (tabId === 'application') {
+            const activeView = document.querySelector('.app-view.active');
+            if (!activeView || activeView.id === 'app-view-registry') {
+                switchApplicationView('registry');
+            } else {
+                switchApplicationView('graph');
+            }
+        }
+        else if (tabId === 'network') {
+            if (typeof fetchRequests === 'function') fetchRequests();
+            // Redraw table if it exists to fix layout issues when unhiding
+            setTimeout(() => {
+                if (window.requestsTable && typeof window.requestsTable.redraw === 'function') {
+                    window.requestsTable.redraw();
+                }
+            }, 50);
+        }
+    } catch (e) {
+        console.error('Error switching tab:', e);
     }
 }
 
@@ -145,4 +157,41 @@ async function fetchFailures() {
     } catch (e) {
         console.error("Failed to fetch failures", e);
     }
+}
+
+// Initialize tabs and navigation
+function initTabs() {
+    console.log('Initializing tabs...');
+
+    // Main tabs
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const tabId = e.currentTarget.getAttribute('data-tab');
+            if (tabId) switchTab(tabId);
+        });
+    });
+
+    // Application view tabs
+    document.querySelectorAll('.view-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            // We need to determine the view ID. 
+            // The previous onclick was "switchApplicationView('registry')"
+            // Let's assume we can infer it or we might need to add data attributes to components.tsx first.
+            // Wait, looking at components.tsx, view-btns don't have data attributes for the view, 
+            // only the onclick. We should add data-view="registry" etc in components.tsx.
+            // But for now, let's try to support the existing structure if possible, 
+            // or better yet, we will update components.tsx to add data-view attributes 
+            // AT THE SAME TIME as removing onclick.
+
+            // For now, let's assume we add data-view to the buttons in components.tsx
+            const viewId = e.currentTarget.getAttribute('data-view');
+            if (viewId) switchApplicationView(viewId);
+        });
+    });
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTabs);
+} else {
+    initTabs();
 }

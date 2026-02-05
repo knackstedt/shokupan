@@ -263,7 +263,7 @@ function pushData(chart, label, datasetValues) {
         chart.data.datasets[idx].data.push(val);
         if (chart.data.datasets[idx].data.length > 60) chart.data.datasets[idx].data.shift();
     });
-    chart.update('none'); // 'none' for smooth animation
+    chart.update(); // Use default update for reliability
 }
 
 // Initialize charts with history
@@ -332,6 +332,8 @@ window.initCharts = function (history) {
 // Push a single metric update
 window.pushChartData = function (metric) {
     if (!metric) return;
+    // Debug log
+    console.log('[Dashboard Client] pushChartData called', metric);
     const label = new Date(metric.timestamp).toLocaleTimeString();
 
     pushData(latencyChart, label, [

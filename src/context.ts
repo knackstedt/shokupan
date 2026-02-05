@@ -10,7 +10,7 @@ import { VALID_HTTP_STATUSES, VALID_REDIRECT_STATUSES } from './util/http-status
 import { parseQuery } from './util/query-string';
 import type { ShokupanRequest } from './util/request';
 import { ShokupanResponse } from './util/response';
-import { $bodyParsed, $bodyParseError, $bodyType, $cachedBody, $cachedCookies, $cachedHost, $cachedHostname, $cachedOrigin, $cachedProtocol, $cachedQuery, $debug, $finalResponse, $io, $rawBody, $requestId, $routeMatched, $socket, $url, $ws } from './util/symbol';
+import { $bodyParsed, $bodyParseError, $bodyType, $cachedBody, $cachedCookies, $cachedHost, $cachedHostname, $cachedOrigin, $cachedProtocol, $cachedQuery, $debug, $finalResponse, $io, $onWsMessage, $rawBody, $requestId, $routeMatched, $socket, $url, $ws, $wsMessages } from './util/symbol';
 import type { CookieOptions, HeadersInit, JSXRenderer, SSEMessage, SSEStreamErrorHandler, SSEStreamHelper, StreamErrorHandler, StreamHelper, TextStreamErrorHandler, TextStreamHelper } from './util/types';
 
 /**
@@ -440,7 +440,6 @@ export class ShokupanContext<
         let wsOptions;
 
         // Initialize tracking array
-        (this as any)._wsMessages = [];
 
         // Check if inline handlers are provided
         if (options !== undefined) {
@@ -453,82 +452,108 @@ export class ShokupanContext<
                 // It's InlineWebSocketHandlers
                 const handlers = options as InlineWebSocketHandlers<State>;
 
+                // Check configuration
+                // Always wrap handlers to ensure `ctx` injection, regardless of tracking config
+                // This fixes the signature mismatch between router (ctx, ws) and adapter/bun (ws)
+
+                // Initialize tracking array if enabled
+                if (this.app.applicationConfig.enableWebSocketTracking) {
+                    (this as any)[$wsMessages] = [];
+                }
+
                 // Construct wrapped handlers
-                const wrappedHandlers = {
+                const WrappedHandler = {
                     open: (ws: ServerWebSocket<any>) => {
-                        // Method to track messages
-                        const track = (type: 'open' | 'close' | 'message', dir: 'in' | 'out', size?: number) => {
+                        // Tracking Logic (if enabled)
+                        if (this.app.applicationConfig.enableWebSocketTracking) {
+                            const track = (type: 'open' | 'close' | 'message', dir: 'in' | 'out', size?: number) => {
+                                const msg = {
+                                    type,
+                                    dir,
+                                    size: size || 0,
+                                    timestamp: Date.now()
+                                };
+                                (this as any)[$wsMessages].push(msg);
+                                // console.log('[Context Debug] Tracking WS Message:', type, dir, 'Handler:', !!(this as any)[$onWsMessage], 'ID:', this.requestId);
+                                if ((this as any)[$onWsMessage]) {
+                                    (this as any)[$onWsMessage](msg);
+                                }
+                            };
+
+                            track('open', 'in');
+
+                            // Proxy send methods to capture outgoing messages
+                            const originalSend = ws.send.bind(ws);
+                            ws.send = (data, compress) => {
+                                const size = typeof data === 'string' ? data.length : (data as any)?.byteLength || 0;
+                                track('message', 'out', size);
+                                return originalSend(data, compress);
+                            };
+
+                            const originalPublish = ws.publish.bind(ws);
+                            ws.publish = (topic, data, compress) => {
+                                const size = typeof data === 'string' ? data.length : (data as any)?.byteLength || 0;
+                                track('message', 'out', size);
+                                return originalPublish(topic, data, compress);
+                            };
+                        }
+
+                        if (this.app.applicationConfig.enableWebSocketTracking) {
                             const msg = {
-                                type,
-                                dir,
-                                size: size || 0,
+                                type: 'open',
+                                dir: 'in',
+                                size: 0,
                                 timestamp: Date.now()
                             };
-                            (this as any)._wsMessages.push(msg);
-                            if ((this as any)._onWsMessage) {
-                                console.log('[Context Debug] calling _onWsMessage for', type);
-                                (this as any)._onWsMessage(msg);
-                            } else {
-                                console.log('[Context Debug] _onWsMessage NOT FOUND on context', (this as any)._onWsMessage);
-                            }
-                        };
-
-                        track('open', 'in');
-
-                        // Proxy send methods to capture outgoing messages
-                        const originalSend = ws.send.bind(ws);
-                        ws.send = (data, compress) => {
-                            const size = typeof data === 'string' ? data.length : (data as any)?.byteLength || 0;
-                            track('message', 'out', size);
-                            return originalSend(data, compress);
-                        };
-
-                        const originalPublish = ws.publish.bind(ws);
-                        ws.publish = (topic, data, compress) => {
-                            const size = typeof data === 'string' ? data.length : (data as any)?.byteLength || 0;
-                            track('message', 'out', size); // Note: this tracks strictly publish calls from this socket instance
-                            return originalPublish(topic, data, compress);
-                        };
+                            (this as any)[$wsMessages].push(msg);
+                            if ((this as any)[$onWsMessage]) (this as any)[$onWsMessage](msg);
+                        }
 
                         if (handlers.open) handlers.open(this, ws);
                     },
                     message: (ws: ServerWebSocket<any>, message: string | Buffer) => {
-                        const size = typeof message === 'string' ? message.length : (message as any)?.byteLength || 0;
-                        const msg = {
-                            type: 'message',
-                            dir: 'in',
-                            size,
-                            timestamp: Date.now()
-                        };
-                        (this as any)._wsMessages.push(msg);
-                        if ((this as any)._onWsMessage) (this as any)._onWsMessage(msg);
+                        if (this.app.applicationConfig.enableWebSocketTracking) {
+                            const size = typeof message === 'string' ? message.length : (message as any)?.byteLength || 0;
+                            const msg = {
+                                type: 'message',
+                                dir: 'in',
+                                size,
+                                timestamp: Date.now()
+                            };
+                            (this as any)[$wsMessages].push(msg);
+                            if ((this as any)[$onWsMessage]) (this as any)[$onWsMessage](msg);
+                        }
 
                         if (handlers.message) handlers.message(this, ws, message);
                     },
                     close: (ws: ServerWebSocket<any>, code: number, message: string) => {
-                        const msg = {
-                            type: 'close',
-                            dir: 'in',
-                            size: 0,
-                            timestamp: Date.now()
-                        };
-                        (this as any)._wsMessages.push(msg);
-                        if ((this as any)._onWsMessage) (this as any)._onWsMessage(msg);
+                        if (this.app.applicationConfig.enableWebSocketTracking) {
+                            const msg = {
+                                type: 'close',
+                                dir: 'in',
+                                size: 0,
+                                timestamp: Date.now()
+                            };
+                            (this as any)[$wsMessages].push(msg);
+                            if ((this as any)[$onWsMessage]) (this as any)[$onWsMessage](msg);
+                        }
 
                         if (handlers.close) handlers.close(this, ws, code, message);
                     },
                     drain: (ws: ServerWebSocket<any>) => {
-                        // Handler interface does not support drain
+                        // Handler interface does not support drain yet, but adapter calls it
                     },
                     error: (ws: ServerWebSocket<any>, error: Error) => {
-                        const msg = {
-                            type: 'error',
-                            dir: 'in',
-                            size: 0,
-                            timestamp: Date.now()
-                        };
-                        (this as any)._wsMessages.push(msg);
-                        if ((this as any)._onWsMessage) (this as any)._onWsMessage(msg);
+                        if (this.app.applicationConfig.enableWebSocketTracking) {
+                            const msg = {
+                                type: 'error',
+                                dir: 'in',
+                                size: 0,
+                                timestamp: Date.now()
+                            };
+                            (this as any)[$wsMessages].push(msg);
+                            if ((this as any)[$onWsMessage]) (this as any)[$onWsMessage](msg);
+                        }
 
                         if (handlers.error) handlers.error(this, ws, error);
                     }
@@ -541,7 +566,7 @@ export class ShokupanContext<
                         ctx: this,
                         createdAt: Date.now(),
                         ...this.state,
-                        handler: wrappedHandlers
+                        handler: WrappedHandler
                     }
                 };
             }

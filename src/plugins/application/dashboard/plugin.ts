@@ -9,7 +9,7 @@ import type { DebugCollector } from "../../../context";
 import { ShokupanRouter } from "../../../router";
 import type { Shokupan } from '../../../shokupan';
 import { getEditorLinkPattern } from '../../../util/ide';
-import { $appRoot, $childRouters, $debug, $mountPath } from "../../../util/symbol";
+import { $appRoot, $childRouters, $debug, $mountPath, $onWsMessage, $wsMessages } from "../../../util/symbol";
 import type { ShokupanHooks, ShokupanPlugin } from "../../../util/types";
 import { DashboardApp } from './components';
 import { FetchInterceptor, type OutboundRequestLog } from './fetch-interceptor';
@@ -737,7 +737,8 @@ export class Dashboard implements ShokupanPlugin {
             const staticFiles = [
                 'charts.js', 'failures.js', 'graph.mjs', 'client.js',
                 'reactflow.css', 'registry.css', 'registry.js', 'requests.js',
-                'styles.css', 'tables.js', 'tabs.js', 'tabulator.css', 'theme.css'
+                'styles.css', 'tables.js', 'tabs.js', 'tabulator.css', 'theme.css',
+                'timeline.js', 'replay.js', 'init_controls.js'
             ];
 
             if (staticFiles.includes(path)) {
@@ -831,7 +832,9 @@ export class Dashboard implements ShokupanPlugin {
         });
 
         for (const client of this.clients) {
-            client.send(data);
+            if (client?.send) {
+                client.send(data);
+            }
         }
     }
 
@@ -878,8 +881,12 @@ export class Dashboard implements ShokupanPlugin {
         };
 
         this[$appRoot]?.logger?.debug('Dashboard', `Sending init message with ${history.length} history points`);
-        ws.send(JSON.stringify(message));
-        this[$appRoot]?.logger?.debug('Dashboard', `Init message sent successfully`);
+
+        // Ensure WS is still valid after async operation
+        if (ws && typeof ws.send === 'function') {
+            ws.send(JSON.stringify(message));
+            this[$appRoot]?.logger?.debug('Dashboard', `Init message sent successfully`);
+        }
     }
 
     private broadcastMetrics() {
@@ -893,7 +900,9 @@ export class Dashboard implements ShokupanPlugin {
         });
 
         for (const client of this.clients) {
-            client.send(data);
+            if (client?.send) {
+                client.send(data);
+            }
         }
     }
 
@@ -994,6 +1003,22 @@ export class Dashboard implements ShokupanPlugin {
                 this.metrics.activeRequests++; // INCREMENTS
                 (ctx as any)._startTime = performance.now();
                 (ctx as any)._reqStartTime = Date.now();
+
+                // Capture IP early while request is fresh
+                let cachedRemoteIP = (ctx as any).ip || ctx.request.headers.get('x-forwarded-for') || (ctx.req as any)?.socket?.remoteAddress;
+                // Fallback for Bun
+                if (!cachedRemoteIP && typeof (globalThis as any).Bun !== 'undefined' && (ctx.app as any).server) {
+                    cachedRemoteIP = (ctx.app as any).server.requestIP(ctx.req);
+                }
+                if (cachedRemoteIP && typeof cachedRemoteIP === 'object') {
+                    cachedRemoteIP = cachedRemoteIP.address;
+                }
+                (ctx as any)._cachedRemoteIP = cachedRemoteIP;
+
+                // Initialize WebSocket tracking storage early
+                if ((ctx.app as any).applicationConfig.enableWebSocketTracking) {
+                    (ctx as any)[$wsMessages] = [];
+                }
 
                 // Attach Collector
                 ctx[$debug] = new Collector(this);
@@ -1119,8 +1144,17 @@ export class Dashboard implements ShokupanPlugin {
                 const responseHeadersSize = Object.entries(response.headers || {}).reduce((acc, [k, v]) => acc + k.length + String(v).length + 2, 0);
                 const responseSize = (ctx as any).responseBody ? String((ctx as any).responseBody).length : 0;
 
-                // Try to get remote IP from various headers or socket
-                const remoteIP = ctx.request.headers.get('x-forwarded-for') || (ctx.req as any)?.socket?.remoteAddress;
+                // Try to get remote IP from various headers or socket, or use cached value
+                let remoteIP = (ctx as any)._cachedRemoteIP || (ctx as any).ip || ctx.request.headers.get('x-forwarded-for') || (ctx.req as any)?.socket?.remoteAddress;
+
+                // Fallback for Bun
+                if (!remoteIP && typeof (globalThis as any).Bun !== 'undefined' && (ctx.app as any).server) {
+                    remoteIP = (ctx.app as any).server.requestIP(ctx.req);
+                }
+
+                if (remoteIP && typeof remoteIP === 'object') {
+                    remoteIP = remoteIP.address;
+                }
 
                 const logEntry: RequestLog = {
                     method: response.status === 101 ? 'WS' : ctx.method,
@@ -1144,18 +1178,23 @@ export class Dashboard implements ShokupanPlugin {
                     remoteIP,
                     requestHeaders: headers,
                     responseHeaders: resHeaders,
-                    wsMessages: (ctx as any)._wsMessages
+                    wsMessages: (ctx as any)[$wsMessages]
                 };
                 // console.log(`[Dashboard Debug] Captured ${ctx.method} ${ctx.path} -> Status: ${response.status}`); // Removed debug log
 
                 const idString = ctx.requestId;
-                if (logEntry.wsMessages) {
-                    console.log(`[Dashboard Debug] WS Messages for ${logEntry.url}:`, logEntry.wsMessages.length);
+                if ((ctx.app as any).applicationConfig.enableWebSocketTracking) {
+                    // console.log(`[Dashboard Debug] Assigning listener for ID: ${idString}`);
 
                     // Attach listener for live updates
                     let updateTimer: any;
-                    (ctx as any)._onWsMessage = (msg: any) => {
-                        console.log('[Dashboard Debug] _onWsMessage fired', msg.type, 'Total:', (ctx as any)._wsMessages.length);
+                    (ctx as any)[$onWsMessage] = (msg: any) => {
+                        // Link messages array if not yet linked (because upgrade happens after request log creation)
+                        if (!logEntry.wsMessages) {
+                            logEntry.wsMessages = (ctx as any)[$wsMessages];
+                        }
+
+                        console.log('[Dashboard Debug] _onWsMessage fired', msg.type, 'Total:', (ctx as any)[$wsMessages]?.length);
                         // Update duration
                         const now = Date.now();
                         const duration = now - logEntry.timestamp;
@@ -1205,6 +1244,9 @@ export class Dashboard implements ShokupanPlugin {
                 const strategy = this.dashboardConfig.updateStrategy || 'immediate';
 
                 if (strategy === 'immediate') {
+                    if (logEntry.method === 'WS' || response.status === 101) {
+                        console.log('[Dashboard Plugin] Broadcasting WS Data:', JSON.stringify(requestData));
+                    }
                     this.broadcastRequestUpdates([requestData]);
                 } else {
                     // Buffer request for WS push
@@ -1248,7 +1290,9 @@ export class Dashboard implements ShokupanPlugin {
         });
 
         for (const client of this.clients) {
-            client.send(data);
+            if (client?.send) {
+                client.send(data);
+            }
         }
     }
 

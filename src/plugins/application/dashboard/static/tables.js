@@ -1,14 +1,40 @@
+console.log("tables.js loading...");
+
+// Helper for duration formatting
+function printDuration(ms) {
+    if (ms === undefined || ms === null) return 'Pending';
+    if (ms < 1000) return Math.round(ms) + 'ms';
+    const s = ms / 1000;
+    if (s < 60) return parseFloat(s.toFixed(1)) + 's';
+    const m = Math.floor(s / 60);
+    const remS = Math.floor(s % 60);
+    if (m < 60) {
+        return m + 'm' + (remS > 0 ? remS + 's' : '');
+    }
+    const h = Math.floor(m / 60);
+    const remM = m % 60;
+    return h + 'h' + (remM > 0 ? remM + 'm' : '');
+}
+
 
 // --- Table Config Helper ---
 function createTable(id, columns, placeholder = "No data available") {
-    return new Tabulator(id, {
-        layout: "fitColumns",
-        height: "300px",
-        placeholder: placeholder,
-        data: [],
-        columns: columns,
-        layoutColumnsOnNewData: true,
-    });
+    console.log(`Creating table: ${id}`);
+    try {
+        const table = new Tabulator(id, {
+            layout: "fitColumns",
+            height: "300px",
+            placeholder: placeholder,
+            data: [],
+            columns: columns,
+            layoutColumnsOnNewData: true,
+        });
+        console.log(`Table created: ${id}`);
+        return table;
+    } catch (e) {
+        console.error(`Error creating table ${id}:`, e);
+        return null;
+    }
 }
 
 // --- Top Requests Table ---
@@ -89,4 +115,3 @@ document.addEventListener("DOMContentLoaded", () => {
     // Refresh periodically
     setInterval(fetchTopStats, 10000);
 });
-

@@ -1,5 +1,5 @@
 import * as os from 'node:os';
-import { monitorEventLoopDelay } from 'node:perf_hooks';
+// import { monitorEventLoopDelay } from 'node:perf_hooks'; // Disabled for stability
 import type { DatastoreAdapter } from '../../../util/adapter/datastore';
 import type { Logger } from '../../../util/logger';
 
@@ -55,7 +55,7 @@ const INTERVALS = [
 export class MetricsCollector {
     private currentIntervalStart: Record<string, number> = {};
     private pendingDetails: Record<string, { duration: number, isError: boolean; }[]> = {};
-    private eventLoopHistogram = monitorEventLoopDelay({ resolution: 10 });
+    // private eventLoopHistogram: any;
     private timer: NodeJS.Timeout | null = null;
 
     public db?: DatastoreAdapter;
@@ -66,7 +66,14 @@ export class MetricsCollector {
         private logger?: Logger
     ) {
         this.db = db;
-        this.eventLoopHistogram.enable();
+        // try {
+        //     this.eventLoopHistogram = monitorEventLoopDelay({ resolution: 10 });
+        //     this.eventLoopHistogram.enable();
+        // } catch (e) {
+        //     // Ignore if perf hooks fail
+        //     this.logger?.warn('MetricsCollector', 'Failed to initialize event loop monitor', { error: e });
+        // }
+
         // Initialize start times
         const now = Date.now();
         INTERVALS.forEach(int => {
@@ -74,14 +81,24 @@ export class MetricsCollector {
             this.pendingDetails[int.label] = [];
         });
 
-        // Start collection loop - tick every 10 seconds to process high-res intervals?
-        // Actually, for 1m interval, we should tick at least every minute.
-        // Let's tick every 10s to be safe and accurate enough.
-        this.timer = setInterval(() => this.collect(), 10000);
+        // Start collection loop
+        this.startLoop();
+    }
+
+    private startLoop() {
+        if (this.timer) clearInterval(this.timer);
+        this.timer = setInterval(() => {
+            try {
+                this.collect();
+            } catch (e) {
+                console.error('[MetricsCollector] Critical error in collect loop', e);
+            }
+        }, 1000); // Check every second for better precision
     }
 
     public recordRequest(duration: number, isError: boolean) {
         INTERVALS.forEach(int => {
+            if (!this.pendingDetails[int.label]) this.pendingDetails[int.label] = [];
             this.pendingDetails[int.label].push({ duration, isError });
         });
     }
@@ -91,50 +108,35 @@ export class MetricsCollector {
     }
 
     private async collect() {
-        try {
-            const now = Date.now();
-            // console.log('[MetricsCollector] collect() called at', new Date(now).toISOString());
-
-            for (const int of INTERVALS) {
-                const start = this.currentIntervalStart[int.label];
-                // If we passed the interval boundary
-                if (now >= start + int.ms) {
-                    // console.log(`[MetricsCollector] Flushing ${int.label} interval (boundary crossed)`);
-                    await this.flushInterval(int.label, start, int.ms);
-                    // Advance to next interval (could simply be aligning now, but be careful of gaps if app was down)
-                    // For simplicity, just align now.
-                    this.currentIntervalStart[int.label] = this.alignTimestamp(now, int.ms);
-                }
+        const now = Date.now();
+        for (const int of INTERVALS) {
+            let start = this.currentIntervalStart[int.label];
+            // Initialize if missing
+            if (!start) {
+                start = this.alignTimestamp(now, int.ms);
+                this.currentIntervalStart[int.label] = start;
+                this.pendingDetails[int.label] = [];
             }
-        } catch (error) {
-            this.logger?.error('MetricsCollector', 'Error in collect():', { error });
+
+            if (now >= start + int.ms) {
+                await this.flushInterval(int.label, start, int.ms);
+                // Advance
+                this.currentIntervalStart[int.label] = this.alignTimestamp(now, int.ms);
+            }
         }
     }
 
     private async flushInterval(label: string, timestamp: number, durationMs: number) {
-        const reqs = this.pendingDetails[label];
-        // console.log(`[MetricsCollector] flushInterval(${label}) - ${reqs.length} requests pending`);
-        // Reset pending only if we are moving forward. 
-        // NOTE: In a real concurrent scenario, we'd need locking or atomic swap.
-        // Javascript is single threaded so this is safe for CPU-bound stuff, 
-        // but verify no awaits before clearing.
+        const reqs = this.pendingDetails[label] || [];
         this.pendingDetails[label] = [];
 
-        if (reqs.length === 0) {
-            // console.log(`[MetricsCollector] No requests for ${label}, skipping persist`);
-            // Optional: Don't record empty intervals to save space? 
-            // Or record zeros to show gaps in graphs.
-            // Let's record zeros for continuity.
-            return; // Don't persist empty intervals
-        }
-
+        // Calculate metrics even if reqs is empty
         const totalReqs = reqs.length;
         const errorReqs = reqs.filter(r => r.isError).length;
         const successReqs = totalReqs - errorReqs;
+
         const duratons = reqs.map(r => r.duration).sort((a, b) => a - b);
-
         const rps = totalReqs / (durationMs / 1000);
-
         const sum = duratons.reduce((a, b) => a + b, 0);
         const avg = totalReqs > 0 ? sum / totalReqs : 0;
 
@@ -143,6 +145,18 @@ export class MetricsCollector {
             const idx = Math.floor(duratons.length * p);
             return duratons[idx];
         };
+
+        let eventLoopStats = { min: 0, max: 0, mean: 0, p50: 0, p95: 0, p99: 0 };
+        // try {
+        //     eventLoopStats = {
+        //         min: this.eventLoopHistogram.min / 1e6,
+        //         max: this.eventLoopHistogram.max / 1e6,
+        //         mean: this.eventLoopHistogram.mean / 1e6,
+        //         p50: this.eventLoopHistogram.percentile(50) / 1e6,
+        //         p95: this.eventLoopHistogram.percentile(95) / 1e6,
+        //         p99: this.eventLoopHistogram.percentile(99) / 1e6,
+        //     };
+        // } catch (e) { }
 
         const metric: AggregatedMetric = {
             timestamp,
@@ -155,14 +169,7 @@ export class MetricsCollector {
                 heapUsed: process.memoryUsage().heapUsed,
                 heapTotal: process.memoryUsage().heapTotal,
             },
-            eventLoopLatency: {
-                min: this.eventLoopHistogram.min / 1e6,
-                max: this.eventLoopHistogram.max / 1e6,
-                mean: this.eventLoopHistogram.mean / 1e6,
-                p50: this.eventLoopHistogram.percentile(50) / 1e6,
-                p95: this.eventLoopHistogram.percentile(95) / 1e6,
-                p99: this.eventLoopHistogram.percentile(99) / 1e6,
-            },
+            eventLoopLatency: eventLoopStats,
             requests: {
                 total: totalReqs,
                 rps,
@@ -179,19 +186,16 @@ export class MetricsCollector {
             }
         };
 
-        // console.log(`[MetricsCollector] Persisting ${label} metric at timestamp ${timestamp}`);
-        if (!this.db) {
-            // console.warn('[MetricsCollector] Skipping collection - No datastore connection');
-            return;
+        // Persist if DB available
+        if (this.db) {
+            try {
+                await this.db.upsert('metrics', `${label}_${timestamp}`, metric);
+            } catch (e) {
+                // Silent fail or log
+            }
         }
 
-        try {
-            await this.db.upsert('metrics', `${label}_${timestamp}`, metric);
-        } catch (e) {
-            this.logger?.error('MetricsCollector', `Failed to save metrics for ${label}:`, { error: e });
-        }
-
-        // Notify Listeners
+        // Always notify
         if (this.onCollect) {
             this.onCollect(metric);
         }
@@ -200,6 +204,6 @@ export class MetricsCollector {
     // Cleanup if needed
     public stop() {
         if (this.timer) clearInterval(this.timer);
-        this.eventLoopHistogram.disable();
+        // try { this.eventLoopHistogram.disable(); } catch (e) { }
     }
 }

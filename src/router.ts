@@ -20,7 +20,7 @@ import { HTTP_STATUS } from './util/http-status';
 import { McpProtocol, type McpPrompt } from './util/mcp-protocol';
 import { MiddlewareTracker } from './util/middleware-tracker';
 import { ShokupanRequest } from './util/request';
-import { $appRoot, $childControllers, $childRouters, $debug, $dispatch, $isApplication, $isMounted, $isRouter, $mountPath, $parent, $routeSpec, $routes, $ws } from './util/symbol';
+import { $appRoot, $childControllers, $childRouters, $debug, $dispatch, $isApplication, $isMounted, $isRouter, $mountPath, $onWsMessage, $parent, $routeSpec, $routes, $ws, $wsMessages } from './util/symbol';
 import { RouterTrie } from './util/trie';
 import { type GuardAPISpec, type HeadersInit, type JSXRenderer, type Method, type MethodAPISpec, type Middleware, type OpenAPIOptions, type ProcessResult, type RequestOptions, type RouteMetadata, type RouteParams, type ShokupanController, type ShokupanHandler, type ShokupanHooks, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions } from './util/types';
 import { ShokupanWebsocketRouter } from './websocket';
@@ -451,12 +451,59 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                         }
                         ctx[$ws] = ws;
                     }
+
+                    // --- WebSocket Message Tracking ---
+                    // Initialize storage
+                    // Initialize storage
+                    if (!(ctx as any)[$wsMessages]) (ctx as any)[$wsMessages] = [];
+
+                    // Wrap send to capture outbound messages
+                    const originalSend = ws.send.bind(ws);
+                    ws.send = (data, compress) => {
+                        const size = typeof data === 'string' ? data.length : (data instanceof ArrayBuffer ? data.byteLength : 0);
+                        const msg = {
+                            type: 'message',
+                            dir: 'out',
+                            timestamp: Date.now(),
+                            data: data,
+                            size: size
+                        };
+                        (ctx as any)[$wsMessages].push(msg);
+                        if ((ctx as any)[$onWsMessage]) (ctx as any)[$onWsMessage](msg);
+                        return originalSend(data, compress);
+                    };
+
+                    // Track Open Event
+                    const openMsg = {
+                        type: 'open',
+                        dir: 'system',
+                        timestamp: Date.now(),
+                        size: 0
+                    };
+                    (ctx as any)[$wsMessages].push(openMsg);
+                    if ((ctx as any)[$onWsMessage]) (ctx as any)[$onWsMessage](openMsg);
+                    // ----------------------------------
                 },
                 message: async (ctx, ws, message) => {
                     // Call onMessage
                     if (handlers.onMessage) {
                         await handlers.onMessage(ctx, ws, message);
                     }
+
+                    // --- WebSocket Message Tracking ---
+                    const size = typeof message === 'string' ? message.length : (message instanceof ArrayBuffer ? message.byteLength : 0);
+                    const msg = {
+                        type: 'message',
+                        dir: 'in',
+                        timestamp: Date.now(),
+                        data: message,
+                        size: size
+                    };
+                    if ((ctx as any)[$wsMessages]) {
+                        (ctx as any)[$wsMessages].push(msg);
+                        if ((ctx as any)[$onWsMessage]) (ctx as any)[$onWsMessage](msg);
+                    }
+                    // ----------------------------------
 
                     // Try to parse as JSON for event routing
                     if (typeof message === 'string' && message.startsWith('{')) {
@@ -488,6 +535,21 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                     if (handlers.onClose) {
                         await handlers.onClose(ctx, ws, code, reason);
                     }
+
+                    // --- WebSocket Message Tracking ---
+                    const closeMsg = {
+                        type: 'close',
+                        dir: 'system',
+                        timestamp: Date.now(),
+                        size: 0,
+                        code,
+                        reason
+                    };
+                    if ((ctx as any)[$wsMessages]) {
+                        (ctx as any)[$wsMessages].push(closeMsg);
+                        if ((ctx as any)[$onWsMessage]) (ctx as any)[$onWsMessage](closeMsg);
+                    }
+                    // ----------------------------------
                 }
             });
         });
@@ -538,6 +600,37 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                             }
                         }
                     }
+
+                    // --- WebSocket Message Tracking ---
+                    // Initialize storage
+                    if (!(ctx as any)[$wsMessages]) (ctx as any)[$wsMessages] = [];
+
+                    // Wrap send to capture outbound messages
+                    const originalSend = ws.send.bind(ws);
+                    ws.send = (data, compress) => {
+                        const size = typeof data === 'string' ? data.length : (data instanceof ArrayBuffer ? data.byteLength : 0);
+                        const msg = {
+                            type: 'message',
+                            dir: 'out',
+                            timestamp: Date.now(),
+                            data: data,
+                            size: size
+                        };
+                        (ctx as any)[$wsMessages].push(msg);
+                        if ((ctx as any)[$onWsMessage]) (ctx as any)[$onWsMessage](msg);
+                        return originalSend(data, compress);
+                    };
+
+                    // Track Open Event
+                    const openMsg = {
+                        type: 'open',
+                        dir: 'system',
+                        timestamp: Date.now(),
+                        size: 0
+                    };
+                    (ctx as any)[$wsMessages].push(openMsg);
+                    if ((ctx as any)[$onWsMessage]) (ctx as any)[$onWsMessage](openMsg);
+                    // ----------------------------------
                 },
                 message: async (ctx, ws, message) => {
                     // Call onMessage (if defined)
@@ -547,6 +640,21 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                             await messageMethod.call(instance, ctx, ws, message);
                         }
                     }
+
+                    // --- WebSocket Message Tracking ---
+                    const size = typeof message === 'string' ? message.length : (message instanceof ArrayBuffer ? message.byteLength : 0);
+                    const msg = {
+                        type: 'message',
+                        dir: 'in',
+                        timestamp: Date.now(),
+                        data: message,
+                        size: size
+                    };
+                    if ((ctx as any)[$wsMessages]) {
+                        (ctx as any)[$wsMessages].push(msg);
+                        if ((ctx as any)[$onWsMessage]) (ctx as any)[$onWsMessage](msg);
+                    }
+                    // ----------------------------------
 
                     // Try to parse as JSON for event routing
                     if (typeof message === 'string' && message.startsWith('{')) {
@@ -588,6 +696,21 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                             await closeMethod.call(instance, ctx, ws, code, reason);
                         }
                     }
+
+                    // --- WebSocket Message Tracking ---
+                    const closeMsg = {
+                        type: 'close',
+                        dir: 'system',
+                        timestamp: Date.now(),
+                        size: 0,
+                        code,
+                        reason
+                    };
+                    if ((ctx as any)[$wsMessages]) {
+                        (ctx as any)[$wsMessages].push(closeMsg);
+                        if ((ctx as any)[$onWsMessage]) (ctx as any)[$onWsMessage](closeMsg);
+                    }
+                    // ----------------------------------
                 },
                 error: async (ctx, ws, error) => {
                     // Call onError (if defined)

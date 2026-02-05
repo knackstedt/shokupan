@@ -38,17 +38,17 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                         </div>
                         <div style="flex: 1;"></div>
                         <div class="tabs">
-                            <button class="tab-btn active" data-tab="overview" {...{ onclick: "switchTab('overview')" }}>Overview</button>
-                            <button class="tab-btn" data-tab="application" {...{ onclick: "switchTab('application')" }}>Application</button>
-                            <button class="tab-btn" data-tab="network" {...{ onclick: "switchTab('network')" }}>Network</button>
+                            <button class="tab-btn active" data-tab="overview">Overview</button>
+                            <button class="tab-btn" data-tab="application">Application</button>
+                            <button class="tab-btn" data-tab="network">Network</button>
                             {integrations.scalar && (
-                                <button class="tab-btn" data-tab="scalar" {...{ onclick: "switchTab('scalar')" }}>Scalar</button>
+                                <button class="tab-btn" data-tab="scalar">Scalar</button>
                             )}
                             {integrations.apiExplorer && (
-                                <button class="tab-btn" data-tab="api-explorer" {...{ onclick: "switchTab('api-explorer')" }}>REST API</button>
+                                <button class="tab-btn" data-tab="api-explorer">REST API</button>
                             )}
                             {integrations.asyncapi && (
-                                <button class="tab-btn" data-tab="asyncapi" {...{ onclick: "switchTab('asyncapi')" }}>WS API</button>
+                                <button class="tab-btn" data-tab="asyncapi">WS API</button>
                             )}
                         </div>
                     </header>
@@ -59,7 +59,7 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
 
                             <div id="chart-container" style="display: flex; flex-direction: column; gap: 1rem;">
                                 <div style="display: flex; justify-content: flex-end;">
-                                    <select id="time-range-selector" {...{ onchange: "updateCharts(); updateDashboard(); fetchTopStats();" }} style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px; border-radius: 4px;">
+                                    <select id="time-range-selector" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--card-border); padding: 5px; border-radius: 4px;">
                                         <option value="1m">1 Minute</option>
                                         <option value="5m">5 Minutes</option>
                                         <option value="30m">30 Minutes</option>
@@ -103,8 +103,8 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                         <div id="tab-application" class="tab-content">
                             <div style="margin: 2rem 2rem 0 2rem; display: flex; gap: 1rem; align-items: center;">
                                 <div class="button-group">
-                                    <button class="view-btn active" {...{ onclick: "switchApplicationView('registry')" }}>Registry</button>
-                                    <button class="view-btn" {...{ onclick: "switchApplicationView('graph')" }}>Graph</button>
+                                    <button class="view-btn active" data-view="registry">Registry</button>
+                                    <button class="view-btn" data-view="graph">Graph</button>
                                 </div>
                             </div>
                             {/* Registry Sub-View */}
@@ -199,6 +199,7 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                     const getRequestHeaders = ${getRequestHeadersSource.replace(/<\/script>/g, '<\\/script>')};
                     window.SHOKUPAN_CONFIG = {
                         rootPath: "${rootPath || ""}",
+                        base: "${base}",
                         linkPattern: "${linkPattern || ""}",
                         ignorePaths: ${safeScriptJson(ignorePaths || [])}
                     };
@@ -207,10 +208,14 @@ export function DashboardApp({ metrics, uptime, integrations, base, getRequestHe
                 <script src={`${base}/client.js`}></script>
                 <script src={`${base}/graph.mjs`} type="module"></script>
                 <script src={`${base}/charts.js`}></script>
+                {/* Debug: forcing update */}
                 <script src={`${base}/tables.js`}></script>
+                <script src={`${base}/timeline.js`}></script>
+                <script src={`${base}/replay.js`}></script>
                 <script src={`${base}/registry.js`}></script>
                 <script src={`${base}/requests.js`}></script>
                 <script src={`${base}/tabs.js`}></script>
+                <script src={`${base}/init_controls.js`}></script>
             </body>
         </html>
     );
