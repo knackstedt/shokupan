@@ -1,5 +1,5 @@
 import { ShokupanContext } from '../../../src/context';
-import { Body, Ctx, Delete, Event, Get, Param, Patch, Post, Put, Query } from '../../../src/util/decorators';
+import { Body, Ctx, Delete, Event, Get, Param, Patch, Post, Put, Query } from '../../../src/decorators';
 
 /**
  * Decorator-Based Controller Example
