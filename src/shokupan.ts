@@ -350,8 +350,14 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     /**
      * Registers a plugin.
      */
-    public register(plugin: ShokupanPlugin, options?: { path?: string; }) {
-        plugin.onInit(this, options);
+    public async register(plugin: ShokupanPlugin, options?: { path?: string; }) {
+        try {
+            await plugin.onInit(this, options);
+        }
+        catch (err) {
+            this.logger?.error('Shokupan', "Failed to initialize plugin", { error: err });
+            throw err;
+        }
         return this;
     }
 
