@@ -35,5 +35,6 @@ export * from "./plugins/middleware/rate-limit";
 export * from "./plugins/middleware/security-headers";
 export * from "./plugins/middleware/serve-static";
 export * from "./plugins/middleware/session";
+export * from "./plugins/middleware/static";
 export * from "./plugins/middleware/validation";
 
