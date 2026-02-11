@@ -150,6 +150,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
     private currentGuards: { handler: ShokupanHandler<T>; spec?: GuardAPISpec; }[] = [];
     private eventHandlers = new Map<string, ShokupanHandler<T>[]>();
+    private wrappedHandlers = new WeakMap<ShokupanHandler<T>, ShokupanHandler<T>>();
 
     /**
      * Registers middleware for this router.
@@ -990,7 +991,38 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
 
     /**
+     * Wraps a handler with this router's middleware.
+     * Caches wrapped handlers to avoid re-wrapping on subsequent requests.
+     */
+    private wrapHandlerWithMiddleware(handler: ShokupanHandler<T>): ShokupanHandler<T> {
+        // If no middleware, return as-is
+        if (this.middleware.length === 0) {
+            return handler;
+        }
+
+        // Check cache
+        const cached = this.wrappedHandlers.get(handler);
+        if (cached) return cached;
+
+        // Create wrapped handler
+        const fn = compose(this.middleware);
+        const wrapped: ShokupanHandler<T> = async (ctx) => {
+            return fn(ctx, () => handler(ctx));
+        };
+
+        // Copy metadata
+        (wrapped as any).originalHandler = (handler as any).originalHandler || handler;
+        (wrapped as any).metadata = (handler as any).metadata;
+
+        // Cache it
+        this.wrappedHandlers.set(handler, wrapped);
+
+        return wrapped;
+    }
+
+    /**
      * Find a route matching the given method and path.
+     * Wraps handler with router middleware if present.
      * @param method HTTP method
      * @param path Request path
      * @returns Route handler and parameters if found, otherwise null
@@ -1001,12 +1033,19 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
         // 1. Check local routes
         let result = this.trie.search(method, path);
-        if (result) return result;
+        if (result) {
+            // Wrap with router middleware if present
+            result.handler = this.wrapHandlerWithMiddleware(result.handler);
+            return result;
+        }
 
         // Fallback: If HEAD not found, try GET
         if (method === "HEAD") {
             result = this.trie.search("GET", path);
-            if (result) return result;
+            if (result) {
+                result.handler = this.wrapHandlerWithMiddleware(result.handler);
+                return result;
+            }
         }
 
         // 2. Check child routers
@@ -1017,7 +1056,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             if (path === prefix || path.startsWith(prefix + "/")) {
                 const subPath = path.slice(prefix.length) || "/";
                 const match = child.find(method, subPath);
-                // Child router handlers are already wrapped with child hooks
+                // Child router handlers are already wrapped with child middleware
                 // Just return them as-is (parent hooks are applied at the app level in handleRequest)
                 if (match) return match;
             }
