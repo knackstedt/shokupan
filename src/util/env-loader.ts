@@ -99,6 +99,7 @@ const $updateMappedProperty = Symbol('updateMappedProperty');
 const $mapProperties = Symbol('mapProperties');
 const $assignProperty = Symbol('assignProperty');
 const $toSnakeCase = Symbol('toSnakeCase');
+const $snakeCaseCache = Symbol('snakeCaseCache');
 
 export abstract class EnvLoader {
     private [$secretsCache]: Map<string, string> = new Map();
@@ -107,6 +108,9 @@ export abstract class EnvLoader {
     private [$watchers]: ReturnType<typeof watch>[] = [];
     private [$watchersStarted] = false;
     private [$logger]: Logger;
+    // P4: Memoize camelCase→SNAKE_CASE conversions — the regex runs repeatedly for the
+    // same keys on every $updateMappedProperty call, so cache the results.
+    private [$snakeCaseCache]: Map<string, string> = new Map();
 
     constructor(options?: EnvLoaderOptions) {
         this[$options] = {
@@ -301,6 +305,10 @@ export abstract class EnvLoader {
     }
 
     private [$toSnakeCase](str: string): string {
-        return str.replace(/[A-Z]/g, letter => `_${letter}`).toUpperCase();
+        // Memoize results to avoid repeated regex on the same key.
+        if (this[$snakeCaseCache].has(str)) return this[$snakeCaseCache].get(str)!;
+        const result = str.replace(/([A-Z])/g, letter => `_${letter}`).toUpperCase();
+        this[$snakeCaseCache].set(str, result);
+        return result;
     }
 }

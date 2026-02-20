@@ -19,7 +19,14 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
     const normalizedPrefix = prefix.endsWith('/') && prefix !== '/' ? prefix.slice(0, -1) : prefix;
     const isEtag = !!config.etag;
     const extensions = config.extensions || ['html', 'htm', 'htmx'];
+    // Refactor R4: useCache:true (or unspecified) means the in-memory cache IS active.
+    // The old code had the condition inverted — !config.useCache triggered the cache walk.
+    const cacheEnabled = config.useCache !== false;
     const FILES: Record<string, FileData> = {};
+
+    // P3: Expose a ready() Promise so callers can optionally await full cache population.
+    let _resolveReady!: () => void;
+    const _ready = new Promise<void>(resolve => { _resolveReady = resolve; });
 
     // Helper: Generate Headers
     function toHeaders(name: string, stats: Stats, isEtag: boolean) {
@@ -38,9 +45,8 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
         return headers;
     }
 
-    // Optimization: Pre-load files in production
-    if (!config.useCache) {
-        // Simple recursive walker
+    // Optimization: Pre-load files into memory when cache is enabled
+    if (cacheEnabled) {
         async function walk(dir: string) {
             const entries = await readdir(dir, { withFileTypes: true });
             for (const entry of entries) {
@@ -52,11 +58,15 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
                     const headers = toHeaders(entry.name, stats, isEtag);
                     const rel = res.slice(rootPath.length).replace(/\\/g, '/');
                     FILES[rel] = { abs: res, stats, headers };
-                    // Also cache with /index if applicable? Sirv does this logic in lookup usually.
                 }
             }
         }
-        walk(rootPath).catch(console.error);
+        walk(rootPath)
+            .then(_resolveReady)
+            .catch(err => { console.error('[serveStatic] Cache population error:', err); _resolveReady(); });
+    } else {
+        // No cache — resolve immediately so ready() doesn't block
+        _resolveReady();
     }
 
     const serveStaticMiddleware: Middleware = async (ctx: ShokupanContext<any>) => {
@@ -75,8 +85,8 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
 
         let file: FileData | undefined;
 
-        // 1. Lookup in Cache (if !dev)
-        if (!config.useCache) {
+        // 1. Lookup in Cache (if enabled)
+        if (cacheEnabled) {
             file = FILES[reqPath];
             if (!file) {
                 // Try extensions
@@ -248,6 +258,9 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
 
     serveStaticMiddleware.isBuiltin = true;
     serveStaticMiddleware.pluginName = 'ServeStatic';
+    // P3: Expose ready() so callers can await full cache population before serving.
+    // Example: await serveStatic(cfg, '/').ready;
+    (serveStaticMiddleware as any).ready = _ready;
 
     return serveStaticMiddleware;
 }

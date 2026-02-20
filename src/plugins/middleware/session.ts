@@ -3,6 +3,12 @@ import { EventEmitter } from "events";
 import { ShokupanContext } from "../../context";
 import type { Middleware } from "../../util/types";
 
+// Symbols used internally by the session Proxy to track dirty state.
+// Using Symbols prevents collision with user session data keys and keeps these
+// properties hidden from JSON.stringify / Object.keys enumeration.
+const $isDirty = Symbol('isDirty');
+const $resetDirty = Symbol('resetDirty');
+
 // --- Types ---
 
 export interface SessionData {
@@ -348,7 +354,7 @@ export function Session(options: SessionOptions): Middleware {
             isNew = true;
         }
 
-        // 3. Helper to wrap session object
+        // 3. Helper to wrap session object with a dirty-flag Proxy
         const createSessionObject = (data: SessionData | null): SessionContext['session'] => {
             const existing = data || { cookie: new Cookie(options.cookie) };
             if (!existing.cookie) existing.cookie = new Cookie(options.cookie);
@@ -389,10 +395,6 @@ export function Session(options: SessionOptions): Middleware {
                     store.destroy(sessObj.id, (err) => {
                         if (err) return reject(err);
                         sessionID = generateId(ctx);
-                        // Create new session object
-                        // We actually need to replace the whole ctx.session object, which is tricky inside a method of that object.
-                        // Typically middleware attaches a proxy or the consumer does this.
-                        // But here we can reset properties.
                         const keys = Object.keys(sessObj);
                         for (let i = 0; i < keys.length; i++) {
                             const key = keys[i];
@@ -411,7 +413,6 @@ export function Session(options: SessionOptions): Middleware {
                     store.get(sessObj.id, (err, sess) => {
                         if (err) return reject(err);
                         if (!sess) return reject(new Error("Session not found"));
-                        // Populate
                         const keys = Object.keys(sessObj);
                         for (let i = 0; i < keys.length; i++) {
                             const key = keys[i];
@@ -431,7 +432,24 @@ export function Session(options: SessionOptions): Middleware {
                 if (store.touch) store.touch(sessObj.id, sessObj);
             };
 
-            return sessObj;
+            // Wrap in a Proxy to track mutations.
+            let _dirty = false;
+            const skippedKeys = new Set(['id', 'save', 'destroy', 'regenerate', 'reload', 'touch']);
+            const proxy = new Proxy(sessObj, {
+                set(target, prop, value, receiver) {
+                    if (!skippedKeys.has(prop as string)) _dirty = true;
+                    return Reflect.set(target, prop, value, receiver);
+                },
+                deleteProperty(target, prop) {
+                    if (!skippedKeys.has(prop as string)) _dirty = true;
+                    return Reflect.deleteProperty(target, prop);
+                }
+            });
+
+            proxy[$isDirty] = () => _dirty;
+            proxy[$resetDirty] = () => { _dirty = false; };
+
+            return proxy;
         };
 
         // 4. Load Session from Store
@@ -463,15 +481,12 @@ export function Session(options: SessionOptions): Middleware {
         ctx.sessionID = sessionID!;
         ctx.sessionStore = store;
 
-        // Hash original sessionStr to detect changes
-        const originalHash = JSON.stringify(sess);
-
         // 5. Run next
         const result = await next();
 
         // 6. Save Logic
-        const currentHash = JSON.stringify(sess);
-        const isModified = originalHash !== currentHash;
+        // Use dirty flag from the Proxy instead of double JSON.stringify.
+        const isModified = (sess as any)[$isDirty]?.() ?? false;
 
         if (!sessionID) return result; // Destroyed?
 
@@ -481,7 +496,7 @@ export function Session(options: SessionOptions): Middleware {
             shouldSave = true;
         } else if (isNew && saveUninitialized) {
             shouldSave = true;
-        } else if (!isNew && resave) {
+        } else if (!isNew && resave && isModified) {
             shouldSave = true;
         }
 

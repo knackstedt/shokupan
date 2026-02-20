@@ -128,16 +128,21 @@ export function Compression(options: CompressionOptions = {}): Middleware {
 
         // Check if compression is supported
         let method: 'br' | 'gzip' | 'zstd' | 'deflate' | null = null;
-        if (acceptEncoding.includes("br")) method = "br";
-        else if (acceptEncoding.includes("zstd")) {
-            // Validate zstd is only used in Bun runtime
-            if (typeof Bun === 'undefined') {
-                throw new Error("zstd compression is only available in Bun runtime. Client requested zstd but server is running on Node.js.");
+
+        const encodings = acceptEncoding.split(',');
+
+        for (let i = 0; i < encodings.length; i++) {
+            const enc = encodings[i].split(';')[0].trim().toLowerCase();
+            if (enc === 'br' && allowedAlgorithms.has('br')) { method = 'br'; break; }
+            if (enc === 'zstd' && allowedAlgorithms.has('zstd')) {
+                // zstd is only available in Bun. If running on Node.js, skip and
+                // try the next preferred encoding (graceful degradation).
+                if (typeof Bun !== 'undefined') { method = 'zstd'; break; }
+                continue;
             }
-            method = "zstd";
+            if (enc === 'gzip' && allowedAlgorithms.has('gzip')) { method = 'gzip'; break; }
+            if (enc === 'deflate' && allowedAlgorithms.has('deflate')) { method = 'deflate'; break; }
         }
-        else if (acceptEncoding.includes("gzip")) method = "gzip";
-        else if (acceptEncoding.includes("deflate")) method = "deflate";
 
         if (!method) return next();
 

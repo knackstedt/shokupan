@@ -147,8 +147,6 @@ const safelyGetBody = async (ctx: ShokupanContext) => {
 
 // --- Main Middleware ---
 
-// --- Main Middleware ---
-
 function getValidator(schema: any): (data: any) => Promise<any> | any {
     if (isZod(schema)) {
         return (data) => validateZod(schema, data);
