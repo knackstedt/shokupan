@@ -485,7 +485,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                     if ((ctx as any)[$onWsMessage]) (ctx as any)[$onWsMessage](openMsg);
                     // ----------------------------------
                 },
-                message: async (ctx, ws, message) => {
+                message: async (ctx, ws, message: string | ArrayBuffer | Buffer) => {
                     // Call onMessage
                     if (handlers.onMessage) {
                         await handlers.onMessage(ctx, ws, message);
@@ -633,7 +633,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                     if ((ctx as any)[$onWsMessage]) (ctx as any)[$onWsMessage](openMsg);
                     // ----------------------------------
                 },
-                message: async (ctx, ws, message) => {
+                message: async (ctx, ws, message: string | ArrayBuffer | Buffer) => {
                     // Call onMessage (if defined)
                     if (messageMethodName) {
                         const messageMethod = instance[messageMethodName as string];
