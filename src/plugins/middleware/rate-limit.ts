@@ -69,7 +69,7 @@ interface HitRecord {
  */
 export function RateLimitMiddleware(options: RateLimitOptions = {}): Middleware {
     const windowMs = options.windowMs || 60 * 1000; // 1 minute
-    const max = options.limit || options.max || 5; // 5 requests per window
+    const max = options.limit || options.max || 100; // 100 requests per window
     const message = options.message || "Too many requests, please try again later.";
     const statusCode = options.statusCode || 429;
     const headers = options.headers !== false;
@@ -112,9 +112,7 @@ export function RateLimitMiddleware(options: RateLimitOptions = {}): Middleware 
     // Cleanup interval
     const interval = setInterval(() => {
         const now = Date.now();
-        const entries = Array.from(hits.entries());
-        for (let i = 0; i < entries.length; i++) {
-            const [key, record] = entries[i];
+        for (const [key, record] of hits) {
             if (record.resetTime <= now) {
                 hits.delete(key);
             }

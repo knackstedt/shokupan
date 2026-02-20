@@ -71,8 +71,12 @@ export interface SecurityHeadersOptions {
  */
 export function SecurityHeaders(options: SecurityHeadersOptions = {}): Middleware {
     const securityHeadersMiddleware: Middleware = async function SecurityHeadersMiddleware(ctx: ShokupanContext, next: NextFn) {
-        // Helper to set header on the context response immediately
-        const set = (k: string, v: string) => ctx.response.set(k, v);
+        // Run the downstream handler first so we have a real Response to attach headers to.
+        const response = await next();
+
+        if (!(response instanceof Response)) return response;
+
+        const set = (k: string, v: string) => response.headers.set(k, v);
 
         // X-DNS-Prefetch-Control
         if (options.dnsPrefetchControl !== false) {
@@ -86,11 +90,13 @@ export function SecurityHeaders(options: SecurityHeadersOptions = {}): Middlewar
             const action = opt.action || 'sameorigin';
             if (action === 'sameorigin') set('X-Frame-Options', 'SAMEORIGIN');
             else if (action === 'deny') set('X-Frame-Options', 'DENY');
-            // 'allow-from' is deprecated/obsolete in modern browsers, but we can support it if needed.
+            // 'allow-from' is deprecated/obsolete in modern browsers
         }
 
         // Strict-Transport-Security
-        if (options.hsts !== false) {
+        // Security: Only set HSTS on secure (HTTPS) connections. Browsers ignore HSTS
+        // sent over plain HTTP, and some proxies may misbehave.
+        if (options.hsts !== false && ctx.secure === true) {
             const opt = options.hsts as any || {};
             const maxAge = opt.maxAge || 15552000; // 180 days
             let header = `max-age=${maxAge}`;
@@ -109,9 +115,9 @@ export function SecurityHeaders(options: SecurityHeadersOptions = {}): Middlewar
             set('X-Content-Type-Options', 'nosniff');
         }
 
-        // X-XSS-Protection (Legacy, but still sometimes used)
+        // X-XSS-Protection — modern recommendation is '0' to avoid browser quirks
         if (options.xssFilter !== false) {
-            set('X-XSS-Protection', '0'); // Modern recommendation is to disable it as it can introduce vulns
+            set('X-XSS-Protection', '0');
         }
 
         // Referrer-Policy
@@ -123,41 +129,36 @@ export function SecurityHeaders(options: SecurityHeadersOptions = {}): Middlewar
 
         // Content-Security-Policy
         if (options.contentSecurityPolicy !== false) {
-            // Basic default CSP if true, or use object
             const opt = options.contentSecurityPolicy;
             if (opt === undefined || opt === true) {
                 set('Content-Security-Policy', "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests");
             } else if (typeof opt === 'object') {
-                // Construct CSP string from object (simplified)
-                // Assuming user passes raw string or we'd need a directive builder.
-                // For now, let's assume they pass directives map.
-                const parts = [];
-                const optEntries = Object.entries(opt);
-                for (let i = 0; i < optEntries.length; i++) {
-                    const [key, val] = optEntries[i];
-                    // directives, etc.
-                    // This is complex to implement fully without a library like 'helmet' itself.
-                    // We will support a simple string or custom logic later if requested.
-                    // For now, skip complex object parsing to keep it simple as per "standard middleware" MVP.
+                // Build CSP string from a directives object.
+                // Keys are camelCase directive names (e.g. defaultSrc) or kebab-case strings.
+                // Values are strings, arrays of strings, or booleans (true = bare directive, false = omit).
+                const parts: string[] = [];
+                for (const [key, val] of Object.entries(opt)) {
+                    if (val === false) continue;
+                    // Convert camelCase to kebab-case
+                    const directive = key.replace(/([A-Z])/g, '-$1').toLowerCase();
+                    if (val === true) {
+                        parts.push(directive);
+                    } else {
+                        const sources = Array.isArray(val) ? val.join(' ') : String(val);
+                        parts.push(`${directive} ${sources}`);
+                    }
+                }
+                if (parts.length > 0) {
+                    set('Content-Security-Policy', parts.join(';'));
                 }
             }
         }
 
+        // X-Powered-By suppression (Shokupan doesn't set it, but remove it if a dep added it)
         if (options.hidePoweredBy !== false) {
-            // Note: Shokupan doesn't set X-Powered-By by default, so we usually don't need to remove it.
-            // But we can ensure it's not there.
-            // We can't delete from response easily before it's created, but we can try to suppress it if we had a hook.
-            // Here we might just do nothing as we don't add it.
+            response.headers.delete('X-Powered-By');
         }
 
-        // Apply headers to context response
-        // We need to apply these to the response *after* it's generated, or *before* if we use `ctx.headers` mutation?
-        // `ctx.headers` is currently read-only wrapper around `req.headers` in `ShokupanContext`?
-        // Wait, `ctx.headers` in `ShokupanContext` getter is `this.request.headers`.
-        // We cannot set response headers on the request object.
-        // We need to intercept the response.
-
-        const response = await next();
         return response;
     };
     securityHeadersMiddleware.isBuiltin = true;

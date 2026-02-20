@@ -362,9 +362,21 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
             };
         }
         else if (provider === 'apple') {
-            // Apple user info is in the ID Token
+            // Apple user info is in the ID Token.
+            // Security: Must cryptographically verify the signature using Apple's public JWKS.
+            // Using decodeJwt() alone is insecure as it skips signature verification.
             if (idToken) {
-                const payload = this.jose.decodeJwt(idToken);
+                const { createRemoteJWKSet, jwtVerify } = this.jose;
+                // Cache the JWKS key fetcher to avoid redundant network requests per login.
+                if (!(this as any)._appleJwks) {
+                    (this as any)._appleJwks = createRemoteJWKSet(
+                        new URL('https://appleid.apple.com/auth/keys')
+                    );
+                }
+                const { payload } = await jwtVerify(idToken, (this as any)._appleJwks, {
+                    issuer: 'https://appleid.apple.com',
+                    audience: this.authConfig.providers.apple?.clientId
+                });
                 user = {
                     id: payload.sub!,
                     email: payload['email'] as string,

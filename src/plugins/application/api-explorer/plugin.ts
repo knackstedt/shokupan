@@ -11,6 +11,15 @@ import { ApiExplorerApp } from './components.tsx';
 export interface ApiExplorerOptions {
     baseDocument?: any;
     path?: string;
+    /**
+     * Allow the `/_source` endpoint to serve source files to the API explorer client.
+     * This is automatically disabled in production (`NODE_ENV === 'production'`) to prevent
+     * accidental exposure of source code, env files, or secrets.
+     * Set to `true` to re-enable in non-development environments (not recommended unless
+     * the explorer is behind authentication).
+     * @default false in production, true in development
+     */
+    enableSourceView?: boolean;
 }
 
 export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin {
@@ -79,29 +88,36 @@ export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin 
         this.get('/theme.css', ctx => serveFile(ctx, 'theme.css', 'text/css'));
         this.get('/explorer-client.mjs', ctx => serveFile(ctx, 'explorer-client.mjs', 'application/javascript'));
 
-        this.get('/_source', async (ctx) => {
-            const file = ctx.query['file'];
-            if (!file) return ctx.text('Missing file parameter', 400);
+        // Security: This endpoint reads source files from the project root.
+        // Disable in production to prevent inadvertent exposure of secrets/env files.
+        const isProduction = process.env.NODE_ENV === 'production';
+        const sourceViewEnabled = this.pluginOptions.enableSourceView ?? !isProduction;
+        if (sourceViewEnabled) {
+            this.get('/_source', async (ctx) => {
 
-            // Security: Validate path is within project root
-            const { resolve, normalize, isAbsolute } = await import('node:path');
-            const cwd = process.cwd();
-            const resolvedPath = resolve(cwd, file);
+                const file = ctx.query['file'];
+                if (!file) return ctx.text('Missing file parameter', 400);
 
-            // Ensure the resolved path starts with the cwd
-            // This prevents ../ traversal.
-            // We DO NOT resolve symlinks (no fs.realpath), so we trust the logical path structure.
-            if (!resolvedPath.startsWith(cwd)) {
-                return ctx.text('Forbidden: File must be within project root', 403);
-            }
+                // Security: Validate path is within project root
+                const { resolve } = await import('node:path');
+                const cwd = process.cwd();
+                const resolvedPath = resolve(cwd, file);
 
-            try {
-                const content = await readFile(resolvedPath, 'utf-8');
-                return ctx.text(content);
-            } catch (err) {
-                return ctx.text('File not found', 404);
-            }
-        });
+                // Ensure the resolved path starts with the cwd
+                // This prevents ../ traversal.
+                // We DO NOT resolve symlinks (no fs.realpath), so we trust the logical path structure.
+                if (!resolvedPath.startsWith(cwd + '/') && resolvedPath !== cwd) {
+                    return ctx.text('Forbidden: File must be within project root', 403);
+                }
+
+                try {
+                    const content = await readFile(resolvedPath, 'utf-8');
+                    return ctx.text(content);
+                } catch (err) {
+                    return ctx.text('File not found', 404);
+                }
+            });
+        }
 
         this.get('/openapi.json', async (ctx) => {
             const spec = (this.root as any).openApiSpec

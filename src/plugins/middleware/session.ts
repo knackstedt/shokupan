@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from "crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "crypto";
 import { EventEmitter } from "events";
 import { ShokupanContext } from "../../context";
 import type { Middleware } from "../../util/types";
@@ -263,12 +263,10 @@ function unsign(input: string, secret: string) {
     Buffer.from(expectedInput).copy(paddedExpected);
     Buffer.from(input).copy(paddedInput);
 
-    // Use crypto.timingSafeEqual for constant-time comparison
     try {
-        const valid = require('crypto').timingSafeEqual(paddedExpected, paddedInput);
+        const valid = timingSafeEqual(paddedExpected, paddedInput);
         return valid ? tentValue : false;
     } catch {
-        // Buffers are different lengths (shouldn't happen with padding, but handle gracefully)
         return false;
     }
 }
@@ -326,12 +324,16 @@ export function Session(options: SessionOptions): Middleware {
         const rawCookie = cookies[name];
 
         if (rawCookie) {
-            if (rawCookie.substr(0, 2) === 's:') {
-                // Signed cookie
-                const val = unsign(rawCookie.slice(2), secrets[0]);
-                if (val) {
-                    reqSessionId = val as string;
-                    isSigned = true;
+            if (rawCookie.slice(0, 2) === 's:') {
+                // Signed cookie — try each secret to support key rotation
+                const signed = rawCookie.slice(2);
+                for (let i = 0; i < secrets.length; i++) {
+                    const val = unsign(signed, secrets[i]);
+                    if (val !== false) {
+                        reqSessionId = val as string;
+                        isSigned = true;
+                        break;
+                    }
                 }
             } else {
                 reqSessionId = rawCookie;
@@ -404,7 +406,6 @@ export function Session(options: SessionOptions): Middleware {
                 });
             };
 
-            sessObj.undefined = () => { }; // Helper? no
             sessObj.reload = () => {
                 return new Promise<void>((resolve, reject) => {
                     store.get(sessObj.id, (err, sess) => {
