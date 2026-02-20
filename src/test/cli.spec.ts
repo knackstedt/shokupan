@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import fs from 'node:fs';
 import path from 'node:path';
 
+const __dirname = new URL('.', import.meta.url).pathname;
+
 const CLI_PATH = path.resolve(__dirname, '../cli/index.ts');
 // Using example project as fixture
 const FIXTURE_DIR = path.resolve(__dirname, '../../examples/api_paths');

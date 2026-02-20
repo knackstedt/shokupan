@@ -1,5 +1,4 @@
 import { EventEmitter } from 'events';
-import path from 'path';
 import { Worker } from 'worker_threads';
 
 export type ASTAnalyzerState = 'idle' | 'analyzing' | 'completed' | 'failed';
@@ -116,7 +115,8 @@ export class ASTAnalyzerWorker extends EventEmitter {
             this.emit('started');
 
             // Create worker thread
-            const workerPath = path.join(__dirname, 'ast-worker-thread.js');
+            const workerPath = new URL('./ast-worker-thread.js', import.meta.url).pathname;
+
             this.worker = new Worker(workerPath, {
                 workerData: {
                     rootDir: this.rootDir,
