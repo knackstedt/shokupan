@@ -1,6 +1,7 @@
 import type { YogaServerOptions } from 'graphql-yoga';
 import { ShokupanRouter } from '../../router';
 import type { Shokupan } from '../../shokupan';
+import { $isMounted } from '../../util/symbol';
 import type { ShokupanPlugin, ShokupanPluginOptions } from '../../util/types';
 
 export interface GraphQLYogaPluginOptions {
@@ -40,7 +41,9 @@ export class GraphQLYogaPlugin extends ShokupanRouter<any> implements ShokupanPl
             graphqlEndpoint: path,
         });
 
-        app.mount(path, this);
+        if (!(this as any)[$isMounted]) {
+            app.mount(path, this);
+        }
 
         // Handle both GET and POST requests
         const handler = async (ctx: any) => {

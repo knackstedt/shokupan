@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import renderToString from 'preact-render-to-string';
 import { ShokupanRouter } from '../../../router';
 import type { Shokupan } from '../../../shokupan.ts';
+import { $isMounted } from '../../../util/symbol';
 import type { ShokupanPlugin, ShokupanPluginOptions } from '../../../util/types.ts';
 import { ApiExplorerApp } from './components.tsx';
 
@@ -30,8 +31,10 @@ export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin 
     }
 
     onInit(app: Shokupan, options?: ShokupanPluginOptions) {
-        const path = this.pluginOptions.path || options?.path || '/apiexplorer';
-        app.mount(path, this);
+        if (!(this as any)[$isMounted]) {
+            const path = this.pluginOptions.path || options?.path || '/apiexplorer';
+            app.mount(path, this);
+        }
 
         // Ensure async api gen is enabled if this plugin is used
         if (app.applicationConfig.enableOpenApiGen !== true) {

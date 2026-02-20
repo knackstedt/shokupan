@@ -1,6 +1,7 @@
 import type { ApolloServer } from '@apollo/server';
 import { ShokupanRouter } from '../../router';
 import type { Shokupan } from '../../shokupan';
+import { $isMounted } from '../../util/symbol';
 import type { ShokupanPlugin, ShokupanPluginOptions } from '../../util/types';
 
 export interface GraphQLPluginOptions {
@@ -49,7 +50,9 @@ export class GraphQLApolloPlugin extends ShokupanRouter<any> implements Shokupan
         });
 
         const path = options?.path || this.pluginOptions.path || '/graphql';
-        app.mount(path, this);
+        if (!(this as any)[$isMounted]) {
+            app.mount(path, this);
+        }
 
 
         // Ensure Apollo Server is started before handling requests

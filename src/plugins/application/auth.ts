@@ -2,6 +2,7 @@
 import { ShokupanContext } from "../../context";
 import { ShokupanRouter } from "../../router";
 import type { Shokupan } from "../../shokupan";
+import { $isMounted } from "../../util/symbol";
 import type { ShokupanPlugin, ShokupanPluginOptions } from "../../util/types";
 
 export interface AuthUser {
@@ -133,19 +134,17 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
             : authConfig.jwtSecret;
     }
 
-    async onInit(app: Shokupan, options?: ShokupanPluginOptions) {
+    async onInit(app: Shokupan, options: ShokupanPluginOptions) {
         // Load dependencies asynchronously
         this.arctic = await import("arctic");
         this.jose = await import("jose");
 
-        // Initialize routes
+        // Initialize routes (idempotent — routes are only registered once)
         this.init();
 
-        // If registered via app.register(), mount it to root or specified path
-        if (options?.path) {
-            app.mount(options.path, this);
-        } else {
-            app.mount(options.path ?? '/', this);
+        // Guard against being mounted more than once (e.g. register() called twice)
+        if (!(this as any)[$isMounted]) {
+            app.mount(options?.path ?? '/', this);
         }
     }
 

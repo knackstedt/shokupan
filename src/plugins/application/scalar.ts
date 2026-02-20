@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { ShokupanRouter } from '../../router';
 import type { Shokupan } from '../../shokupan';
 import { deepMerge } from '../../util/deep-merge';
+import { $isMounted } from '../../util/symbol';
 import type { DeepPartial, ShokupanPlugin, ShokupanPluginOptions } from '../../util/types';
 import { OpenAPIAnalyzer } from './openapi/analyzer';
 
@@ -67,8 +68,10 @@ export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin 
         const { Eta } = await import('eta');
         this.eta = new Eta();
 
-        const path = options?.path || this.pluginOptions.path || '/reference';
-        app.mount(path, this);
+        if (!(this as any)[$isMounted]) {
+            const path = options?.path || this.pluginOptions.path || '/reference';
+            app.mount(path, this);
+        }
 
         // Also run onMount logic if needed
         this.onMount(app);
