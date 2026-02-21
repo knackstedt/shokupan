@@ -127,7 +127,6 @@ export class SurrealAdapter implements DatastoreAdapter {
         const res = await this.db.query<[{ count: number; }]>(q.statement, q.vars);
 
         const result = res as any; // Cast to inspect
-        this.logger.debug('SurrealAdapter', "Count Result", { result });
 
         // Defensive coding:
         if (Array.isArray(result) && result.length > 0) {

@@ -935,7 +935,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                         } catch (handlerErr) {
                             // If the error handler itself fails, fall through to default handling
                             // but log the new error
-                            this.logger?.error("Shokupan", "Error in error handler:", { error: handlerErr });
+                            if (process.env.NODE_ENV !== 'test') this.logger?.error("Shokupan", "Error in error handler:", { error: handlerErr });
                             err = handlerErr;
                             break; // Avoid infinite loops if handlerErr is same type
                         }
