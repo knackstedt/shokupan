@@ -443,6 +443,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
             return ctx.upgrade({
                 open: async (ctx, ws) => {
+                    ctx[$ws] = ws;
                     // Call onOpen and set return value to ws.data and ctx.state
                     if (handlers.onOpen) {
                         const sessionData = await handlers.onOpen(ctx, ws);
@@ -450,7 +451,6 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                             ws.data = sessionData;
                             ctx.state = sessionData;
                         }
-                        ctx[$ws] = ws;
                     }
 
                     // --- WebSocket Message Tracking ---
@@ -590,6 +590,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
             return ctx.upgrade({
                 open: async (ctx, ws) => {
+                    ctx[$ws] = ws;
                     // Call onOpen (if defined)
                     if (openMethodName) {
                         const openMethod = instance[openMethodName as string];
@@ -1034,8 +1035,10 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         // 1. Check local routes
         let result = this.trie.search(method, path);
         if (result) {
-            // Wrap with router middleware if present
-            result.handler = this.wrapHandlerWithMiddleware(result.handler);
+            // Wrap with router middleware if present (except for root application, which handles it globally)
+            if (!(this as any)[$isApplication]) {
+                result.handler = this.wrapHandlerWithMiddleware(result.handler);
+            }
             return result;
         }
 
@@ -1043,7 +1046,9 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         if (method === "HEAD") {
             result = this.trie.search("GET", path);
             if (result) {
-                result.handler = this.wrapHandlerWithMiddleware(result.handler);
+                if (!(this as any)[$isApplication]) {
+                    result.handler = this.wrapHandlerWithMiddleware(result.handler);
+                }
                 return result;
             }
         }

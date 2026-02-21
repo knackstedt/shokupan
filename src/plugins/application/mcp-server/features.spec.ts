@@ -67,9 +67,7 @@ describe("MCP Features", () => {
         const res = await app.fetch(req);
         const data = await res.json();
 
-        if (data.error) {
-            console.error(`Error calling ${method}:`, JSON.stringify(data.error, null, 2));
-        }
+        // don't log errors, tests might expect them
         return { result: data.result, error: data.error };
     };
 
@@ -77,9 +75,19 @@ describe("MCP Features", () => {
         if (server) await server.stop();
     });
 
-    it.skip("should return 400 for malformed JSON", async () => {
-        await startServer();
-        // Skip for now as we changed startServer structure
+    it("should return 400 for malformed JSON", async () => {
+        const urlKey = `${baseUrl}?sessionId=${sessionId}`;
+        const req = new Request(urlKey, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json, text/event-stream"
+            },
+            body: "{ bad json"
+        });
+
+        const res = await app.fetch(req);
+        expect(res.status).toBe(400);
     });
 
     it("should list resources", async () => {

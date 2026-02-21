@@ -60,6 +60,13 @@ export class BodyParser {
      * Content-Length header.
      */
     static async parseFormData(req: ShokupanRequest<any>, maxBodySize: number): Promise<FormData> {
+        // Enforce Content-Length header presence, unless chunked
+        if (!req.headers.has('content-length') && req.headers.get('transfer-encoding') !== 'chunked') {
+            const err = new Error("Length Required");
+            (err as any).status = 411;
+            throw err;
+        }
+
         // Read and size-limit the raw body stream first
         const rawBuffer = await BodyParser.readRawBufferBody(req, maxBodySize);
 

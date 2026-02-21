@@ -70,7 +70,7 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
     }
 
     const serveStaticMiddleware: Middleware = async (ctx: ShokupanContext<any>) => {
-        let reqPath = ctx.path.slice(normalizedPrefix.length);
+        let reqPath = ctx.params?.['*'] ?? ctx.path.slice(normalizedPrefix.length);
         if (!reqPath.startsWith('/')) reqPath = '/' + reqPath;
 
         try {
@@ -180,7 +180,7 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
                                          <li><a href="../">../</a></li>
                                      <% } %>
                                      <% it.files.forEach(function(f) { %>
-                                         <li><a href="<%= f %>"><%= f %></a></li>
+                                         <li><a href="<%= encodeURIComponent(f) %>"><%= f %></a></li>
                                      <% }) %>
                                  </ul>
                                  </body>

@@ -437,11 +437,13 @@ export function Session(options: SessionOptions): Middleware {
             const skippedKeys = new Set(['id', 'save', 'destroy', 'regenerate', 'reload', 'touch']);
             const proxy = new Proxy(sessObj, {
                 set(target, prop, value, receiver) {
-                    if (!skippedKeys.has(prop as string)) _dirty = true;
+                    if (typeof prop !== 'symbol' && !skippedKeys.has(prop as string)) {
+                        _dirty = true;
+                    }
                     return Reflect.set(target, prop, value, receiver);
                 },
                 deleteProperty(target, prop) {
-                    if (!skippedKeys.has(prop as string)) _dirty = true;
+                    if (typeof prop !== 'symbol' && !skippedKeys.has(prop as string)) _dirty = true;
                     return Reflect.deleteProperty(target, prop);
                 }
             });

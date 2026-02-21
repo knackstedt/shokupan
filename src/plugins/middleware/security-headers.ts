@@ -74,9 +74,12 @@ export function SecurityHeaders(options: SecurityHeadersOptions = {}): Middlewar
         // Run the downstream handler first so we have a real Response to attach headers to.
         const response = await next();
 
-        if (!(response instanceof Response)) return response;
-
-        const set = (k: string, v: string) => response.headers.set(k, v);
+        const set = (k: string, v: string) => {
+            if (response instanceof Response) {
+                try { response.headers.set(k, v); } catch (e) { }
+            }
+            ctx.response.headers.set(k, v);
+        };
 
         // X-DNS-Prefetch-Control
         if (options.dnsPrefetchControl !== false) {
@@ -156,7 +159,10 @@ export function SecurityHeaders(options: SecurityHeadersOptions = {}): Middlewar
 
         // X-Powered-By suppression (Shokupan doesn't set it, but remove it if a dep added it)
         if (options.hidePoweredBy !== false) {
-            response.headers.delete('X-Powered-By');
+            if (response instanceof Response) {
+                try { response.headers.delete('X-Powered-By'); } catch (e) { }
+            }
+            ctx.response.headers.delete('X-Powered-By');
         }
 
         return response;

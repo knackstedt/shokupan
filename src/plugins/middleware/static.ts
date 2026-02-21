@@ -44,6 +44,8 @@ export function Static<T extends Record<string, any>>(
 
             // If serveStatic returned a 404, call next() instead
             if (result instanceof Response && result.status === 404) {
+                // Revert status code back to 200 in case serveStatic modified it
+                ctx.response.status = 200;
                 return next();
             }
 

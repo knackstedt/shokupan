@@ -127,7 +127,7 @@ export function Proxy(options: ProxyOptions): Middleware {
         if (!['http:', 'https:'].includes(url.protocol)) {
             return ctx.text('Invalid protocol in proxied URL', 400);
         }
-        if (!options.allowedHosts?.includes(url.hostname)) {
+        if (options.allowedHosts && !options.allowedHosts.includes(url.hostname)) {
             return ctx.text('Proxied hostname not in allowlist', 403);
         }
 

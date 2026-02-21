@@ -134,8 +134,10 @@ export class RouterTrie<T = any> {
         // 3. Single Wildcard Match (*)
         if (node.wildcardChild) {
             // Strictly match one segment
+            params['*'] = segment;
             const result = this.findNode(node.wildcardChild, segments, index + 1, params);
             if (result) return result;
+            delete params['*'];
         }
 
         // 4. Recursive Wildcard Match (**)
@@ -153,8 +155,13 @@ export class RouterTrie<T = any> {
             const remaining = segments.length - index;
             for (let k = 0; k <= remaining; k++) {
                 // Skip k segments
+                const matchedSegments = segments.slice(index, index + k).join('/');
+                params['*'] = matchedSegments;
+                params['**'] = matchedSegments;
                 const result = this.findNode(node.recursiveChild, segments, index + k, params);
                 if (result) return result;
+                delete params['*'];
+                delete params['**'];
             }
         }
 

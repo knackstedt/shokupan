@@ -100,7 +100,7 @@ describe('Static Middleware with Fallthrough', () => {
         app = new Shokupan({ development: true });
 
         // Typical SPA setup: serve static assets, but fall back to index.html for routes
-        app.get('/*',
+        app.get('/**',
             Static({ root: testDir }),
             async (ctx) => {
                 // Serve index.html for all routes that don't match files

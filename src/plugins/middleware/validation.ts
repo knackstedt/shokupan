@@ -218,12 +218,23 @@ export function validate(config: ValidationConfig): Middleware {
         let validQuery: any;
         if (validators.query && queryObj) {
             validQuery = await validators.query(queryObj);
+            Object.defineProperty(ctx, 'query', {
+                value: validQuery,
+                writable: true,
+                configurable: true
+            });
         }
 
         // Validate Headers
+        let validHeaders: any;
         if (validators.headers) {
             const headersObj = Object.fromEntries(ctx.req.headers.entries());
-            await validators.headers(headersObj);
+            validHeaders = await validators.headers(headersObj);
+            Object.defineProperty(ctx, 'headers', {
+                value: new Headers(validHeaders),
+                writable: true,
+                configurable: true
+            });
         }
 
         // Validate Body
@@ -252,6 +263,7 @@ export function validate(config: ValidationConfig): Middleware {
         const validatedData: any = { ...dataToValidate };
         if (config.params) validatedData.params = ctx.params;
         if (config.query) validatedData.query = validQuery;
+        if (config.headers) validatedData.headers = validHeaders;
         if (config.body) validatedData.body = validBody;
 
         await ctx.app.runHooks('afterValidate', ctx, validatedData);
