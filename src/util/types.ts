@@ -758,13 +758,12 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
     surreal?: any;
 
     datastore?: {
-        adapter: 'surreal' | 'sqlite' | 'level' | 'knex';
+        adapter: 'surreal' | 'sqlite' | 'level';
         /**
          * Options for the specific adapter.
          * - For 'surreal', this matches SurrealAdapterOptions
          * - For 'sqlite', this matches SqliteAdapterOptions
          * - For 'level', this matches LevelAdapterOptions
-         * - For 'knex', this matches KnexAdapterOptions (Knex.Config)
          */
         options?: any;
     };

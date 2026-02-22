@@ -306,11 +306,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                     this.datastore = new SurrealAdapter(effectiveOptions);
                     break;
                 }
-                case 'knex': {
-                    const { KnexAdapter } = await import('./util/adapter/datastore/knex');
-                    this.datastore = new KnexAdapter(options || {});
-                    break;
-                }
                 default: {
                     // Determine default behavior if adapter not specified
                     // Old default: SurrealDB
@@ -331,9 +326,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         }
     }
 
-    /**
-     * Adds middleware to the application.
-     */
     /**
      * Adds middleware to the application.
      */

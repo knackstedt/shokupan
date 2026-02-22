@@ -50,24 +50,6 @@ const adapters = [
         cleanup: async (adapter: DatastoreAdapter) => {
             await adapter.disconnect();
         }
-    },
-    {
-        name: "KnexAdapter (sqlite3)",
-        create: async () => {
-            const { KnexAdapter } = await import('./knex');
-            // In-memory sqlite via knex
-            const adapter = new KnexAdapter({
-                client: 'sqlite3',
-                connection: { filename: ':memory:' },
-                useNullAsDefault: true
-            });
-            await adapter.connect();
-            await adapter.setupSchema();
-            return adapter;
-        },
-        cleanup: async (adapter: DatastoreAdapter) => {
-            await adapter.disconnect();
-        }
     }
 ];
 
