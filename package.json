@@ -70,8 +70,8 @@
         "@apollo/server": "^5.2.0",
         "@modelcontextprotocol/sdk": "^1.25.2",
         "@opentelemetry/api": "^1.9.0",
-        "@scalar/api-reference": "^1.0.0",
         "@scalar/openapi-types": "^0.5.3",
+        "@scalar/types": "^0.6.6",
         "@surrealdb/node": "^2.4.0",
         "ajv": "^8.0.0",
         "ajv-formats": "^3.0.0",
@@ -138,9 +138,6 @@
         "secure-json-parse": {
             "optional": true
         },
-        "@scalar/api-reference": {
-            "optional": true
-        },
         "@surrealdb/node": {
             "optional": true
         },
@@ -154,6 +151,9 @@
             "optional": true
         },
         "@scalar/openapi-types": {
+            "optional": true
+        },
+        "@scalar/types": {
             "optional": true
         },
         "js-yaml": {
@@ -178,8 +178,8 @@
         "@opentelemetry/sdk-trace-base": "^2.3.0",
         "@opentelemetry/sdk-trace-node": "^2.3.0",
         "@opentelemetry/semantic-conventions": "^1.38.0",
-        "@scalar/api-reference": "^1.43.1",
         "@scalar/openapi-types": "^0.5.3",
+        "@scalar/types": "^0.6.6",
         "@sinclair/typebox": "^0.34.47",
         "@surrealdb/node": "^2.4.0",
         "@tsconfig/bun": "^1.0.10",

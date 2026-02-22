@@ -1,5 +1,5 @@
-import type { ApiReferenceConfiguration } from '@scalar/api-reference';
 import type { OpenAPI } from '@scalar/openapi-types';
+import type { ApiReferenceConfiguration } from '@scalar/types/api-reference';
 import type { Eta } from 'eta';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
