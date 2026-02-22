@@ -5,7 +5,7 @@
         {
             "label": "▶ otel viewer",
             "type": "shell",
-            "command": "docker",
+            "command": "podman",
             // docker run --rm -it -p 18888:18888 -p 4317:18889 -p 4318:18890 -e ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true=true mcr.microsoft.com/dotnet/aspire-dashboard:latest
             "args": [
                 "run",

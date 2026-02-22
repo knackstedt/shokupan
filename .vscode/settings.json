@@ -1,5 +1,6 @@
 {
     "cSpell.words": [
+        "analogjs",
         "bodyinit",
         "Shokupan"
     ],
@@ -14,9 +15,9 @@
     "explorer.fileNesting.expand": false,
     "explorer.fileNesting.patterns": {
         "*.ts": "${capture}.js, ${capture}.spec.ts, ${capture}.*.spec.ts, ${capture}.test.ts",
+        "*.tsx": "${capture}.spec.ts, ${capture}.*.spec.ts, ${capture}.test.ts",
         "*.js": "${capture}.js.map, ${capture}.min.js, ${capture}.d.ts, ${capture}.wasm, ${capture}.wasm.map, ${capture}.wat",
         "*.jsx": "${capture}.js",
-        "*.tsx": "${capture}.ts",
         "tsconfig.json": "tsconfig.*.json",
         "package.json": "package-lock.json, yarn.lock, pnpm-lock.yaml, bun.lock",
         "angular.json": "proxy.config.json, ngsw-config.json"
@@ -38,4 +39,5 @@
         "**/.git/objects/**": true,
         "**/.git/subtree-cache/**": true
     },
+    "angular.enable-strict-mode-prompt": false,
 }
