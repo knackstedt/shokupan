@@ -206,9 +206,14 @@ async function generate(legacyAnalyzeMode = false) {
     const asyncApiArg = getArgValue('--asyncapi');
     if (asyncApiArg) asyncApiPath = asyncApiArg;
 
+    let astPath = 'shokupan-ast.json';
+    const astArg = getArgValue('--ast');
+    if (astArg) astPath = astArg;
+
     if (args.includes('--skip-openapi')) skipOpenApi = true;
     if (args.includes('--skip-http-api')) skipHttpApi = true;
     if (args.includes('--skip-asyncapi')) skipAsyncApi = true;
+    const exportAst = args.includes('--ast');
 
     if (legacyAnalyzeMode) {
         skipHttpApi = true;
@@ -392,6 +397,14 @@ async function generate(legacyAnalyzeMode = false) {
             if (!legacyAnalyzeMode) p.note(`AsyncAPI spec written to: ${fullOutputPath}`, 'AsyncAPI');
         }
 
+        // 5. Export AST
+        if (exportAst || legacyAnalyzeMode) {
+            const outPath = legacyAnalyzeMode ? openApiPath : astPath;
+            const fullOutputPath = path.resolve(outPath);
+            fs.writeFileSync(fullOutputPath, JSON.stringify({ applications }, null, 2));
+            p.note(`AST written to: ${fullOutputPath}`, 'AST');
+        }
+
         s.stop('Generation complete');
 
         // Show Warnings
@@ -452,7 +465,7 @@ async function main() {
         console.log('');
         console.log('Usage:');
         console.log('  shokupan scaffold');
-        console.log('  shokupan generate [--dir <dir>] [--openapi <path>] [--http-api <path>] [--asyncapi <path>]');
+        console.log('  shokupan generate [--dir <dir>] [--openapi <path>] [--http-api <path>] [--asyncapi <path>] [--ast [<path>]]');
         console.log('  shokupan analyze <directory> [--output openapi.json]');
         process.exit(0);
     }

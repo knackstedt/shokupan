@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -50,8 +51,17 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
             app.mount(path, this);
         }
 
+        const astFileName = app.applicationConfig.astFilePath || 'shokupan-ast.json';
+        const specPath = join(process.cwd(), astFileName);
+
+        if (!existsSync(specPath)) {
+            app.applicationConfig.enableAsyncApiGen = true;
+        } else if (app.applicationConfig.enableAsyncApiGen !== true) {
+            console.log(`AsyncApiPlugin: Found ${astFileName}, using static spec instead of generating.`);
+        }
+
         // Ensure async api gen is enabled if this plugin is used
-        if (app.applicationConfig.enableAsyncApiGen !== true) {
+        if (app.applicationConfig.enableAsyncApiGen !== true && !existsSync(specPath)) {
             console.warn('AsyncApiPlugin: enableAsyncApiGen is disabled. AsyncApiPlugin will not generate spec.');
         }
     }

@@ -84,7 +84,12 @@ app.mount('/docs', new ScalarPlugin({
 
 ## Automatic OpenAPI Generation
 
-Shokupan automatically generates OpenAPI specs from your routes and controllers. You can enhance them with metadata:
+Shokupan automatically generates fully-featured OpenAPI specs from your routes, DTOs, and controllers through powerful Abstract Syntax Tree (AST) analysis. The Scalar plugin leverages this deeply-analyzed specification to hydrate its beautiful interactive UI out of the box.
+
+> [!TIP]
+> While AST analysis guarantees zero-configuration documentation, it can affect cold start performance in massive projects. Read the **[AST Generation Guide](/guides/ast-generation/)** to learn how to pre-compile this static mapping during your CI workflow in a single CLI command!
+
+You can further enhance your routes with manual metadata overrides:
 
 ```typescript
 app.get('/users/:id', {

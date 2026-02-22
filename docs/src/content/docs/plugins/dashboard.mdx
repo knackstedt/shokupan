@@ -24,8 +24,9 @@ Showing Event loop latency and Error rate
 
 ## Application Structure 
 :::tip[Did you know?]
-Shokupan reads your source code and generates an AST of your code, then it can provide a visual representation of the application's structure, including routers, controllers, and middleware.
-This process is done either during startup or in your CI/CD pipeline, allowing you to write an application without managing DTOs or manually documenting your API.
+Shokupan dynamically reads your source code and generates a deep **Abstract Syntax Tree (AST)** of your logic. The Dashboard utilizes this analyzed AST to visually represent your application's structure, intelligently draw connections between your routers, controllers, and middlewares, and highlight areas where code was statically unparsable. 
+
+If you want to skip runtime scanning and vastly improve application startup times in production, read our **[AST Generation Guide](/guides/ast-generation/)** to learn how to securely pre-compile the AST tree directly in CI!
 :::
 
 Application registry -- a tree view of your application's structure and registered routes.

@@ -114,6 +114,7 @@ export default defineConfig({
                     label: 'Guides',
                     items: [
                         { label: 'Advanced Features', link: '/guides/advanced/' },
+                        { label: 'AST Generation', link: '/guides/ast-generation/' },
                         { label: 'Debugging', link: '/guides/debugging/' },
                         { label: 'CLI Tools', link: '/guides/cli/' },
                         { label: 'Deployment', link: '/guides/deployment/' },

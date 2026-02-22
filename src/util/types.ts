@@ -555,6 +555,11 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      */
     astAnalysisTimeout?: number;
     /**
+     * The file path to use for exporting/importing the statically-analyzed AST.
+     * @default "shokupan-ast.json"
+     */
+    astFilePath?: string;
+    /**
      * Whether to reuse the port.
      * @default false
      */
