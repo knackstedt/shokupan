@@ -202,6 +202,7 @@ export interface ShokupanHooks<T = any> {
     onReadTimeout?: (ctx: ShokupanContext<T>) => void | Promise<void>;
     onWriteTimeout?: (ctx: ShokupanContext<T>) => void | Promise<void>;
     onRequestTimeout?: (ctx: ShokupanContext<T>) => void | Promise<void>;
+    onStop?: () => void | Promise<void>;
 }
 
 export interface CookieOptions {

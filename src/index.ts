@@ -16,6 +16,7 @@ export * from "./plugins/application/auth";
 export * from "./plugins/application/cluster";
 export * from "./plugins/application/dashboard/plugin";
 export * from "./plugins/application/error-view/index";
+export * from "./plugins/application/graceful-shutdown/plugin";
 export * from "./plugins/application/graphql-apollo";
 export * from "./plugins/application/graphql-yoga";
 export * from "./plugins/application/htmx";

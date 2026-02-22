@@ -50,5 +50,6 @@ export const $wsMessages = Symbol.for("Shokupan.ctx.wsMessages");
 export const $onWsMessage = Symbol.for("Shokupan.ctx.onWsMessage");
 
 export const $resilienceConfig = Symbol.for("Shokupan.resilience.config");
+export const $isWebSocketRouter = Symbol.for("Shokupan.isWebSocketRouter");
 
 

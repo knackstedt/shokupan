@@ -128,6 +128,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     // Performance: Flattened Router Trie
     private rootTrie?: RouterTrie<T>;
     private startupHooks: (() => Promise<void> | void)[] = [];
+    private plugins: ShokupanPlugin[] = [];
     private specAvailableHooks: ((spec: any) => void | Promise<void>)[] = [];
 
 
@@ -153,11 +154,18 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         // Exclude hooks from the router config passed to super() to avoid double execution
         // The application handles app-level hooks in handleRequest()
         const { hooks, ...routerConfig } = config;
-        super({ ...routerConfig, hooks });
+        super(routerConfig);
 
         this[$isApplication] = true;
         this[$appRoot] = this;
         this.applicationConfig = config;
+
+        // Register hooks if provided in config
+        if (hooks) {
+            for (const [name, fn] of Object.entries(hooks)) {
+                this.hook(name as any, fn);
+            }
+        }
 
         // Initialize logger if not provided
         this.applicationConfig.logger ??= createLogger(this.applicationConfig.development ? 'development' : 'production');
@@ -356,6 +364,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
      * Registers a plugin.
      */
     public async register(plugin: ShokupanPlugin, options?: { path?: string; }) {
+        this.plugins.push(plugin);
         try {
             await plugin.onInit(this, options);
         }
@@ -406,7 +415,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             }
 
             // Register ErrorView
-            const hasErrorView = (this as any).plugins?.some((p: any) => p instanceof ErrorView);
+            const hasErrorView = this.plugins.some((p: any) => p instanceof ErrorView);
             if (!hasErrorView) {
                 await this.register(new ErrorView({
                     developmentErrorView: true
@@ -415,7 +424,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             }
 
             // Register Dashboard
-            const hasDashboard = (this as any).plugins?.some((p: any) => typeof p === 'object' && p.metadata?.pluginName === 'Dashboard');
+            const hasDashboard = this.plugins.some((p: any) => typeof p === 'object' && p.metadata?.pluginName === 'Dashboard');
             if (!hasDashboard) {
                 await this.register(DashboardPlugin({
                     path: '/dashboard',
@@ -425,14 +434,14 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             }
 
             // Register ApiExplorer
-            const hasApiExplorer = (this as any).plugins?.some((p: any) => p === ApiExplorerPlugin || p instanceof ApiExplorerPlugin);
+            const hasApiExplorer = this.plugins.some((p: any) => p === ApiExplorerPlugin || p instanceof ApiExplorerPlugin);
             if (!hasApiExplorer) {
                 await this.register(new ApiExplorerPlugin(), { path: '/dashboard/explorer' });
                 this.logger.info("Shokupan", "Loaded ApiExplorer module");
             }
 
             // Register AsyncAPI UI
-            const hasAsyncApi = (this as any).plugins?.some((p: any) => p === AsyncApiPlugin || p instanceof AsyncApiPlugin);
+            const hasAsyncApi = this.plugins.some((p: any) => p === AsyncApiPlugin || p instanceof AsyncApiPlugin);
             if (!hasAsyncApi) {
                 await this.register(new AsyncApiPlugin(), { path: '/dashboard/ws-explorer' });
                 this.logger.info("Shokupan", "Loaded AsyncAPI module");
@@ -600,6 +609,8 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
      * @param closeActiveConnections — Immediately terminate in-flight requests, websockets, and stop accepting new connections.
      */
     public async stop(closeActiveConnections?: boolean): Promise<void> {
+        await this.runOnStopHooks(this);
+
         // Stop CPU monitor if running
         if (this.cpuMonitor) {
             this.cpuMonitor.stop();
@@ -747,7 +758,11 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 const msg = "Too Many Requests (CPU Backpressure)";
                 const res = ctx.text(msg, 429);
                 // Trigger hooks so metrics are recorded
-                if (this.hasOnResponseEndHook) await this.runHooks('onResponseEnd', ctx, res);
+                if (this.hasOnResponseEndHook) {
+                    Promise.resolve(this.runHooks('onResponseEnd', ctx, res)).catch(e => {
+                        this.logger?.debug("Shokupan", "Error in onResponseEnd hook (backpressure):", { error: e });
+                    });
+                }
                 return res;
             }
 
@@ -1012,7 +1027,12 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             .then(async (res) => {
                 // Response End Hook - Response returned
                 // Note: We can't guarantee it's fully sent to client here, but it's handed off to Bun
-                await this.runHooks('onResponseEnd', ctx, res);
+                // Note: We can't guarantee it's fully sent to client here, but it's handed off to Bun
+                if (this.hasOnResponseEndHook) {
+                    Promise.resolve(this.runHooks('onResponseEnd', ctx, res)).catch(e => {
+                        this.logger?.debug("Shokupan", "Error in onResponseEnd hook:", { error: e });
+                    });
+                }
                 return res;
             });
     };

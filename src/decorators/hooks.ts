@@ -46,3 +46,8 @@ export const BeforeValidate = createHookDecorator('beforeValidate');
  * Decorator: Hook that runs after validation.
  */
 export const AfterValidate = createHookDecorator('afterValidate');
+
+/**
+ * Decorator: Hook that runs when the server is stopped.
+ */
+export const OnStop = createHookDecorator('onStop');

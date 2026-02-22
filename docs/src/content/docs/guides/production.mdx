@@ -258,23 +258,35 @@ app.use(async (ctx, next) => {
 
 ### Graceful Shutdown
 
+For production environments, it is crucial to gracefully shut down your application to avoid dropping in-flight requests. You can use the built-in `GracefulShutdown` plugin for this.
+
 ```typescript
+import { Shokupan, GracefulShutdown } from 'shokupan';
+
+const app = new Shokupan();
+
+app.use(GracefulShutdown({
+    signals: ['SIGINT', 'SIGTERM'],
+    timeout: 30000,
+    forceExit: true
+}));
+
 const server = await app.listen(3000);
+```
 
-const shutdown = async () => {
-    logger.info('Shutting down gracefully...');
-    
-    // Close database connections
-    await pool.end();
-    
-    // Stop server
-    server.stop();
-    
-    process.exit(0);
-};
+You can then use the `@OnStop` decorator in your controllers or the `onStop` hook to clean up resources like database connections:
 
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+```typescript
+import { Controller, OnStop } from 'shokupan';
+
+@Controller('/users')
+export class UserController {
+    @OnStop()
+    async cleanup() {
+        // e.g., await pool.end();
+        console.log('Cleaned up resources');
+    }
+}
 ```
 
 ## Monitoring
