@@ -55,7 +55,7 @@ export function attachSocketIOBridge(io: Server, app: Shokupan) {
                     if (app.applicationConfig['websocketErrorHandler']) {
                         await app.applicationConfig['websocketErrorHandler'](e, ctx);
                     } else {
-                        console.error(`Error in event ${event}:`, e);
+                        app.logger?.error('Socket.IO', `Error in event ${event}`, e);
                     }
                 }
             }

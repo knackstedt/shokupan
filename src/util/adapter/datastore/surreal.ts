@@ -14,7 +14,7 @@ export interface SurrealAdapterOptions {
 export class SurrealAdapter implements DatastoreAdapter {
     name = 'surrealdb';
     private db: Surreal;
-    private logger = createLogger('surreal-adapter');
+    private logger = createLogger();
     private options: SurrealAdapterOptions;
 
     constructor(options: SurrealAdapterOptions = {}) {

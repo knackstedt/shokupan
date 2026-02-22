@@ -5,7 +5,7 @@ import type { DatastoreAdapter, QueryOptions } from '../datastore';
 export class SqliteAdapter implements DatastoreAdapter {
     name = 'sqlite';
     private db: Database;
-    private logger = createLogger('sqlite-adapter');
+    private logger = createLogger();
     private tables = new Set<string>();
 
     constructor(

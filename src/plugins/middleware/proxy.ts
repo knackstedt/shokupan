@@ -216,7 +216,7 @@ function handleWSOpen(ws: ServerWebSocket, ctx: ShokupanContext, options: ProxyO
     };
 
     upstream.onerror = (err) => {
-        console.error("Upstream WebSocket error:", err);
+        ctx.app?.logger?.error('Proxy', 'Upstream WebSocket error', err);
         ws.close(1011, "Internal Error");
     };
 

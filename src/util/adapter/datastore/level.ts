@@ -5,7 +5,7 @@ import type { DatastoreAdapter, QueryOptions } from '../datastore';
 export class LevelAdapter implements DatastoreAdapter {
     name = 'leveldb';
     private db: AbstractLevel<any, string, string>;
-    private logger = createLogger('level-adapter');
+    private logger = createLogger();
 
     constructor(
         private options: { location?: string, db?: any; } = {}

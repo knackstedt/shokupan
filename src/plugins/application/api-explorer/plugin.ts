@@ -47,7 +47,7 @@ export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin 
 
         // Ensure async api gen is enabled if this plugin is used
         if (app.applicationConfig.enableOpenApiGen !== true) {
-            console.warn('ApiExplorerPlugin: enableOpenApiGen is disabled. ApiExplorerPlugin will not generate spec.');
+            app.logger?.warn('ApiExplorerPlugin', 'enableOpenApiGen is disabled. ApiExplorerPlugin will not generate spec.');
         }
     }
 

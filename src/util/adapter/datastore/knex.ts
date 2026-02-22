@@ -9,7 +9,7 @@ export interface KnexAdapterOptions extends Knex.Config {
 export class KnexAdapter implements DatastoreAdapter {
     name = 'knex';
     private db!: Knex;
-    private logger = createLogger('knex-adapter');
+    private logger = createLogger();
     private jsonColumnType = 'json'; // 'json' or 'jsonb'
 
     constructor(private options: KnexAdapterOptions) { }

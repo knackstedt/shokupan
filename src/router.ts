@@ -873,7 +873,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             try {
                 result = await match.handler(ctx);
             } catch (err: any) {
-                console.error(err);
+                this.logger?.error('Router', 'Error in route handler', err);
                 status = getErrorStatus(err);
                 result = { error: err.message || "Internal Server Error" };
                 if (err.errors) result.errors = err.errors;

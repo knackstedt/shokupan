@@ -51,7 +51,7 @@ export function Idempotency(options: IdempotencyOptions = {}): Middleware {
                 });
             }
         } catch (e) {
-            console.error("Idempotency read error:", e);
+            ctx.app?.logger?.error('Idempotency', 'Read error', e);
         }
 
 
@@ -100,7 +100,7 @@ export function Idempotency(options: IdempotencyOptions = {}): Middleware {
             try {
                 await ctx.app.db.upsert('idempotency', key, toStore);
             } catch (e) {
-                console.error("Idempotency write error:", e);
+                ctx.app?.logger?.error('Idempotency', 'Write error', e);
             }
 
             return response;

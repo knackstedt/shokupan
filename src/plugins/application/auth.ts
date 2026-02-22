@@ -293,7 +293,7 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
 
                 } catch (e: any) {
                     // Security: Log detailed errors server-side, return generic message to client
-                    console.error("Auth Error", e);
+                    ctx.app?.logger?.error('Auth', 'Authentication failed', e);
                     return ctx.text("Authentication failed. Please try again.", 500);
                 }
             });

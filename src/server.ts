@@ -48,10 +48,6 @@ export class ShokupanServer {
         } else if (adapterName === 'node') {
             adapter = new NodeAdapter();
         } else if (adapterName === 'h3') {
-            console.warn(
-                '[Shokupan] ⚠️  The "h3" adapter is deprecated and has been removed.\n' +
-                '   HTTP/3 support is planned for a future release.'
-            );
             throw new Error(
                 '[Shokupan] H3Adapter is no longer supported. HTTP/3 support is coming in a future release.'
             );

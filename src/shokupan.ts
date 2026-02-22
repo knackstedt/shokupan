@@ -16,7 +16,7 @@ import { SystemCpuMonitor } from "./util/cpu-monitor";
 import { getErrorStatus, NotFoundError } from "./util/http-error";
 import { HTTP_STATUS } from "./util/http-status";
 import { configureIde } from './util/ide';
-import { createLogger } from './util/logger';
+import { createHTTPLogger, createLogger } from './util/logger';
 
 import { Container } from './decorators';
 import { getCallerInfo } from './decorators/util/stack';
@@ -168,7 +168,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         }
 
         // Initialize logger if not provided
-        this.applicationConfig.logger ??= createLogger(this.applicationConfig.development ? 'development' : 'production');
+        this.applicationConfig.logger ??= createLogger();
 
         // Initialize response transformer registry
         this.responseTransformerRegistry = new ResponseTransformerRegistry();
@@ -407,6 +407,8 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         await Promise.all(this.startupHooks.map(hook => hook()));// --- Dev Mode Auto-Enablers ---
         if (this.applicationConfig.development) {
             this.logger?.info('Shokupan', 'Development mode enabled. Auto-loading development plugins...');
+
+            this.use(createHTTPLogger());
 
             // Always ensure middleware tracking is on in dev unless explicitly disabled
             if (this.applicationConfig.enableMiddlewareTracking !== false) {

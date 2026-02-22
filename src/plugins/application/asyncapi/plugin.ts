@@ -57,12 +57,12 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
         if (!existsSync(specPath)) {
             app.applicationConfig.enableAsyncApiGen = true;
         } else if (app.applicationConfig.enableAsyncApiGen !== true) {
-            console.log(`AsyncApiPlugin: Found ${astFileName}, using static spec instead of generating.`);
+            app.logger?.info('AsyncApiPlugin', `Found ${astFileName}, using static spec instead of generating.`);
         }
 
         // Ensure async api gen is enabled if this plugin is used
         if (app.applicationConfig.enableAsyncApiGen !== true && !existsSync(specPath)) {
-            console.warn('AsyncApiPlugin: enableAsyncApiGen is disabled. AsyncApiPlugin will not generate spec.');
+            app.logger?.warn('AsyncApiPlugin', 'enableAsyncApiGen is disabled. AsyncApiPlugin will not generate spec.');
         }
     }
 

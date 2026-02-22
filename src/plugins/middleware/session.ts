@@ -505,7 +505,7 @@ export function Session(options: SessionOptions): Middleware {
         if (shouldSave) {
             await new Promise<void>((resolve, reject) => {
                 store.set(sessionID!, sess, (err) => {
-                    if (err) console.error("Failed to save session", err);
+                    if (err) ctx.app?.logger?.error('Session', 'Failed to save session', err);
                     resolve();
                 });
             });

@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createLogger } from './logger';
 
-const logger = createLogger('development');
+const logger = createLogger();
 
 export interface TLSCertOptions {
     key: string;

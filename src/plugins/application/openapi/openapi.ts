@@ -292,7 +292,6 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
         }
     } catch (e) {
         // Silently fail if analysis cannot run (e.g. runtime environment issues)
-        // console.warn("OpenAPI AST analysis skipped:", e);
         astStatus = 'failed';
         if (options.warnings) {
             options.warnings.push({

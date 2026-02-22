@@ -1094,10 +1094,10 @@ export class ShokupanContext<
                             try {
                                 await onError(err as Error, helper);
                             } catch (handlerErr) {
-                                console.error('Error in stream error handler:', handlerErr);
+                                this.app.logger?.error('Context', 'Stream error handler', handlerErr);
                             }
                         } else {
-                            console.error('Stream error:', err);
+                            this.app.logger?.error('Context', 'Stream error', err);
                         }
                         if (!aborted.value) {
                             controller.close();
@@ -1114,7 +1114,7 @@ export class ShokupanContext<
                     try {
                         cb();
                     } catch (err) {
-                        console.error('Error in abort callback:', err);
+                        this.app.logger?.error('Context', 'Stream abort callback', err);
                     }
                 });
             }

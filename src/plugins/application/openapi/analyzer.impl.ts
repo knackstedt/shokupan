@@ -133,8 +133,6 @@ export class OpenAPIAnalyzer {
             return this.cachedResult;
         }
 
-        // console.log(`Analyzing directory: ${this.rootDir}`);
-
         // Step 1: Parse TypeScript files (which might involve scanning or using entrypoint)
         await this.parseTypeScriptFiles();
 
@@ -202,13 +200,10 @@ export class OpenAPIAnalyzer {
                     return true;
                 }
 
-                // console.log(`[Analyzer] Pruning unreachable module: ${app.filePath}`);
                 return false;
             }
             return true;
         });
-
-        // console.log(`[Analyzer] Pruned ${initialCount - this.applications.length} unreachable modules.`);
     }
 
     /**
@@ -321,13 +316,11 @@ export class OpenAPIAnalyzer {
         if (this.entrypoint) {
             // If entrypoint is provided, let TypeScript resolve dependencies
             fileNames = [this.entrypoint];
-            // console.log(`[Analyzer] Using entrypoint: ${this.entrypoint}`);
         } else {
             // Otherwise, scan the directory manually
             await this.scanDirectory(this.rootDir);
             const tsFiles = this.files.filter(f => f.type === 'ts' || f.type === 'js');
             fileNames = tsFiles.map(f => f.path);
-            // console.log(`[Analyzer] Scanning directory, found ${fileNames.length} files`);
         }
 
         // Create TypeScript program
@@ -374,11 +367,8 @@ export class OpenAPIAnalyzer {
             const isFixtureFile = sourceFile.fileName.includes('/fixtures/');
             const isEntrypoint = this.entrypoint && sourceFile.fileName === this.entrypoint;
 
-            // console.log(`[Analyzer] check ${sourceFile.fileName}: isTestEnv=${isTestEnv}, isFixture=${isFixtureFile}, isEntry=${isEntrypoint}`);
-
             if (!isTestEnv && !isFixtureFile && !isEntrypoint) {
                 if (sourceFile.fileName.includes('/test/') || sourceFile.fileName.includes('/tests/')) {
-                    // console.log(`[Analyzer] Skipping test file: ${sourceFile.fileName}`);
                     continue;
                 }
                 if (sourceFile.fileName.includes('/base_test/')) continue;
