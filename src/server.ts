@@ -69,7 +69,7 @@ export class ShokupanServer {
 
         // Handle Dev SSL
         let tlsOptions: TLSCertOptions | undefined = config.tls;
-        if (!tlsOptions && config.development) {
+        if (!tlsOptions && config.development && process.env.NODE_ENV !== 'test') {
             tlsOptions = ensureLocalSslCertificates();
         }
 

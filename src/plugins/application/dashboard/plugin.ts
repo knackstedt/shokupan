@@ -157,6 +157,9 @@ class Collector implements DebugCollector {
  * When enabled, enableMiddlewareTracking will automatically be enabled on the application.
  */
 export class Dashboard implements ShokupanPlugin {
+    public readonly metadata = {
+        pluginName: 'Dashboard'
+    };
 
     private [$appRoot]: Shokupan;
 
@@ -780,6 +783,8 @@ export class Dashboard implements ShokupanPlugin {
     }
 
     private shouldIgnoreRequest(req: RequestLog): boolean {
+        const path = (req.path || '').replace(/\/+/g, '/');
+
         // Status Codes
         if (this.dashboardConfig.ignoreStatusCodes?.includes(req.status)) return true;
 
@@ -791,9 +796,9 @@ export class Dashboard implements ShokupanPlugin {
             for (const pattern of this.dashboardConfig.ignorePatterns) {
                 if (typeof pattern === 'string') {
                     const glob = new Glob(pattern);
-                    if (glob.match(req.url) || glob.match(req.path || '')) return true;
+                    if (glob.match(req.url) || glob.match(path)) return true;
                 } else if (pattern instanceof RegExp) {
-                    if (pattern.test(req.url) || (req.path && pattern.test(req.path))) return true;
+                    if (pattern.test(req.url) || pattern.test(path)) return true;
                 } else if (typeof pattern === 'function') {
                     if (pattern(req)) return true;
                 }
