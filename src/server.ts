@@ -1,5 +1,6 @@
 import type { Shokupan } from './shokupan';
 import { BunAdapter, NodeAdapter, type ServerAdapter } from './util/adapter';
+import { ensureLocalSslCertificates, type TLSCertOptions } from './util/dev-ssl';
 
 /**
  * Shokupan Server
@@ -66,8 +67,14 @@ export class ShokupanServer {
         // Compile Routes (Flattening Optimization) if not done
         this.app.compile();
 
+        // Handle Dev SSL
+        let tlsOptions: TLSCertOptions | undefined = config.tls;
+        if (!tlsOptions && config.development) {
+            tlsOptions = ensureLocalSslCertificates();
+        }
+
         // Start Server
-        this.server = await adapter.listen(finalPort, this.app);
+        this.server = await adapter.listen(finalPort, this.app, tlsOptions);
 
         // Update config port if 0 was used
         if (finalPort === 0 && this.server?.port) {

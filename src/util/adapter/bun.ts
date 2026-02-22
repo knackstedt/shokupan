@@ -10,7 +10,7 @@ import type { ServerAdapter } from "./interface";
 export class BunAdapter implements ServerAdapter {
     private server?: Server<any>;
 
-    async listen(port: number, app: Shokupan): Promise<Server<any>> {
+    async listen(port: number, app: Shokupan, tls?: { key: string; cert: string; }): Promise<Server<any>> {
         // @ts-ignore
         if (typeof Bun === "undefined") {
             throw new Error("BunAdapter requires the Bun runtime.");
@@ -155,6 +155,10 @@ export class BunAdapter implements ServerAdapter {
                 }
             }
         };
+
+        if (tls) {
+            (serveOptions as any).tls = tls;
+        }
 
         // @ts-ignore
         this.server = Bun.serve(serveOptions);

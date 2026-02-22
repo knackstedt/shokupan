@@ -13,7 +13,7 @@ Shokupan is designed to make building APIs delightful again. With zero-config de
 ## ✨ Features
 
 - 🎯 **TypeScript First** - End-to-end type safety with decorators and generics. No manual types needed.
-- 🛠️ **Zero Config** - Works effectively out of the box. No complex setup or boilerplate.
+- 🛠️ **Zero Config** - Works effectively out of the box. Automatically serves over Local HTTPS with a Debug Dashboard and API Explorer in Dev Mode.
 - 🚀 **Built for Bun** - Native [Bun](https://bun.sh/) performance with instant startup.
 - 🔍 **Debug Dashboard** - Visual inspector for your routes, middleware, and request flow.
 - 📝 **Auto OpenAPI** - Generate [OpenAPI](https://www.openapis.org/) specs automatically from routes.
@@ -47,7 +47,15 @@ app.mount('/scalar', new ScalarPlugin({
 app.listen();
 ```
 
-That's it! Your server is running at `http://localhost:3000` 🎉
+That's it! In development mode, your server is automatically running securely at `https://localhost:3000` 🎉
+
+### Development Mode
+
+By default, when `NODE_ENV` is not `production` (or `development: true` in config), Shokupan automatically enhances your developer experience:
+- **Local HTTPS:** Generates and trusts a local CA to serve your API over `https://localhost:3000` automatically.
+- **Debug Dashboard:** Mounted at `https://localhost:3000/dashboard` to inspect requests and middleware.
+- **API Explorer:** Mounted at `https://localhost:3000/dashboard/explorer` to interact with your OpenAPI spec.
+- **Detailed Errors:** Uncaught exceptions render a beautiful HTML stack trace instead of a plain text 500.
 
 ## 💡 Core Concepts
 

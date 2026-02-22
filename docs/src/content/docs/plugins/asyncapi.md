@@ -92,3 +92,11 @@ Once your application is running, navigate to the configured path (e.g., `http:/
 ### JSON Specification
 
 You can access the raw generated JSON specification at the `/json` subpath (e.g., `http://localhost:3000/asyncapi/json`).
+
+### Pre-compiled Static Specs (shokupan-ast.json)
+
+For massive codebases, AST parsing and schema generation can slightly impact startup times. You can pre-compile your specification using the Shokupan CLI build tools and output it as `shokupan-ast.json` in your project root. 
+
+If Shokupan detects a `shokupan-ast.json` file on startup:
+1. It automatically disables runtime AST Analysis for AsyncAPI generation unless manually overridden.
+2. It mounts the provided `shokupan-ast.json` spec directly into the viewer interface, optimizing performance immensely.

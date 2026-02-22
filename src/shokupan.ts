@@ -2,6 +2,10 @@ import type { Server } from 'bun';
 import { nanoid } from 'nanoid';
 import { ShokupanContext } from "./context";
 import { compose } from "./middleware";
+import { ApiExplorerPlugin } from './plugins/application/api-explorer/plugin';
+import { AsyncApiPlugin } from './plugins/application/asyncapi/plugin';
+import DashboardPlugin from './plugins/application/dashboard/plugin';
+import { ErrorView } from './plugins/application/error-view/index';
 import { generateOpenApi } from "./plugins/application/openapi/openapi";
 import { ShokupanRouter } from './router';
 import { ShokupanServer } from './server';
@@ -153,9 +157,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         this.applicationConfig = config;
 
         // Initialize logger if not provided
-        if (!this.applicationConfig.logger) {
-            this.applicationConfig.logger = createLogger(this.applicationConfig.development ? 'development' : 'production');
-        }
+        this.applicationConfig.logger ??= createLogger(this.applicationConfig.development ? 'development' : 'production');
 
         // Initialize response transformer registry
         this.responseTransformerRegistry = new ResponseTransformerRegistry();
@@ -394,37 +396,47 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
      */
     public async start() {
         // Run startup hooks
-        await Promise.all(this.startupHooks.map(hook => hook()));
+        await Promise.all(this.startupHooks.map(hook => hook()));// --- Dev Mode Auto-Enablers ---
+        if (this.applicationConfig.development) {
+            this.logger?.info('Shokupan', 'Development mode enabled. Auto-loading development plugins...');
 
-        // Initialize AST analyzer early if async scanning is enabled
-        if (this.applicationConfig.enableAsyncAstScanning !== false &&
-            (this.applicationConfig.enableOpenApiGen || this.applicationConfig.enableAsyncApiGen)) {
-            try {
-                const { getGlobalAnalyzer } = await import('./util/ast-analyzer-worker');
-                const entrypoint = this.metadata?.file;
-                const timeout = this.applicationConfig.astAnalysisTimeout ?? 30000;
+            // Always ensure middleware tracking is on in dev unless explicitly disabled
+            if (this.applicationConfig.enableMiddlewareTracking !== false) {
+                this.applicationConfig.enableMiddlewareTracking = true;
+                this.logger.info("Shokupan", "Enabled middleware tracking");
+            }
 
-                const analyzer = getGlobalAnalyzer(process.cwd(), entrypoint, timeout);
+            // Register ErrorView
+            const hasErrorView = (this as any).plugins?.some((p: any) => p instanceof ErrorView);
+            if (!hasErrorView) {
+                await this.register(new ErrorView({
+                    developmentErrorView: true
+                }));
+                this.logger.info("Shokupan", "Loaded ErrorView module");
+            }
 
-                // Start analysis in background (don't await unless blocking is enabled)
-                const shouldBlock = this.applicationConfig.blockOnOpenApiGen !== false ||
-                    this.applicationConfig.blockOnAsyncApiGen !== false;
+            // Register Dashboard
+            const hasDashboard = (this as any).plugins?.some((p: any) => typeof p === 'object' && p.metadata?.pluginName === 'Dashboard');
+            if (!hasDashboard) {
+                await this.register(DashboardPlugin({
+                    path: '/dashboard',
+                    trackStateMutations: true
+                }));
+                this.logger.info("Shokupan", "Loaded Dashboard module");
+            }
 
-                if (!shouldBlock) {
-                    // Start analysis but don't wait
-                    analyzer.analyze().catch(err => {
-                        this.logger?.error('Shokupan', "AST analysis failed", { error: err });
-                    });
-                } else {
-                    // Block on analysis if required by config
-                    try {
-                        await analyzer.analyze();
-                    } catch (err) {
-                        this.logger?.error("Shokupan", "AST analysis failed", { error: err });
-                    }
-                }
-            } catch (err) {
-                this.logger?.debug('Shokupan', "Failed to initialize AST analyzer", { error: err });
+            // Register ApiExplorer
+            const hasApiExplorer = (this as any).plugins?.some((p: any) => p === ApiExplorerPlugin || p instanceof ApiExplorerPlugin);
+            if (!hasApiExplorer) {
+                await this.register(new ApiExplorerPlugin(), { path: '/dashboard/explorer' });
+                this.logger.info("Shokupan", "Loaded ApiExplorer module");
+            }
+
+            // Register AsyncAPI UI
+            const hasAsyncApi = (this as any).plugins?.some((p: any) => p === AsyncApiPlugin || p instanceof AsyncApiPlugin);
+            if (!hasAsyncApi) {
+                await this.register(new AsyncApiPlugin(), { path: '/dashboard/ws-explorer' });
+                this.logger.info("Shokupan", "Loaded AsyncAPI module");
             }
         }
 
@@ -560,6 +572,12 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     public async listen(port?: number) {
         this.httpServer = new ShokupanServer(this);
         this.server = await this.httpServer.listen(port);
+
+        const protocol = (this.applicationConfig.tls || this.applicationConfig.development) ? 'https' : 'http';
+        const url = `${protocol}://${this.applicationConfig.hostname}:${this.applicationConfig.port}`;
+        const hyperlinkedUrl = `\x1b]8;;${url}\x07${url}\x1b]8;;\x07`;
+
+        this.logger.info('Shokupan', `Server running on ${hyperlinkedUrl}`);
         return this.server;
     }
 

@@ -491,6 +491,15 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      */
     hostname: string;
     /**
+     * TLS/SSL configuration options.
+     * In development mode, if this is not provided, self-signed certificates will be automatically generated.
+     */
+    tls: {
+        key: string;
+        cert: string;
+        [key: string]: any;
+    };
+    /**
      * Whether to run in development mode.
      * @default process.env.NODE_ENV !== "production"
      */

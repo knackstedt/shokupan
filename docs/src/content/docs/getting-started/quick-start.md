@@ -35,8 +35,10 @@ let nextId = 1;
 // Routes will go here
 
 app.listen();
-console.log('🍞 Server running at http://localhost:3000');
+console.log('🍞 Server running securely at https://localhost:3000');
 ```
+
+> **Note:** Because we enabled `development: true`, Shokupan automatically generates a trusted local SSL certificate and mounts the Debug Dashboard at `https://localhost:3000/dashboard`!
 
 ## Adding Routes
 
@@ -266,27 +268,27 @@ Start your server:
 bun run app.ts
 ```
 
-Test with curl:
+Test with curl (add `-k` if curl does not use the system trust store):
 
 ```bash
 # Create a todo
-curl -X POST http://localhost:3000/todos \
+curl -X POST https://localhost:3000/todos \
   -H "Content-Type: application/json" \
   -d '{"title": "Learn Shokupan"}'
 
 # Get all todos
-curl http://localhost:3000/todos
+curl https://localhost:3000/todos
 
 # Get a specific todo
-curl http://localhost:3000/todos/1
+curl https://localhost:3000/todos/1
 
 # Update a todo
-curl -X PUT http://localhost:3000/todos/1 \
+curl -X PUT https://localhost:3000/todos/1 \
   -H "Content-Type: application/json" \
   -d '{"completed": true}'
 
 # Delete a todo
-curl -X DELETE http://localhost:3000/todos/1
+curl -X DELETE https://localhost:3000/todos/1
 ```
 
 ## Next Steps

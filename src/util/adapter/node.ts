@@ -8,7 +8,7 @@ import type { ServerAdapter } from "./interface";
 export class NodeAdapter implements ServerAdapter {
     private server?: any;
 
-    async listen(port: number, app: Shokupan): Promise<Server<any>> {
+    async listen(port: number, app: Shokupan, tls?: { key: string; cert: string; }): Promise<Server<any>> {
         const factory = app.applicationConfig.serverFactory;
 
         let nodeServer: http.Server | https.Server;
@@ -31,7 +31,7 @@ export class NodeAdapter implements ServerAdapter {
         }
 
         // Standard Node.js implementation
-        nodeServer = http.createServer(async (req, res) => {
+        const handler = async (req: http.IncomingMessage, res: http.ServerResponse) => {
             const url = new URL(req.url!, `http://${req.headers.host}`);
             const request = new Request(url.toString(), {
                 method: req.method,
@@ -48,6 +48,7 @@ export class NodeAdapter implements ServerAdapter {
                 duplex: 'half'
             } as any);
 
+            // Create faux server inside handler or borrow from outside
             const response = await app.fetch(request, fauxServer);
 
             res.statusCode = response.status;
@@ -78,7 +79,13 @@ export class NodeAdapter implements ServerAdapter {
             } else {
                 res.end();
             }
-        });
+        };
+
+        if (tls) {
+            nodeServer = https.createServer(tls, handler);
+        } else {
+            nodeServer = http.createServer(handler);
+        }
 
         // Store reference
         this.server = nodeServer;
