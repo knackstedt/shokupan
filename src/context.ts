@@ -691,6 +691,26 @@ export class ShokupanContext<
     }
 
     /**
+     * Bypasses the configured `maxBodySize` and memory buffering, directly invoking the 
+     * underlying native runtime's `FormData` parser.
+     * 
+     * In Bun, this handles large files by seamlessly backing them up to disk, keeping
+     * memory usage extremely low. Use this when handling large file uploads.
+     */
+    async nativeFormData(): Promise<FormData> {
+        return this.request.formData();
+    }
+
+    /**
+     * Exposes the raw, unread incoming `ReadableStream` of the HTTP request body.
+     * Use this if you want to manually process chunks (e.g., custom streaming parsers)
+     * without anything being buffered to memory or disk first.
+     */
+    get nativeStream(): ReadableStream<Uint8Array> | null {
+        return this.request.body;
+    }
+
+    /**
      * Pre-parse the request body before handler execution.
      * This improves performance and enables Node.js compatibility for large payloads.
      * Errors are deferred until the body is actually accessed in the handler.
@@ -703,6 +723,11 @@ export class ShokupanContext<
 
         // Skip for methods that typically don't have bodies
         if (this.request.method === 'GET' || this.request.method === 'HEAD') {
+            return;
+        }
+
+        // Skip if automatic parsing is explicitly disabled
+        if (this.app?.applicationConfig?.['disableBodyParsing'] === true) {
             return;
         }
 

@@ -120,6 +120,7 @@ export default defineConfig({
                         { label: 'Deployment', link: '/guides/deployment/' },
                         { label: 'Global Type Augmentation', link: '/guides/global-type-augmentation/' },
                         { label: 'JSON Parser Configuration', link: '/guides/json-parser-configuration/' },
+                        { label: 'Multipart Streaming', link: '/guides/multipart-streaming/' },
                         { label: 'Plugin Dependencies', link: '/guides/plugin-dependencies/' },
                         { label: 'Production Best Practices', link: '/guides/production/' },
                         { label: 'Testing', link: '/guides/testing/' },
