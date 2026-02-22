@@ -127,6 +127,9 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
     // Performance: Flattened Router Trie
     private rootTrie?: RouterTrie<T>;
+    private startupHooks: (() => Promise<void> | void)[] = [];
+    private specAvailableHooks: ((spec: any) => void | Promise<void>)[] = [];
+
 
     public get db(): DatastoreAdapter | undefined {
         return this.datastore;
@@ -363,8 +366,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         return this;
     }
 
-    private startupHooks: (() => Promise<void> | void)[] = [];
-
     /**
      * Registers a callback to be executed before the server starts listening.
      */
@@ -372,8 +373,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         this.startupHooks.push(callback);
         return this;
     }
-
-    private specAvailableHooks: ((spec: any) => void | Promise<void>)[] = [];
 
     /**
      * Registers a callback to be executed when the OpenAPI spec is available.
