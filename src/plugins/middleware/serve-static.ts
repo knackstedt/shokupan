@@ -64,7 +64,7 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
         walk(rootPath)
             .then(_resolveReady)
             .catch(err => {
-                if (process.env.NODE_ENV !== 'test') this.logger.error('[serveStatic] Cache population error:', err);
+                if (process.env.NODE_ENV !== 'test') console.error('[serveStatic] Cache population error:', err);
                 _resolveReady();
             });
     } else {
