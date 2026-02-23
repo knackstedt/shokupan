@@ -86,6 +86,8 @@
         "parse-json": "^8.0.0",
         "reflect-metadata": "^0.2.0",
         "secure-json-parse": "^4.0.0",
+        "preact": "^10.0.0",
+        "preact-render-to-string": "^6.0.0",
         "socket.io": "^4.8.3",
         "surrealdb": "^2.0.0-alpha.16"
     },
@@ -148,6 +150,12 @@
             "optional": true
         },
         "js-yaml": {
+            "optional": true
+        },
+        "preact": {
+            "optional": true
+        },
+        "preact-render-to-string": {
             "optional": true
         },
         "socket.io": {
