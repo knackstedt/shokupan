@@ -217,7 +217,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             this.use(SecurityHeaders(this.applicationConfig.defaultSecurityHeaders === true ? {} : this.applicationConfig.defaultSecurityHeaders));
         }
 
-        if (this.applicationConfig.adapter !== 'wintercg') {
+        if (this.applicationConfig.adapter !== 'wintercg' && this.applicationConfig.datastore) {
             this.dbPromise = this.initDatastore().catch(err => {
                 // Log but don't crash if optional datastore init fails
                 this.logger?.debug('Shokupan', "Failed to initialize default datastore", { error: err });
@@ -571,7 +571,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
      * @param port - The port to listen on. If not specified, the port from the configuration is used. If that is not specified, port 3000 is used.
      * @returns The server instance.
      */
-    public async listen(port?: number) {
+    public async listen(port?: number, callback?: () => void) {
         this.httpServer = new ShokupanServer(this);
         this.server = await this.httpServer.listen(port);
 
@@ -580,6 +580,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         const hyperlinkedUrl = `\x1b]8;;${url}\x07${url}\x1b]8;;\x07`;
 
         this.logger.info('Shokupan', `Server running on ${hyperlinkedUrl}`);
+        callback?.();
         return this.server;
     }
 
