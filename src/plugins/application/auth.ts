@@ -12,6 +12,7 @@ export interface AuthUser {
     picture?: string;
     provider: string;
     raw?: any;
+    [key: string]: any;
 }
 
 export interface ProviderConfig {
@@ -100,6 +101,11 @@ export interface AuthConfig {
          */
         maxAge?: number;
     };
+    /**
+     * Optional URL to redirect to upon successful login and session creation.
+     * If not provided, returns a JSON object with the token.
+     */
+    successRedirect?: string;
     /**
      * Success callback
      */
@@ -199,6 +205,35 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
     }
 
     private init() {
+        // ── Session & Logout endpoints ──────────────────────────────────────────
+        /**
+         * GET /auth/me
+         * Reads and verifies the auth_token cookie and returns the decoded user.
+         * Used by the Angular SPA to bootstrap session state on page load.
+         * The JWT signature is verified server-side — the client never sees the secret.
+         */
+        this.get('/auth/me', async (ctx) => {
+            const cookieHeader = ctx.req.headers.get('Cookie');
+            const token = cookieHeader?.match(/auth_token=([^;]+)/)?.[1];
+            if (!token) return ctx.json({ error: 'Unauthenticated' }, 401);
+            try {
+                const { payload } = await this.jose.jwtVerify(token, this.secret);
+                // Return the verified payload directly — no raw token exposure
+                return ctx.json(payload);
+            } catch {
+                return ctx.json({ error: 'Invalid or expired token' }, 401);
+            }
+        });
+
+        /**
+         * POST /auth/logout
+         * Clears the auth_token cookie.
+         */
+        this.post('/auth/logout', (ctx) => {
+            ctx.set('Set-Cookie', 'auth_token=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax');
+            return ctx.json({ ok: true });
+        });
+
         const { generateState, generateCodeVerifier, GitHub, Google, MicrosoftEntraId, Apple, Auth0, Okta, OAuth2Client } = this.arctic;
         const providerEntries = Object.entries(this.authConfig.providers);
 
@@ -252,6 +287,8 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
                 const code = url.searchParams.get("code");
                 const state = url.searchParams.get("state");
 
+                console.log("== OAuth Callback Hit ==", { providerName, code, state });
+
                 const cookieHeader = ctx.req.headers.get("Cookie");
                 const storedState = cookieHeader?.match(/oauth_state=([^;]+)/)?.[1];
                 const storedVerifier = cookieHeader?.match(/oauth_verifier=([^;]+)/)?.[1];
@@ -279,7 +316,20 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
                         tokens = await provider.validateAuthorizationCode(providerConfig.tokenUrl, code, null);
                     }
 
-                    const accessToken = tokens.accessToken || tokens.access_token;
+                    // Call accessToken as a method if it's an arctic v3+ OAuth2Tokens object
+                    const accessToken = typeof tokens.accessToken === 'function' ? tokens.accessToken() : (tokens.accessToken || tokens.access_token);
+
+                    // Call idToken if present. Arctic v3 throws if it's missing, so wrap in try-catch.
+                    try {
+                        if (typeof tokens.idToken === 'function') {
+                            idToken = tokens.idToken();
+                        } else if (tokens.idToken) {
+                            idToken = tokens.idToken;
+                        }
+                    } catch (e) {
+                        // Ignore missing idToken for providers like GitHub that don't issue them natively
+                    }
+
                     const user = await this.fetchUser(providerName, accessToken, providerConfig, idToken);
 
                     if (this.authConfig.onSuccess) {
@@ -289,12 +339,19 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
 
                     // Default behavior: create encoded session and returning it or redirect
                     const jwt = await this.createSession(user, ctx);
+
+                    if (this.authConfig.successRedirect) {
+                        return ctx.redirect(this.authConfig.successRedirect);
+                    }
                     return ctx.json({ token: jwt, user });
 
                 } catch (e: any) {
-                    // Security: Log detailed errors server-side, return generic message to client
+                    console.error("Auth Exception:", e);
+                    let extradata = "";
+                    try { if (e && e.response) extradata = " | Body: " + await e.response.text(); } catch { }
+                    // Temporary debug: Return the actual error message to the client
                     ctx.app?.logger?.error('Auth', 'Authentication failed', e);
-                    return ctx.text("Authentication failed. Please try again.", 500);
+                    return ctx.text(`Authentication failed.\nError: ${e?.message ?? String(e)}${extradata}\n\nStack:\n${e?.stack}`, 500);
                 }
             });
         }
@@ -305,7 +362,10 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
 
         if (provider === 'github') {
             const res = await fetch("https://api.github.com/user", {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'User-Agent': 'Shokupan-Auth/1.0'
+                }
             });
             const data = await res.json() as any;
             user = {

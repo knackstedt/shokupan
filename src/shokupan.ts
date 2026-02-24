@@ -131,6 +131,8 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     private plugins: ShokupanPlugin[] = [];
     private specAvailableHooks: ((spec: any) => void | Promise<void>)[] = [];
 
+    private pluginInitPromises: Promise<void>[] = [];
+
 
     public get db(): DatastoreAdapter | undefined {
         return this.datastore;
@@ -354,11 +356,16 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
     /**
      * Registers a plugin.
+     * This returns a promise that resolves when the plugin is initialized. You do not 
+     * need to await it unless you want to run code specifically after the plugin is initialized.
+     * Shokupan automatically awaits plugin initialization promises when calling listen().
      */
     public async register(plugin: ShokupanPlugin, options?: { path?: string; }) {
         this.plugins.push(plugin);
         try {
-            await plugin.onInit(this, options);
+            const promise = plugin.onInit(this, options);
+            this.pluginInitPromises.push(promise as any);
+            await promise;
         }
         catch (err) {
             this.logger?.error('Shokupan', "Failed to initialize plugin", { error: err });
@@ -573,6 +580,10 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
      */
     public async listen(port?: number, callback?: () => void) {
         this.httpServer = new ShokupanServer(this);
+
+        // Wait for all plugins to initialize
+        await Promise.allSettled(this.pluginInitPromises);
+
         this.server = await this.httpServer.listen(port);
 
         const protocol = (this.applicationConfig.tls || this.applicationConfig.development) ? 'https' : 'http';
