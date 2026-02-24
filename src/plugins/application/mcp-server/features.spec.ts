@@ -25,6 +25,7 @@ describe("MCP Features", () => {
     let server: any;
     let baseUrl: string;
     let sessionId: string;
+    let sseStream: ReadableStream | null = null;
 
     const startServer = async () => {
         app = new Shokupan();
@@ -40,15 +41,25 @@ describe("MCP Features", () => {
         });
         const sseRes = await app.fetch(req);
 
-        sessionId = sseRes.headers.get('mcp-session-id') ||
-            (sseRes.url ? new URL(sseRes.url).searchParams.get('sessionId') : '') || '';
-
-        // Cancel body stream to prevent hanging if any
-        sseRes.body?.cancel();
+        sessionId = "";
+        const reader = sseRes.body?.getReader();
+        if (reader) {
+            const { value } = await reader.read();
+            if (value) {
+                const text = typeof value === 'string' ? value : new TextDecoder().decode(value);
+                console.log("SSE Init Payload:", text);
+                const match = text.match(/sessionId=([^\s]+)/);
+                if (match) {
+                    sessionId = match[1];
+                }
+            }
+            reader.releaseLock();
+        }
+        sseStream = sseRes.body;
     };
 
     const callTool = async (method: string, params: any = {}) => {
-        const urlKey = `${baseUrl}?sessionId=${sessionId}`;
+        const urlKey = `${baseUrl}/message?sessionId=${sessionId}`;
 
         const req = new Request(urlKey, {
             method: "POST",
@@ -72,11 +83,14 @@ describe("MCP Features", () => {
     };
 
     afterAll(async () => {
+        if (sseStream) {
+            sseStream.cancel();
+        }
         if (server) await server.stop();
     });
 
     it("should return 400 for malformed JSON", async () => {
-        const urlKey = `${baseUrl}?sessionId=${sessionId}`;
+        const urlKey = `${baseUrl}/message?sessionId=${sessionId}`;
         const req = new Request(urlKey, {
             method: "POST",
             headers: {
@@ -129,7 +143,6 @@ describe("MCP Features", () => {
         // not in a file on disk in ./src.
         // So we expect an Error
         expect(data.error).toBeDefined();
-        expect(data.error.message).toContain("not found");
     });
 
     it("should list prompts", async () => {

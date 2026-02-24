@@ -32,8 +32,19 @@ describe("MCP Server Plugin", async () => {
         });
         expect(sseRes.status).toBe(200);
 
-        // Mock session ID not needed for lightweight server
-        const sessionId = "mock-session";
+        // Extract the sessionId from the SSE stream
+        let sessionId = "";
+        const reader = sseRes.body?.getReader();
+        if (reader) {
+            const { value } = await reader.read();
+            if (value) {
+                const text = new TextDecoder().decode(value);
+                const match = text.match(/sessionId=([^\s]+)/);
+                if (match) {
+                    sessionId = match[1];
+                }
+            }
+        }
 
         // Send a tool call
         const toolCall = {
@@ -46,7 +57,7 @@ describe("MCP Server Plugin", async () => {
             }
         };
 
-        const postRes = await fetch(`http://localhost:${port}/mcp`, {
+        const postRes = await fetch(`http://localhost:${port}/mcp/message?sessionId=${sessionId}`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
