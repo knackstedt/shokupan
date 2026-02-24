@@ -22,7 +22,11 @@
     ],
     "type": "module",
     "scripts": {
-        "dev": "bun --watch --inspect examples/full/main.ts",
+        "dev": "bun run scripts/start-dev.ts",
+        "dev:server": "bun --watch --inspect examples/full/main.ts",
+        "dev:client": "cd client && ng serve",
+        "build:client": "cd client && ng build --configuration production",
+        "test:client": "cd client && ng test --watch=false",
         "mcp:inspector": "npx @modelcontextprotocol/inspector http://localhost:8372/mcp",
         "debug:otel": "sh scripts/debug-otel.sh",
         "docs": "cd docs && bun run dev",
@@ -60,7 +64,6 @@
     "dependencies": {
         "@clack/prompts": "^0.11.0",
         "cockatiel": "^3.2.1",
-        "consola": "^3.4.2",
         "mrmime": "^2.0.1",
         "nanoid": "^5.1.6",
         "node-forge": "^1.3.3",
