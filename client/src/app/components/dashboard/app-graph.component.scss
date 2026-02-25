@@ -1,0 +1,50 @@
+.graph-wrapper {
+    height: 100%;
+    width: 100%;
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    background: var(--bg-card);
+    overflow: hidden;
+    position: relative;
+}
+
+.xyflow-container {
+    height: 100%;
+    width: 100%;
+}
+
+/* Base XYFlow style overrides to adapt to dark/light themes */
+.xyflow-container {
+    --xy-node-background: var(--bg-card);
+    --xy-node-color: var(--text-primary);
+    --xy-node-border: 1px solid var(--card-border);
+    --xy-edge-stroke: var(--text-muted);
+}
+
+.graph-controls {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: var(--bg-secondary);
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--card-border);
+    font-size: 0.8rem;
+    font-family: var(--skp-font);
+    color: var(--text-secondary);
+    z-index: 5;
+}
+
+.empty-state {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    gap: 0.5rem;
+
+    span {
+        font-size: 2rem;
+    }
+}

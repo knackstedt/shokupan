@@ -1,0 +1,99 @@
+<div class="dashboard-wrapper">
+    <!-- Sub-navigation Tabs -->
+    <div class="dash-tabs">
+        <button class="dash-tab" [class.active]="activeTab() === 'overview'"
+            (click)="setTab('overview')">Overview</button>
+        <button class="dash-tab" [class.active]="activeTab() === 'application'"
+            (click)="setTab('application')">Application</button>
+        <button class="dash-tab" [class.active]="activeTab() === 'network'" (click)="setTab('network')">Network
+            Log</button>
+    </div>
+
+    <div class="dash-content">
+        <!-- Overview Tab -->
+        @if (activeTab() === 'overview') {
+        <div class="metrics-grid">
+            <div class="card">
+                <div class="card-label">Total Requests</div>
+                <div class="card-value">{{ metrics().totalRequests | number }}</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Active</div>
+                <div class="card-value accent">{{ metrics().activeRequests }}</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Successful</div>
+                <div class="card-value success">{{ metrics().successfulRequests | number }}</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Failed</div>
+                <div class="card-value error">{{ metrics().failedRequests | number }}</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Avg Latency</div>
+                <div class="card-value">{{ metrics().averageTotalTime_ms | number:'1.0-1' }} <small>ms</small></div>
+            </div>
+            <div class="card ws-card">
+                <div class="card-label">WebSocket</div>
+                <div class="card-value">
+                    <span class="ws-dot" [class.connected]="wsConnected()"></span>
+                    {{ wsConnected() ? 'Live' : 'Disconnected' }}
+                </div>
+            </div>
+        </div>
+        }
+
+        <!-- Application Tab -->
+        @if (activeTab() === 'application') {
+        <div class="app-split">
+            <div class="app-split-left">
+                <skp-app-registry-tree [rawData]="appData()" [metrics]="metrics()"></skp-app-registry-tree>
+            </div>
+            <div class="app-split-right">
+                <skp-app-graph [rawData]="appData()"></skp-app-graph>
+            </div>
+        </div>
+        }
+
+        <!-- Network Tab -->
+        @if (activeTab() === 'network') {
+        <div class="card log-card">
+            <div class="card-header">
+                <span class="card-title">Recent Requests</span>
+                <button class="icon-btn" (click)="purgeRequests()" title="Purge logs">🗑</button>
+                <button class="icon-btn" (click)="fetchRequests()" title="Refresh">↻</button>
+            </div>
+            <ng-scrollbar class="log-scroll">
+                <table class="request-table">
+                    <thead>
+                        <tr>
+                            <th>Method</th>
+                            <th>URL</th>
+                            <th>Status</th>
+                            <th>Duration</th>
+                            <th>Direction</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (req of requests(); track req.id) {
+                        <tr [class.row-error]="req.status >= 400">
+                            <td><span class="badge-{{ req.method }}">{{ req.method }}</span></td>
+                            <td class="url-cell" [title]="req.url">{{ req.url }}</td>
+                            <td [class.status-error]="req.status >= 400">{{ req.status }}</td>
+                            <td>{{ req.duration | number:'1.0-1' }}ms</td>
+                            <td>{{ req.direction }}</td>
+                            <td>{{ req.timestamp | date:'HH:mm:ss' }}</td>
+                        </tr>
+                        } @empty {
+                        <tr>
+                            <td colspan="6" class="empty-row">No requests recorded yet.</td>
+                        </tr>
+                        }
+                    </tbody>
+                </table>
+            </ng-scrollbar>
+        </div>
+        }
+    </div>
+</div>

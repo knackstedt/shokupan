@@ -1,0 +1,90 @@
+<div class="tree-wrapper">
+    <ng-scrollbar class="tree-scroll">
+        <div class="tree-root">
+            <ng-container *ngTemplateOutlet="nodeTemplate; context: { $implicit: rootItems() }"></ng-container>
+        </div>
+    </ng-scrollbar>
+
+    <!-- Recursive Template -->
+    <ng-template #nodeTemplate let-items>
+        @for (item of items; track item.id || item.path || item.name) {
+        <div class="tree-node">
+            <!-- Middleware -->
+            @if (item.kind === 'middleware') {
+            <div class="tree-item middleware-item">
+                <span class="badge badge-MIDDLEWARE">MIDDLEWARE</span>
+                <span class="tree-label">{{ item.name }}</span>
+                <span class="tree-meta" *ngIf="item.metadata?.file">{{ item.metadata.file }}:{{ item.metadata.line
+                    }}</span>
+            </div>
+            }
+
+            <!-- Router -->
+            @if (item.kind === 'router') {
+            <div class="tree-group router-group">
+                <div class="tree-item router-header">
+                    <span class="badge badge-ROUTER" [class.badge-PLUGIN]="item.metadata?.pluginName">
+                        {{ item.metadata?.pluginName ? 'PLUGIN' : 'ROUTER' }}
+                    </span>
+                    <span class="tree-label">{{ item.path }}</span>
+                    <span class="tree-meta" *ngIf="item.metadata?.file">{{ item.metadata.file }}:{{ item.metadata.line
+                        }}</span>
+                    <span class="plugin-name" *ngIf="item.metadata?.pluginName">[{{ item.metadata.pluginName }}]</span>
+                </div>
+                @if (item.children) {
+                <div class="tree-children">
+                    <!-- The legacy JS actually recursively called renderRegistry here. -->
+                    <!-- If we need full deep recursion for routers nested in routers, we use the template again. -->
+                    <ng-container
+                        *ngTemplateOutlet="nodeTemplate; context: { $implicit: getChildren(item) }"></ng-container>
+                </div>
+                }
+            </div>
+            }
+
+            <!-- Controller -->
+            @if (item.kind === 'controller') {
+            <div class="tree-group controller-group">
+                <div class="tree-item controller-header">
+                    <span class="badge badge-CONTROLLER">CTRL</span>
+                    <span class="tree-label"><strong>{{ item.name }}</strong> <span class="path-context">({{ item.path
+                            }})</span></span>
+                    <span class="builtin-badge" *ngIf="isBuiltin(item.metadata)">BUILTIN</span>
+                </div>
+                @if (item.children?.routes?.length) {
+                <div class="tree-children routes-list">
+                    @for (route of item.children.routes; track route.path) {
+                    <div class="tree-item route-item">
+                        <span class="badge badge-{{ route.method | uppercase }}">{{ route.method | uppercase }}</span>
+                        <span class="tree-label">{{ route.path }}</span>
+                        <span class="handler-name" *ngIf="route.handlerName">({{ route.handlerName }})</span>
+                    </div>
+                    }
+                </div>
+                } @else {
+                <div class="tree-children empty-routes">(No routes detected)</div>
+                }
+            </div>
+            }
+
+            <!-- Loose Route -->
+            @if (item.kind === 'route') {
+            <div class="tree-item loose-route-item">
+                <span class="badge badge-{{ item.method | uppercase }}">{{ item.method | uppercase }}</span>
+                <span class="tree-label">{{ item.path }}</span>
+                <span class="handler-name" *ngIf="item.handlerName">({{ item.handlerName }})</span>
+            </div>
+            }
+
+            <!-- Event -->
+            @if (item.kind === 'event') {
+            <div class="tree-item event-item">
+                <span class="badge badge-WS">WS</span>
+                <span class="tree-label">{{ item.name }}</span>
+                <span class="handler-name" *ngIf="item.handlerName">({{ item.handlerName }})</span>
+            </div>
+            }
+        </div>
+        }
+    </ng-template>
+</div>

@@ -1,0 +1,8 @@
+::ng-deep html.theme-dark ngx-extended-pdf-viewer {
+
+    filter: invert(1) sepia(.5) saturate(1.5) hue-rotate(190deg);
+
+    .pdfViewer .page {
+        border: none;
+    }
+}

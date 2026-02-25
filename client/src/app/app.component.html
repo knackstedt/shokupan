@@ -1,0 +1,10 @@
+@if (auth.loading()) {
+<div class="boot-spinner">
+    <span class="spinner-icon">🍞</span>
+    <p>Loading…</p>
+</div>
+} @else if (!auth.isAuthenticated) {
+<skp-login />
+} @else {
+<skp-shell />
+}

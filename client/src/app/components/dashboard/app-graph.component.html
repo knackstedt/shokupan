@@ -1,0 +1,12 @@
+<div class="graph-wrapper">
+    @if (nodes().length > 0) {
+    <ngx-xyflow [nodes]="nodes()" [edges]="edges()" [fitView]="fitView()" class="xyflow-container">
+        <!-- Add any custom templates needed by ngx-xyflow if needed, but for now just the component -->
+    </ngx-xyflow>
+    } @else {
+    <div class="empty-state">
+        <span>🕸️</span>
+        <p>Building dependency graph...</p>
+    </div>
+    }
+</div>

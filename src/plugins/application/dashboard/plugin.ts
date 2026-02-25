@@ -619,6 +619,7 @@ export class Dashboard implements ShokupanPlugin {
 
         // Requests Listing Endpoint
         this.router.get("/requests", async (ctx) => {
+            if (!this.db) return ctx.json({ requests: [] });
             const result = await this.db.findMany('request', {
                 sort: { timestamp: 'desc' },
                 limit: 100
@@ -628,8 +629,10 @@ export class Dashboard implements ShokupanPlugin {
 
         this.router.delete("/requests", async (ctx) => {
             this[$appRoot]?.logger?.debug('Dashboard', `Purging all requests`);
-            await this.db.deleteMany('request');
-            await this.db.deleteMany('failed_request');
+            if (this.db) {
+                await this.db.deleteMany('request');
+                await this.db.deleteMany('failed_request');
+            }
             this.metrics.logs = [];
             this.metrics.totalRequests = 0;
             this.metrics.activeRequests = 0;
@@ -644,6 +647,7 @@ export class Dashboard implements ShokupanPlugin {
 
         // Request Details Endpoint
         this.router.get("/requests/:id", async (ctx) => {
+            if (!this.db) return ctx.json({ request: null });
             const result = await this.db.get('request', ctx.params['id']);
             return ctx.json({ request: result });
         });

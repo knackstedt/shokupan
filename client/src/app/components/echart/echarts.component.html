@@ -1,0 +1,15 @@
+@if (dataExists) {
+    <div
+        echarts
+        [options]="configuration"
+        style="height: 100%; width: 100%"
+        (chartInit)="onChartInit($event)"
+        [autoResize]="true"
+    >
+    </div>
+}
+@else {
+    Chart is empty
+}
+
+

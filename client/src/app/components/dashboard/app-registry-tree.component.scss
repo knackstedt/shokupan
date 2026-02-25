@@ -1,0 +1,173 @@
+:host {
+    display: block;
+    height: 100%;
+}
+
+.tree-wrapper {
+    height: 100%;
+    border-radius: 6px;
+    background: var(--bg-card);
+    border: 1px solid var(--card-border);
+    overflow: hidden;
+}
+
+.tree-scroll {
+    height: 100%;
+}
+
+.tree-root {
+    padding: 1rem;
+}
+
+.tree-node {
+    padding-left: 1rem;
+    margin-left: 0.5rem;
+    border-left: 1px dashed var(--card-border);
+    margin-bottom: 0.25rem;
+}
+
+.tree-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-family: var(--skp-font-mono);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.tree-item:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.tree-label {
+    flex: 1;
+}
+
+/* Badges */
+.badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: white;
+    text-transform: uppercase;
+}
+
+.badge-MIDDLEWARE {
+    background: #9333ea;
+}
+
+.badge-ROUTER {
+    background: #8b5cf6;
+}
+
+.badge-PLUGIN {
+    background: #f59e0b;
+    color: #000;
+}
+
+.badge-CONTROLLER {
+    background: #3b82f6;
+}
+
+.badge-GET {
+    background: #10b981;
+}
+
+.badge-POST {
+    background: #f59e0b;
+}
+
+.badge-PUT {
+    background: #3b82f6;
+}
+
+.badge-DELETE {
+    background: #ef4444;
+}
+
+.badge-PATCH {
+    background: #6366f1;
+}
+
+.badge-OPTIONS,
+.badge-HEAD {
+    background: #6b7280;
+}
+
+.badge-WS {
+    background: #ec4899;
+}
+
+/* Specific Item Styling */
+.router-header {
+    font-weight: 600;
+    margin-top: 0.5rem;
+}
+
+.controller-header {
+    font-weight: 600;
+    margin-top: 0.5rem;
+    font-family: var(--skp-font);
+}
+
+.controller-header strong {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.path-context {
+    color: var(--text-muted);
+    font-weight: normal;
+    font-size: 0.75rem;
+    margin-left: 0.5rem;
+}
+
+.tree-children {
+    margin-top: 0.25rem;
+}
+
+.routes-list {
+    padding-left: 1rem;
+    margin-left: 0.5rem;
+    border-left: 1px dashed var(--card-border);
+}
+
+.empty-routes {
+    font-style: italic;
+    color: var(--text-muted);
+    padding: 0.25rem 1.5rem;
+    font-size: 0.75rem;
+}
+
+.handler-name {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.plugin-name {
+    color: #6ee7b7;
+    font-size: 0.75rem;
+}
+
+.tree-meta {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.tree-meta:hover {
+    color: var(--primary);
+}
+
+.builtin-badge {
+    background: #059669;
+    color: white;
+    font-size: 0.55rem;
+    padding: 2px 4px;
+    border-radius: 4px;
+}

@@ -1,0 +1,93 @@
+<div class="asyncapi">
+    <as-split direction="horizontal" [gutterSize]="4">
+        <!-- Sidebar -->
+        <as-split-area [size]="25" [minSize]="15">
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <h2>AsyncAPI</h2>
+                    <small>{{ spec()?.info?.version }}</small>
+                </div>
+                <ng-scrollbar class="sidebar-scroll">
+                    @for (tag of channelTags(); track tag) {
+                    <div class="group-label">{{ tag }}</div>
+                    @for (ch of channelsByTag(tag); track ch.name) {
+                    <button class="nav-item" [class.active]="selectedChannel()?.name === ch.name"
+                        (click)="selectChannel(ch)">
+                        <span class="badge-{{ ch.type === 'publish' ? 'SEND' : 'RECV' }}">
+                            {{ ch.type === 'publish' ? 'SEND' : 'RECV' }}
+                        </span>
+                        <span class="nav-label">{{ ch.name }}</span>
+                    </button>
+                    }
+                    }
+                </ng-scrollbar>
+            </div>
+        </as-split-area>
+
+        <!-- Detail + Console -->
+        <as-split-area [size]="75">
+            <as-split direction="horizontal" [gutterSize]="4">
+                <as-split-area [size]="55">
+                    <div class="detail-panel">
+                        @if (selectedChannel()) {
+                        <h2 class="channel-name">{{ selectedChannel()!.name }}</h2>
+                        @if (selectedChannel()!.op.summary) {
+                        <p class="channel-summary">{{ selectedChannel()!.op.summary }}</p>
+                        }
+                        @if (selectedChannel()!.op.description) {
+                        <p class="channel-desc">{{ selectedChannel()!.op.description }}</p>
+                        }
+                        @if (selectedChannel()!.op.payload) {
+                        <div class="schema-section">
+                            <h3>Payload Schema</h3>
+                            <pre>{{ selectedChannel()!.op.payload | json }}</pre>
+                        </div>
+                        }
+                        } @else {
+                        <div class="empty-state"><span>⚡</span>
+                            <p>Select a channel</p>
+                        </div>
+                        }
+                    </div>
+                </as-split-area>
+
+                <!-- WS Console -->
+                <as-split-area [size]="45">
+                    <div class="console-panel">
+                        <div class="console-header">
+                            <h3>Console</h3>
+                            <div class="ws-status">
+                                <span class="ws-dot" [class.connected]="wsConnected()"></span>
+                                {{ wsConnected() ? 'Connected' : 'Disconnected' }}
+                            </div>
+                        </div>
+                        <div class="connection-bar">
+                            <input #urlInput type="text" [value]="wsUrl()"
+                                (change)="wsUrl.set($any($event.target).value)" placeholder="ws://..." />
+                            <button class="btn" (click)="wsConnected() ? disconnectWs() : connectWs(urlInput.value)">
+                                {{ wsConnected() ? 'Disconnect' : 'Connect' }}
+                            </button>
+                        </div>
+                        <ng-scrollbar class="log-scroll">
+                            <div class="log-container">
+                                @for (log of wsLogs(); track $index) {
+                                <div class="log-entry" [class.sent]="log.dir === 'send'"
+                                    [class.recv]="log.dir === 'recv'">
+                                    <span class="log-dir">{{ log.dir === 'send' ? '↑' : '↓' }}</span>
+                                    <pre class="log-data">{{ log.data }}</pre>
+                                </div>
+                                } @empty {
+                                <div class="log-empty">No messages yet.</div>
+                                }
+                            </div>
+                        </ng-scrollbar>
+                        <div class="compose-area">
+                            <textarea #payload rows="3" placeholder="JSON payload…"></textarea>
+                            <button class="btn send" (click)="sendMessage(payload.value)">Send</button>
+                        </div>
+                    </div>
+                </as-split-area>
+            </as-split>
+        </as-split-area>
+    </as-split>
+</div>

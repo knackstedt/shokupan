@@ -1,0 +1,71 @@
+<div class="explorer">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h2>{{ spec()?.info?.title ?? 'API Explorer' }}</h2>
+            <small>{{ spec()?.info?.version }}</small>
+        </div>
+        <ng-scrollbar class="sidebar-scroll">
+            @for (group of groups(); track group.name) {
+            <div class="nav-group" [class.collapsed]="!expandedGroups().has(group.name)">
+                <div class="nav-group-title" (click)="toggleGroup(group.name)">
+                    <span class="chevron">{{ expandedGroups().has(group.name) ? '▼' : '▶' }}</span>
+                    {{ group.name }}
+                    @if (group.isBuiltin) { <span class="builtin-badge" title="Built-in Plugin">⬡</span> }
+                </div>
+                @if (expandedGroups().has(group.name)) {
+                <div class="nav-items">
+                    @for (child of group.children; track child.name) {
+                    @if (child.type === 'route') {
+                    <button class="nav-item" [class.active]="selectedOp() === child.routes![0].op.operationId"
+                        (click)="selectRoute(child.routes![0])">
+                        <span class="badge-{{ child.routes![0].method.toUpperCase() }}">{{
+                            child.routes![0].method.toUpperCase() }}</span>
+                        <span class="nav-label">{{ child.routes![0].path }}</span>
+                    </button>
+                    }
+                    }
+                </div>
+                }
+            </div>
+            }
+        </ng-scrollbar>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main-content">
+        @if (activeRoute()) {
+        <div class="route-detail">
+            <div class="route-header">
+                <span class="badge-{{ activeRoute()!.method.toUpperCase() }} badge-lg">{{
+                    activeRoute()!.method.toUpperCase() }}</span>
+                <code class="route-path">{{ activeRoute()!.path }}</code>
+            </div>
+            @if (activeRoute()!.op.summary) {
+            <p class="route-summary">{{ activeRoute()!.op.summary }}</p>
+            }
+            @if (activeRoute()!.op.description) {
+            <div class="route-desc" [innerHTML]="safeDescription(activeRoute()!.op.description)"></div>
+            }
+            <div class="try-section">
+                <h3>Try it out</h3>
+                @if (tryResult()) {
+                <div class="try-result">
+                    <div class="try-status" [class.ok]="tryStatus() && tryStatus()! < 400"
+                        [class.err]="tryStatus() && tryStatus()! >= 400">
+                        Status: {{ tryStatus() }}
+                    </div>
+                    <pre class="try-body">{{ tryResult() }}</pre>
+                </div>
+                }
+                <button class="send-btn" (click)="sendRequest()">▶ Send Request</button>
+            </div>
+        </div>
+        } @else {
+        <div class="empty-state">
+            <span>🔌</span>
+            <p>Select an endpoint from the sidebar</p>
+        </div>
+        }
+    </main>
+</div>

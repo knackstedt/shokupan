@@ -1,0 +1,43 @@
+<div class="shell">
+    <!-- ── Header ─────────────────────────────────── -->
+    <header class="shell-header">
+        <div class="header-logo">
+            <span class="logo-bread">🍞</span>
+            <span class="logo-text">Shokupan</span>
+        </div>
+
+        <nav class="header-tabs">
+            @for (tab of visibleTabs(); track tab.id) {
+            <button class="header-tab" [class.active]="activeTab() === tab.id" (click)="setTab(tab.id)">
+                <span class="tab-icon">{{ tab.icon }}</span>
+                <span class="tab-label">{{ tab.label }}</span>
+            </button>
+            }
+        </nav>
+
+        <div class="header-right">
+            @if (auth.user(); as user) {
+            <div class="user-info">
+                @if (user.picture) {
+                <img [src]="user.picture" [alt]="user.name ?? 'User'" class="avatar" />
+                }
+                <span class="user-name">{{ user.name ?? user.email }}</span>
+            </div>
+            }
+            <button class="logout-btn" (click)="auth.logout()" title="Sign out">⏻</button>
+        </div>
+    </header>
+
+    <!-- ── Content ────────────────────────────────── -->
+    <main class="shell-content">
+        @if (activeTab() === 'dashboard') {
+        <skp-dashboard />
+        } @else if (activeTab() === 'api-explorer') {
+        <skp-api-explorer />
+        } @else if (activeTab() === 'asyncapi') {
+        <skp-asyncapi />
+        } @else if (activeTab() === 'scalar') {
+        <skp-scalar />
+        }
+    </main>
+</div>

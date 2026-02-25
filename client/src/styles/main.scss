@@ -1,0 +1,176 @@
+@import '@fontsource/vend-sans/300.css';
+@import '@fontsource/vend-sans/400.css';
+@import '@fontsource/vend-sans/400-italic.css';
+@import '@fontsource/vend-sans/600.css';
+@import '@fontsource/vend-sans/700.css';
+@import '@fontsource/google-sans-code/400.css';
+
+// ─── Shokupan CSS design tokens ────────────────────────────────────────────
+:root {
+    // Raw palette – Dark (enforced)
+    --palette-primary: #FFB380; // Warm Filament
+    --palette-secondary: #7B5E7B; // Yeast Purple
+    --palette-accent: #D6D3D1; // Flour Dust
+    --palette-bg: #1A1614; // Oven Depth
+    --palette-card: #2A2421;
+    --palette-header: rgb(39, 27, 19);
+
+    // Fonts
+    --skp-font: "Vend Sans", 'Open Sans', 'Helvetica Neue', sans-serif;
+    --skp-font-mono: "Google Sans Code", monospace;
+
+    // Semantic aliases
+    --bg-primary: var(--palette-bg);
+    --bg-secondary: var(--palette-card);
+    --bg-card: var(--palette-card);
+    --bg-header: var(--palette-header);
+
+    --text-primary: #F0F0F0;
+    --text-secondary: var(--palette-accent);
+    --text-flavor: #ffcc80;
+    --text-muted: rgba(214, 211, 209, 0.5);
+
+    --primary: var(--palette-primary);
+    --secondary: var(--palette-secondary);
+    --accent: var(--palette-accent);
+
+    --border-color: rgba(214, 211, 209, 0.2);
+    --card-border: rgba(214, 211, 209, 0.2);
+
+    --table-header-border-color: rgba(214, 211, 209, 0.2);
+    --table-row-hover-color: #382818;
+    --table-row-selected-color: #48331e;
+
+    --link-color: var(--palette-primary);
+    --link-hover: #FFCBA0;
+
+    --button-bg: var(--palette-primary);
+    --button-text: #1A1614;
+}
+
+// ─── Base reset ─────────────────────────────────────────────────────────────
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--skp-font);
+    font-size: 14px;
+}
+
+// ─── Custom scrollbar ────────────────────────────────────────────────────────
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+    background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+    border-radius: 10px;
+    background: var(--primary);
+    box-shadow: inset 0 0 6px rgba(0, 0, 0, .3);
+}
+
+::-webkit-scrollbar-track {
+    border-radius: 10px;
+    background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-corner {
+    box-shadow: inset 0 0 6px rgba(0, 0, 0, .3);
+}
+
+// ─── HTTP method badges (shared) ─────────────────────────────────────────────
+.badge-GET {
+    background: #0f172a;
+    color: #3b82f6;
+    border: 1px solid #3b82f6;
+}
+
+.badge-POST {
+    background: #0f172a;
+    color: #22c55e;
+    border: 1px solid #22c55e;
+}
+
+.badge-PUT {
+    background: #0f172a;
+    color: #eab308;
+    border: 1px solid #eab308;
+}
+
+.badge-PATCH {
+    background: #0f172a;
+    color: #08d3ea;
+    border: 1px solid #08d3ea;
+}
+
+.badge-DELETE {
+    background: #0f172a;
+    color: #ef4444;
+    border: 1px solid #ef4444;
+}
+
+.badge-HEAD {
+    background: #0f172a;
+    color: #e3ea08;
+    border: 1px solid #e3ea08;
+}
+
+.badge-OPTIONS {
+    background: #0f172a;
+    color: #838383;
+    border: 1px solid #838383;
+}
+
+.badge-SEND {
+    background: rgba(59, 130, 246, .15);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, .3);
+}
+
+.badge-RECV {
+    background: rgba(16, 185, 129, .15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, .3);
+}
+
+.badge-GET,
+.badge-POST,
+.badge-PUT,
+.badge-PATCH,
+.badge-DELETE,
+.badge-HEAD,
+.badge-OPTIONS,
+.badge-SEND,
+.badge-RECV {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    font-family: var(--skp-font-mono);
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+// ─── PrimeNG overrides ───────────────────────────────────────────────────────
+.p-button.p-button-primary {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--button-text);
+
+    &:hover {
+        background: var(--link-hover);
+        border-color: var(--link-hover);
+    }
+}
