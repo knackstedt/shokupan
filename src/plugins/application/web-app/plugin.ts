@@ -1,5 +1,6 @@
 import { join, resolve } from 'node:path';
 import type { Shokupan, ShokupanPlugin } from '../../../shokupan';
+import { Proxy } from '../../middleware/proxy';
 
 const $isMounted = Symbol('isMounted');
 
@@ -53,70 +54,39 @@ export class WebAppPlugin implements ShokupanPlugin {
     }
 
     /** Dev mode: proxy all requests to the Angular dev server */
-    /** Dev mode: proxy all requests to the Angular dev server */
     private initDev(app: Shokupan) {
         // Read port dynamically at init time, not constructor time, to ensure env is loaded
         const currentDevPort = process.env['ANGULAR_DEV_PORT'] || this.devPort || '4200';
         const target = `http://localhost:${currentDevPort}`;
 
-        const performProxy = async (ctx: any, proxyUrl: string) => {
-            try {
-                const proxyReq = new Request(proxyUrl, {
-                    method: ctx.req.method,
-                    headers: {
-                        'accept': ctx.req.headers.get('accept') ?? '*/*',
-                        'accept-encoding': ctx.req.headers.get('accept-encoding') ?? '',
-                        'cookie': ctx.req.headers.get('cookie') ?? '',
-                    },
-                    body: ctx.req.method !== 'GET' && ctx.req.method !== 'HEAD' ? ctx.req.body : undefined,
-                });
+        const mainProxy = Proxy({
+            target,
+            ws: true,
+            pathRewrite: (path) => path.replace(this.mountPath, '') || '/'
+        });
 
-                const res = await fetch(proxyReq);
-                const buffer = await res.arrayBuffer();
-
-                const headers = new Headers();
-                const safeHeaders = ['content-type', 'cache-control', 'etag', 'last-modified', 'set-cookie'];
-                for (const key of safeHeaders) {
-                    if (res.headers.has(key)) {
-                        headers.set(key, res.headers.get(key)!);
-                    }
-                }
-
-                return new Response(buffer, {
-                    status: res.status,
-                    headers,
-                });
-            } catch (err) {
-                return new Response(`Angular dev server unavailable (port ${this.devPort}): ${err}`, {
-                    status: 502,
-                    headers: { 'content-type': 'text/plain' },
-                });
-            }
-        };
+        const rootProxy = Proxy({
+            target,
+            ws: true
+        });
 
         // Register a catch-all route under the mount path for the main app
-        app.get(`${this.mountPath}/**`, async (ctx) => {
-            // Remove the mount prefix for the proxy path
-            const urlObj = new URL(ctx.req.url);
-            const subPath = urlObj.pathname.replace(this.mountPath, '') || '/';
-            const proxyUrl = `${target}${subPath}${urlObj.search}`;
-            return performProxy(ctx, proxyUrl);
+        app.get(`${this.mountPath}/**`, async (ctx) => mainProxy(ctx, async () => { }));
+        app.get(this.mountPath, async (ctx) => mainProxy(ctx, async () => { }));
+
+        // Pass root websocket connections to the dev server since Vite uses `wss://domain/?token=...`
+        app.get('/', async (ctx) => {
+            if (ctx.req.headers.get('upgrade')?.toLowerCase() === 'websocket') {
+                return rootProxy(ctx, async () => { });
+            }
         });
 
         // Register catch-alls at the root for Vite's internal development absolute paths
-        // Vite requests things like /@vite/client, /@fs/..., /@id/... from the domain root.
-        const vitePaths = ['/@vite', '/@fs', '/@id', '/@react-refresh', '/node_modules'];
+        // Angular uses /ng-cli-ws for its dev server WebSockets.
+        const vitePaths = ['/@vite', '/@fs', '/@id', '/@react-refresh', '/node_modules', '/ng-cli-ws'];
         for (const vp of vitePaths) {
-            app.get(`${vp}/**`, async (ctx) => {
-                const urlObj = new URL(ctx.req.url);
-                const proxyUrl = `${target}${urlObj.pathname}${urlObj.search}`;
-                return performProxy(ctx, proxyUrl);
-            });
-            app.get(vp, async (ctx) => {
-                const urlObj = new URL(ctx.req.url);
-                const proxyUrl = `${target}${urlObj.pathname}${urlObj.search}`;
-                return performProxy(ctx, proxyUrl);
-            });
+            app.get(`${vp}/**`, async (ctx) => rootProxy(ctx, async () => { }));
+            app.get(vp, async (ctx) => rootProxy(ctx, async () => { }));
         }
     }
     /** Production mode: serve static files, SPA fallback to index.html */
