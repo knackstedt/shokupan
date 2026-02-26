@@ -1,8 +1,33 @@
 <div class="graph-wrapper">
     @if (nodes().length > 0) {
-    <ngx-xyflow [nodes]="nodes()" [edges]="edges()" [fitView]="fitView()" class="xyflow-container">
-        <!-- Add any custom templates needed by ngx-xyflow if needed, but for now just the component -->
-    </ngx-xyflow>
+    <vflow class="vflow-container" [nodes]="nodes()" [edges]="edges()" [minZoom]="0.05" [maxZoom]="2"
+        [background]="{ type: 'solid', color: 'transparent' }" view="auto">
+        <ng-template nodeHtml let-ctx>
+            <div class="graph-node kind-{{ctx.node.data?.()?.kind}}" [style.width.px]="380"
+                [style.min-height.px]="ctx.node.data?.()?.nodeHeight || 44">
+                <!-- Source Handle (Incoming Connections) -->
+                <handle id="top" type="target" position="top" class="vflow-handle target-handle"></handle>
+                <div class="node-header">
+                    <span class="node-kind">{{ ctx.node.data?.()?.kind | uppercase }}</span>
+                    <span class="node-title">{{ ctx.node.data?.()?.label }}</span>
+                </div>
+
+                @if (ctx.node.data?.()?.endpoints?.length) {
+                <div class="endpoints-list">
+                    @for (ep of ctx.node.data?.()?.endpoints; track ep.id) {
+                    <div class="endpoint-row">
+                        <span class="badge-{{ ep.method }}">{{ ep.method }}</span>
+                        <span class="ep-path">{{ ep.path }}</span>
+                    </div>
+                    }
+                </div>
+                }
+
+                <!-- Target Handle (Outgoing Connections) -->
+                <handle id="bottom" type="source" position="bottom" class="vflow-handle source-handle"></handle>
+            </div>
+        </ng-template>
+    </vflow>
     } @else {
     <div class="empty-state">
         <span>🕸️</span>

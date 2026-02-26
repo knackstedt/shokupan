@@ -8,33 +8,48 @@
     <!-- Recursive Template -->
     <ng-template #nodeTemplate let-items>
         @for (item of items; track item.id || item.path || item.name) {
+
         <div class="tree-node">
             <!-- Middleware -->
             @if (item.kind === 'middleware') {
-            <div class="tree-item middleware-item">
+            <div class="tree-item middleware-item" [pTooltip]="pTooltip" tooltipPosition="bottom">
                 <span class="badge badge-MIDDLEWARE">MIDDLEWARE</span>
                 <span class="tree-label">{{ item.name }}</span>
-                <span class="tree-meta" *ngIf="item.metadata?.file">{{ item.metadata.file }}:{{ item.metadata.line
-                    }}</span>
+                @if (item.metadata?.file) {
+                <a class="tree-meta" [href]="getIdeLink(item.metadata.file, item.metadata.line)">
+                    {{getRelativePath(item.metadata.file)}}:{{ item.metadata.line }}
+                </a>
+                }
+                <ng-template #pTooltip let-item>
+                    <ng-container
+                        *ngTemplateOutlet="tooltipContentTemplate; context: { $implicit: item }"></ng-container>
+                </ng-template>
             </div>
             }
 
             <!-- Router -->
             @if (item.kind === 'router') {
             <div class="tree-group router-group">
-                <div class="tree-item router-header">
+                <div class="tree-item router-header" [pTooltip]="pTooltip" tooltipPosition="bottom">
                     <span class="badge badge-ROUTER" [class.badge-PLUGIN]="item.metadata?.pluginName">
                         {{ item.metadata?.pluginName ? 'PLUGIN' : 'ROUTER' }}
                     </span>
                     <span class="tree-label">{{ item.path }}</span>
-                    <span class="tree-meta" *ngIf="item.metadata?.file">{{ item.metadata.file }}:{{ item.metadata.line
-                        }}</span>
-                    <span class="plugin-name" *ngIf="item.metadata?.pluginName">[{{ item.metadata.pluginName }}]</span>
+                    @if (item.metadata?.file) {
+                    <a class="tree-meta" [href]="getIdeLink(item.metadata.file, item.metadata.line)">
+                        {{getRelativePath(item.metadata.file)}}:{{ item.metadata.line }}
+                    </a>
+                    }
+                    @if (item.metadata?.pluginName) {
+                    <span class="plugin-name">[{{ item.metadata.pluginName }}]</span>
+                    }
+                    <ng-template #pTooltip let-item>
+                        <ng-container
+                            *ngTemplateOutlet="tooltipContentTemplate; context: { $implicit: item }"></ng-container>
+                    </ng-template>
                 </div>
                 @if (item.children) {
                 <div class="tree-children">
-                    <!-- The legacy JS actually recursively called renderRegistry here. -->
-                    <!-- If we need full deep recursion for routers nested in routers, we use the template again. -->
                     <ng-container
                         *ngTemplateOutlet="nodeTemplate; context: { $implicit: getChildren(item) }"></ng-container>
                 </div>
@@ -45,19 +60,43 @@
             <!-- Controller -->
             @if (item.kind === 'controller') {
             <div class="tree-group controller-group">
-                <div class="tree-item controller-header">
+                <div class="tree-item controller-header" [pTooltip]="pTooltip" tooltipPosition="bottom">
                     <span class="badge badge-CONTROLLER">CTRL</span>
-                    <span class="tree-label"><strong>{{ item.name }}</strong> <span class="path-context">({{ item.path
-                            }})</span></span>
-                    <span class="builtin-badge" *ngIf="isBuiltin(item.metadata)">BUILTIN</span>
+                    <span class="tree-label">
+                        <strong>{{ item.name }}</strong>
+                        <span class="path-context">({{ item.path }})</span>
+                    </span>
+                    @if (item.metadata?.file) {
+                    <a class="tree-meta" [href]="getIdeLink(item.metadata.file, item.metadata.line)">
+                        {{getRelativePath(item.metadata.file) }}:{{ item.metadata.line }}
+                    </a>
+                    }
+                    @if (isBuiltin(item.metadata)) {
+                    <span class="builtin-badge">BUILTIN</span>
+                    }
+                    <ng-template #pTooltip let-item>
+                        <ng-container
+                            *ngTemplateOutlet="tooltipContentTemplate; context: { $implicit: item }"></ng-container>
+                    </ng-template>
                 </div>
                 @if (item.children?.routes?.length) {
                 <div class="tree-children routes-list">
                     @for (route of item.children.routes; track route.path) {
-                    <div class="tree-item route-item">
+                    <div class="tree-item route-item" [pTooltip]="pTooltip" tooltipPosition="bottom">
                         <span class="badge badge-{{ route.method | uppercase }}">{{ route.method | uppercase }}</span>
                         <span class="tree-label">{{ route.path }}</span>
-                        <span class="handler-name" *ngIf="route.handlerName">({{ route.handlerName }})</span>
+                        @if (route.metadata?.file) {
+                        <a class="tree-meta" [href]="getIdeLink(route.metadata.file, route.metadata.line)">
+                            {{getRelativePath(route.metadata.file) }}:{{ route.metadata.line }}
+                        </a>
+                        }
+                        @if (route.handlerName) {
+                        <span class="handler-name">({{ route.handlerName }})</span>
+                        }
+                        <ng-template #pTooltip let-item>
+                            <ng-container
+                                *ngTemplateOutlet="tooltipContentTemplate; context: { $implicit: route }"></ng-container>
+                        </ng-template>
                     </div>
                     }
                 </div>
@@ -69,22 +108,74 @@
 
             <!-- Loose Route -->
             @if (item.kind === 'route') {
-            <div class="tree-item loose-route-item">
+            <div class="tree-item loose-route-item" [pTooltip]="pTooltip" tooltipPosition="bottom">
                 <span class="badge badge-{{ item.method | uppercase }}">{{ item.method | uppercase }}</span>
                 <span class="tree-label">{{ item.path }}</span>
-                <span class="handler-name" *ngIf="item.handlerName">({{ item.handlerName }})</span>
+                @if (item.metadata?.file) {
+                <a class="tree-meta" [href]="getIdeLink(item.metadata.file, item.metadata.line)">
+                    {{getRelativePath(item.metadata.file) }}:{{ item.metadata.line }}
+                </a>
+                }
+                @if (item.handlerName) {
+                <span class="handler-name">({{ item.handlerName }})</span>
+                }
+                <ng-template #pTooltip let-item>
+                    <ng-container
+                        *ngTemplateOutlet="tooltipContentTemplate; context: { $implicit: item }"></ng-container>
+                </ng-template>
             </div>
             }
 
             <!-- Event -->
             @if (item.kind === 'event') {
-            <div class="tree-item event-item">
+            <div class="tree-item event-item" [pTooltip]="pTooltip" tooltipPosition="bottom">
                 <span class="badge badge-WS">WS</span>
                 <span class="tree-label">{{ item.name }}</span>
-                <span class="handler-name" *ngIf="item.handlerName">({{ item.handlerName }})</span>
+                @if (item.metadata?.file) {
+                <a class="tree-meta" [href]="getIdeLink(item.metadata.file, item.metadata.line)">
+                    {{getRelativePath(item.metadata.file)}}:{{ item.metadata.line }}</a>
+                }
+                @if (item.handlerName) {
+                <span class="handler-name">({{ item.handlerName }})</span>
+                }
+            </div>
+            <ng-template #pTooltip let-item>
+                <ng-container *ngTemplateOutlet="tooltipContentTemplate; context: { $implicit: item }"></ng-container>
+            </ng-template>
+            }
+        </div>
+        }
+    </ng-template>
+
+    <!-- Tooltip logic reusable contents -->
+    <ng-template #tooltipContentTemplate let-item>
+        @if (getNodeStats(item); as stats) {
+        <div class="tooltip-text">
+            <div class="perf-header">Metrics</div>
+            <div class="perf-row"><span>Requests:</span> <span>{{ stats.requests }}</span></div>
+            <div class="perf-row"><span>Traffic:</span> <span>{{ stats.trafficPercent }}%</span></div>
+            <div class="perf-row"><span [style.color]="stats.failures > 0 ? '#ef4444' : 'inherit'">Failures:</span>
+                <span [style.color]="stats.failures > 0 ? '#ef4444' : 'inherit'">{{ stats.failures }}</span>
+            </div>
+
+            <div class="perf-header" style="margin-top: 8px;">Response Times</div>
+            <div class="perf-row"><span>p1:</span> <span>{{ stats.p1 }}ms</span></div>
+            <div class="perf-row"><span>p10:</span> <span>{{ stats.p10 }}ms</span></div>
+            <div class="perf-row"><span>p25:</span> <span>{{ stats.p25 }}ms</span></div>
+            <div class="perf-row"><span>p50:</span> <span>{{ stats.p50 }}ms</span></div>
+            <div class="perf-row"><span>p75:</span> <span>{{ stats.p75 }}ms</span></div>
+            <div class="perf-row"><span>p90:</span> <span>{{ stats.p90 }}ms</span></div>
+            <div class="perf-row"><span>p99:</span> <span>{{ stats.p99 }}ms</span></div>
+
+            @if (getObjectKeys(stats.statusCodes).length > 0) {
+            <div class="status-list">
+                @for (code of getObjectKeys(stats.statusCodes); track code) {
+                <div class="perf-row"><span>HTTP {{ code }}:</span> <span>{{ stats.statusCodes[code] }}</span></div>
+                }
             </div>
             }
         </div>
         }
+        @else {EMPTY}
     </ng-template>
 </div>

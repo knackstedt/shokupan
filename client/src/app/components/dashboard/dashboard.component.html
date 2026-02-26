@@ -46,12 +46,18 @@
         <!-- Application Tab -->
         @if (activeTab() === 'application') {
         <div class="app-split">
-            <div class="app-split-left">
-                <skp-app-registry-tree [rawData]="appData()" [metrics]="metrics()"></skp-app-registry-tree>
+            <div class="view-toggle">
+                <button class="toggle-btn" [class.active]="viewMode() === 'tree'" (click)="setViewMode('tree')">🌲
+                    Tree</button>
+                <button class="toggle-btn" [class.active]="viewMode() === 'graph'" (click)="setViewMode('graph')">🕸️
+                    Diagram</button>
             </div>
-            <div class="app-split-right">
-                <skp-app-graph [rawData]="appData()"></skp-app-graph>
-            </div>
+            @if (viewMode() === 'tree') {
+            <skp-app-registry-tree [rawData]="appData()" [metrics]="metrics()"
+                [requests]="requests()"></skp-app-registry-tree>
+            } @else {
+            <skp-app-graph [rawData]="appData()"></skp-app-graph>
+            }
         </div>
         }
 

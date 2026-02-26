@@ -30,6 +30,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     private http = inject(HttpClient);
 
     readonly activeTab = signal<'overview' | 'network' | 'application'>('overview');
+    readonly viewMode = signal<'tree' | 'graph'>('graph');
 
     readonly metrics = signal<Metrics>({
         totalRequests: 0, successfulRequests: 0, failedRequests: 0,
@@ -60,6 +61,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
         }
     }
 
+    setViewMode(mode: 'tree' | 'graph') {
+        this.viewMode.set(mode);
+    }
+
     private connectWs(): void {
         const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
         this.ws = new WebSocket(`${proto}//${location.host}/dashboard/ws`);
@@ -75,7 +80,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
                 if (msg.type === 'metrics-update' && msg.metrics) {
                     this.metrics.set(msg.metrics);
                 }
-                if (msg.type === 'request-update' && msg.requests) {
+                if (msg.type === 'requests-update' && msg.requests) {
                     this.requests.update(prev => [...msg.requests, ...prev].slice(0, 200));
                 }
             } catch { /* ignore parse errors */ }

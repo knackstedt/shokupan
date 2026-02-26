@@ -33,7 +33,6 @@
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     font-family: var(--skp-font-mono);
-    font-size: 0.8rem;
     color: var(--text-secondary);
 }
 
@@ -122,7 +121,7 @@
 .path-context {
     color: var(--text-muted);
     font-weight: normal;
-    font-size: 0.75rem;
+    font-size: 0.85rem;
     margin-left: 0.5rem;
 }
 
@@ -170,4 +169,64 @@
     font-size: 0.55rem;
     padding: 2px 4px;
     border-radius: 4px;
+}
+
+/* Tooltip Styles */
+.tooltip {
+    position: relative;
+    display: inline-flex;
+}
+
+.tooltip .tooltip-text {
+    visibility: hidden;
+    width: 280px;
+    background-color: var(--bg-card);
+    /* Match theme */
+    color: var(--text-primary);
+    text-align: left;
+    border-radius: 6px;
+    padding: 12px 14px;
+    position: absolute;
+    z-index: 1000;
+
+    /* Flow tooltip downwards to avoid top viewport clipping */
+    top: 100%;
+    left: 20%;
+    margin-top: 8px;
+
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    transform: translateY(-4px);
+    border: 1px solid var(--card-border);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.25);
+    line-height: 1.4;
+    font-size: 0.75rem;
+}
+
+.tooltip:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.tooltip-text .perf-row {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--skp-font-mono);
+    margin-bottom: 3px;
+}
+
+.tooltip-text .perf-header {
+    font-weight: 600;
+    border-bottom: 1px solid var(--text-secondary);
+    margin-bottom: 6px;
+    padding-bottom: 2px;
+    font-family: var(--skp-font);
+    color: var(--primary);
+}
+
+.tooltip-text .status-list {
+    margin-top: 8px;
+    border-top: 1px dashed var(--text-secondary);
+    padding-top: 6px;
 }

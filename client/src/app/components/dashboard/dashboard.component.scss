@@ -158,57 +158,113 @@
     text-align: center;
     color: var(--text-muted);
     padding: 2rem !important;
-}.dashboard-wrapper {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+}
+
+.dashboard-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.view-toggle {
+    display: flex;
+    align-self: flex-start;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 4px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+    margin-bottom: 2px;
+    z-index: 10;
+
+    .toggle-btn {
+        background: transparent;
+        color: var(--text-muted);
+        border: none;
+        padding: 8px 24px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        font-family: var(--skp-font);
+        cursor: pointer;
+        border-radius: 6px;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        &:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        &.active {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02));
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+    }
+}
+
+skp-app-registry-tree,
+skp-app-graph {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
 }
 
 .dash-tabs {
-  display: flex;
-  gap: 1rem;
-  padding: 0.5rem 1.5rem 0;
-  border-bottom: 1px solid var(--border-color);
-  background: var(--bg-primary);
+    display: flex;
+    gap: 1rem;
+    padding: 0.5rem 1.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-primary);
 }
 
 .dash-tab {
-  padding: 0.5rem 0.5rem 0.75rem;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  font-family: var(--skp-font);
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s;
-  
-  &:hover { color: var(--text-primary); }
-  &.active { color: var(--primary); border-bottom-color: var(--primary); }
+    padding: 0.5rem 0.5rem 0.75rem;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--skp-font);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+
+    &:hover {
+        color: var(--text-primary);
+    }
+
+    &.active {
+        color: var(--primary);
+        border-bottom-color: var(--primary);
+    }
 }
 
 .dash-content {
-  flex: 1;
-  overflow: hidden;
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
 }
 
 .app-split {
-  display: flex;
-  gap: 1.5rem;
-  height: 100%;
-  width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    height: 100%;
+    width: 100%;
 }
 
 .app-split-left {
-  flex: 0 0 320px;
-  height: 100%;
+    flex: 0 0 320px;
+    height: 100%;
 }
 
 .app-split-right {
-  flex: 1;
-  height: 100%;
+    flex: 1;
+    height: 100%;
 }
