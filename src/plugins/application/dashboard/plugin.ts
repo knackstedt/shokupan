@@ -260,7 +260,7 @@ export class Dashboard implements ShokupanPlugin {
 
             // Fire and forget save
             // We strip 'id' from data if we are passing it separately to create/upsert
-            this.db.upsert('request', idString, {
+            this.db?.upsert('request', idString, {
                 ...requestData,
                 id: idString
             }).catch(e => this[$appRoot]?.logger?.error('Dashboard', "Failed to save outbound request", { error: e }));

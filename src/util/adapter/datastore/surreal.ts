@@ -32,21 +32,24 @@ export class SurrealAdapter implements DatastoreAdapter {
 
     async connect(): Promise<void> {
         let url = this.options.url;
+        let useWasm = false;
         if (!url) {
-            // Default behavior equivalent to old initDatastore
-            if (process.env.NODE_ENV === 'test') {
-                url = 'mem://';
-            } else {
-                url = 'surrealkv://database';
-            }
+            url = 'mem://';
+            useWasm = true;
         }
 
         if (!this.options.engines && !url.match(/^(?:wss?|https?):\/\//)) {
             try {
-                const mod = await import('@surrealdb/node');
-                this.db = new Surreal({ engines: mod.createNodeEngines() });
+                // Use WASM engine for memory instances when no URL is provided
+                if (useWasm || url === 'mem://') {
+                    const { createWasmEngines } = await import('@surrealdb/wasm');
+                    this.db = new Surreal({ engines: createWasmEngines() });
+                } else {
+                    const mod = await import('@surrealdb/node');
+                    this.db = new Surreal({ engines: mod.createNodeEngines() });
+                }
             } catch (e) {
-                this.logger.warn('SurrealAdapter', "Could not load @surrealdb/node engines. Embedded protocols might fail.", { error: e });
+                this.logger.warn('SurrealAdapter', "Could not load engines. Embedded protocols might fail.", { error: e });
             }
         }
 
@@ -90,7 +93,7 @@ export class SurrealAdapter implements DatastoreAdapter {
 
     async get<T>(table: string, id: string): Promise<T | null> {
         try {
-            const result = await this.db.select<T>(new RecordId(table, id));
+            const result = await this.db.select<any>(new RecordId(table, id));
             // SurrealDB select typically returns the object, or throws if connection fails.
             // If ID not found, it might return undefined or null or error depending on version.
             // Recent JS SDK: select returns T (single) or T[] (if variable).
