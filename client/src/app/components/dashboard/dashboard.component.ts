@@ -8,6 +8,7 @@ import {
 import { NgScrollbarModule } from 'ngx-scrollbar';
 import { AppGraphComponent } from './app-graph.component';
 import { AppRegistryTreeComponent } from './app-registry-tree.component';
+import { NetworkToolsComponent } from './network-tools/network-tools.component';
 
 interface Metrics {
     totalRequests: number;
@@ -22,7 +23,7 @@ interface Metrics {
 @Component({
     selector: 'skp-dashboard',
     standalone: true,
-    imports: [DecimalPipe, DatePipe, NgScrollbarModule, AppRegistryTreeComponent, AppGraphComponent],
+    imports: [DecimalPipe, DatePipe, NgScrollbarModule, AppRegistryTreeComponent, AppGraphComponent, NetworkToolsComponent],
     templateUrl: './dashboard.component.html',
     styleUrl: './dashboard.component.scss',
 })
@@ -37,6 +38,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         activeRequests: 0, averageTotalTime_ms: 0, recentTimings: [], logs: [],
     });
     readonly requests = signal<any[]>([]);
+    readonly selectedRequestId = signal<string | null>(null);
     readonly appData = signal<any>(null);
     readonly wsConnected = signal(false);
 
@@ -55,6 +57,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
 
     setTab(tab: 'overview' | 'network' | 'application') {
+        console.log("Dashboard: setting tab to", tab);
         this.activeTab.set(tab);
         if (tab === 'application' && !this.appData()) {
             this.fetchRegistry();
@@ -63,6 +66,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     setViewMode(mode: 'tree' | 'graph') {
         this.viewMode.set(mode);
+    }
+
+    selectRequest(id: string | null) {
+        console.log("Dashboard: selectRequest called with ID", id);
+        this.selectedRequestId.set(id);
+        if (id) {
+            this.activeTab.set('network');
+        }
     }
 
     private connectWs(): void {
@@ -81,15 +92,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
                     this.metrics.set(msg.metrics);
                 }
                 if (msg.type === 'requests-update' && msg.requests) {
-                    this.requests.update(prev => [...msg.requests, ...prev].slice(0, 200));
+                    const newReqs = msg.requests.map((r: any) => ({ ...r, id: r.id || `${r.timestamp}-${r.method}-${r.url}` }));
+                    this.requests.update(prev => [...newReqs, ...prev].slice(0, 200));
                 }
             } catch { /* ignore parse errors */ }
         });
     }
-
     fetchRequests(): void {
         this.http.get<{ requests: any[]; }>('/dashboard/requests').subscribe({
-            next: ({ requests }) => this.requests.set(requests),
+            next: ({ requests }) => this.requests.set(requests.map(r => ({ ...r, id: r.id || `${r.timestamp}-${r.method}-${r.url}` }))),
             error: () => { },
         });
         this.http.get<{ metrics: Metrics; uptime: string; }>('/dashboard/metrics').subscribe({

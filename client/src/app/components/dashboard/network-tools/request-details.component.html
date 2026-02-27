@@ -1,0 +1,182 @@
+<div class="details-container">
+    <div class="details-header">
+        <button class="btn-icon" (click)="onClose.emit()" title="Close details">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+        <div class="request-summary">
+            <span class="method">{{ request().method }}</span>
+            <span class="url" [title]="request().url">{{ request().url }}</span>
+        </div>
+        <div class="actions">
+            <button pButton class="p-button-text p-button-sm" (click)="copyAsCurl()">cURL</button>
+            <button pButton class="p-button-text p-button-sm" (click)="copyAsFetch()">Fetch</button>
+            <button pButton class="p-button-text p-button-sm" (click)="exportHAR()">HAR</button>
+        </div>
+    </div>
+
+    <p-tabs [value]="activeTab()" (valueChange)="activeTab.set($any($event))" class="details-tabs">
+        <p-tablist>
+            <p-tab value="headers">Headers</p-tab>
+            <p-tab value="payload">Payload</p-tab>
+            <p-tab value="response">Response</p-tab>
+            <p-tab value="cookies">Cookies</p-tab>
+            <p-tab value="timings">Timings</p-tab>
+            @if (request().handlerStack && request().handlerStack!.length > 0) {
+            <p-tab value="middleware">Middleware</p-tab>
+            }
+            @if (request().type === 'ws' || request().status === 101) {
+            <p-tab value="timeline">Timeline</p-tab>
+            }
+        </p-tablist>
+        <p-tabpanels>
+            <p-tabpanel value="headers">
+                <ng-scrollbar class="tab-content">
+                    <section>
+                        <h3>General</h3>
+                        <div class="kv-grid">
+                            <div class="key">Request URL:</div>
+                            <div class="val">{{ request().url }}</div>
+                            <div class="key">Request Method:</div>
+                            <div class="val">{{ request().method }}</div>
+                            <div class="key">Status Code:</div>
+                            <div class="val">{{ request().status }}</div>
+                            <div class="key">Remote Address:</div>
+                            <div class="val">{{ request().remoteIP || '-' }}</div>
+                            <div class="key">Referrer Policy:</div>
+                            <div class="val">{{ request().requestHeaders?.['referrer-policy'] || '-' }}</div>
+                        </div>
+                    </section>
+                    @if (request().responseHeaders) {
+                    <section>
+                        <h3>Response Headers</h3>
+                        <div class="kv-grid">
+                            @for (h of request().responseHeaders | keyvalue; track $index) {
+                            <div class="key">{{ h.key }}:</div>
+                            <div class="val">{{ h.value }}</div>
+                            }
+                        </div>
+                    </section>
+                    }
+                    @if (request().requestHeaders) {
+                    <section>
+                        <h3>Request Headers</h3>
+                        <div class="kv-grid">
+                            @for (h of request().requestHeaders | keyvalue; track $index) {
+                            <div class="key">{{ h.key }}:</div>
+                            <div class="val">{{ h.value }}</div>
+                            }
+                        </div>
+                    </section>
+                    }
+                </ng-scrollbar>
+            </p-tabpanel>
+
+            <p-tabpanel value="payload">
+                <ng-scrollbar class="tab-content">
+                    @if (request().requestBody) {
+                    <div class="editor-header">
+                        <span>Payload</span>
+                        <button pButton class="p-button-text p-button-sm"
+                            (click)="copyToClipboard(request().requestBody)">Copy</button>
+                    </div>
+                    <!-- Monaco Stub -->
+                    <div class="monaco-stub">
+                        <pre>{{ request().requestBody | json }}</pre>
+                    </div>
+                    } @else {
+                    <div class="empty-msg">No request payload</div>
+                    }
+                </ng-scrollbar>
+            </p-tabpanel>
+
+            <p-tabpanel value="response">
+                <ng-scrollbar class="tab-content">
+                    @if (request().responseBody || request().body) {
+                    <div class="editor-header">
+                        <span>Response Body</span>
+                        <div class="actions">
+                            <button pButton class="p-button-text p-button-sm"
+                                (click)="copyToClipboard(request().responseBody || request().body)">Copy</button>
+                            <button pButton class="p-button-text p-button-sm"
+                                (click)="downloadResponse()">Download</button>
+                        </div>
+                    </div>
+                    <!-- Monaco Stub -->
+                    <div class="monaco-stub">
+                        <pre>{{ (request().responseBody || request().body) | json }}</pre>
+                    </div>
+                    } @else {
+                    <div class="empty-msg">No response body captured</div>
+                    }
+                </ng-scrollbar>
+            </p-tabpanel>
+
+            <p-tabpanel value="cookies">
+                <ng-scrollbar class="tab-content">
+                    <section>
+                        <h3>Request Cookies</h3>
+                        @if (request().requestHeaders?.['cookie']) {
+                        <div class="kv-grid">
+                            @for (c of request().requestHeaders!['cookie'].split(';'); track $index) {
+                            @let parts = c.trim().split('=');
+                            <div class="key">{{ parts[0] }}</div>
+                            <div class="val">{{ parts[1] }}</div>
+                            }
+                        </div>
+                        } @else {
+                        <div class="empty-msg">No cookies</div>
+                        }
+                    </section>
+                </ng-scrollbar>
+            </p-tabpanel>
+
+            <p-tabpanel value="timings">
+                <ng-scrollbar class="tab-content">
+                    <div class="kv-grid">
+                        <div class="key">Started:</div>
+                        <div class="val">{{ request().timestamp | date:'mediumTime' }}</div>
+                        <div class="key">Duration:</div>
+                        <div class="val">{{ formatDuration(request().duration) }}</div>
+                    </div>
+                </ng-scrollbar>
+            </p-tabpanel>
+
+            @if (request().handlerStack && request().handlerStack!.length > 0) {
+            <p-tabpanel value="middleware">
+                <ng-scrollbar class="tab-content">
+                    <div class="middleware-list">
+                        @for (m of request().handlerStack; track $index) {
+                        <div class="middleware-item">
+                            <div class="m-info">
+                                <span class="m-name">{{ m.name }}</span>
+                                <span class="m-file">{{ m.file }}:{{ m.line }}</span>
+                            </div>
+                            <span class="m-time">{{ formatDuration(m.duration) }}</span>
+                        </div>
+                        }
+                    </div>
+                </ng-scrollbar>
+            </p-tabpanel>
+            }
+
+            @if (request().type === 'ws' || request().status === 101) {
+            <p-tabpanel value="timeline">
+                <ng-scrollbar class="tab-content">
+                    <div class="ws-messages">
+                        @for (m of request().wsMessages; track $index) {
+                        <div class="ws-msg" [class.out]="m.dir === 'out'">
+                            <span class="ws-dir">{{ m.dir === 'out' ? '↑' : '↓' }}</span>
+                            <span class="ws-data">{{ m.data }}</span>
+                            <span class="ws-time">+{{ formatDuration(m.timestamp - request().timestamp) }}</span>
+                        </div>
+                        }
+                    </div>
+                </ng-scrollbar>
+            </p-tabpanel>
+            }
+        </p-tabpanels>
+    </p-tabs>
+</div>

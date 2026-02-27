@@ -17,6 +17,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 0.75rem;
+    margin-bottom: 1rem;
 }
 
 .card {
@@ -115,7 +116,6 @@
 .request-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.8rem;
 
     th {
         position: sticky;
@@ -158,6 +158,10 @@
     text-align: center;
     color: var(--text-muted);
     padding: 2rem !important;
+}
+
+.clickable {
+    cursor: pointer;
 }
 
 .dashboard-wrapper {
@@ -246,7 +250,7 @@ skp-app-graph {
 .dash-content {
     flex: 1;
     overflow: hidden;
-    padding: 1.5rem;
+    // padding: 1.5rem;
     display: flex;
     flex-direction: column;
 }

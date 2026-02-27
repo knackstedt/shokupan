@@ -14,7 +14,7 @@
 
                 @if (ctx.node.data?.()?.endpoints?.length) {
                 <div class="endpoints-list">
-                    @for (ep of ctx.node.data?.()?.endpoints; track ep.id) {
+                    @for (ep of ctx.node.data?.()?.endpoints; track $index) {
                     <div class="endpoint-row">
                         <span class="badge-{{ ep.method }}">{{ ep.method }}</span>
                         <span class="ep-path">{{ ep.path }}</span>

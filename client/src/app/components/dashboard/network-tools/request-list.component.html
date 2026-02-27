@@ -1,0 +1,78 @@
+<div class="list-container">
+    <div class="list-header">
+        <div class="p-input-icon-left filter-wrapper">
+            <i class="pi pi-search"></i>
+            <input pInputText type="text" [ngModel]="filterText()" (ngModelChange)="filterText.set($event)"
+                placeholder="Filter" class="filter-input" />
+        </div>
+        <p-multiSelect [options]="cols" [ngModel]="selectedCols()" (ngModelChange)="selectedCols.set($event)"
+            optionLabel="header" selectedItemsLabel="{0} columns selected" [style]="{'min-width': '200px'}"
+            placeholder="Choose Columns"></p-multiSelect>
+    </div>
+
+    <ngx-tabulator [dataSource]="filteredRequests()" class="network-table" [selectable]="1" [headerSort]="true"
+        [movableColumns]="true" [height]="'100%'" [rowFormatter]="rowFormatter" (rowClick)="onRowSelect($any($event))"
+        (cellClick)="debug('cell', $event)" (rowContext)="onRowContext($any($event))">
+        <ngx-tabulator-column field="status" title="Status" [width]="100" [headerSort]="true"
+            (onCellClick)="debug('cell', $event)" [visible]="isColVisible('status')">
+            <ng-template let-data>
+                <div class="status-cell">
+                    <span class="status-dot"
+                        [style.background-color]="data.status >= 500 ? '#ef4444' : data.status >= 400 ? '#f59e0b' : '#10b981'"></span>
+                    {{ data.status || 'Pending' }}
+                </div>
+            </ng-template>
+        </ngx-tabulator-column>
+        <ngx-tabulator-column field="method" title="Method" [width]="90" [headerSort]="true"
+            [visible]="isColVisible('method')" />
+        <ngx-tabulator-column field="name" title="Name" [width]="150" [headerSort]="true"
+            [visible]="isColVisible('name')">
+            <ng-template let-data>
+                <div class="name-cell" [title]="data.url">{{ getName(data.url) }}</div>
+            </ng-template>
+        </ngx-tabulator-column>
+        <ngx-tabulator-column field="url" title="Path" [width]="200" [headerSort]="true"
+            [visible]="isColVisible('url')">
+            <ng-template let-data>
+                <div class="path-cell" [title]="data.url">{{ data.url }}</div>
+            </ng-template>
+        </ngx-tabulator-column>
+        <ngx-tabulator-column field="type" title="Type" [width]="80" [headerSort]="true"
+            [visible]="isColVisible('type')" />
+        <ngx-tabulator-column field="size" title="Size" [width]="100" [headerSort]="true"
+            [visible]="isColVisible('size')">
+            <ng-template let-data>
+                {{ formatBytes(data.size || 0) }}
+            </ng-template>
+        </ngx-tabulator-column>
+        <ngx-tabulator-column field="duration" title="Time" [width]="90" [headerSort]="true"
+            [visible]="isColVisible('duration')">
+            <ng-template let-data>
+                {{ formatDuration(data.duration) }}
+            </ng-template>
+        </ngx-tabulator-column>
+        <ngx-tabulator-column field="waterfall" title="Waterfall" [widthGrow]="1" [visible]="isColVisible('waterfall')">
+            <ng-template let-data>
+                <div class="waterfall-cell">
+                    @if (data.type === 'ws' || data.status === 101) {
+                    @let ws = getWSWaterfallData(data);
+                    <div class="ws-waterfall">
+                        <div class="ws-line" [ngStyle]="ws.lineStyle"></div>
+                        <div class="ws-marker start" [ngStyle]="ws.startMarkerStyle"></div>
+                        @if (!ws.isOpen) {
+                        <div class="ws-marker end" [ngStyle]="ws.endMarkerStyle"></div>
+                        } @else {
+                        <div class="ws-marker active-arrow" [ngStyle]="ws.endMarkerStyle"></div>
+                        }
+                        @for (p of ws.pixels; track $index) {
+                        <div class="ws-pixel" [ngStyle]="p.style" [title]="p.title"></div>
+                        }
+                    </div>
+                    } @else {
+                    <div class="waterfall-bar" [ngStyle]="getWaterfallStyle(data)"></div>
+                    }
+                </div>
+            </ng-template>
+        </ngx-tabulator-column>
+    </ngx-tabulator>
+</div>

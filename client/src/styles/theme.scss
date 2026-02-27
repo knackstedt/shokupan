@@ -1,0 +1,137 @@
+:root {
+    /* Raw Palette - Dark (Now Default) */
+    --palette-dark-primary: #FFB380;
+    /* Warm Filament */
+    --palette-dark-secondary: #7B5E7B;
+    /* Yeast Purple */
+    --palette-dark-accent: #D6D3D1;
+    /* Flour Dust */
+    --palette-dark-bg: #1A1614;
+    /* Oven Depth */
+    --palette-dark-card: #2A2421;
+
+    --palette-dark-header: rgb(39, 27, 19);
+    /* Proofing Drawer */
+
+    --shokupan-font: "Vend Sans", 'Open Sans', 'Helvetica Neue', sans-serif;
+    --shokupan-font-mono: "Google Sans Code", monospace;
+
+    /* Theme Variables - Enforced Dark Mode */
+    --bg-primary: var(--palette-dark-bg);
+    --bg-secondary: var(--palette-dark-card);
+    --bg-card: var(--palette-dark-card);
+    --bg-header: var(--palette-dark-header);
+
+    --text-primary: #F0F0F0;
+    --text-secondary: var(--palette-dark-accent);
+    --text-flavor: #ffcc80;
+    --text-muted: rgba(214, 211, 209, 0.5);
+
+    --primary: var(--palette-dark-primary);
+    --secondary: var(--palette-dark-secondary);
+    --accent: var(--palette-dark-accent);
+
+    --border-color: rgba(214, 211, 209, 0.2);
+    --card-border: rgba(214, 211, 209, 0.2);
+
+    --table-header-border-color: rgba(214, 211, 209, 0.2);
+    --table-row-hover-color: #382818;
+    --table-row-selected-color: #48331e;
+
+    --link-color: var(--palette-dark-primary);
+    --link-hover: #FFCBA0;
+
+    --button-bg: var(--palette-dark-primary);
+    --button-text: #1A1614;
+
+}
+
+* {
+    box-sizing: border-box;
+    font-optical-sizing: auto;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+    background-color: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+    border-radius: 10px;
+    background-color: var(--primary);
+    box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+}
+
+::-webkit-scrollbar-track {
+    border-radius: 10px;
+    background-color: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-corner {
+    box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+}
+
+.badge-SEND {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.badge-RECV {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-GET {
+    background: #0f172a;
+    color: #3b82f6;
+    border: 1px solid #3b82f6;
+}
+
+.badge-POST {
+    background: #0f172a;
+    color: #22c55e;
+    border: 1px solid #22c55e;
+}
+
+.badge-PUT {
+    background: #0f172a;
+    color: #eab308;
+    border: 1px solid #eab308;
+}
+
+.badge-PATCH {
+    background: #0f172a;
+    color: #08d3ea;
+    border: 1px solid #08eae6;
+}
+
+.badge-HEAD {
+    background: #0f172a;
+    color: #e3ea08;
+    border: 1px solid #e3ea08;
+}
+
+.badge-OPTIONS {
+    background: #0f172a;
+    color: #838383;
+    border: 1px solid #838383;
+}
+
+.badge-DELETE {
+    background: #0f172a;
+    color: #ef4444;
+    border: 1px solid #ef4444;
+}
+
+.badge-ROUTER {
+    background: #334155;
+    color: #f8fafc;
+}
+
+.badge-CONTROLLER {
+    background: #475569;
+    color: #f8fafc;
+}

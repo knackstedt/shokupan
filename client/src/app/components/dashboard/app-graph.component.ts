@@ -30,6 +30,8 @@ export class AppGraphComponent {
             this.generateGraph(value);
         }
     }
+    @Input() metrics: any = {};
+    @Input() requests: any[] = [];
 
     nodes = signal<Node[]>([]);
     edges = signal<Edge[]>([]);

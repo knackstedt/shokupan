@@ -1,0 +1,37 @@
+<div class="network-tools-container">
+    <div class="toolbar">
+        <button class="btn-icon" (click)="clear()" title="Clear">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+            </svg>
+        </button>
+        <div class="divider"></div>
+        <!-- Filtering will be inside RequestListComponent for better encapsulation or here?
+             Let's put global filter in List component for now as it's standard DevTools behavior. -->
+    </div>
+
+    <div class="content">
+        <as-split direction="horizontal" [gutterSize]="4">
+            <as-split-area [size]="selectedRequest() ? 40 : 100">
+                <skp-request-list [requests]="requests()" [(selectedId)]="selectedId" [contextMenu]="cm"
+                    (onSelect)="selectRequest($any($event))"
+                    (onContextMenu)="onRowContextMenu($any($event))"></skp-request-list>
+            </as-split-area>
+
+            @if (selectedRequest()) {
+            <as-split-area [size]="60">
+                <skp-request-details [request]="selectedRequest()!"
+                    (onClose)="selectRequest(null)"></skp-request-details>
+            </as-split-area>
+            }
+        </as-split>
+    </div>
+
+    <p-contextMenu #cm [model]="menuItems"></p-contextMenu>
+
+    @if (showReplayModal()) {
+    <skp-replay-modal [request]="replayRequest()!" [visible]="showReplayModal()"
+        (onClose)="showReplayModal.set(false)"></skp-replay-modal>
+    }
+</div>

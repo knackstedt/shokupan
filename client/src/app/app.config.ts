@@ -56,7 +56,7 @@ export const appConfig: ApplicationConfig = {
       theme: {
         preset: ShokupanPreset,
         options: {
-          darkModeSelector: 'body',
+          darkModeSelector: '.dark',
           cssLayer: { name: 'primeng', order: 'tailwind-base, primeng, tailwind-utilities' },
         },
       },

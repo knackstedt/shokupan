@@ -1,0 +1,104 @@
+.replay-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+
+    .replay-toolbar {
+        display: flex;
+        gap: 8px;
+        padding: 12px;
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border-color);
+
+        .url-input {
+            flex: 1;
+        }
+    }
+
+    ::ng-deep {
+        .p-tabview {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+
+            .p-tabview-panels {
+                flex: 1;
+                overflow: auto;
+                padding: 0;
+            }
+        }
+    }
+
+    .tab-padding {
+        padding: 16px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .body-editor {
+        flex: 1;
+        width: 100%;
+        min-height: 200px;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        padding: 12px;
+        font-family: monospace;
+        resize: none;
+        outline: none;
+    }
+
+    .header-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 8px;
+
+        input {
+            flex: 1;
+        }
+    }
+
+    .response-header {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border-color);
+
+        .status {
+            font-weight: bold;
+            color: #10b981;
+
+            &.error {
+                color: #ef4444;
+            }
+        }
+
+        .duration {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+    }
+
+    .monaco-stub {
+        background: var(--bg-secondary);
+        padding: 12px;
+        border-radius: 4px;
+        border: 1px solid var(--border-color);
+        overflow: auto;
+
+        pre {
+            margin: 0;
+            font-size: 0.8rem;
+        }
+    }
+
+    .empty-msg {
+        text-align: center;
+        padding: 3rem;
+        color: var(--text-muted);
+    }
+}

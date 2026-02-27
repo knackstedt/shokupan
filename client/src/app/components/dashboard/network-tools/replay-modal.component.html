@@ -1,0 +1,73 @@
+<p-dialog [visible]="visible()" (onHide)="onClose.emit()" [modal]="true" [style]="{width: '800px', height: '80vh'}"
+    [contentStyle]="{height: '100%', padding: '0'}" class="replay-dialog">
+    <ng-template pTemplate="header">
+        <span class="p-dialog-title">Replay Request</span>
+    </ng-template>
+    <div class="replay-content">
+        <div class="replay-toolbar">
+            <p-select [options]="['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS']"
+                [ngModel]="replayState().method" (ngModelChange)="updateMethod($any($event))"
+                class="method-select"></p-select>
+            <input pInputText type="text" [ngModel]="replayState().url" (ngModelChange)="updateUrl($any($event))"
+                placeholder="URL" class="url-input" />
+            <button pButton label="Send" icon="pi pi-send" (click)="executeReplay()"
+                [loading]="replayState().loading"></button>
+        </div>
+
+        <p-tabs [value]="replayState().activeTab" (valueChange)="updateActiveTab($any($event))">
+            <p-tablist>
+                <p-tab [value]="0">Body</p-tab>
+                <p-tab [value]="1">Headers</p-tab>
+                <p-tab [value]="2">Response</p-tab>
+            </p-tablist>
+            <p-tabpanels>
+                <p-tabpanel [value]="0">
+                    <div class="tab-padding">
+                        <textarea class="body-editor" [ngModel]="replayState().body"
+                            (ngModelChange)="updateBody($any($event))" spellcheck="false"
+                            placeholder="Request body (JSON)"></textarea>
+                    </div>
+                </p-tabpanel>
+                <p-tabpanel [value]="1">
+                    <div class="tab-padding">
+                        @for (h of replayState().headers; track $index) {
+                        <div class="header-row">
+                            <input pInputText [(ngModel)]="h.key" placeholder="Key" />
+                            <input pInputText [(ngModel)]="h.value" placeholder="Value" />
+                            <button pButton icon="pi pi-times" class="p-button-text p-button-danger"
+                                (click)="removeHeader($index)"></button>
+                        </div>
+                        }
+                        <button pButton label="Add Header" icon="pi pi-plus" class="p-button-sm p-button-text"
+                            (click)="addHeader()"></button>
+                    </div>
+                </p-tabpanel>
+                <p-tabpanel [value]="2">
+                    <div class="tab-padding">
+                        @if (replayState().response) {
+                        @let res = replayState().response;
+                        <div class="response-meta">
+                            <span class="status" [class]="'status-' + (res.status / 100 | number:'1.0-0')">
+                                {{res.status}} {{res.statusText}}
+                            </span>
+                            <span class="size">{{formatBytes(res.body?.length || 0)}}</span>
+                            <span class="time">{{res.duration}}ms</span>
+                        </div>
+
+                        <div class="response-body">
+                            <pre><code>{{res.body | json}}</code></pre>
+                        </div>
+                        } @else if (replayState().loading) {
+                        <div class="loading-state">
+                            <i class="pi pi-spin pi-spinner"></i>
+                            <span>Sending request...</span>
+                        </div>
+                        } @else {
+                        <div class="empty-state">No response yet. Send a request to see the result.</div>
+                        }
+                    </div>
+                </p-tabpanel>
+            </p-tabpanels>
+        </p-tabs>
+    </div>
+</p-dialog>

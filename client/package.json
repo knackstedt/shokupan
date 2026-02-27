@@ -44,7 +44,7 @@
         "ngx-echarts": "^21.0.0",
         "ngx-extended-pdf-viewer": "^25.6.4",
         "ngx-scrollbar": "^19.1.4",
-        "ngx-tabulator-tables": "^0.1.2",
+        "ngx-tabulator-tables": "^0.2.8",
         "ngx-vflow": "^2.4.0",
         "primeflex": "^4.0.0",
         "primeng": "^21.1.1",

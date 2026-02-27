@@ -7,7 +7,7 @@
 
     <!-- Recursive Template -->
     <ng-template #nodeTemplate let-items>
-        @for (item of items; track item.id || item.path || item.name) {
+        @for (item of items; track $index) {
 
         <div class="tree-node">
             <!-- Middleware -->
@@ -81,7 +81,7 @@
                 </div>
                 @if (item.children?.routes?.length) {
                 <div class="tree-children routes-list">
-                    @for (route of item.children.routes; track route.path) {
+                    @for (route of item.children.routes; track $index) {
                     <div class="tree-item route-item" [pTooltip]="pTooltip" tooltipPosition="bottom">
                         <span class="badge badge-{{ route.method | uppercase }}">{{ route.method | uppercase }}</span>
                         <span class="tree-label">{{ route.path }}</span>
@@ -169,7 +169,7 @@
 
             @if (getObjectKeys(stats.statusCodes).length > 0) {
             <div class="status-list">
-                @for (code of getObjectKeys(stats.statusCodes); track code) {
+                @for (code of getObjectKeys(stats.statusCodes); track $index) {
                 <div class="perf-row"><span>HTTP {{ code }}:</span> <span>{{ stats.statusCodes[code] }}</span></div>
                 }
             </div>

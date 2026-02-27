@@ -24,7 +24,7 @@
         "ngx-echarts": "^21.0.0",
         "ngx-extended-pdf-viewer": "^25.6.4",
         "ngx-scrollbar": "^19.1.4",
-        "ngx-tabulator-tables": "^0.1.2",
+        "ngx-tabulator-tables": "^0.2.8",
         "ngx-vflow": "^2.4.0",
         "primeflex": "^4.0.0",
         "primeng": "^21.1.1",
@@ -1029,7 +1029,7 @@
 
     "ngx-scrollbar": ["ngx-scrollbar@19.1.4", "", { "dependencies": { "tslib": "^2.3.0" }, "peerDependencies": { "@angular/cdk": ">=20.0.0", "@angular/common": ">=20.0.0", "@angular/core": ">=20.0.0", "rxjs": ">=7.0.0" } }, "sha512-VzmLli1Uq+tZ40s5BpBDVO5mxjeNL7L7JbVluuokKsrIfi1GmXmkx69iz0zruyVWmyzU5VeuiqhMobPYazGKOQ=="],
 
-    "ngx-tabulator-tables": ["ngx-tabulator-tables@0.1.2", "", { "dependencies": { "@types/tabulator-tables": ">=6.0.0", "tabulator-tables": ">=6.0.0", "tslib": ">=2.6.0" }, "peerDependencies": { "@angular/common": ">=17.0.0", "@angular/core": ">=17.0.0" } }, "sha512-RszDA0eA1MNb3F3UjP63XL58n6gQ92VRzAxCykiaMy1d86i0mYR64sbIbevPacbgn0veb9bRkQARyUwk4eywOg=="],
+    "ngx-tabulator-tables": ["ngx-tabulator-tables@0.2.8", "", { "dependencies": { "@types/tabulator-tables": ">=6.0.0", "tabulator-tables": ">=6.3.0", "tslib": ">=2.6.0" }, "peerDependencies": { "@angular/common": ">=17.0.0", "@angular/core": ">=17.0.0" } }, "sha512-hXO2VhAiuC8PJ6I9BiIaZa2irDY/yfgoYuu1ypsbSbyQyZyvfoVjUhSis6vP4VBePJkQeDr3MNUhA+Be0XRW7Q=="],
 
     "ngx-vflow": ["ngx-vflow@2.4.0", "", { "dependencies": { "tslib": "^2.3.0" }, "peerDependencies": { "@angular/common": "^19.2.17 || 20.x || 21.x", "@angular/core": "^19.2.17 || 20.x || 21.x", "@types/d3-drag": "^3.0.7", "@types/d3-selection": "^3.0.10", "@types/d3-zoom": "^3.0.8", "d3-drag": "^3.0.0", "d3-selection": "^3.0.0", "d3-zoom": "^3.0.0", "rxjs": ">=6.0.0" } }, "sha512-5udvfpg+mhr9EVIsIsidTDow0WbOVZMnW6fc+n1ZN74esOpaHiYIpYaeUOWC/rHhPxe+CjIYXVzHgcYfJ/LHfg=="],
 
