@@ -1,5 +1,6 @@
 import { join, resolve } from 'node:path';
-import type { Shokupan, ShokupanPlugin } from '../../../shokupan';
+import type { Shokupan } from '../../../shokupan';
+import type { ShokupanPlugin } from '../../../util/types';
 import { Proxy } from '../../middleware/proxy';
 
 const $isMounted = Symbol('isMounted');
