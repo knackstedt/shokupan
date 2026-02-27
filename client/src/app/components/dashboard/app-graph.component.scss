@@ -82,7 +82,7 @@
                 .node-title {
                     color: #fff;
                     font-size: 0.85rem;
-                    font-family: var(--font-mono);
+                    font-family: var(--skp-font-mono);
                     font-weight: normal;
                     margin: 0;
                 }
@@ -111,7 +111,7 @@
             border-bottom: 1px solid var(--card-border);
 
             .node-kind {
-                font-size: 0.7rem;
+                font-size: 0.857rem;
                 color: var(--text-muted);
                 font-weight: 600;
                 letter-spacing: 0.5px;
@@ -139,14 +139,14 @@
                 align-items: center;
                 gap: 12px;
                 font-size: 0.85rem;
-                font-family: var(--font-mono);
+                font-family: var(--skp-font-mono);
 
                 &:hover {
                     background: rgba(255, 255, 255, 0.05);
                 }
 
                 span[class^="badge-"] {
-                    font-size: 0.7rem;
+                    font-size: 0.857rem;
                     padding: 2px 6px;
                     border-radius: 4px;
                     font-weight: 600;

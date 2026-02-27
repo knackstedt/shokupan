@@ -31,7 +31,7 @@
 
     small {
         color: var(--text-muted);
-        font-size: 0.75rem;
+        font-size: 0.857rem;
     }
 }
 
@@ -60,13 +60,13 @@
 }
 
 .chevron {
-    font-size: 0.6rem;
+    font-size: 0.857rem;
     width: 10px;
 }
 
 .builtin-badge {
     margin-left: auto;
-    font-size: 0.7rem;
+    font-size: 0.857rem;
     color: var(--text-muted);
 }
 
@@ -84,7 +84,7 @@
     background: transparent;
     color: var(--text-secondary);
     font-family: var(--skp-font);
-    font-size: 0.78rem;
+    font-size: 0.857rem;
     cursor: pointer;
     text-align: left;
     transition: background 0.1s;

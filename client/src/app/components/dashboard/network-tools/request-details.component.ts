@@ -1,15 +1,30 @@
 import { CommonModule, KeyValuePipe } from '@angular/common';
-import { Component, input, output, signal } from '@angular/core';
+import { Component, computed, input, output, signal } from '@angular/core';
+import { VscodeComponent } from '@dotglitch/ngx-common';
 import { NgScrollbarModule } from 'ngx-scrollbar';
 import { ButtonModule } from 'primeng/button';
 import { Tab, TabList, TabPanel, TabPanels, Tabs } from 'primeng/tabs';
 import { TooltipModule } from 'primeng/tooltip';
+import { HeaderTokensPipe } from './header-tokens.pipe';
 import { NetworkRequest, formatBytes, formatDurationPretty, generateCurlCode, generateFetchCode, generateHAR } from './network-utils';
 
 @Component({
     selector: 'skp-request-details',
     standalone: true,
-    imports: [CommonModule, Tabs, TabList, Tab, TabPanels, TabPanel, ButtonModule, TooltipModule, KeyValuePipe, NgScrollbarModule],
+    imports: [
+        CommonModule,
+        Tabs,
+        TabList,
+        Tab,
+        TabPanels,
+        TabPanel,
+        ButtonModule,
+        TooltipModule,
+        KeyValuePipe,
+        NgScrollbarModule,
+        VscodeComponent,
+        HeaderTokensPipe
+    ],
     templateUrl: './request-details.component.html',
     styleUrl: './request-details.component.scss'
 })
@@ -19,8 +34,90 @@ export class RequestDetailsComponent {
 
     readonly activeTab = signal<string | number>('headers');
 
+    /** Parse query parameters from the request URL */
+    readonly queryParams = computed(() => {
+        try {
+            const u = new URL(this.request().url);
+            return [...u.searchParams.entries()];
+        } catch {
+            const qs = this.request().url.split('?')[1];
+            if (!qs) return [];
+            return qs.split('&').map(p => {
+                const [k, ...v] = p.split('=');
+                return [decodeURIComponent(k), decodeURIComponent(v.join('='))] as [string, string];
+            });
+        }
+    });
+
+    /**
+     * Classify a header value into a semantic CSS class for color-coding.
+     * Classes: hl-auth, hl-mime, hl-num, hl-date, hl-bool, hl-url, hl-default
+     */
+    headerValueClass(key: string, value: string): string {
+        const k = key.toLowerCase();
+        const v = (value || '').trim();
+
+        // Auth / security
+        if (k === 'authorization' || k === 'proxy-authorization' || k === 'www-authenticate')
+            return 'hl-auth';
+        if (k === 'cookie' || k === 'set-cookie')
+            return 'hl-cookie';
+
+        // MIME / content type
+        if (k === 'content-type' || k === 'accept' || k === 'accept-encoding' || k === 'accept-language')
+            return 'hl-mime';
+
+        // URL / location
+        if (k === 'location' || k === 'referer' || k === 'origin' || k === 'host' || k === 'x-forwarded-for')
+            return 'hl-url';
+
+        // Date-like
+        if (k === 'date' || k === 'last-modified' || k === 'expires' || k === 'if-modified-since')
+            return 'hl-date';
+
+        // Numeric values (content-length, status codes, cache-control maxage etc.)
+        if (/^[\d.,; ]+$/.test(v) || k === 'content-length' || k === 'age' || k === 'max-age')
+            return 'hl-num';
+
+        // Booleans / simple flags
+        if (v === 'true' || v === 'false' || v === 'no-cache' || v === 'no-store')
+            return 'hl-bool';
+
+        return 'hl-default';
+    }
+
+    /** Classify a query param value for color coding */
+    queryParamClass(value: string): string {
+        const v = value.trim();
+        if (/^-?[\d.]+$/.test(v)) return 'hl-num';
+        if (v === 'true' || v === 'false') return 'hl-bool';
+        if (v.startsWith('http://') || v.startsWith('https://') || v.startsWith('/')) return 'hl-url';
+        return 'hl-string';
+    }
+
+    /** Serialize body to a pretty-printed string for Monaco */
+    bodyString(body: any): string {
+        if (!body) return '';
+        if (typeof body === 'string') {
+            try { return JSON.stringify(JSON.parse(body), null, 2); } catch { return body; }
+        }
+        return JSON.stringify(body, null, 2);
+    }
+
+    /** Detect language for Monaco from the content-type or body shape */
+    bodyLanguage(body: any, contentType?: string): string {
+        const ct = (contentType || '').toLowerCase();
+        if (ct.includes('json') || (typeof body === 'object' && body !== null)) return 'json';
+        if (ct.includes('html') || (typeof body === 'string' && body.trimStart().startsWith('<'))) return 'html';
+        if (ct.includes('xml')) return 'xml';
+        if (ct.includes('css')) return 'css';
+        if (ct.includes('javascript') || ct.includes('js')) return 'javascript';
+        return 'plaintext';
+    }
+
     formatBytes(b: number) { return formatBytes(b); }
     formatDuration(ms: number) { return formatDurationPretty(ms); }
+    formatTimestamp(ms: number) { return new Date(ms).toLocaleTimeString(); }
 
     copyToClipboard(text: string) {
         navigator.clipboard.writeText(text);

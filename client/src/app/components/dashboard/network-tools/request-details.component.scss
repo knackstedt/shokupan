@@ -101,10 +101,17 @@
                 overflow: auto;
             }
         }
+
+        // Padding applied to the actual scrollable content inside ng-scrollbar
+        ng-scrollbar.tab-content .ng-scroll-content {
+            padding: 16px;
+        }
     }
 
     .tab-content {
-        padding: 12px;
+        // Fallback padding for non-ng-scrollbar contexts;
+        // actual padding injected via ::ng-deep .ng-scroll-content above
+        padding: 0;
 
         section {
             margin-bottom: 20px;
@@ -120,19 +127,165 @@
 
         .kv-grid {
             display: grid;
-            grid-template-columns: auto 1fr;
-            gap: 4px 12px;
-            font-size: 0.8rem;
-            font-family: monospace;
+            grid-template-columns: auto 1fr auto;
+            gap: 4px 8px;
+            font-family: var(--skp-font-mono);
+            align-items: center;
 
             .key {
-                color: var(--text-muted);
+                color: var(--text-flavor);
                 white-space: nowrap;
+                align-self: start;
             }
 
             .val {
                 color: var(--text-primary);
                 word-break: break-all;
+
+                // ── Syntax highlight classes ─────────────────────────────
+                &.hl-auth {
+                    color: #f87171;
+                }
+
+                &.hl-cookie {
+                    color: #fb923c;
+                }
+
+                &.hl-mime {
+                    color: #60a5fa;
+                }
+
+                &.hl-url {
+                    color: #34d399;
+                }
+
+                &.hl-date {
+                    color: #45c58b;
+                }
+
+                &.hl-num {
+                    color: #38bdf8;
+                }
+
+                &.hl-bool {
+                    color: #fb923c;
+                }
+
+                &.hl-string {
+                    color: #e2e8f0;
+                }
+
+                // near-white — generic strings
+                &.hl-default {
+                    color: var(--text-primary);
+                }
+
+                // HTTP method colors
+                &.hl-method {
+                    font-weight: 700;
+
+                    &[data-method="GET"] {
+                        color: #3b82f6;
+                    }
+
+                    &[data-method="POST"] {
+                        color: #22c55e;
+                    }
+
+                    &[data-method="PUT"] {
+                        color: #eab308;
+                    }
+
+                    &[data-method="PATCH"] {
+                        color: #06b6d4;
+                    }
+
+                    &[data-method="DELETE"] {
+                        color: #ef4444;
+                    }
+
+                    &[data-method="HEAD"] {
+                        color: #e3ea08;
+                    }
+                }
+
+                // HTTP status code colors
+                &.hl-status {
+                    font-weight: 600;
+                }
+
+                &.hl-status-2 {
+                    color: #22c55e;
+                }
+
+                &.hl-status-3 {
+                    color: #60a5fa;
+                }
+
+                &.hl-status-4 {
+                    color: #f59e0b;
+                }
+
+                &.hl-status-5 {
+                    color: #ef4444;
+                }
+
+                // ── Sub-token spans (from HeaderTokensPipe) ──────────────
+                .ht-key {
+                    color: #ffe0b2; // violet — directive/param name
+                    font-weight: 500;
+                }
+
+                .ht-eq {
+                    color: var(--text-muted);
+                    margin: 0 1px;
+                }
+
+                .ht-val {
+                    color: #b2b2b2; // amber — directive/param value
+                    // max-width: 280px;
+                    // overflow: hidden;
+                    // text-overflow: ellipsis;
+                    // white-space: nowrap;
+                    // display: inline-block;
+                    // vertical-align: bottom;
+                }
+
+                .ht-standalone {
+                    color: #94a3b8; // muted slate — flags like HttpOnly, no-store
+                    font-style: italic;
+                }
+
+                .ht-sep {
+                    color: var(--text-muted);
+                    opacity: 0.6;
+                }
+            }
+
+            .copy-btn {
+                background: transparent;
+                border: none;
+                color: var(--text-muted);
+                cursor: pointer;
+                font-size: 0.9rem;
+                padding: 0 5px;
+                border-radius: 4px;
+                opacity: 0;
+                transition: opacity 0.12s, background 0.12s;
+                line-height: 1;
+
+                &:hover {
+                    background: var(--bg-hover);
+                    color: var(--text-primary);
+                    opacity: 1 !important;
+                }
+            }
+
+            // Reveal the copy button when hovering any sibling cell in the same row
+            &:has(.key:hover) .copy-btn,
+            &:has(.val:hover) .copy-btn,
+            &:has(.copy-btn:focus-visible) .copy-btn {
+                opacity: 0.45;
             }
         }
 
@@ -148,19 +301,15 @@
             font-size: 0.8rem;
         }
 
-        .monaco-stub {
+        .monaco-wrapper {
             border: 1px solid var(--border-color);
             border-radius: 0 0 4px 4px;
-            background: var(--bg-secondary);
-            padding: 8px;
-            font-size: 0.75rem;
-            max-height: 500px;
-            overflow: auto;
+            overflow: hidden;
+            height: 400px;
 
-            pre {
-                margin: 0;
-                white-space: pre-wrap;
-                word-break: break-all;
+            app-vscode {
+                display: block;
+                height: 100%;
             }
         }
 
@@ -176,6 +325,7 @@
         display: flex;
         flex-direction: column;
         gap: 8px;
+        padding: 16px;
 
         .middleware-item {
             display: flex;
@@ -196,15 +346,15 @@
                 }
 
                 .m-file {
-                    font-size: 0.7rem;
+                    font-size: 0.857rem;
                     color: var(--text-muted);
-                    font-family: monospace;
+                    font-family: var(--skp-font-mono);
                 }
             }
 
             .m-time {
-                font-size: 0.8rem;
-                font-family: monospace;
+                font-size: 0.857rem;
+                font-family: var(--skp-font-mono);
                 color: var(--text-muted);
             }
         }
@@ -213,14 +363,15 @@
     .ws-messages {
         display: flex;
         flex-direction: column;
+        padding: 8px 0;
 
         .ws-msg {
             display: flex;
             gap: 12px;
             padding: 6px 12px;
             border-bottom: 1px solid var(--border-color-dim);
-            font-size: 0.75rem;
-            font-family: monospace;
+            font-size: 0.857rem;
+            font-family: var(--skp-font-mono);
 
             &.out {
                 background: rgba(16, 185, 129, 0.03);

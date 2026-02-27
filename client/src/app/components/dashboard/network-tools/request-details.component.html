@@ -20,6 +20,9 @@
     <p-tabs [value]="activeTab()" (valueChange)="activeTab.set($any($event))" class="details-tabs">
         <p-tablist>
             <p-tab value="headers">Headers</p-tab>
+            @if (queryParams().length > 0) {
+            <p-tab value="params">Params</p-tab>
+            }
             <p-tab value="payload">Payload</p-tab>
             <p-tab value="response">Response</p-tab>
             <p-tab value="cookies">Cookies</p-tab>
@@ -32,21 +35,62 @@
             }
         </p-tablist>
         <p-tabpanels>
+            <!-- ── Headers ──────────────────────────────────────────────── -->
             <p-tabpanel value="headers">
                 <ng-scrollbar class="tab-content">
                     <section>
                         <h3>General</h3>
                         <div class="kv-grid">
                             <div class="key">Request URL:</div>
-                            <div class="val">{{ request().url }}</div>
+                            <div class="val hl-url">{{ request().url }}</div>
+                            <button class="copy-btn" (click)="copyToClipboard(request().url)" title="Copy">
+                                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                    <path
+                                        d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z" />
+                                    <path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h-1v1H2V6h1V5H2z" />
+                                </svg>
+                            </button>
                             <div class="key">Request Method:</div>
-                            <div class="val">{{ request().method }}</div>
+                            <div class="val hl-method" [attr.data-method]="request().method">{{ request().method }}
+                            </div>
+                            <button class="copy-btn" (click)="copyToClipboard(request().method)" title="Copy">
+                                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                    <path
+                                        d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z" />
+                                    <path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h-1v1H2V6h1V5H2z" />
+                                </svg>
+                            </button>
                             <div class="key">Status Code:</div>
-                            <div class="val">{{ request().status }}</div>
+                            <div class="val"
+                                [class]="'hl-status hl-status-' + ((request().status | number:'1.0-0') ?? '0')[0]">
+                                {{ request().status }}</div>
+                            <button class="copy-btn" (click)="copyToClipboard('' + request().status)" title="Copy">
+                                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                    <path
+                                        d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z" />
+                                    <path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h-1v1H2V6h1V5H2z" />
+                                </svg>
+                            </button>
                             <div class="key">Remote Address:</div>
-                            <div class="val">{{ request().remoteIP || '-' }}</div>
+                            <div class="val hl-default">{{ request().remoteIP || '-' }}</div>
+                            <button class="copy-btn" (click)="copyToClipboard(request().remoteIP || '')" title="Copy">
+                                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                    <path
+                                        d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z" />
+                                    <path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h-1v1H2V6h1V5H2z" />
+                                </svg>
+                            </button>
                             <div class="key">Referrer Policy:</div>
-                            <div class="val">{{ request().requestHeaders?.['referrer-policy'] || '-' }}</div>
+                            <div class="val hl-default">{{ request().requestHeaders?.['referrer-policy'] || '-' }}</div>
+                            <button class="copy-btn"
+                                (click)="copyToClipboard(request().requestHeaders?.['referrer-policy'] || '')"
+                                title="Copy">
+                                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                    <path
+                                        d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z" />
+                                    <path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h-1v1H2V6h1V5H2z" />
+                                </svg>
+                            </button>
                         </div>
                     </section>
                     @if (request().responseHeaders) {
@@ -55,7 +99,25 @@
                         <div class="kv-grid">
                             @for (h of request().responseHeaders | keyvalue; track $index) {
                             <div class="key">{{ h.key }}:</div>
-                            <div class="val">{{ h.value }}</div>
+                            <div class="val" [class]="headerValueClass(h.key, h.value)">
+                                @let tokens = (h.value | headerTokens:h.key);
+                                @if (tokens) {
+                                @for (t of tokens; track $index) {
+                                @if (t.key) { <span class="ht-key">{{ t.key }}</span><span class="ht-eq">=</span> }
+                                <span [class]="t.key ? 'ht-val' : 'ht-standalone'">{{ t.val }}</span>
+                                @if (t.sep) { <span class="ht-sep">{{ t.sep }}</span> }
+                                }
+                                } @else {
+                                {{ h.value }}
+                                }
+                            </div>
+                            <button class="copy-btn" (click)="copyToClipboard(h.value)" title="Copy value">
+                                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                    <path
+                                        d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z" />
+                                    <path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h-1v1H2V6h1V5H2z" />
+                                </svg>
+                            </button>
                             }
                         </div>
                     </section>
@@ -66,7 +128,25 @@
                         <div class="kv-grid">
                             @for (h of request().requestHeaders | keyvalue; track $index) {
                             <div class="key">{{ h.key }}:</div>
-                            <div class="val">{{ h.value }}</div>
+                            <div class="val" [class]="headerValueClass(h.key, h.value)">
+                                @let tokens = (h.value | headerTokens:h.key);
+                                @if (tokens) {
+                                @for (t of tokens; track $index) {
+                                @if (t.key) { <span class="ht-key">{{ t.key }}</span><span class="ht-eq">=</span> }
+                                <span [class]="t.key ? 'ht-val' : 'ht-standalone'">{{ t.val }}</span>
+                                @if (t.sep) { <span class="ht-sep">{{ t.sep }}</span> }
+                                }
+                                } @else {
+                                {{ h.value }}
+                                }
+                            </div>
+                            <button class="copy-btn" (click)="copyToClipboard(h.value)" title="Copy value">
+                                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                    <path
+                                        d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z" />
+                                    <path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h-1v1H2V6h1V5H2z" />
+                                </svg>
+                            </button>
                             }
                         </div>
                     </section>
@@ -74,17 +154,38 @@
                 </ng-scrollbar>
             </p-tabpanel>
 
+            <!-- ── Query Params ─────────────────────────────────────────── -->
+            @if (queryParams().length > 0) {
+            <p-tabpanel value="params">
+                <ng-scrollbar class="tab-content">
+                    <section>
+                        <h3>Query Parameters</h3>
+                        <div class="kv-grid params-grid">
+                            @for (p of queryParams(); track $index) {
+                            <div class="key param-key">{{ p[0] }}</div>
+                            <div class="val" [class]="queryParamClass(p[1])">{{ p[1] }}</div>
+                            }
+                        </div>
+                    </section>
+                </ng-scrollbar>
+            </p-tabpanel>
+            }
+
+            <!-- ── Payload ──────────────────────────────────────────────── -->
             <p-tabpanel value="payload">
                 <ng-scrollbar class="tab-content">
                     @if (request().requestBody) {
                     <div class="editor-header">
-                        <span>Payload</span>
+                        <span>Request Payload</span>
                         <button pButton class="p-button-text p-button-sm"
-                            (click)="copyToClipboard(request().requestBody)">Copy</button>
+                            (click)="copyToClipboard(bodyString(request().requestBody))">Copy</button>
                     </div>
-                    <!-- Monaco Stub -->
-                    <div class="monaco-stub">
-                        <pre>{{ request().requestBody | json }}</pre>
+                    <div class="monaco-wrapper">
+                        <app-vscode [code]="bodyString(request().requestBody)"
+                            [language]="bodyLanguage(request().requestBody, request().contentType)" [readOnly]="true"
+                            [lineNumbers]="'off'" [minimapEnabled]="false" [scrollBeyondLastLine]="false"
+                            [automaticLayout]="true" theme="vs-dark" installationLocation="/lib/monaco">
+                        </app-vscode>
                     </div>
                     } @else {
                     <div class="empty-msg">No request payload</div>
@@ -92,6 +193,7 @@
                 </ng-scrollbar>
             </p-tabpanel>
 
+            <!-- ── Response ─────────────────────────────────────────────── -->
             <p-tabpanel value="response">
                 <ng-scrollbar class="tab-content">
                     @if (request().responseBody || request().body) {
@@ -99,14 +201,18 @@
                         <span>Response Body</span>
                         <div class="actions">
                             <button pButton class="p-button-text p-button-sm"
-                                (click)="copyToClipboard(request().responseBody || request().body)">Copy</button>
+                                (click)="copyToClipboard(bodyString(request().responseBody || request().body))">Copy</button>
                             <button pButton class="p-button-text p-button-sm"
                                 (click)="downloadResponse()">Download</button>
                         </div>
                     </div>
-                    <!-- Monaco Stub -->
-                    <div class="monaco-stub">
-                        <pre>{{ (request().responseBody || request().body) | json }}</pre>
+                    <div class="monaco-wrapper">
+                        <app-vscode [code]="bodyString(request().responseBody || request().body)"
+                            [language]="bodyLanguage(request().responseBody || request().body, request().contentType)"
+                            [readOnly]="true" [lineNumbers]="'off'" [minimapEnabled]="false"
+                            [scrollBeyondLastLine]="false" [automaticLayout]="true" theme="vs-dark"
+                            installationLocation="/lib/monaco">
+                        </app-vscode>
                     </div>
                     } @else {
                     <div class="empty-msg">No response body captured</div>
@@ -114,6 +220,7 @@
                 </ng-scrollbar>
             </p-tabpanel>
 
+            <!-- ── Cookies ──────────────────────────────────────────────── -->
             <p-tabpanel value="cookies">
                 <ng-scrollbar class="tab-content">
                     <section>
@@ -123,27 +230,85 @@
                             @for (c of request().requestHeaders!['cookie'].split(';'); track $index) {
                             @let parts = c.trim().split('=');
                             <div class="key">{{ parts[0] }}</div>
-                            <div class="val">{{ parts[1] }}</div>
+                            <div class="val">
+                                <span class="ht-key">{{ parts[0] }}</span>
+                                <span class="ht-eq">=</span>
+                                <span class="ht-val">{{ parts.slice(1).join('=') }}</span>
+                            </div>
+                            <button class="copy-btn" (click)="copyToClipboard(parts.slice(1).join('='))"
+                                title="Copy value">
+                                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                    <path
+                                        d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z" />
+                                    <path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h-1v1H2V6h1V5H2z" />
+                                </svg>
+                            </button>
                             }
                         </div>
                         } @else {
-                        <div class="empty-msg">No cookies</div>
+                        <div class="empty-msg">No request cookies</div>
                         }
                     </section>
+                    @if (request().responseHeaders?.['set-cookie']) {
+                    <section>
+                        <h3>Response Set-Cookie</h3>
+                        <div class="kv-grid">
+                            <div class="key">set-cookie:</div>
+                            <div class="val hl-cookie">
+                                @let tokens = (request().responseHeaders!['set-cookie'] | headerTokens:'set-cookie');
+                                @if (tokens) {
+                                @for (t of tokens; track $index) {
+                                @if (t.key) { <span class="ht-key">{{ t.key }}</span><span class="ht-eq">=</span> }
+                                <span [class]="t.key ? 'ht-val' : 'ht-standalone'">{{ t.val }}</span>
+                                @if (t.sep) { <span class="ht-sep">{{ t.sep }}</span> }
+                                }
+                                } @else {
+                                {{ request().responseHeaders!['set-cookie'] }}
+                                }
+                            </div>
+                            <button class="copy-btn" (click)="copyToClipboard(request().responseHeaders!['set-cookie'])"
+                                title="Copy value">
+                                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                    <path
+                                        d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z" />
+                                    <path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h-1v1H2V6h1V5H2z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </section>
+                    }
                 </ng-scrollbar>
             </p-tabpanel>
 
+            <!-- ── Timings ──────────────────────────────────────────────── -->
             <p-tabpanel value="timings">
                 <ng-scrollbar class="tab-content">
                     <div class="kv-grid">
                         <div class="key">Started:</div>
-                        <div class="val">{{ request().timestamp | date:'mediumTime' }}</div>
+                        <div class="val hl-date">{{ request().timestamp | date:'mediumTime' }}</div>
+                        <button class="copy-btn" (click)="copyToClipboard(formatTimestamp(request().timestamp))"
+                            title="Copy">
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                <path
+                                    d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z" />
+                                <path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h-1v1H2V6h1V5H2z" />
+                            </svg>
+                        </button>
                         <div class="key">Duration:</div>
-                        <div class="val">{{ formatDuration(request().duration) }}</div>
+                        <div class="val hl-num">{{ formatDuration(request().duration) }}</div>
+                        <button class="copy-btn" (click)="copyToClipboard(formatDuration(request().duration))"
+                            title="Copy">
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                <path
+                                    d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z" />
+                                <path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h-1v1H2V6h1V5H2z" />
+                            </svg>
+                        </button>
                     </div>
                 </ng-scrollbar>
             </p-tabpanel>
 
+            <!-- ── Middleware ────────────────────────────────────────────── -->
             @if (request().handlerStack && request().handlerStack!.length > 0) {
             <p-tabpanel value="middleware">
                 <ng-scrollbar class="tab-content">
@@ -162,6 +327,7 @@
             </p-tabpanel>
             }
 
+            <!-- ── WS Timeline ───────────────────────────────────────────── -->
             @if (request().type === 'ws' || request().status === 101) {
             <p-tabpanel value="timeline">
                 <ng-scrollbar class="tab-content">
@@ -179,4 +345,5 @@
             }
         </p-tabpanels>
     </p-tabs>
+
 </div>
