@@ -62,12 +62,14 @@ export class WebAppPlugin implements ShokupanPlugin {
         const mainProxy = Proxy({
             target,
             ws: true,
+            changeOrigin: true,
             pathRewrite: (path) => path.replace(this.mountPath, '') || '/'
         });
 
         const rootProxy = Proxy({
             target,
-            ws: true
+            ws: true,
+            changeOrigin: true
         });
 
         // Register a catch-all route under the mount path for the main app
@@ -77,6 +79,7 @@ export class WebAppPlugin implements ShokupanPlugin {
         // Pass root websocket connections to the dev server since Vite uses `wss://domain/?token=...`
         app.get('/', async (ctx) => {
             if (ctx.req.headers.get('upgrade')?.toLowerCase() === 'websocket') {
+                ctx.logger?.debug('WebAppPlugin', 'Intercepted root WebSocket upgrade, proxying to dev server...');
                 return rootProxy(ctx, async () => { });
             }
         });

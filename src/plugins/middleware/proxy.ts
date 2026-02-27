@@ -97,7 +97,14 @@ export function Proxy(options: ProxyOptions): Middleware {
 
         // WebSocket Upgrade Handling
         if (options.ws && req.headers.get("upgrade")?.toLowerCase() === "websocket") {
+            const upgradeHeaders: Record<string, string> = {};
+            const protocol = req.headers.get("sec-websocket-protocol");
+            if (protocol) {
+                upgradeHeaders["Sec-WebSocket-Protocol"] = protocol;
+            }
+
             const success = ctx.upgrade({
+                headers: upgradeHeaders,
                 data: {
                     handler: {
                         open: (ws: ServerWebSocket) => handleWSOpen(ws, ctx, options, targetUrl),
@@ -134,13 +141,15 @@ export function Proxy(options: ProxyOptions): Middleware {
         const headers = new Headers(req.headers);
         if (options.changeOrigin) {
             headers.set("host", targetUrl.host);
+            if (headers.has("origin")) {
+                headers.set("origin", targetUrl.origin);
+            }
         }
         if (options.headers) {
             Object.entries(options.headers).forEach(([key, value]) => headers.set(key, value));
         }
 
         // Remove hop-by-hop headers
-        headers.delete("connection");
         headers.delete("keep-alive");
         headers.delete("proxy-authenticate");
         headers.delete("proxy-authorization");
@@ -180,9 +189,6 @@ function handleWSOpen(ws: ServerWebSocket, ctx: ShokupanContext, options: ProxyO
     url.protocol = targetUrl.protocol.replace('http', 'ws');
 
     const headers: Record<string, string> = {};
-    if (options.changeOrigin) {
-        headers['Host'] = targetUrl.host;
-    }
     // Copy headers from client request
     ctx.request.headers.forEach((v, k) => {
         if (!['upgrade', 'connection', 'sec-websocket-key', 'sec-websocket-version', 'sec-websocket-extensions'].includes(k.toLowerCase())) {
@@ -190,8 +196,16 @@ function handleWSOpen(ws: ServerWebSocket, ctx: ShokupanContext, options: ProxyO
         }
     });
 
-    // TODO: Is this the correct WebSocket constructor?
-    const upstream = new WebSocket(url.toString());
+    if (options.changeOrigin) {
+        headers['host'] = targetUrl.host;
+        headers['origin'] &&= targetUrl.origin;
+    }
+
+    const protocolHeader = headers['sec-websocket-protocol'] || ctx.request.headers.get('sec-websocket-protocol');
+    const protocols = protocolHeader ? protocolHeader.split(',').map(p => p.trim()) : undefined;
+
+    // @ts-ignore - Bun's native WebSocket supports options mapping as the 3rd argument.
+    const upstream = new WebSocket(url.toString(), protocols, { headers });
 
     wsMap.set(ws, upstream);
 
