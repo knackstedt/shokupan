@@ -331,19 +331,48 @@
             @if (request().handlerStack && request().handlerStack!.length > 0) {
             <p-tabpanel value="middleware">
                 <ng-scrollbar class="tab-content" orientation="vertical">
-                    <div class="middleware-list">
+                    <div class="middleware-tab-content">
                         @let pathMap = shortestUniquePaths();
-                        @for (m of request().handlerStack; track $index) {
-                        <div class="middleware-item">
-                            <div class="m-info">
-                                <span class="m-name">{{ m.name }}</span>
-                                <a class="m-file" [href]="getIdeLink(m.file, m.line)" [title]="m.file + ':' + m.line"
-                                    (click)="$event.preventDefault(); openIdeLink(m.file, m.line)">
-                                    {{ pathMap.get(m.file) ?? m.file }}:{{ m.line }}
-                                </a>
+                        @let groups = handlerGroups();
+
+                        @if (groups.finalHandlers.length > 0) {
+                        <section class="final-handler-section">
+                            <h3>Final Handler</h3>
+                            @for (m of groups.finalHandlers; track $index) {
+                            <div class="middleware-item final-handler-item">
+                                <div class="m-info">
+                                    <span class="m-name">{{ m.name }}</span>
+                                    <a class="m-file" [href]="getIdeLink(m.file, m.line)"
+                                        [title]="m.file + ':' + m.line"
+                                        (click)="$event.preventDefault(); openIdeLink(m.file, m.line)">
+                                        {{ pathMap.get(m.file) ?? m.file }}:{{ m.line }}
+                                    </a>
+                                </div>
+                                <span class="m-time">{{ formatDuration(m.duration) }}</span>
                             </div>
-                            <span class="m-time">{{ formatDuration(m.duration) }}</span>
-                        </div>
+                            }
+                        </section>
+                        }
+
+                        @if (groups.middleware.length > 0) {
+                        <section class="middleware-section">
+                            <h3>Middleware</h3>
+                            <div class="middleware-list">
+                                @for (m of groups.middleware; track $index) {
+                                <div class="middleware-item">
+                                    <div class="m-info">
+                                        <span class="m-name">{{ m.name }}</span>
+                                        <a class="m-file" [href]="getIdeLink(m.file, m.line)"
+                                            [title]="m.file + ':' + m.line"
+                                            (click)="$event.preventDefault(); openIdeLink(m.file, m.line)">
+                                            {{ pathMap.get(m.file) ?? m.file }}:{{ m.line }}
+                                        </a>
+                                    </div>
+                                    <span class="m-time">{{ formatDuration(m.duration) }}</span>
+                                </div>
+                                }
+                            </div>
+                        </section>
                         }
                     </div>
                 </ng-scrollbar>

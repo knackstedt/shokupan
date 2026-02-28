@@ -320,34 +320,81 @@
         }
     }
 
-    .middleware-list {
+    .middleware-tab-content {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 20px;
+
+        section {
+            h3 {
+                font-size: 0.85rem;
+                font-weight: 600;
+                color: var(--text-secondary);
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                margin-bottom: 12px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+
+                &::after {
+                    content: '';
+                    flex: 1;
+                    height: 1px;
+                    background: var(--border-color-dim);
+                }
+            }
+        }
+
+        .final-handler-item {
+            background: rgba(var(--primary-rgb), 0.05) !important;
+            border-left: 3px solid var(--primary) !important;
+            padding: 12px !important;
+
+            .m-name {
+                color: var(--primary);
+                font-size: 0.95rem !important;
+            }
+        }
+
+        .middleware-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
 
         .middleware-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px;
+            padding: 8px 12px;
             background: var(--bg-secondary);
             border-radius: 4px;
             border: 1px solid var(--border-color);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            display: inline-block;
+            transition: background 0.2s, border-color 0.2s;
+
+            &:hover {
+                background: var(--bg-hover);
+                border-color: var(--border-color-highlight);
+            }
 
             .m-info {
                 display: flex;
                 flex-direction: column;
+                gap: 2px;
+                flex: 1;
+                min-width: 0;
 
                 .m-name {
                     font-weight: 500;
                     font-size: 0.85rem;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
 
                 .m-file {
-                    font-size: 0.857rem;
+                    font-size: 0.75rem;
                     color: var(--text-muted);
                     font-family: var(--skp-font-mono);
                     overflow: hidden;
@@ -363,9 +410,11 @@
             }
 
             .m-time {
-                font-size: 0.857rem;
+                font-size: 0.8rem;
                 font-family: var(--skp-font-mono);
                 color: var(--text-muted);
+                margin-left: 12px;
+                flex-shrink: 0;
             }
         }
     }

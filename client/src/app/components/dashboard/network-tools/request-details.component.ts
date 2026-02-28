@@ -54,6 +54,18 @@ export class RequestDetailsComponent {
         this.request().type === 'ws' || this.request().status === 101
     );
 
+    /** Split the handler stack into middleware and final route handlers */
+    readonly handlerGroups = computed(() => {
+        const stack = this.request().handlerStack ?? [];
+        if (stack.length === 0) return { middleware: [], finalHandlers: [] };
+
+        // The last item is always the final handler
+        const middleware = stack.slice(0, -1);
+        const finalHandlers = stack.slice(-1);
+
+        return { middleware, finalHandlers };
+    });
+
     /** Aggregate stats across all WS messages */
     readonly wsStats = computed(() => {
         const msgs = this.request().wsMessages ?? [];
