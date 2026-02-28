@@ -49,6 +49,47 @@ export class RequestDetailsComponent {
         }
     });
 
+    /** True when this request is a WebSocket upgrade */
+    readonly isWs = computed(() =>
+        this.request().type === 'ws' || this.request().status === 101
+    );
+
+    /** Aggregate stats across all WS messages */
+    readonly wsStats = computed(() => {
+        const msgs = this.request().wsMessages ?? [];
+        // Only count actual data messages, not system events (open/close/error)
+        const dataMsgs = msgs.filter((m: any) => m.type === 'message');
+        const inbound = dataMsgs.filter((m: any) => m.dir === 'in');
+        const outbound = dataMsgs.filter((m: any) => m.dir === 'out');
+        const bytesIn = inbound.reduce((s: number, m: any) => s + (m.size ?? m.data?.length ?? 0), 0);
+        const bytesOut = outbound.reduce((s: number, m: any) => s + (m.size ?? m.data?.length ?? 0), 0);
+        const start = this.request().timestamp;
+        const last = msgs.length ? Math.max(...msgs.map((m: any) => m.timestamp)) : start;
+        return {
+            total: dataMsgs.length, inbound: inbound.length, outbound: outbound.length,
+            bytesIn, bytesOut, durationMs: last - start
+        };
+    });
+
+    /**
+     * Map each WS message to an (x, dir) point for the timeline SVG chart.
+     * x is a 0–1 fraction of the total connection duration.
+     */
+    readonly wsTimelinePoints = computed(() => {
+        const msgs = this.request().wsMessages ?? [];
+        if (!msgs.length) return [];
+        const start = this.request().timestamp;
+        const end = Math.max(...msgs.map((m: any) => m.timestamp));
+        const span = end - start || 1;
+        return msgs.map((m: any) => ({
+            x: (m.timestamp - start) / span,
+            dir: (m.dir ?? 'system') as 'in' | 'out' | 'system',
+            type: m.type as string,
+            data: m.data,
+            t: m.timestamp - start,
+        }));
+    });
+
     /**
      * Classify a header value into a semantic CSS class for color-coding.
      * Classes: hl-auth, hl-mime, hl-num, hl-date, hl-bool, hl-url, hl-default
@@ -118,6 +159,45 @@ export class RequestDetailsComponent {
     formatBytes(b: number) { return formatBytes(b); }
     formatDuration(ms: number) { return formatDurationPretty(ms); }
     formatTimestamp(ms: number) { return new Date(ms).toLocaleTimeString(); }
+
+    /** Open file in VS Code (same pattern as AppRegistryTreeComponent) */
+    getIdeLink(absolutePath: string, line?: number): string {
+        if (!absolutePath) return '';
+        return `vscode://file${absolutePath}${line ? ':' + line : ''}`;
+    }
+
+    openIdeLink(absolutePath: string, line?: number) {
+        window.open(this.getIdeLink(absolutePath, line));
+    }
+
+    /**
+     * For each entry in handlerStack, compute the shortest path suffix that
+     * uniquely identifies the file among all stack entries.
+     * Returns a Map<file, displayLabel>.
+     */
+    readonly shortestUniquePaths = computed(() => {
+        const stack = this.request().handlerStack ?? [];
+        const files = stack.map((m: any) => (m.file || '') as string);
+        const result = new Map<string, string>();
+
+        files.forEach(file => {
+            if (!file) { result.set(file, file); return; }
+            const parts = file.split('/');
+
+            // Find the minimum number of trailing segments that makes this path unique
+            for (let depth = 1; depth <= parts.length; depth++) {
+                const label = parts.slice(-depth).join('/');
+                const clash = files.some(f => f !== file && f.split('/').slice(-depth).join('/') === label);
+                if (!clash) {
+                    result.set(file, label);
+                    return;
+                }
+            }
+            result.set(file, file); // full path as last resort
+        });
+
+        return result;
+    });
 
     copyToClipboard(text: string) {
         navigator.clipboard.writeText(text);

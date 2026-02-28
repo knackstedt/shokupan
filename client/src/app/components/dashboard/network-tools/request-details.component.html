@@ -7,7 +7,7 @@
             </svg>
         </button>
         <div class="request-summary">
-            <span class="method">{{ request().method }}</span>
+            <span class="method" [class.method-ws]="isWs()">{{ isWs() ? 'WS' : request().method }}</span>
             <span class="url" [title]="request().url">{{ request().url }}</span>
         </div>
         <div class="actions">
@@ -23,14 +23,16 @@
             @if (queryParams().length > 0) {
             <p-tab value="params">Params</p-tab>
             }
+            @if (!isWs()) {
             <p-tab value="payload">Payload</p-tab>
             <p-tab value="response">Response</p-tab>
+            }
             <p-tab value="cookies">Cookies</p-tab>
             <p-tab value="timings">Timings</p-tab>
             @if (request().handlerStack && request().handlerStack!.length > 0) {
             <p-tab value="middleware">Middleware</p-tab>
             }
-            @if (request().type === 'ws' || request().status === 101) {
+            @if (isWs()) {
             <p-tab value="timeline">Timeline</p-tab>
             }
         </p-tablist>
@@ -91,6 +93,23 @@
                                     <path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h-1v1H2V6h1V5H2z" />
                                 </svg>
                             </button>
+                            @if (isWs()) {
+                            <div class="key">Messages ↓ In:</div>
+                            <div class="val hl-url">{{ wsStats().inbound }}</div>
+                            <div></div>
+                            <div class="key">Messages ↑ Out:</div>
+                            <div class="val hl-mime">{{ wsStats().outbound }}</div>
+                            <div></div>
+                            <div class="key">Bytes Received:</div>
+                            <div class="val hl-num">{{ formatBytes(wsStats().bytesIn) }}</div>
+                            <div></div>
+                            <div class="key">Bytes Sent:</div>
+                            <div class="val hl-num">{{ formatBytes(wsStats().bytesOut) }}</div>
+                            <div></div>
+                            <div class="key">Connection Open:</div>
+                            <div class="val hl-date">{{ formatDuration(wsStats().durationMs) }}</div>
+                            <div></div>
+                            }
                         </div>
                     </section>
                     @if (request().responseHeaders) {
@@ -311,13 +330,17 @@
             <!-- ── Middleware ────────────────────────────────────────────── -->
             @if (request().handlerStack && request().handlerStack!.length > 0) {
             <p-tabpanel value="middleware">
-                <ng-scrollbar class="tab-content">
+                <ng-scrollbar class="tab-content" orientation="vertical">
                     <div class="middleware-list">
+                        @let pathMap = shortestUniquePaths();
                         @for (m of request().handlerStack; track $index) {
                         <div class="middleware-item">
                             <div class="m-info">
                                 <span class="m-name">{{ m.name }}</span>
-                                <span class="m-file">{{ m.file }}:{{ m.line }}</span>
+                                <a class="m-file" [href]="getIdeLink(m.file, m.line)" [title]="m.file + ':' + m.line"
+                                    (click)="$event.preventDefault(); openIdeLink(m.file, m.line)">
+                                    {{ pathMap.get(m.file) ?? m.file }}:{{ m.line }}
+                                </a>
                             </div>
                             <span class="m-time">{{ formatDuration(m.duration) }}</span>
                         </div>
@@ -328,18 +351,62 @@
             }
 
             <!-- ── WS Timeline ───────────────────────────────────────────── -->
-            @if (request().type === 'ws' || request().status === 101) {
+            @if (isWs()) {
             <p-tabpanel value="timeline">
-                <ng-scrollbar class="tab-content">
-                    <div class="ws-messages">
-                        @for (m of request().wsMessages; track $index) {
-                        <div class="ws-msg" [class.out]="m.dir === 'out'">
-                            <span class="ws-dir">{{ m.dir === 'out' ? '↑' : '↓' }}</span>
-                            <span class="ws-data">{{ m.data }}</span>
-                            <span class="ws-time">+{{ formatDuration(m.timestamp - request().timestamp) }}</span>
+                <ng-scrollbar class="tab-content" orientation="vertical">
+                    @if ((request().wsMessages?.length ?? 0) === 0) {
+                    <div class="empty-msg">No WebSocket messages recorded</div>
+                    } @else {
+                    <section class="ws-chart-section">
+                        <h3>Message Timeline</h3>
+                        <div class="ws-chart-wrap">
+                            <svg class="ws-chart" viewBox="0 0 1000 80" preserveAspectRatio="none"
+                                xmlns="http://www.w3.org/2000/svg">
+                                <line x1="0" y1="40" x2="1000" y2="40" stroke="var(--border-color)" stroke-width="1" />
+                                <text x="4" y="20" fill="#60a5fa" font-size="10" font-family="monospace">IN</text>
+                                <text x="4" y="72" fill="#fb923c" font-size="10" font-family="monospace">OUT</text>
+                                @for (p of wsTimelinePoints(); track $index) {
+                                @if (p.dir === 'system') {
+                                <!-- System events (open/close/error) as small gray diamonds on center line -->
+                                <polygon
+                                    [attr.points]="(20 + p.x * 960) + ',34 ' + (20 + p.x * 960 + 4) + ',40 ' + (20 + p.x * 960) + ',46 ' + (20 + p.x * 960 - 4) + ',40'"
+                                    fill="#94a3b8" opacity="0.7">
+                                    <title>⚡ {{ p.type | uppercase }} +{{ formatDuration(p.t) }}{{ p.data ? ': ' +
+                                        p.data : '' }}</title>
+                                </polygon>
+                                } @else {
+                                <circle [attr.cx]="20 + p.x * 960" [attr.cy]="p.dir === 'in' ? 24 : 56" r="4.5"
+                                    [attr.fill]="p.dir === 'in' ? '#60a5fa' : '#fb923c'" opacity="0.85">
+                                    <title>{{ p.dir === 'in' ? '↓ IN' : '↑ OUT' }} +{{ formatDuration(p.t) }}: {{ p.data
+                                        | slice:0:120 }}</title>
+                                </circle>
+                                }
+                                }
+                            </svg>
+                            <div class="ws-chart-axis">
+                                <span>t=0</span>
+                                <span>+{{ formatDuration(wsStats().durationMs) }}</span>
+                            </div>
                         </div>
-                        }
-                    </div>
+                    </section>
+                    <section>
+                        <h3>Messages
+                            <span class="ws-legend">
+                                <span class="ws-dot in"></span>In ({{ wsStats().inbound }})
+                                <span class="ws-dot out"></span>Out ({{ wsStats().outbound }})
+                            </span>
+                        </h3>
+                        <div class="ws-messages">
+                            @for (m of request().wsMessages; track $index) {
+                            <div class="ws-msg" [class.out]="m.dir === 'out'" [class.system]="m.dir === 'system'">
+                                <span class="ws-dir">{{ m.dir === 'out' ? '↑' : m.dir === 'in' ? '↓' : '⚡' }}</span>
+                                <span class="ws-time">+{{ formatDuration(m.timestamp - request().timestamp) }}</span>
+                                <span class="ws-data">{{ m.data || m.type }}</span>
+                            </div>
+                            }
+                        </div>
+                    </section>
+                    }
                 </ng-scrollbar>
             </p-tabpanel>
             }

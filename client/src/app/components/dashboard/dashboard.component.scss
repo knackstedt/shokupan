@@ -272,3 +272,16 @@ skp-app-graph {
     flex: 1;
     height: 100%;
 }
+
+.status-cell {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}

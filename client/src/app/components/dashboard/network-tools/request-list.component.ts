@@ -72,6 +72,58 @@ export class RequestListComponent {
     formatBytes(b: number) { return formatBytes(b); }
     formatDuration(ms: number) { return formatDurationPretty(ms); }
 
+    stats = computed(() => {
+        const filtered = this.filteredRequests();
+        const total = this.requests();
+
+        let transferred = 0;
+        let resources = 0;
+        let totalDuration = 0;
+        let durationCount = 0;
+        let failedCount = 0;
+        let pendingCount = 0;
+        let typeCounts = { fetch: 0, xhr: 0, ws: 0, other: 0 };
+
+        filtered.forEach(r => {
+            const type = (r.type || 'other').toLowerCase();
+            if (type === 'fetch') typeCounts.fetch++;
+            else if (type === 'xhr') typeCounts.xhr++;
+            else if (type === 'ws') typeCounts.ws++;
+            else typeCounts.other++;
+
+            transferred += Number(r.transferred || r.size || 0);
+            resources += Number(r.size || 0);
+
+            if (!r.status) {
+                pendingCount++;
+            } else if (r.status >= 400) {
+                failedCount++;
+            }
+
+            if (r.duration !== undefined && r.duration !== null) {
+                totalDuration += r.duration;
+                durationCount++;
+            }
+        });
+
+        const completedCount = filtered.length - pendingCount;
+        const successRate = completedCount > 0
+            ? ((completedCount - failedCount) / completedCount * 100).toFixed(1)
+            : '0.0';
+
+        return {
+            filteredCount: filtered.length,
+            totalCount: total.length,
+            transferred: formatBytes(transferred),
+            resources: formatBytes(resources),
+            avgLatency: durationCount > 0 ? formatDurationPretty(totalDuration / durationCount) : '0ms',
+            failedCount,
+            pendingCount,
+            successRate,
+            typeCounts
+        };
+    });
+
     isColVisible(field: string): boolean {
         return this.selectedCols().some(c => c.field === field);
     }

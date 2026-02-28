@@ -75,4 +75,54 @@
             </ng-template>
         </ngx-tabulator-column>
     </ngx-tabulator>
+
+    <div class="list-footer">
+        <div class="stat-item">
+            <span class="stat-value">{{ stats().filteredCount }}</span>
+            <span class="stat-label">requests</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+            <span class="stat-value">{{ stats().transferred }}</span>
+            <span class="stat-label">transferred</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+            <span class="stat-value">{{ stats().resources }}</span>
+            <span class="stat-label">resources</span>
+        </div>
+        @if (stats().failedCount > 0) {
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+            <span class="stat-value text-danger">{{ stats().failedCount }}</span>
+            <span class="stat-label">failed</span>
+        </div>
+        }
+        @if (stats().pendingCount > 0) {
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+            <span class="stat-value">{{ stats().pendingCount }}</span>
+            <span class="stat-label">pending</span>
+        </div>
+        }
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+            <span class="stat-value">{{ stats().successRate }}%</span>
+            <span class="stat-label">success rate</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+            <span class="stat-label">type: </span>
+            <span class="stat-value">
+                {{ stats().typeCounts.fetch }} fetch |
+                {{ stats().typeCounts.xhr }} xhr |
+                {{ stats().typeCounts.ws }} ws
+            </span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+            <span class="stat-label">avg latency: </span>
+            <span class="stat-value">{{ stats().avgLatency }}</span>
+        </div>
+    </div>
 </div>

@@ -184,4 +184,39 @@
         text-align: center;
         color: var(--text-secondary);
     }
+
+    .list-footer {
+        display: flex;
+        align-items: center;
+        padding: 4px 12px;
+        gap: 12px;
+        background: var(--bg-secondary);
+        border-top: 1px solid var(--border-color);
+        font-size: 11px;
+        color: var(--text-secondary);
+        height: 28px;
+        flex-shrink: 0;
+
+        .stat-item {
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+            white-space: nowrap;
+
+            .stat-value {
+                color: var(--text-primary);
+                font-weight: 600;
+            }
+
+            .stat-label {
+                color: var(--text-muted, #6b7280);
+            }
+        }
+
+        .stat-divider {
+            width: 1px;
+            height: 12px;
+            background: var(--border-color);
+        }
+    }
 }
