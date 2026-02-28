@@ -200,11 +200,11 @@
                             (click)="copyToClipboard(bodyString(request().requestBody))">Copy</button>
                     </div>
                     <div class="monaco-wrapper">
-                        <app-vscode [code]="bodyString(request().requestBody)"
+                        <ngx-monaco-editor [code]="bodyString(request().requestBody)"
                             [language]="bodyLanguage(request().requestBody, request().contentType)" [readOnly]="true"
                             [lineNumbers]="'off'" [minimapEnabled]="false" [scrollBeyondLastLine]="false"
-                            [automaticLayout]="true" theme="vs-dark" installationLocation="/lib/monaco">
-                        </app-vscode>
+                            [automaticLayout]="true" theme="vs-dark" installationLocation="/_app/lib/monaco/vs">
+                        </ngx-monaco-editor>
                     </div>
                     } @else {
                     <div class="empty-msg">No request payload</div>
@@ -226,12 +226,12 @@
                         </div>
                     </div>
                     <div class="monaco-wrapper">
-                        <app-vscode [code]="bodyString(request().responseBody || request().body)"
+                        <ngx-monaco-editor [code]="bodyString(request().responseBody || request().body)"
                             [language]="bodyLanguage(request().responseBody || request().body, request().contentType)"
                             [readOnly]="true" [lineNumbers]="'off'" [minimapEnabled]="false"
                             [scrollBeyondLastLine]="false" [automaticLayout]="true" theme="vs-dark"
-                            installationLocation="/lib/monaco">
-                        </app-vscode>
+                            installationLocation="/_app/lib/monaco/vs">
+                        </ngx-monaco-editor>
                     </div>
                     } @else {
                     <div class="empty-msg">No response body captured</div>

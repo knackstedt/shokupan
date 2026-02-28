@@ -1,6 +1,6 @@
 import { CommonModule, KeyValuePipe } from '@angular/common';
 import { Component, computed, input, output, signal } from '@angular/core';
-import { VscodeComponent } from '@dotglitch/ngx-common';
+import { MonacoEditorComponent } from '@dotglitch/ngx-common/monaco-editor';
 import { NgScrollbarModule } from 'ngx-scrollbar';
 import { ButtonModule } from 'primeng/button';
 import { Tab, TabList, TabPanel, TabPanels, Tabs } from 'primeng/tabs';
@@ -22,7 +22,7 @@ import { NetworkRequest, formatBytes, formatDurationPretty, generateCurlCode, ge
         TooltipModule,
         KeyValuePipe,
         NgScrollbarModule,
-        VscodeComponent,
+        MonacoEditorComponent,
         HeaderTokensPipe
     ],
     templateUrl: './request-details.component.html',

@@ -34,7 +34,7 @@
                             },
                             {
                                 "glob": "**/*",
-                                "input": "node_modules/@dotglitch/ngx-common/assets/lib/vs/",
+                                "input": "node_modules/monaco-editor/min/vs/",
                                 "output": "./lib/monaco/vs"
                             }
                         ],
