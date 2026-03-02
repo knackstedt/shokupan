@@ -84,7 +84,6 @@
         "eta": "^4.0.0",
         "graphql": "^16.12.0",
         "graphql-yoga": "^5.18.0",
-        "h3": "^2.0.0",
         "jose": "^6.0.0",
         "js-yaml": "^4.1.1",
         "parse-json": "^8.0.0",
@@ -115,9 +114,6 @@
             "optional": true
         },
         "graphql-yoga": {
-            "optional": true
-        },
-        "h3": {
             "optional": true
         },
         "class-validator": {
