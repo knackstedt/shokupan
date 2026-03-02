@@ -11,7 +11,7 @@ import {
     isWebSocketController
 } from './decorators/websocket';
 import { compose } from './middleware';
-import { generateOpenApi } from './plugins/application/openapi/openapi';
+// generateOpenApi is dynamically imported in generateApiSpec to break circular dependency
 import { serveStatic } from './plugins/middleware/serve-static';
 import type { Shokupan } from './shokupan';
 import { ControllerScanner } from './util/controller-scanner';
@@ -20,10 +20,9 @@ import { HTTP_STATUS } from './util/http-status';
 import { McpProtocol, type McpPrompt } from './util/mcp-protocol';
 import { MiddlewareTracker } from './util/middleware-tracker';
 import { ShokupanRequest } from './util/request';
-import { $appRoot, $childControllers, $childRouters, $debug, $dispatch, $isApplication, $isMounted, $isRouter, $mountPath, $onWsMessage, $parent, $routeSpec, $routes, $ws, $wsMessages } from './util/symbol';
+import { $appRoot, $childControllers, $childRouters, $controllerHooks, $debug, $dispatch, $isApplication, $isMounted, $isRouter, $isWebSocketRouter, $mountPath, $onWsMessage, $parent, $routeSpec, $routes, $ws, $wsMessages } from './util/symbol';
 import { RouterTrie } from './util/trie';
 import { type GuardAPISpec, type HeadersInit, type JSXRenderer, type Method, type MethodAPISpec, type Middleware, type OpenAPIOptions, type ProcessResult, type RequestOptions, type RouteMetadata, type RouteParams, type ShokupanController, type ShokupanHandler, type ShokupanHooks, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions } from './util/types';
-import { ShokupanWebsocketRouter } from './websocket';
 
 
 export const RouterRegistry = new Map<string, ShokupanRouter<any>>();
@@ -101,16 +100,18 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
     public [$childRouters]: ShokupanRouter<T>[] = [];
     public [$childControllers]: ShokupanController[] = [];
 
-    private _hasOnResponseEndHook: boolean;
-    private _hasOnRequestStartHook: boolean;
-    private _hasOnRequestEndHook: boolean;
-    private _hasOnResponseStartHook: boolean;
-    private _hasOnErrorHook: boolean;
-    private _hasOnRequestTimeoutHook: boolean;
-    private _hasOnReadTimeoutHook: boolean;
-    private _hasOnWriteTimeoutHook: boolean;
-    private _hasBeforeValidateHook: boolean;
-    private _hasAfterValidateHook: boolean;
+    private _hasOnStopHook: boolean = false;
+    private _hasOnResponseEndHook: boolean = false;
+    private _hasOnRequestStartHook: boolean = false;
+    private _hasOnRequestEndHook: boolean = false;
+    private _hasOnResponseStartHook: boolean = false;
+    private _hasOnErrorHook: boolean = false;
+    private _hasOnRequestTimeoutHook: boolean = false;
+    private _hasOnReadTimeoutHook: boolean = false;
+    private _hasOnWriteTimeoutHook: boolean = false;
+    private _hasBeforeValidateHook: boolean = false;
+    private _hasAfterValidateHook: boolean = false;
+    get hasOnStopHook() { return this._hasOnStopHook; };
     get hasOnResponseEndHook() { return this._hasOnResponseEndHook; };
     get hasOnRequestStartHook() { return this._hasOnRequestStartHook; };
     get hasOnRequestEndHook() { return this._hasOnRequestEndHook; };
@@ -150,6 +151,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
     private currentGuards: { handler: ShokupanHandler<T>; spec?: GuardAPISpec; }[] = [];
     private eventHandlers = new Map<string, ShokupanHandler<T>[]>();
+    private wrappedHandlers = new WeakMap<ShokupanHandler<T>, ShokupanHandler<T>>();
 
     /**
      * Registers middleware for this router.
@@ -283,6 +285,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             this.hookCache.set(name, handlers);
 
             // Set the has hooks flags
+            this._hasOnStopHook ||= name === 'onStop';
             this._hasOnErrorHook ||= name === 'onError';
             this._hasOnRequestStartHook ||= name === 'onRequestStart';
             this._hasOnRequestEndHook ||= name === 'onRequestEnd';
@@ -379,7 +382,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      */
     public mount(prefix: string, controller: ShokupanController | ShokupanController<T> | ShokupanRouter | ShokupanRouter<T> | Record<string, any>) {
         // Check if it's a WebSocket router
-        if (ShokupanWebsocketRouter.isWebSocketRouter(controller)) {
+        if (controller && typeof controller === 'object' && (controller as any)[$isWebSocketRouter]) {
             this.mountWebSocketRouter(prefix, controller);
             return this;
         }
@@ -442,6 +445,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
             return ctx.upgrade({
                 open: async (ctx, ws) => {
+                    ctx[$ws] = ws;
                     // Call onOpen and set return value to ws.data and ctx.state
                     if (handlers.onOpen) {
                         const sessionData = await handlers.onOpen(ctx, ws);
@@ -449,7 +453,6 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                             ws.data = sessionData;
                             ctx.state = sessionData;
                         }
-                        ctx[$ws] = ws;
                     }
 
                     // --- WebSocket Message Tracking ---
@@ -484,7 +487,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                     if ((ctx as any)[$onWsMessage]) (ctx as any)[$onWsMessage](openMsg);
                     // ----------------------------------
                 },
-                message: async (ctx, ws, message) => {
+                message: async (ctx, ws, message: string | ArrayBuffer | Buffer) => {
                     // Call onMessage
                     if (handlers.onMessage) {
                         await handlers.onMessage(ctx, ws, message);
@@ -589,6 +592,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
             return ctx.upgrade({
                 open: async (ctx, ws) => {
+                    ctx[$ws] = ws;
                     // Call onOpen (if defined)
                     if (openMethodName) {
                         const openMethod = instance[openMethodName as string];
@@ -632,7 +636,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                     if ((ctx as any)[$onWsMessage]) (ctx as any)[$onWsMessage](openMsg);
                     // ----------------------------------
                 },
-                message: async (ctx, ws, message) => {
+                message: async (ctx, ws, message: string | ArrayBuffer | Buffer) => {
                     // Call onMessage (if defined)
                     if (messageMethodName) {
                         const messageMethod = instance[messageMethodName as string];
@@ -809,7 +813,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
             // Ensure path starts with /
             const path = url.startsWith("/") ? url : "/" + url;
-            url = base + path;
+            url = (base + path).replace(/\/+/g, '/').replace('http:/', 'http://').replace('https:/', 'https://');
         }
 
         const req = new ShokupanRequest({
@@ -831,7 +835,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         if (!url.startsWith("http")) {
             const base = `http://${this.rootConfig?.hostname || "localhost"}:${this.rootConfig?.port || 3000}`;
             const path = url.startsWith("/") ? url : "/" + url;
-            url = base + path;
+            url = (base + path).replace(/\/+/g, '/').replace('http:/', 'http://').replace('https:/', 'https://');
         }
 
         // Handle query params in options
@@ -869,7 +873,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             try {
                 result = await match.handler(ctx);
             } catch (err: any) {
-                console.error(err);
+                this.logger?.error('Router', 'Error in route handler', err);
                 status = getErrorStatus(err);
                 result = { error: err.message || "Internal Server Error" };
                 if (err.errors) result.errors = err.errors;
@@ -990,7 +994,38 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
 
     /**
+     * Wraps a handler with this router's middleware.
+     * Caches wrapped handlers to avoid re-wrapping on subsequent requests.
+     */
+    private wrapHandlerWithMiddleware(handler: ShokupanHandler<T>): ShokupanHandler<T> {
+        // If no middleware, return as-is
+        if (this.middleware.length === 0) {
+            return handler;
+        }
+
+        // Check cache
+        const cached = this.wrappedHandlers.get(handler);
+        if (cached) return cached;
+
+        // Create wrapped handler
+        const fn = compose(this.middleware);
+        const wrapped: ShokupanHandler<T> = async (ctx) => {
+            return fn(ctx, () => handler(ctx));
+        };
+
+        // Copy metadata
+        (wrapped as any).originalHandler = (handler as any).originalHandler || handler;
+        (wrapped as any).metadata = (handler as any).metadata;
+
+        // Cache it
+        this.wrappedHandlers.set(handler, wrapped);
+
+        return wrapped;
+    }
+
+    /**
      * Find a route matching the given method and path.
+     * Wraps handler with router middleware if present.
      * @param method HTTP method
      * @param path Request path
      * @returns Route handler and parameters if found, otherwise null
@@ -1001,12 +1036,23 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
 
         // 1. Check local routes
         let result = this.trie.search(method, path);
-        if (result) return result;
+        if (result) {
+            // Wrap with router middleware if present (except for root application, which handles it globally)
+            if (!(this as any)[$isApplication]) {
+                result.handler = this.wrapHandlerWithMiddleware(result.handler);
+            }
+            return result;
+        }
 
         // Fallback: If HEAD not found, try GET
         if (method === "HEAD") {
             result = this.trie.search("GET", path);
-            if (result) return result;
+            if (result) {
+                if (!(this as any)[$isApplication]) {
+                    result.handler = this.wrapHandlerWithMiddleware(result.handler);
+                }
+                return result;
+            }
         }
 
         // 2. Check child routers
@@ -1017,7 +1063,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             if (path === prefix || path.startsWith(prefix + "/")) {
                 const subPath = path.slice(prefix.length) || "/";
                 const match = child.find(method, subPath);
-                // Child router handlers are already wrapped with child hooks
+                // Child router handlers are already wrapped with child middleware
                 // Just return them as-is (parent hooks are applied at the app level in handleRequest)
                 if (match) return match;
             }
@@ -1564,7 +1610,8 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * Generates an OpenAPI 3.1 Document by recursing through the router and its descendants.
      * Now includes runtime analysis of handler functions to infer request/response types.
      */
-    public generateApiSpec(options: OpenAPIOptions = {}): Promise<any> {
+    public async generateApiSpec(options: OpenAPIOptions = {}): Promise<any> {
+        const { generateOpenApi } = await import('./plugins/application/openapi/openapi');
         return generateOpenApi(this, options);
     }
 
@@ -1585,7 +1632,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             const hookTypes: (keyof ShokupanHooks)[] = [
                 'onRequestStart', 'onRequestEnd',
                 'onResponseStart', 'onResponseEnd',
-                'onError',
+                'onError', 'onStop',
                 'beforeValidate', 'afterValidate',
                 'onRequestTimeout', 'onReadTimeout', 'onWriteTimeout'
             ];
@@ -1600,6 +1647,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                 if (fns.length > 0) {
                     // console.log(`[Router] Found hook ${type} (${fns.length}) for router ${this.constructor.name}`);
                     // Set the has hooks flags for much faster check
+                    this._hasOnStopHook ||= type === 'onStop';
                     this._hasOnErrorHook ||= type === 'onError';
                     this._hasOnRequestStartHook ||= type === 'onRequestStart';
                     this._hasOnRequestEndHook ||= type === 'onRequestEnd';
@@ -1656,6 +1704,38 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         } else {
             // Fast path: no debug tracking
             return Promise.all(fns.map(fn => fn(...args)));
+        }
+    }
+
+    public async runOnStopHooks(app: Shokupan): Promise<void> {
+        if (!this.hooksInitialized) {
+            this.ensureHooksInitialized();
+        }
+
+        if (this._hasOnStopHook) {
+            const hooks = this.hookCache.get('onStop');
+            if (hooks) {
+                for (let i = 0; i < hooks.length; i++) {
+                    await hooks[i](app);
+                }
+            }
+        }
+
+        for (let i = 0; i < this[$childControllers].length; i++) {
+            const controller = this[$childControllers][i];
+            const proto = Object.getPrototypeOf(controller);
+            const hooksMap = (controller as any)[$controllerHooks] || (proto && (proto as any)[$controllerHooks]);
+
+            if (hooksMap && hooksMap.has('onStop')) {
+                const methods = hooksMap.get('onStop');
+                for (let j = 0; j < methods.length; j++) {
+                    await controller[methods[j]](app);
+                }
+            }
+        }
+
+        for (let i = 0; i < this[$childRouters].length; i++) {
+            await this[$childRouters][i].runOnStopHooks(app);
         }
     }
 }

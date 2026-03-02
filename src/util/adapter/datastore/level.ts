@@ -5,7 +5,7 @@ import type { DatastoreAdapter, QueryOptions } from '../datastore';
 export class LevelAdapter implements DatastoreAdapter {
     name = 'leveldb';
     private db: AbstractLevel<any, string, string>;
-    private logger = createLogger('level-adapter');
+    private logger = createLogger();
 
     constructor(
         private options: { location?: string, db?: any; } = {}
@@ -64,14 +64,12 @@ export class LevelAdapter implements DatastoreAdapter {
         try {
             const val = await this.db.get(key);
             if (val !== undefined) {
-                this.logger.error('LevelAdapter', `Record ${key} found unexpectedly`);
                 throw new Error(`Record ${id} already exists`);
             }
         } catch (e: any) {
             // Check for various not found error codes/flags
             const isNotFound = e.code === 'LEVEL_NOT_FOUND' || e.notFound;
             if (!isNotFound) {
-                this.logger.error('LevelAdapter', `Create error for ${key}:`, e);
                 throw e;
             }
         }

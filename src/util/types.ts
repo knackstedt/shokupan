@@ -202,6 +202,7 @@ export interface ShokupanHooks<T = any> {
     onReadTimeout?: (ctx: ShokupanContext<T>) => void | Promise<void>;
     onWriteTimeout?: (ctx: ShokupanContext<T>) => void | Promise<void>;
     onRequestTimeout?: (ctx: ShokupanContext<T>) => void | Promise<void>;
+    onStop?: () => void | Promise<void>;
 }
 
 export interface CookieOptions {
@@ -491,6 +492,15 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      */
     hostname: string;
     /**
+     * TLS/SSL configuration options.
+     * In development mode, if this is not provided, self-signed certificates will be automatically generated.
+     */
+    tls: {
+        key: string;
+        cert: string;
+        [key: string]: any;
+    };
+    /**
      * Whether to run in development mode.
      * @default process.env.NODE_ENV !== "production"
      */
@@ -545,6 +555,11 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      * @default 30000 (30 seconds)
      */
     astAnalysisTimeout?: number;
+    /**
+     * The file path to use for exporting/importing the statically-analyzed AST.
+     * @default "shokupan-ast.json"
+     */
+    astFilePath?: string;
     /**
      * Whether to reuse the port.
      * @default false
@@ -743,13 +758,12 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
     surreal?: any;
 
     datastore?: {
-        adapter: 'surreal' | 'sqlite' | 'level' | 'knex';
+        adapter: 'surreal' | 'sqlite' | 'level';
         /**
          * Options for the specific adapter.
          * - For 'surreal', this matches SurrealAdapterOptions
          * - For 'sqlite', this matches SqliteAdapterOptions
          * - For 'level', this matches LevelAdapterOptions
-         * - For 'knex', this matches KnexAdapterOptions (Knex.Config)
          */
         options?: any;
     };

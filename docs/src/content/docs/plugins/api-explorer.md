@@ -58,6 +58,12 @@ Once registered, navigate to the configured path (e.g., `http://localhost:3000/e
 
 The explorer will automatically load the OpenAPI specification from your application's `.well-known/openapi.yaml` endpoint.
 
+> [!TIP]
+> **Source Code Mapping via AST**
+> The API Explorer heavily integrates with Shokupan's AST engine to automatically reflect the generated OpenAPI specification and magically map snippets of your underlying source-code routines directly into the documentation interface.
+>
+> If you are deploying to production and wish to avoid the start-up cost of runtime AST generation, you can pre-compile the specification in CI. Check out the **[AST Generation Guide](/guides/ast-generation/)** for more details!
+
 ### AsyncAPI Support
 
 If you have enabled AsyncAPI generation in your application config, the API Explorer can also display your AsyncAPI documentation.

@@ -10,7 +10,7 @@ describe("SecurityHeaders Plugin", () => {
 
         app.get("/", (ctx) => ctx.text("ok"));
 
-        const res = await app.testRequest({ method: "GET", url: "http://localhost/" });
+        const res = await app.testRequest({ method: "GET", url: "https://localhost/" });
 
         expect(res.headers["x-dns-prefetch-control"]).toBe("off");
         expect(res.headers["x-frame-options"]).toBe("SAMEORIGIN");

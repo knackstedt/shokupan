@@ -81,7 +81,7 @@ app.post('/users', async (ctx) => {
     };
 });
 
-console.log('🍞 Server running at http://localhost:3000');
+console.log('🍞 Server running securely at https://localhost:3000');
 app.listen();
 ```
 
@@ -91,7 +91,7 @@ app.listen();
 bun run index.ts
 ```
 
-Your server is now running! Open `http://localhost:3000` in your browser.
+Your server is now running! Open `https://localhost:3000` in your browser.
 
 ## Development Mode
 

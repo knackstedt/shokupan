@@ -46,7 +46,7 @@ describe('OpenAPI Built-in Type Analysis', () => {
         expect(schema['x-unknown']).toBeUndefined();
     });
 
-    test.skip('should handle nested property access (process.env)', async () => {
+    test('should handle nested property access (process.env)', async () => {
         const spec = await getSharedSpec();
         const path = '/json3';
 

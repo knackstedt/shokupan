@@ -197,8 +197,4 @@ console.log(`
 🌐 Starting server...
 `);
 
-app.listen().then(() => {
-    console.log(`
-Shokupan Example Server is listening on http://localhost:${port}
-    `);
-});
+app.listen();

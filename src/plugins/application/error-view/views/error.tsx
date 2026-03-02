@@ -450,7 +450,7 @@ export async function renderErrorView(ctx: ShokupanContext, error: any, options:
             }
 
             let isShokupan = false;
-            if (fileName.includes('node_modules/@dotglitch/shokupan')) {
+            if (fileName.includes('node_modules/shokupan')) {
                 isShokupan = true;
             } else if (relativeFile.startsWith('src/') || fileName.includes('/shokupan/dist/')) {
                 isShokupan = true;

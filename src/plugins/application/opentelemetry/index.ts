@@ -32,7 +32,7 @@ export class OpenTelemetryPlugin implements ShokupanPlugin {
             // which might not be installed. For now we just provide the API wrapper and middleware.
             // In a real expanded plugin, we'd try to import sdk-node and start it if configured.
         } catch (e) {
-            console.warn("OpenTelemetry API not found. OpenTelemetryPlugin will be disabled.");
+            app.logger?.warn('OpenTelemetry', 'OpenTelemetry API package not found. OpenTelemetryPlugin will not be available. This will not block the application from starting.');
             return;
         }
 

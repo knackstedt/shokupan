@@ -3,6 +3,8 @@ import { describe, expect, test } from 'bun:test';
 import path from 'node:path';
 import { OpenAPIAnalyzer } from '../openapi/analyzer';
 
+const __dirname = new URL('.', import.meta.url).pathname;
+
 async function analyze(directory: string) {
     const analyzer = new OpenAPIAnalyzer(directory);
     return await analyzer.analyze();

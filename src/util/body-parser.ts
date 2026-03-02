@@ -55,29 +55,73 @@ export class BodyParser {
 
     /**
      * Parsing helper for FormData
+     * Security: Enforces maxBodySize by reading the raw body stream before
+     * handing it to formData(), so the limit cannot be bypassed via a spoofed
+     * Content-Length header.
      */
     static async parseFormData(req: ShokupanRequest<any>, maxBodySize: number): Promise<FormData> {
-        const clHeader = req.headers.get("content-length");
-        if (!clHeader) {
+        // Enforce Content-Length header presence, unless chunked
+        if (!req.headers.has('content-length') && req.headers.get('transfer-encoding') !== 'chunked') {
             const err = new Error("Length Required");
             (err as any).status = 411;
             throw err;
         }
 
-        const cl = parseInt(clHeader, 10);
-        if (isNaN(cl)) {
-            const err = new Error("Bad Request");
-            (err as any).status = 400;
-            throw err;
+        // Read and size-limit the raw body stream first
+        const rawBuffer = await BodyParser.readRawBufferBody(req, maxBodySize);
+
+        // Reconstruct a synthetic Request so the runtime can parse FormData
+        // from the already-read buffer (avoids re-reading a consumed stream).
+        const syntheticReq = new Request('http://localhost', {
+            method: 'POST',
+            headers: req.headers,
+            body: rawBuffer.buffer as ArrayBuffer
+        });
+        return syntheticReq.formData();
+    }
+
+    /**
+     * Reads raw body as Uint8Array with size enforcement (used by parseFormData).
+     */
+    static async readRawBufferBody(req: ShokupanRequest<any>, maxBodySize: number): Promise<Uint8Array> {
+        if (typeof (req as any).body === 'string') {
+            const enc = new TextEncoder().encode((req as any).body);
+            if (enc.byteLength > maxBodySize) {
+                const err = new Error("Payload Too Large");
+                (err as any).status = 413;
+                throw err;
+            }
+            return enc;
         }
 
-        if (cl > maxBodySize) {
-            const err = new Error("Payload Too Large");
-            (err as any).status = 413;
-            throw err;
+        const reader = req.body?.getReader();
+        if (!reader) return new Uint8Array(0);
+
+        const chunks: Uint8Array[] = [];
+        let totalSize = 0;
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                totalSize += value.length;
+                if (totalSize > maxBodySize) {
+                    const err = new Error("Payload Too Large");
+                    (err as any).status = 413;
+                    throw err;
+                }
+                chunks.push(value);
+            }
+        } finally {
+            reader.releaseLock();
         }
-        // NOTE: Does not enforce limit during streaming for FormData in this implementation
-        return req.formData();
+
+        const result = new Uint8Array(totalSize);
+        let offset = 0;
+        for (const chunk of chunks) {
+            result.set(chunk, offset);
+            offset += chunk.length;
+        }
+        return result;
     }
 
     /**

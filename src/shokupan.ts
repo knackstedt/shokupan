@@ -2,6 +2,10 @@ import type { Server } from 'bun';
 import { nanoid } from 'nanoid';
 import { ShokupanContext } from "./context";
 import { compose } from "./middleware";
+import { ApiExplorerPlugin } from './plugins/application/api-explorer/plugin';
+import { AsyncApiPlugin } from './plugins/application/asyncapi/plugin';
+import DashboardPlugin from './plugins/application/dashboard/plugin';
+import { ErrorView } from './plugins/application/error-view/index';
 import { generateOpenApi } from "./plugins/application/openapi/openapi";
 import { ShokupanRouter } from './router';
 import { ShokupanServer } from './server';
@@ -12,7 +16,7 @@ import { SystemCpuMonitor } from "./util/cpu-monitor";
 import { getErrorStatus, NotFoundError } from "./util/http-error";
 import { HTTP_STATUS } from "./util/http-status";
 import { configureIde } from './util/ide';
-import { createLogger } from './util/logger';
+import { createHTTPLogger, createLogger } from './util/logger';
 
 import { Container } from './decorators';
 import { getCallerInfo } from './decorators/util/stack';
@@ -123,6 +127,12 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
     // Performance: Flattened Router Trie
     private rootTrie?: RouterTrie<T>;
+    private startupHooks: (() => Promise<void> | void)[] = [];
+    private plugins: ShokupanPlugin[] = [];
+    private specAvailableHooks: ((spec: any) => void | Promise<void>)[] = [];
+
+    private pluginInitPromises: Promise<void>[] = [];
+
 
     public get db(): DatastoreAdapter | undefined {
         return this.datastore;
@@ -146,16 +156,21 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         // Exclude hooks from the router config passed to super() to avoid double execution
         // The application handles app-level hooks in handleRequest()
         const { hooks, ...routerConfig } = config;
-        super({ ...routerConfig, hooks });
+        super(routerConfig);
 
         this[$isApplication] = true;
         this[$appRoot] = this;
         this.applicationConfig = config;
 
-        // Initialize logger if not provided
-        if (!this.applicationConfig.logger) {
-            this.applicationConfig.logger = createLogger(this.applicationConfig.development ? 'development' : 'production');
+        // Register hooks if provided in config
+        if (hooks) {
+            for (const [name, fn] of Object.entries(hooks)) {
+                this.hook(name as any, fn);
+            }
         }
+
+        // Initialize logger if not provided
+        this.applicationConfig.logger ??= createLogger();
 
         // Initialize response transformer registry
         this.responseTransformerRegistry = new ResponseTransformerRegistry();
@@ -204,7 +219,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             this.use(SecurityHeaders(this.applicationConfig.defaultSecurityHeaders === true ? {} : this.applicationConfig.defaultSecurityHeaders));
         }
 
-        if (this.applicationConfig.adapter !== 'wintercg') {
+        if (this.applicationConfig.adapter !== 'wintercg' && this.applicationConfig.datastore) {
             this.dbPromise = this.initDatastore().catch(err => {
                 // Log but don't crash if optional datastore init fails
                 this.logger?.debug('Shokupan', "Failed to initialize default datastore", { error: err });
@@ -293,11 +308,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                     this.datastore = new SurrealAdapter(effectiveOptions);
                     break;
                 }
-                case 'knex': {
-                    const { KnexAdapter } = await import('./util/adapter/datastore/knex');
-                    this.datastore = new KnexAdapter(options || {});
-                    break;
-                }
                 default: {
                     // Determine default behavior if adapter not specified
                     // Old default: SurrealDB
@@ -318,9 +328,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         }
     }
 
-    /**
-     * Adds middleware to the application.
-     */
     /**
      * Adds middleware to the application.
      */
@@ -349,13 +356,23 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
     /**
      * Registers a plugin.
+     * This returns a promise that resolves when the plugin is initialized. You do not 
+     * need to await it unless you want to run code specifically after the plugin is initialized.
+     * Shokupan automatically awaits plugin initialization promises when calling listen().
      */
-    public register(plugin: ShokupanPlugin, options?: { path?: string; }) {
-        plugin.onInit(this, options);
+    public async register(plugin: ShokupanPlugin, options?: { path?: string; }) {
+        this.plugins.push(plugin);
+        try {
+            const promise = plugin.onInit(this, options);
+            this.pluginInitPromises.push(promise as any);
+            await promise;
+        }
+        catch (err) {
+            this.logger?.error('Shokupan', "Failed to initialize plugin", { error: err });
+            throw err;
+        }
         return this;
     }
-
-    private startupHooks: (() => Promise<void> | void)[] = [];
 
     /**
      * Registers a callback to be executed before the server starts listening.
@@ -364,8 +381,6 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         this.startupHooks.push(callback);
         return this;
     }
-
-    private specAvailableHooks: ((spec: any) => void | Promise<void>)[] = [];
 
     /**
      * Registers a callback to be executed when the OpenAPI spec is available.
@@ -388,37 +403,49 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
      */
     public async start() {
         // Run startup hooks
-        await Promise.all(this.startupHooks.map(hook => hook()));
+        await Promise.all(this.startupHooks.map(hook => hook()));// --- Dev Mode Auto-Enablers ---
+        if (this.applicationConfig.development) {
+            this.logger?.info('Shokupan', 'Development mode enabled. Auto-loading development plugins...');
 
-        // Initialize AST analyzer early if async scanning is enabled
-        if (this.applicationConfig.enableAsyncAstScanning !== false &&
-            (this.applicationConfig.enableOpenApiGen || this.applicationConfig.enableAsyncApiGen)) {
-            try {
-                const { getGlobalAnalyzer } = await import('./util/ast-analyzer-worker');
-                const entrypoint = this.metadata?.file;
-                const timeout = this.applicationConfig.astAnalysisTimeout ?? 30000;
+            this.use(createHTTPLogger());
 
-                const analyzer = getGlobalAnalyzer(process.cwd(), entrypoint, timeout);
+            // Always ensure middleware tracking is on in dev unless explicitly disabled
+            if (this.applicationConfig.enableMiddlewareTracking !== false) {
+                this.applicationConfig.enableMiddlewareTracking = true;
+                this.logger.info("Shokupan", "Enabled middleware tracking");
+            }
 
-                // Start analysis in background (don't await unless blocking is enabled)
-                const shouldBlock = this.applicationConfig.blockOnOpenApiGen !== false ||
-                    this.applicationConfig.blockOnAsyncApiGen !== false;
+            // Register ErrorView
+            const hasErrorView = this.plugins.some((p: any) => p instanceof ErrorView);
+            if (!hasErrorView) {
+                await this.register(new ErrorView({
+                    developmentErrorView: true
+                }));
+                this.logger.info("Shokupan", "Loaded ErrorView module");
+            }
 
-                if (!shouldBlock) {
-                    // Start analysis but don't wait
-                    analyzer.analyze().catch(err => {
-                        this.logger?.error('Shokupan', "AST analysis failed", { error: err });
-                    });
-                } else {
-                    // Block on analysis if required by config
-                    try {
-                        await analyzer.analyze();
-                    } catch (err) {
-                        this.logger?.error("Shokupan", "AST analysis failed", { error: err });
-                    }
-                }
-            } catch (err) {
-                this.logger?.debug('Shokupan', "Failed to initialize AST analyzer", { error: err });
+            // Register Dashboard
+            const hasDashboard = this.plugins.some((p: any) => typeof p === 'object' && p.metadata?.pluginName === 'Dashboard');
+            if (!hasDashboard) {
+                await this.register(DashboardPlugin({
+                    path: '/dashboard',
+                    trackStateMutations: true
+                }));
+                this.logger.info("Shokupan", "Loaded Dashboard module");
+            }
+
+            // Register ApiExplorer
+            const hasApiExplorer = this.plugins.some((p: any) => p === ApiExplorerPlugin || p instanceof ApiExplorerPlugin);
+            if (!hasApiExplorer) {
+                await this.register(new ApiExplorerPlugin(), { path: '/dashboard/explorer' });
+                this.logger.info("Shokupan", "Loaded ApiExplorer module");
+            }
+
+            // Register AsyncAPI UI
+            const hasAsyncApi = this.plugins.some((p: any) => p === AsyncApiPlugin || p instanceof AsyncApiPlugin);
+            if (!hasAsyncApi) {
+                await this.register(new AsyncApiPlugin(), { path: '/dashboard/ws-explorer' });
+                this.logger.info("Shokupan", "Loaded AsyncAPI module");
             }
         }
 
@@ -551,9 +578,20 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
      * @param port - The port to listen on. If not specified, the port from the configuration is used. If that is not specified, port 3000 is used.
      * @returns The server instance.
      */
-    public async listen(port?: number) {
+    public async listen(port?: number, callback?: () => void) {
         this.httpServer = new ShokupanServer(this);
+
+        // Wait for all plugins to initialize
+        await Promise.allSettled(this.pluginInitPromises);
+
         this.server = await this.httpServer.listen(port);
+
+        const protocol = (this.applicationConfig.tls || this.applicationConfig.development) ? 'https' : 'http';
+        const url = `${protocol}://${this.applicationConfig.hostname}:${this.applicationConfig.port}`;
+        const hyperlinkedUrl = `\x1b]8;;${url}\x07${url}\x1b]8;;\x07`;
+
+        this.logger.info('Shokupan', `Server running on ${hyperlinkedUrl}`);
+        callback?.();
         return this.server;
     }
 
@@ -577,6 +615,8 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
      * @param closeActiveConnections — Immediately terminate in-flight requests, websockets, and stop accepting new connections.
      */
     public async stop(closeActiveConnections?: boolean): Promise<void> {
+        await this.runOnStopHooks(this);
+
         // Stop CPU monitor if running
         if (this.cpuMonitor) {
             this.cpuMonitor.stop();
@@ -724,7 +764,11 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 const msg = "Too Many Requests (CPU Backpressure)";
                 const res = ctx.text(msg, 429);
                 // Trigger hooks so metrics are recorded
-                if (this.hasOnResponseEndHook) await this.runHooks('onResponseEnd', ctx, res);
+                if (this.hasOnResponseEndHook) {
+                    Promise.resolve(this.runHooks('onResponseEnd', ctx, res)).catch(e => {
+                        this.logger?.debug("Shokupan", "Error in onResponseEnd hook (backpressure):", { error: e });
+                    });
+                }
                 return res;
             }
 
@@ -929,7 +973,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                         } catch (handlerErr) {
                             // If the error handler itself fails, fall through to default handling
                             // but log the new error
-                            this.logger?.error("Shokupan", "Error in error handler:", { error: handlerErr });
+                            if (process.env.NODE_ENV !== 'test') this.logger?.error("Shokupan", "Error in error handler:", { error: handlerErr });
                             err = handlerErr;
                             break; // Avoid infinite loops if handlerErr is same type
                         }
@@ -989,7 +1033,12 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             .then(async (res) => {
                 // Response End Hook - Response returned
                 // Note: We can't guarantee it's fully sent to client here, but it's handed off to Bun
-                await this.runHooks('onResponseEnd', ctx, res);
+                // Note: We can't guarantee it's fully sent to client here, but it's handed off to Bun
+                if (this.hasOnResponseEndHook) {
+                    Promise.resolve(this.runHooks('onResponseEnd', ctx, res)).catch(e => {
+                        this.logger?.debug("Shokupan", "Error in onResponseEnd hook:", { error: e });
+                    });
+                }
                 return res;
             });
     };

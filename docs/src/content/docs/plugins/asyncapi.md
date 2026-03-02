@@ -92,3 +92,9 @@ Once your application is running, navigate to the configured path (e.g., `http:/
 ### JSON Specification
 
 You can access the raw generated JSON specification at the `/json` subpath (e.g., `http://localhost:3000/asyncapi/json`).
+
+### Pre-compiled Static Specs (AST Export)
+
+Shokupan uses its powerful AST generator to evaluate your WebSocket controllers and `@Event` decorators into dynamic AsyncAPI specifications automatically. 
+
+For massive codebases, AST parsing can slightly impact startup times. You can pre-compile your specification using the Shokupan CLI in a CI Environment. For complete instructions, refer to the **[AST Generation Guide](/guides/ast-generation/)**.

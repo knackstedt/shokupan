@@ -157,6 +157,9 @@ class Collector implements DebugCollector {
  * When enabled, enableMiddlewareTracking will automatically be enabled on the application.
  */
 export class Dashboard implements ShokupanPlugin {
+    public readonly metadata = {
+        pluginName: 'Dashboard'
+    };
 
     private [$appRoot]: Shokupan;
 
@@ -257,7 +260,7 @@ export class Dashboard implements ShokupanPlugin {
 
             // Fire and forget save
             // We strip 'id' from data if we are passing it separately to create/upsert
-            this.db.upsert('request', idString, {
+            this.db?.upsert('request', idString, {
                 ...requestData,
                 id: idString
             }).catch(e => this[$appRoot]?.logger?.error('Dashboard', "Failed to save outbound request", { error: e }));
@@ -780,6 +783,8 @@ export class Dashboard implements ShokupanPlugin {
     }
 
     private shouldIgnoreRequest(req: RequestLog): boolean {
+        const path = (req.path || '').replace(/\/+/g, '/');
+
         // Status Codes
         if (this.dashboardConfig.ignoreStatusCodes?.includes(req.status)) return true;
 
@@ -791,9 +796,9 @@ export class Dashboard implements ShokupanPlugin {
             for (const pattern of this.dashboardConfig.ignorePatterns) {
                 if (typeof pattern === 'string') {
                     const glob = new Glob(pattern);
-                    if (glob.match(req.url) || glob.match(req.path || '')) return true;
+                    if (glob.match(req.url) || glob.match(path)) return true;
                 } else if (pattern instanceof RegExp) {
-                    if (pattern.test(req.url) || (req.path && pattern.test(req.path))) return true;
+                    if (pattern.test(req.url) || pattern.test(path)) return true;
                 } else if (typeof pattern === 'function') {
                     if (pattern(req)) return true;
                 }
@@ -1116,7 +1121,7 @@ export class Dashboard implements ShokupanPlugin {
                             responseBody: this.serializeBody((ctx as any).responseBody)
                         });
                     } catch (e) {
-                        console.error("Failed to record failed request", e);
+                        this[$appRoot].logger?.error('Dashboard', 'Failed to record failed request', e);
                     }
 
                 } else {
@@ -1180,11 +1185,9 @@ export class Dashboard implements ShokupanPlugin {
                     responseHeaders: resHeaders,
                     wsMessages: (ctx as any)[$wsMessages]
                 };
-                // console.log(`[Dashboard Debug] Captured ${ctx.method} ${ctx.path} -> Status: ${response.status}`); // Removed debug log
 
                 const idString = ctx.requestId;
                 if ((ctx.app as any).applicationConfig.enableWebSocketTracking) {
-                    // console.log(`[Dashboard Debug] Assigning listener for ID: ${idString}`);
 
                     // Attach listener for live updates
                     let updateTimer: any;
@@ -1194,7 +1197,6 @@ export class Dashboard implements ShokupanPlugin {
                             logEntry.wsMessages = (ctx as any)[$wsMessages];
                         }
 
-                        console.log('[Dashboard Debug] _onWsMessage fired', msg.type, 'Total:', (ctx as any)[$wsMessages]?.length);
                         // Update duration
                         const now = Date.now();
                         const duration = now - logEntry.timestamp;
@@ -1204,7 +1206,6 @@ export class Dashboard implements ShokupanPlugin {
                         if (updateTimer) return;
                         updateTimer = setTimeout(() => {
                             updateTimer = null;
-                            // console.log(`[Dashboard Debug] Broadcasting update for ${logEntry.url}, messages: ${logEntry.wsMessages?.length}`);
 
                             // Re-save to DB
                             this.db.upsert('request', idString, {
@@ -1245,7 +1246,7 @@ export class Dashboard implements ShokupanPlugin {
 
                 if (strategy === 'immediate') {
                     if (logEntry.method === 'WS' || response.status === 101) {
-                        console.log('[Dashboard Plugin] Broadcasting WS Data:', JSON.stringify(requestData));
+                        this[$appRoot]?.logger?.debug('Dashboard', 'Broadcasting WS Data:', requestData);
                     }
                     this.broadcastRequestUpdates([requestData]);
                 } else {

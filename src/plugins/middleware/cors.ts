@@ -20,12 +20,23 @@ export interface CorsOptions {
     exposedHeaders?: string | string[];
     /**
      * Whether to allow credentials.
+     * NOTE: Cannot be combined with `origin: "*"` — browsers reject that combination.
      */
     credentials?: boolean;
     /**
      * Maximum age of preflight request.
      */
     maxAge?: number;
+    /**
+     * Whether to pass preflight requests to the next handler.
+     * @default false
+     */
+    preflightContinue?: boolean;
+    /**
+     * HTTP status code for successful OPTIONS preflight requests.
+     * @default 204
+     */
+    optionsSuccessStatus?: number;
 }
 
 /**
@@ -39,9 +50,18 @@ export function Cors(options: CorsOptions = {}): Middleware {
         methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
         preflightContinue: false,
         optionsSuccessStatus: 204
-    } as any;
+    };
 
     const opts = { ...defaults, ...options };
+
+    // Security: Browsers reject Access-Control-Allow-Credentials:true with a wildcard origin.
+    // Catch this misconfiguration at startup rather than silently sending invalid headers.
+    if (opts.credentials && opts.origin === '*') {
+        throw new Error(
+            'CORS misconfiguration: `credentials: true` is incompatible with `origin: "*"`. ' +
+            'Specify an explicit origin or array of origins instead.'
+        );
+    }
 
     const corsMiddleware: Middleware = async function CorsMiddleware(ctx: ShokupanContext, next: NextFn) {
         const headers: Record<string, string> = {};

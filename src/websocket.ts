@@ -1,7 +1,8 @@
 import type { ServerWebSocket } from 'bun';
 import type { ShokupanContext } from './context';
 import { getCallerInfo } from './decorators/util/stack';
-import { $childControllers, $childRouters, $routes } from './util/symbol';
+import type { Shokupan } from './shokupan';
+import { $childControllers, $childRouters, $isWebSocketRouter, $routes } from './util/symbol';
 
 /**
  * WebSocket lifecycle handlers
@@ -39,6 +40,11 @@ export interface WebSocketHandlers<T = any> {
      * Called when an error occurs.
      */
     onError?: (ctx: ShokupanContext<T>, ws: ServerWebSocket<any>, error: Error) => void | Promise<void>;
+
+    /**
+     * Called when the server is stopped.
+     */
+    onStop?: (app: Shokupan) => void | Promise<void>;
 }
 
 /**
@@ -72,6 +78,7 @@ export type EventHandler<T = any> = (ctx: ShokupanContext<T>, data?: any) => voi
  * ```
  */
 export class ShokupanWebsocketRouter<T = any> {
+    private [$isWebSocketRouter]: true = true;
     private handlers: WebSocketHandlers<T> = {};
     public middleware: any[] = [];
     private events: Map<string, EventHandler<T>> = new Map();
@@ -130,6 +137,15 @@ export class ShokupanWebsocketRouter<T = any> {
      */
     public onError(handler: NonNullable<WebSocketHandlers<T>['onError']>): this {
         this.handlers.onError = handler;
+        return this;
+    }
+
+    /**
+     * Register stop handler.
+     * Called when the server is stopped.
+     */
+    public onStop(handler: NonNullable<WebSocketHandlers<T>['onStop']>): this {
+        this.handlers.onStop = handler;
         return this;
     }
 
@@ -245,6 +261,16 @@ export class ShokupanWebsocketRouter<T = any> {
      * @internal
      */
     public static isWebSocketRouter(obj: any): obj is ShokupanWebsocketRouter {
-        return obj instanceof ShokupanWebsocketRouter;
+        return obj && typeof obj === 'object' && obj[$isWebSocketRouter] === true;
+    }
+
+    /**
+     * Execute onStop hooks recursively.
+     * @internal
+     */
+    public async runOnStopHooks(app: Shokupan): Promise<void> {
+        if (this.handlers.onStop) {
+            await this.handlers.onStop(app);
+        }
     }
 }

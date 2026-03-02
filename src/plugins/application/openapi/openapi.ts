@@ -205,59 +205,71 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
     let astStatus: 'analyzing' | 'completed' | 'failed' | 'disabled' = 'disabled';
 
     try {
-        // Check if async AST scanning is enabled (will be controlled by config)
-        const useAsyncScanning = (rootRouter as any)[$appRoot]?.applicationConfig?.enableAsyncAstScanning ?? true;
+        const rootApp = (rootRouter as any)[$appRoot] || rootRouter;
+        const astFileName = rootApp?.applicationConfig?.astFilePath || 'shokupan-ast.json';
+        const astPath = require('node:path').join(process.cwd(), astFileName);
 
-        if (useAsyncScanning) {
-            // Use async worker-based analyzer
-            const { getGlobalAnalyzer } = await import('../../../util/ast-analyzer-worker');
-            const entrypoint = rootRouter.metadata?.file;
-            const timeout = (rootRouter as any)[$appRoot]?.applicationConfig?.astAnalysisTimeout ?? 30000;
+        if (require('node:fs').existsSync(astPath)) {
+            // Use pre-compiled static AST
+            const cachedAst = await require('node:fs/promises').readFile(astPath, 'utf8');
+            const result = JSON.parse(cachedAst);
+            applications = result.applications || [];
+            astStatus = 'completed';
+        } else {
+            // Check if async AST scanning is enabled (will be controlled by config)
+            const useAsyncScanning = (rootRouter as any)[$appRoot]?.applicationConfig?.enableAsyncAstScanning ?? true;
 
-            const analyzer = getGlobalAnalyzer(process.cwd(), entrypoint, timeout);
+            if (useAsyncScanning) {
+                // Use async worker-based analyzer
+                const { getGlobalAnalyzer } = await import('../../../util/ast-analyzer-worker');
+                const entrypoint = rootRouter.metadata?.file;
+                const timeout = (rootRouter as any)[$appRoot]?.applicationConfig?.astAnalysisTimeout ?? 30000;
 
-            // Check current state
-            const state = analyzer.getState();
+                const analyzer = getGlobalAnalyzer(process.cwd(), entrypoint, timeout);
 
-            if (state === 'completed') {
-                // Use cached results
-                const result = analyzer.getResult();
-                if (result) {
-                    applications = result.applications;
-                    astStatus = 'completed';
-                }
-            } else if (state === 'analyzing') {
-                // Analysis in progress
-                astStatus = 'analyzing';
-                // Don't wait, return partial spec
-            } else if (state === 'failed') {
-                // Previous analysis failed
-                astStatus = 'failed';
-                if (options.warnings) {
-                    const error = analyzer.getError();
-                    options.warnings.push({
-                        type: 'ast-analysis-failed',
-                        message: 'AST Analysis failed',
-                        detail: error?.message || 'Unknown error'
+                // Check current state
+                const state = analyzer.getState();
+
+                if (state === 'completed') {
+                    // Use cached results
+                    const result = analyzer.getResult();
+                    if (result) {
+                        applications = result.applications;
+                        astStatus = 'completed';
+                    }
+                } else if (state === 'analyzing') {
+                    // Analysis in progress
+                    astStatus = 'analyzing';
+                    // Don't wait, return partial spec
+                } else if (state === 'failed') {
+                    // Previous analysis failed
+                    astStatus = 'failed';
+                    if (options.warnings) {
+                        const error = analyzer.getError();
+                        options.warnings.push({
+                            type: 'ast-analysis-failed',
+                            message: 'AST Analysis failed',
+                            detail: error?.message || 'Unknown error'
+                        });
+                    }
+                } else {
+                    // Not started yet - start it but don't wait
+                    analyzer.analyze().then(result => {
+                        // Analysis completed in background
+                    }).catch(err => {
+                        // Analysis failed, but we've already returned the spec
                     });
+                    astStatus = 'analyzing';
                 }
             } else {
-                // Not started yet - start it but don't wait
-                analyzer.analyze().then(result => {
-                    // Analysis completed in background
-                }).catch(err => {
-                    // Analysis failed, but we've already returned the spec
-                });
-                astStatus = 'analyzing';
+                // Use synchronous analyzer (old behavior)
+                const { OpenAPIAnalyzer } = await import('./analyzer');
+                const entrypoint = rootRouter.metadata?.file;
+                const analyzer = new OpenAPIAnalyzer(process.cwd(), entrypoint);
+                const analysisResult = await analyzer.analyze();
+                applications = analysisResult.applications;
+                astStatus = 'completed';
             }
-        } else {
-            // Use synchronous analyzer (old behavior)
-            const { OpenAPIAnalyzer } = await import('./analyzer');
-            const entrypoint = rootRouter.metadata?.file;
-            const analyzer = new OpenAPIAnalyzer(process.cwd(), entrypoint);
-            const analysisResult = await analyzer.analyze();
-            applications = analysisResult.applications;
-            astStatus = 'completed';
         }
 
         if (applications.length > 0) {
@@ -280,7 +292,6 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
         }
     } catch (e) {
         // Silently fail if analysis cannot run (e.g. runtime environment issues)
-        // console.warn("OpenAPI AST analysis skipped:", e);
         astStatus = 'failed';
         if (options.warnings) {
             options.warnings.push({

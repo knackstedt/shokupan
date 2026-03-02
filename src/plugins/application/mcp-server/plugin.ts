@@ -1,6 +1,7 @@
 
 import { ShokupanRouter } from "../../../router";
 import type { Shokupan } from '../../../shokupan';
+import type { McpSession } from "../../../util/mcp-protocol";
 import { $appRoot, $childRouters } from "../../../util/symbol";
 import type { ShokupanPlugin } from "../../../util/types";
 import { OpenAPIAnalyzer } from "../openapi/analyzer.impl";
@@ -103,21 +104,28 @@ export class MCPServerPlugin implements ShokupanPlugin {
         collect(app);
     }
 
-    private setupRoutes() {
+    private sessions = new Map<string, McpSession>();
 
+    private setupRoutes() {
         // SSE Endpoint (GET)
         this.router.get('', (ctx) => {
-            const endpointUrl = `${ctx.protocol}://${ctx.host}${this.options.path}`;
-            const enc = new TextEncoder();
+            const sessionId = crypto.randomUUID();
+            const session = this.router.mcpProtocol.createSession(sessionId);
+            this.sessions.set(sessionId, session);
+
+            const base = ctx.request.url.replace(/\/$/, '');
+            const endpointUrl = `${base}/message?sessionId=${sessionId}`;
 
             return new Response(
                 new ReadableStream({
                     start(controller) {
-                        controller.enqueue(enc.encode(`event: endpoint\ndata: ${JSON.stringify(endpointUrl)}\n\n`));
+                        session.attachStream(controller);
+                        controller.enqueue(`event: endpoint\ndata: ${endpointUrl}\n\n`);
                         // Keep open
                     },
-                    cancel() {
-                        // Cleanup if needed
+                    cancel: () => {
+                        session.close();
+                        this.sessions.delete(sessionId);
                     }
                 }),
                 {
@@ -131,7 +139,19 @@ export class MCPServerPlugin implements ShokupanPlugin {
         });
 
         // JSON-RPC Endpoint (POST)
-        this.router.post('', async (ctx) => {
+        this.router.post('/message', async (ctx) => {
+            const url = new URL(ctx.request.url);
+            const sessionId = url.searchParams.get('sessionId');
+
+            if (!sessionId) {
+                return ctx.text('Missing sessionId', 400);
+            }
+
+            const session = this.sessions.get(sessionId);
+            if (!session) {
+                return ctx.text('Session not found', 404);
+            }
+
             let parsedBody;
             try {
                 parsedBody = await ctx.body();
@@ -143,7 +163,7 @@ export class MCPServerPlugin implements ShokupanPlugin {
                 }, 400);
             }
 
-            const response = await this.router.mcpProtocol.handleMessage(parsedBody);
+            const response = await session.handleMessage(parsedBody);
 
             if (response) {
                 return ctx.json(response);

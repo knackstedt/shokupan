@@ -30,7 +30,7 @@ export const compose = (middleware: Middleware[]) => {
 
             if (typeof fn !== 'function') {
                 const name = (fn as any)?.constructor?.name;
-                console.error(`[Middleware Error] Item at index ${i} is not a function! It is: ${typeof fn} (${name})`, fn);
+                context.app?.logger?.error('Middleware', `Item at index ${i} is not a function! It is: ${typeof fn} (${name})`, fn);
                 throw new TypeError(`Middleware at index ${i} must be a function, got ${name}`);
             }
 

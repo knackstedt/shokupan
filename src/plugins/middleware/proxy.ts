@@ -122,9 +122,13 @@ export function Proxy(options: ProxyOptions): Middleware {
 
         const url = new URL(path + ctx.url.search, targetUrl);
 
-        // Security: Validate the final URL doesn't bypass restrictions
+        // Security: Re-validate the final URL after pathRewrite in case the rewrite function
+        // returned an absolute URL that bypasses the construction-time allowlist check.
         if (!['http:', 'https:'].includes(url.protocol)) {
             return ctx.text('Invalid protocol in proxied URL', 400);
+        }
+        if (options.allowedHosts && !options.allowedHosts.includes(url.hostname)) {
+            return ctx.text('Proxied hostname not in allowlist', 403);
         }
 
         const headers = new Headers(req.headers);
@@ -212,7 +216,7 @@ function handleWSOpen(ws: ServerWebSocket, ctx: ShokupanContext, options: ProxyO
     };
 
     upstream.onerror = (err) => {
-        console.error("Upstream WebSocket error:", err);
+        ctx.app?.logger?.error('Proxy', 'Upstream WebSocket error', err);
         ws.close(1011, "Internal Error");
     };
 

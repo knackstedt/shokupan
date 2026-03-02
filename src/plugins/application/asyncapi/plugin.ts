@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -5,6 +6,7 @@ import renderToString from 'preact-render-to-string';
 import { ShokupanRouter } from '../../../router';
 import type { Shokupan } from '../../../shokupan';
 import { deepMerge } from '../../../util/deep-merge';
+import { $isMounted } from '../../../util/symbol';
 import type { DeepPartial, ShokupanPlugin, ShokupanPluginOptions } from '../../../util/types';
 import { AsyncApiApp, buildNavTree } from './components.tsx';
 import { generateAsyncApi } from './generator';
@@ -44,12 +46,23 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
     }
 
     onInit(app: Shokupan, options?: ShokupanPluginOptions) {
-        const path = this.pluginOptions.path || options?.path || '/asyncapi';
-        app.mount(path, this);
+        if (!(this as any)[$isMounted]) {
+            const path = this.pluginOptions.path || options?.path || '/asyncapi';
+            app.mount(path, this);
+        }
+
+        const astFileName = app.applicationConfig.astFilePath || 'shokupan-ast.json';
+        const specPath = join(process.cwd(), astFileName);
+
+        if (!existsSync(specPath)) {
+            app.applicationConfig.enableAsyncApiGen = true;
+        } else if (app.applicationConfig.enableAsyncApiGen !== true) {
+            app.logger?.info('AsyncApiPlugin', `Found ${astFileName}, using static spec instead of generating.`);
+        }
 
         // Ensure async api gen is enabled if this plugin is used
-        if (app.applicationConfig.enableAsyncApiGen !== true) {
-            console.warn('AsyncApiPlugin: enableAsyncApiGen is disabled. AsyncApiPlugin will not generate spec.');
+        if (app.applicationConfig.enableAsyncApiGen !== true && !existsSync(specPath)) {
+            app.logger?.warn('AsyncApiPlugin', 'enableAsyncApiGen is disabled. AsyncApiPlugin will not generate spec.');
         }
     }
 

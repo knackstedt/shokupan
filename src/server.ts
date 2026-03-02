@@ -1,5 +1,6 @@
 import type { Shokupan } from './shokupan';
-import { BunAdapter, H3Adapter, NodeAdapter, type ServerAdapter } from './util/adapter';
+import { BunAdapter, NodeAdapter, type ServerAdapter } from './util/adapter';
+import { ensureLocalSslCertificates, type TLSCertOptions } from './util/dev-ssl';
 
 /**
  * Shokupan Server
@@ -47,7 +48,9 @@ export class ShokupanServer {
         } else if (adapterName === 'node') {
             adapter = new NodeAdapter();
         } else if (adapterName === 'h3') {
-            adapter = new H3Adapter();
+            throw new Error(
+                '[Shokupan] H3Adapter is no longer supported. HTTP/3 support is coming in a future release.'
+            );
         } else if (adapterName === 'wintercg') {
             throw new Error("WinterCG adapter does not support listen(). Use fetch directly.");
         } else {
@@ -60,8 +63,14 @@ export class ShokupanServer {
         // Compile Routes (Flattening Optimization) if not done
         this.app.compile();
 
+        // Handle Dev SSL
+        let tlsOptions: TLSCertOptions | undefined = config.tls;
+        if (!tlsOptions && config.development && process.env.NODE_ENV !== 'test') {
+            tlsOptions = ensureLocalSslCertificates();
+        }
+
         // Start Server
-        this.server = await adapter.listen(finalPort, this.app);
+        this.server = await adapter.listen(finalPort, this.app, tlsOptions);
 
         // Update config port if 0 was used
         if (finalPort === 0 && this.server?.port) {
