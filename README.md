@@ -24,7 +24,8 @@ Shokupan is designed to make building APIs delightful again. With zero-config de
 - 🔐 **OAuth2 Support** - GitHub, Google, Microsoft, Apple, Auth0, Okta.
 - ✅ **Multi-validator Support** - Zod, Ajv, TypeBox, Valibot.
 - 📚 **OpenAPI Docs** - Beautiful OpenAPI documentation with [Scalar](https://scalar.dev/).
-- ⏩ **Short shift** - Very simple migration from [Express](https://expressjs.com/) or [NestJS](https://nestjs.com/) to Shokupan.
+
+ - ⏩ **Smooth migration** - Very simple migration from [Express](https://expressjs.com/) or [NestJS](https://nestjs.com/) to Shokupan.
 
 ![Shokupan Debug Dashboard](docs/src/assets/dashboard_charts_1.png)
 

@@ -89,7 +89,7 @@ ctx.text('...');          // → text response
 ### ❌ TypeScript-Only Features
 ```typescript
 as { ... }                // Type assertions - compile-time only
-: Type                    // Type annotations -compile-time only
+: Type                    // Type annotations - compile-time only
 interface/type            // Type definitions - compile-time only
 ```
 
