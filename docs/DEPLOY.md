@@ -20,8 +20,9 @@ The documentation is configured to automatically deploy to GitHub Pages when you
 
 3. **First deployment:**
    - The workflow will run automatically on push
-   - Or manually trigger it from the **Actions** tab
-   - After ~2-3 minutes, your docs will be live!
+    - The workflow will run automatically on push
+    - or manually trigger it from the **Actions** tab
+    - After ~2-3 minutes, your docs will be live!
 
 ## Accessing Your Docs
 
