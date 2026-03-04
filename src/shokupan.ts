@@ -219,10 +219,12 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             this.use(SecurityHeaders(this.applicationConfig.defaultSecurityHeaders === true ? {} : this.applicationConfig.defaultSecurityHeaders));
         }
 
-        if (this.applicationConfig.adapter !== 'wintercg' && this.applicationConfig.datastore) {
+        this.dbPromise = Promise.resolve();
+        if (this.applicationConfig.adapter !== 'wintercg' && (this.applicationConfig.datastore || this.applicationConfig.surreal)) {
             this.dbPromise = this.initDatastore().catch(err => {
                 // Log but don't crash if optional datastore init fails
                 this.logger?.debug('Shokupan', "Failed to initialize default datastore", { error: err });
+                throw err; // Re-throw so callers know it failed
             });
         }
 

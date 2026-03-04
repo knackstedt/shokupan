@@ -19,47 +19,57 @@ export class SurrealAdapter implements DatastoreAdapter {
 
     constructor(options: SurrealAdapterOptions = {}) {
         this.options = options;
-        if (options.engines) {
-            this.db = new Surreal({ engines: options.engines });
-        } else {
-            this.db = new Surreal();
-        }
 
         process.on("exit", async () => {
             await this.disconnect();
         });
     }
 
+    private connectionPromise: Promise<void> | null = null;
+
     async connect(): Promise<void> {
-        let url = this.options.url;
-        if (!url) {
-            // Default behavior equivalent to old initDatastore
-            if (process.env.NODE_ENV === 'test') {
-                url = 'mem://';
+        if (this.connectionPromise) return this.connectionPromise;
+
+        this.connectionPromise = (async () => {
+            let url = this.options.url;
+            if (!url) {
+                // Default behavior equivalent to old initDatastore
+                if (process.env.NODE_ENV === 'test') {
+                    url = 'mem://';
+                } else {
+                    url = 'surrealkv://database';
+                }
+            }
+
+            if (!this.options.engines && !url.match(/^(?:wss?|https?):\/\//)) {
+                try {
+                    const mod = await import('@surrealdb/node');
+                    this.db = new Surreal({ engines: mod.createNodeEngines() });
+                } catch (e) {
+                    this.logger.warn('SurrealAdapter', "Could not load @surrealdb/node engines. Embedded protocols might fail.", { error: e });
+                    this.db = new Surreal();
+                }
+            } else if (this.options.engines) {
+                this.db = new Surreal({ engines: this.options.engines });
             } else {
-                url = 'surrealkv://database';
+                this.db = new Surreal();
             }
-        }
 
-        if (!this.options.engines && !url.match(/^(?:wss?|https?):\/\//)) {
-            try {
-                const mod = await import('@surrealdb/node');
-                this.db = new Surreal({ engines: mod.createNodeEngines() });
-            } catch (e) {
-                this.logger.warn('SurrealAdapter', "Could not load @surrealdb/node engines. Embedded protocols might fail.", { error: e });
-            }
-        }
+            await this.db.connect(url, this.options.connectOptions);
 
-        await this.db.connect(url, this.options.connectOptions);
+            await this.db.use({
+                namespace: this.options.namespace ?? "vendor",
+                database: this.options.database ?? "shokupan"
+            });
+        })();
 
-        await this.db.use({
-            namespace: this.options.namespace ?? "vendor",
-            database: this.options.database ?? "shokupan"
-        });
+        return this.connectionPromise;
     }
 
     async disconnect(): Promise<void> {
-        await this.db.close();
+        if (this.db) {
+            await this.db.close();
+        }
     }
 
     async setupSchema(): Promise<void> {
@@ -89,6 +99,7 @@ export class SurrealAdapter implements DatastoreAdapter {
     }
 
     async get<T>(table: string, id: string): Promise<T | null> {
+        await this.connect();
         try {
             const result = await this.db.select<T>(new RecordId(table, id));
             // SurrealDB select typically returns the object, or throws if connection fails.
@@ -105,24 +116,28 @@ export class SurrealAdapter implements DatastoreAdapter {
     }
 
     async create<T>(table: string, id: string, data: T): Promise<T> {
+        await this.connect();
         return this.retry(() => this.db.create(new RecordId(table, id)).content(data as any)) as any;
     }
 
     async update<T>(table: string, id: string, data: Partial<T>): Promise<T> {
+        await this.connect();
         return this.retry(() => this.db.update(new RecordId(table, id)).merge(data as any)) as any;
     }
 
     async upsert<T>(table: string, id: string, data: T): Promise<T> {
+        await this.connect();
         // SurrealDB .upsert() replaces content. If we want merge-like upsert behavior we might need logic,
-        // but typically upsert means "insert or replace".
         return this.retry(() => this.db.upsert(new RecordId(table, id)).content(data as any)) as any;
     }
 
     async delete(table: string, id: string): Promise<void> {
+        await this.connect();
         await this.retry(() => this.db.delete(new RecordId(table, id)));
     }
 
     async count(table: string, query?: QueryOptions): Promise<number> {
+        await this.connect();
         const q = this.buildQuery(table, query, true);
         const res = await this.db.query<[{ count: number; }]>(q.statement, q.vars);
 
@@ -151,11 +166,13 @@ export class SurrealAdapter implements DatastoreAdapter {
     }
 
     async deleteMany(table: string, query?: QueryOptions): Promise<void> {
+        await this.connect();
         const q = this.buildQuery(table, query, false, true);
         await this.db.query(q.statement, q.vars);
     }
 
     async findMany<T>(table: string, query?: QueryOptions): Promise<T[]> {
+        await this.connect();
         const q = this.buildQuery(table, query);
         try {
             const res = await this.db.query<T[]>(q.statement, q.vars);

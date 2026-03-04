@@ -278,6 +278,9 @@ export function createHTTPLogger(): Middleware {
     }
 
     return async (ctx, next) => {
+        const d = performance.now();
+        const result = await next();
+
         const methodColor = {
             GET: '\x1b[32m',      // Green
             POST: '\x1b[36m',     // Cyan
@@ -293,9 +296,6 @@ export function createHTTPLogger(): Middleware {
         else if (status >= 400) statusColor = '\x1b[33m'; // Yellow
         else if (status >= 300) statusColor = '\x1b[36m'; // Cyan
         else if (status >= 200) statusColor = '\x1b[32m'; // Green
-
-        const d = performance.now();
-        const result = await next();
 
         if (status >= 500) {
             log.error('http', `${methodColor}${ctx.method}\x1b[30m ${ctx.url} ${statusColor}${status} \x1b[1;36m${printDuration(performance.now() - d)}\x1b[0m`);

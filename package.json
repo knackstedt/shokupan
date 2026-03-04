@@ -74,7 +74,7 @@
         "@opentelemetry/api": "^1.9.0",
         "@scalar/openapi-types": "^0.5.3",
         "@scalar/types": "^0.6.6",
-        "@surrealdb/node": "^2.4.0",
+        "@surrealdb/node": "^3.0.1",
         "ajv": "^8.0.0",
         "ajv-formats": "^3.0.0",
         "arctic": "^3",
@@ -92,7 +92,7 @@
         "preact": "^10.0.0",
         "preact-render-to-string": "^6.0.0",
         "socket.io": "^4.8.3",
-        "surrealdb": "^2.0.0-alpha.16"
+        "surrealdb": "^2.0.0"
     },
     "peerDependenciesMeta": {
         "ajv": {
@@ -179,7 +179,7 @@
         "@scalar/openapi-types": "^0.5.3",
         "@scalar/types": "^0.6.6",
         "@sinclair/typebox": "^0.34.47",
-        "@surrealdb/node": "^2.4.0",
+        "@surrealdb/node": "^3.0.1",
         "@tsconfig/bun": "^1.0.10",
         "@types/axios": "^0.9.36",
         "@types/bun": "^1.3.5",
@@ -210,7 +210,7 @@
         "secure-json-parse": "^4.1.0",
         "socket.io": "^4.8.3",
         "supertest": "^7.2.2",
-        "surrealdb": "^2.0.0-beta.2",
+        "surrealdb": "^2.0.0",
         "typescript": "~5.9.3",
         "valibot": "^1.2.0",
         "vite": "^7.3.1",
