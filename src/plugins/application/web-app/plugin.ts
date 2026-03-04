@@ -87,7 +87,7 @@ export class WebAppPlugin implements ShokupanPlugin {
 
         // Register catch-alls at the root for Vite's internal development absolute paths
         // Angular uses /ng-cli-ws for its dev server WebSockets.
-        const vitePaths = ['/@vite', '/@fs', '/@id', '/@react-refresh', '/node_modules', '/ng-cli-ws'];
+        const vitePaths = ['/@vite', '/@fs', '/@id', '/@react-refresh', '/node_modules', '/ng-cli-ws', '/__open-in-editor'];
         for (const vp of vitePaths) {
             app.get(`${vp}/**`, async (ctx) => rootProxy(ctx, async () => { }));
             app.get(vp, async (ctx) => rootProxy(ctx, async () => { }));
