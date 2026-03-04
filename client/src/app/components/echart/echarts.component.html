@@ -1,15 +1,7 @@
 @if (dataExists) {
-    <div
-        echarts
-        [options]="configuration"
-        style="height: 100%; width: 100%"
-        (chartInit)="onChartInit($event)"
-        [autoResize]="true"
-    >
-    </div>
+<div class="echart" #chartContainer style="height: 100%; width: 100%">
+</div>
 }
 @else {
-    Chart is empty
+Chart is empty
 }
-
-

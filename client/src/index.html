@@ -2,15 +2,24 @@
 <html lang="en" class="dark">
 
 <head>
-  <meta charset="utf-8">
-  <title>Shokupan Admin</title>
-  <base href="/_app/">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <meta charset="utf-8">
+    <title>Shokupan Admin</title>
+    <base href="/_app/">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <script>
+        // Critical overrides to completely detach animation and generic UI events from
+        // triggering exhaustive Angular Zone loops on chart overlays during scroll/pinch
+        window.__Zone_disable_requestAnimationFrame = true;
+        window.__Zone_disable_wheel = true;
+        window.__zone_symbol__UNPATCHED_EVENTS = [
+            'scroll', 'mousemove', 'wheel', 'touchmove', 'touchstart', 'touchend', 'pointermove'
+        ];
+    </script>
 </head>
 
 <body>
-  <skp-root></skp-root>
+    <skp-root></skp-root>
 </body>
 
 </html>

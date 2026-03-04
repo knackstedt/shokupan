@@ -47,7 +47,15 @@
                         "styles": [
                             "src/styles/main.scss"
                         ],
-                        "allowedCommonJsDependencies": [],
+                        "allowedCommonJsDependencies": [
+                            "brotli-wasm",
+                            "fflate",
+                            "fzstd",
+                            "elkjs"
+                        ],
+                        "scripts": [
+                            "node_modules/echarts/dist/echarts.min.js"
+                        ],
                         "optimization": {
                             "scripts": true,
                             "styles": {
@@ -111,7 +119,9 @@
                         "styles": [
                             "src/styles/main.scss"
                         ],
-                        "scripts": []
+                        "scripts": [
+                            "node_modules/echarts/dist/echarts.min.js"
+                        ]
                     }
                 }
             }

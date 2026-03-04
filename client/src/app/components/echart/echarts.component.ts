@@ -1,8 +1,9 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, EventEmitter, Input, NgZone, OnDestroy, Output, ViewChild } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { ECElementEvent, ECharts, EChartsOption } from 'echarts';
-import { NGX_ECHARTS_CONFIG, NgxEchartsModule } from 'ngx-echarts';
 import { ThemeService } from '../../services/theme.service';
+
+declare const echarts: any;
 
 // Watch for print actions and tell echart to resize and fix the background color
 window.matchMedia('print').addEventListener("change", () =>
@@ -35,30 +36,33 @@ window.addEventListener("focus", () => {
     templateUrl: './echarts.component.html',
     styleUrls: ['./echarts.component.scss'],
     imports: [
-        NgxEchartsModule,
         MatIconModule
     ],
-    providers: [
-        {
-            provide: NGX_ECHARTS_CONFIG,
-            useFactory: () => ({ echarts: () => import('echarts') })
-        },
-    ],
+    providers: [],
     standalone: true
 })
-export class EChartComponent {
+export class EChartComponent implements AfterViewInit, OnDestroy {
+    @ViewChild('chartContainer') chartContainer!: ElementRef<HTMLDivElement>;
     chart!: ECharts;
 
     private _configuration!: EChartsOption;
     @Input("config") set configuration(config: EChartsOption) {
         this._configuration = config;
+        if (this.chart) {
+            this.zone.runOutsideAngular(() => {
+                this.chart.setOption(config, { replaceMerge: ['series', 'xAxis', 'yAxis'] });
+            });
+        }
     };
     get configuration() { return this._configuration; }
 
     private _data: any;
     @Input("data") set data(data: any) {
-        if (data) {
-            this.chart?.setOption({ series: data });
+        this._data = data;
+        if (data && this.chart) {
+            this.zone.runOutsideAngular(() => {
+                this.chart.setOption({ series: data });
+            });
         }
     }
 
@@ -70,22 +74,44 @@ export class EChartComponent {
     static _selfInstances: EChartComponent[] = [];
 
     constructor(
-        private readonly theme: ThemeService
+        private readonly theme: ThemeService,
+        private readonly zone: NgZone
     ) { }
 
     ngAfterViewInit() {
+        console.log('[EChartComponent] ngAfterViewInit triggered. Element:', this.chartContainer?.nativeElement);
         EChartComponent._selfInstances.push(this);
+        if (this.dataExists && this.chartContainer) {
+            this.zone.runOutsideAngular(() => {
+                try {
+                    // console.log('[EChartComponent] Initializing ECharts using window global...');
+                    if (typeof echarts === 'undefined') {
+                        console.error('[EChartComponent] FATAL: window.echarts is undefined! The angular.json scripts bundle did not load correctly.');
+                        return;
+                    }
+                    this.chart = echarts.init(this.chartContainer.nativeElement);
+                    if (this._configuration) {
+                        this.chart.setOption(this._configuration);
+                    }
+                    if (this._data) {
+                        this.chart.setOption({ series: this._data });
+                    }
+                    this.chart.on('click', evt => {
+                        this.zone.run(() => this.click.next(evt));
+                    });
+                    this.zone.run(() => this.load.next(this.chart));
+                    console.log('[EChartComponent] Successfully initialized ECharts instance:', this.chart.id);
+                } catch (err) {
+                    console.error('[EChartComponent] Crashed during initialization!', err);
+                }
+            });
+        }
     }
 
     ngOnDestroy() {
         EChartComponent._selfInstances.splice(EChartComponent._selfInstances.indexOf(this), 1);
-    }
-
-    onChartInit(ec: any) {
-        this.chart = ec;
-        this.chart.on('click', evt => {
-            this.click.next(evt);
-        });
-        this.load.next(ec);
+        if (this.chart) {
+            this.chart.dispose();
+        }
     }
 }
