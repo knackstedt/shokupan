@@ -11,81 +11,9 @@
     <div class="dash-content">
         @switch (activeTab()) {
         @case ('overview') {
-        <div style="padding: 1.5rem; overflow: hidden; display: flex; flex-direction: column;">
-            <div class="metrics-grid">
-                <div class="card">
-                    <div class="card-label">Total Requests</div>
-                    <div class="card-value">{{ metrics().totalRequests | number }}</div>
-                </div>
-                <div class="card">
-                    <div class="card-label">Successful</div>
-                    <div class="card-value success">{{ metrics().successfulRequests | number }}</div>
-                </div>
-                <div class="card">
-                    <div class="card-label">Failed</div>
-                    <div class="card-value error">{{ metrics().failedRequests | number }}</div>
-                </div>
-                <div class="card">
-                    <div class="card-label">Active</div>
-                    <div class="card-value">{{ metrics().activeRequests | number }}</div>
-                </div>
-                <div class="card">
-                    <div class="card-label">Avg. Response Time</div>
-                    <div class="card-value accent">{{ metrics().averageTotalTime_ms | number:'1.0-2' }}<small>ms</small>
-                    </div>
-                </div>
-            </div>
-            <div class="card log-card mt-4">
-                <div class="card-header">
-                    <span class="card-title">Recent Activity</span>
-                    <div class="ws-status">
-                        <span class="ws-dot" [class.connected]="wsConnected()"></span>
-                        {{ wsConnected() ? 'Live' : 'Offline' }}
-                    </div>
-                    <button class="icon-btn" (click)="purgeRequests()" title="Purge History">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path
-                                d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                        </svg>
-                    </button>
-                </div>
-                <ngx-tabulator [dataSource]="requests()" class="network-table" [selectable]="1" [headerSort]="true"
-                    [movableColumns]="true" [height]="'100%'" [rowFormatter]="rowFormatter" [layout]="'fitColumns'"
-                    (rowClick)="selectRequest($any($event)[1].getData().id)">
-
-                    <ngx-tabulator-column field="status" title="Status" [width]="100" [headerSort]="true">
-                        <ng-template let-data>
-                            <div class="status-cell">
-                                <span class="status-dot"
-                                    [style.background-color]="data.status >= 500 ? '#ef4444' : data.status >= 400 ? '#f59e0b' : '#10b981'"></span>
-                                {{ data.status || 'Pending' }}
-                            </div>
-                        </ng-template>
-                    </ngx-tabulator-column>
-
-                    <ngx-tabulator-column field="method" title="Method" [width]="90" [headerSort]="true" />
-
-                    <ngx-tabulator-column field="url" title="URL" [headerSort]="true">
-                        <ng-template let-data>
-                            <div class="url-cell" [title]="data.url">{{ data.url }}</div>
-                        </ng-template>
-                    </ngx-tabulator-column>
-
-                    <ngx-tabulator-column field="duration" title="Time" [width]="90" [headerSort]="true">
-                        <ng-template let-data>
-                            {{ formatDuration(data.duration) }}
-                        </ng-template>
-                    </ngx-tabulator-column>
-
-                    <ngx-tabulator-column field="timestamp" title="Captured" [width]="100" [headerSort]="true">
-                        <ng-template let-data>
-                            {{ data.timestamp | date:'shortTime' }}
-                        </ng-template>
-                    </ngx-tabulator-column>
-                </ngx-tabulator>
-            </div>
-        </div>
+        <skp-dashboard-overview [metrics]="metrics()" [requests]="requests()" [wsConnected]="wsConnected()"
+            (requestSelect)="selectRequest($event)" (purge)="purgeRequests()">
+        </skp-dashboard-overview>
         }
         @case ('network') {
         <skp-network-tools [requests]="requests()" [(selectedId)]="selectedRequestId"

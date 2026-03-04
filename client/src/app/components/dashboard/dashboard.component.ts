@@ -1,16 +1,13 @@
-import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import {
     Component,
     inject,
     OnDestroy, OnInit, signal
 } from '@angular/core';
-import { NgScrollbarModule } from 'ngx-scrollbar';
-import { TabulatorModule } from 'ngx-tabulator-tables';
 import { AppGraphComponent } from './app-graph.component';
 import { AppRegistryTreeComponent } from './app-registry-tree.component';
 import { NetworkToolsComponent } from './network-tools/network-tools.component';
-import { formatDurationPretty } from './network-tools/network-utils';
+import { DashboardOverviewComponent } from './overview.component';
 
 interface Metrics {
     totalRequests: number;
@@ -25,7 +22,7 @@ interface Metrics {
 @Component({
     selector: 'skp-dashboard',
     standalone: true,
-    imports: [DecimalPipe, DatePipe, NgScrollbarModule, AppRegistryTreeComponent, AppGraphComponent, NetworkToolsComponent, TabulatorModule],
+    imports: [AppRegistryTreeComponent, AppGraphComponent, NetworkToolsComponent, DashboardOverviewComponent],
     templateUrl: './dashboard.component.html',
     styleUrl: './dashboard.component.scss',
 })
@@ -131,16 +128,4 @@ export class DashboardComponent implements OnInit, OnDestroy {
         });
     }
 
-    formatDuration(ms: number) {
-        return formatDurationPretty(ms);
-    }
-
-    rowFormatter = (row: any) => {
-        const data = row.getData();
-        if (data.status >= 400) {
-            row.getElement().classList.add('row-error');
-        } else {
-            row.getElement().classList.remove('row-error');
-        }
-    };
 }

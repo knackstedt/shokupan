@@ -10,14 +10,19 @@ describe("FailedRequestRecorder Plugin", () => {
     let deleteManySpy: any;
 
     test("Records failed requests", async () => {
-        const app = new Shokupan();
+        const app = new Shokupan({
+            datastore: { adapter: 'sqlite', options: { inMemory: true } }
+        });
         // Wait for DB init
         await app.dbPromise;
 
         // Spy on DB methods
-        upsertSpy = spyOn(app.db!, 'upsert').mockImplementation(async () => { return {} as any; });
-        countSpy = spyOn(app.db!, 'count').mockImplementation(async () => 0);
-        deleteManySpy = spyOn(app.db!, 'deleteMany').mockImplementation(async () => undefined);
+        // @ts-ignore
+        upsertSpy = spyOn(app.db, 'upsert').mockImplementation(async () => { return {} as any; });
+        // @ts-ignore
+        countSpy = spyOn(app.db, 'count').mockImplementation(async () => 0);
+        // @ts-ignore
+        deleteManySpy = spyOn(app.db, 'deleteMany').mockImplementation(async () => undefined);
 
         app.use(FailedRequestRecorder());
 
@@ -43,13 +48,18 @@ describe("FailedRequestRecorder Plugin", () => {
 
     test("Enforces Max Capacity", async () => {
         const max = 5;
-        const app = new Shokupan();
+        const app = new Shokupan({
+            datastore: { adapter: 'sqlite', options: { inMemory: true } }
+        });
         await app.dbPromise;
 
         // Mock returning count > max
-        countSpy = spyOn(app.db!, 'count').mockImplementation(async () => 10);
-        deleteManySpy = spyOn(app.db!, 'deleteMany').mockImplementation(async () => undefined);
-        upsertSpy = spyOn(app.db!, 'upsert').mockImplementation(async () => { return {} as any; });
+        // @ts-ignore
+        countSpy = spyOn(app.db, 'count').mockImplementation(async () => 10);
+        // @ts-ignore
+        deleteManySpy = spyOn(app.db, 'deleteMany').mockImplementation(async () => undefined);
+        // @ts-ignore
+        upsertSpy = spyOn(app.db, 'upsert').mockImplementation(async () => { return {} as any; });
 
         app.use(FailedRequestRecorder({ maxCapacity: max }));
 
@@ -73,12 +83,17 @@ describe("FailedRequestRecorder Plugin", () => {
 
     test("Enforces TTL", async () => {
         const ttl = 1000;
-        const app = new Shokupan();
+        const app = new Shokupan({
+            datastore: { adapter: 'sqlite', options: { inMemory: true } }
+        });
         await app.dbPromise;
 
-        deleteManySpy = spyOn(app.db!, 'deleteMany').mockImplementation(async () => undefined);
-        countSpy = spyOn(app.db!, 'count').mockImplementation(async () => 0);
-        upsertSpy = spyOn(app.db!, 'upsert').mockImplementation(async () => { return {} as any; });
+        // @ts-ignore
+        deleteManySpy = spyOn(app.db, 'deleteMany').mockImplementation(async () => undefined);
+        // @ts-ignore
+        countSpy = spyOn(app.db, 'count').mockImplementation(async () => 0);
+        // @ts-ignore
+        upsertSpy = spyOn(app.db, 'upsert').mockImplementation(async () => { return {} as any; });
 
         app.use(FailedRequestRecorder({ ttl }));
 

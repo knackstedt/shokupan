@@ -8,8 +8,10 @@ const PORT = 4000 + Math.floor(Math.random() * 1000);
 describe('Debug Dashboard Metrics', () => {
     const app = new Shokupan({
         port: PORT,
-        applicationConfig: { enableTracing: false }
+        applicationConfig: { enableTracing: false },
+        datastore: { adapter: 'sqlite', options: { inMemory: true } }
     });
+    // Ensure DB is initialized for testing
     let baseUrl: string;
     let server: any;
 

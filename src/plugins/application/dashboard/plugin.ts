@@ -46,7 +46,7 @@ export interface RequestLog {
     duration: number;
     timestamp: number;
     handlerStack?: any[];
-    body?: any;
+    body?: any;          // Optional: for small payloads or compatibility
     contentType?: string;
     // New fields
     type: 'xhr' | 'fetch' | 'ws';
@@ -61,9 +61,11 @@ export interface RequestLog {
     transferred?: number;
     requestHeaders?: Record<string, string>;
     responseHeaders?: Record<string, string>;
-    requestBody?: any;
-    responseBody?: any;
+    requestBody?: any;   // Optional
+    responseBody?: any;  // Optional
     wsMessages?: any[];
+    hasRequestBody?: boolean;
+    hasResponseBody?: boolean;
 }
 
 export interface DashboardConfig {
@@ -231,8 +233,7 @@ export class Dashboard implements ShokupanPlugin {
                 direction: 'outbound',
                 size: log.responseSize || (log.responseBody ? (typeof log.responseBody === 'string' ? log.responseBody.length : ((log.responseBody instanceof ArrayBuffer || log.responseBody instanceof Uint8Array) ? log.responseBody.byteLength : 0)) : 0),
                 contentType: log.responseHeaders['content-type'] || log.responseHeaders['Content-Type'],
-                body: log.responseBody,
-                requestBody: log.requestBody,
+                // Large bodies removed from main log
                 domain: log.domain,
                 path: log.path,
                 scheme: log.scheme,
@@ -241,11 +242,15 @@ export class Dashboard implements ShokupanPlugin {
                 cookies: log.cookies,
                 transferred: log.transferred,
                 requestHeaders: log.requestHeaders,
-                // No handler stack for outbound
+                hasRequestBody: !!log.requestBody,
+                hasResponseBody: !!log.responseBody,
             };
 
             // Check ignore options
             if (this.shouldIgnoreRequest(requestData)) return;
+
+            // Route to Third-Party metrics collection
+            this.metricsCollector.recordThirdPartyRequest(log.duration, log.status >= 400);
 
             // Enforce log limit
             const maxLogs = this.dashboardConfig.maxLogEntries ?? 1000;
@@ -254,25 +259,40 @@ export class Dashboard implements ShokupanPlugin {
             }
             this.metrics.logs.push(requestData);
 
-            // Persist
-            // We use 'request' table for both inbound and outbound.
-            // ID generation: 'req_out_<timestamp>_<random>'
-            const idString = `req_${Date.now()}_${nanoid()}`;
-
             // Fire and forget save
-            // We strip 'id' from data if we are passing it separately to create/upsert
-            this.db.upsert('request', idString, {
-                ...requestData,
-                id: idString
-            }).catch(e => this[$appRoot]?.logger?.error('Dashboard', "Failed to save outbound request", { error: e }));
+            const save = async () => {
+                await this[$appRoot].dbPromise;
+                if (!this.db) return;
 
-            // Broadcast
-            const strategy = this.dashboardConfig.updateStrategy || 'immediate';
-            if (strategy === 'immediate') {
-                this.broadcastRequestUpdates([{ ...requestData, id: idString }]);
-            } else {
-                this.requestsBuffer.push({ ...requestData, id: idString });
-            }
+                const idString = `req_${Date.now()}_${nanoid()}`;
+
+                try {
+                    await this.db.upsert('request', idString, {
+                        ...requestData,
+                        id: idString
+                    });
+
+                    // Save payloads separately
+                    if (log.requestBody) {
+                        this.db.upsert('payload', `${idString}:request`, { data: this.serializeBody(log.requestBody, false) }).catch(() => { });
+                    }
+                    if (log.responseBody) {
+                        this.db.upsert('payload', `${idString}:response`, { data: this.serializeBody(log.responseBody, false) }).catch(() => { });
+                    }
+
+                    // Broadcast
+                    const strategy = this.dashboardConfig.updateStrategy || 'immediate';
+                    if (strategy === 'immediate') {
+                        this.broadcastRequestUpdates([{ ...requestData, id: idString }]);
+                    } else {
+                        this.requestsBuffer.push({ ...requestData, id: idString });
+                    }
+                } catch (e) {
+                    this[$appRoot]?.logger?.error('Dashboard', "Failed to save outbound request", { error: e });
+                }
+            };
+
+            save();
         });
 
         if (app.onStart) {
@@ -427,6 +447,7 @@ export class Dashboard implements ShokupanPlugin {
                 const ms = intervalMap[interval] || 60 * 1000;
                 const startTime = Date.now() - ms;
 
+                await this[$appRoot].dbPromise;
                 // Helper to perform in-memory aggregation if DB doesn't support complex query
                 const requests = await this.db.findMany<any>('request', {
                     where: {
@@ -492,6 +513,7 @@ export class Dashboard implements ShokupanPlugin {
             const periodMs = intervalMap[interval] || 60 * 1000;
             const startTime = Date.now() - (periodMs * 3);
 
+            await this[$appRoot].dbPromise;
             const metrics = await this.db.findMany<any>('metrics', {
                 gt: { timestamp: startTime },
                 where: { interval },
@@ -526,6 +548,7 @@ export class Dashboard implements ShokupanPlugin {
         this.router.get("/requests/top", async (ctx) => {
             const startTime = getIntervalStartTime(ctx.query['interval']);
 
+            await this[$appRoot].dbPromise;
             const requests = await this.db.findMany<any>('request', {
                 gt: { timestamp: startTime }
             });
@@ -553,6 +576,7 @@ export class Dashboard implements ShokupanPlugin {
             // Or does app specifically write to failed_request table?
             // "FailedRequestRecorder" plugin usually does.
             // If we use separate table:
+            await this[$appRoot].dbPromise;
             const requests = await this.db.findMany<any>('failed_request', {
                 gt: { timestamp: startTime }
             });
@@ -574,6 +598,7 @@ export class Dashboard implements ShokupanPlugin {
         // Failing Requests Endpoint
         this.router.get("/requests/failing", async (ctx) => {
             const startTime = getIntervalStartTime(ctx.query['interval']);
+            await this[$appRoot].dbPromise;
             const requests = await this.db.findMany<any>('failed_request', {
                 gt: { timestamp: startTime }
             });
@@ -596,6 +621,7 @@ export class Dashboard implements ShokupanPlugin {
         this.router.get("/requests/slowest", async (ctx) => {
             const startTime = getIntervalStartTime(ctx.query['interval']);
 
+            await this[$appRoot].dbPromise;
             // If adapter supports sort, let's use it.
             const requests = await this.db.findMany<any>('request', {
                 gt: { timestamp: startTime },
@@ -620,7 +646,8 @@ export class Dashboard implements ShokupanPlugin {
 
         // Requests Listing Endpoint
         this.router.get("/requests", async (ctx) => {
-            if (!this.db) return ctx.json({ requests: [] });
+            await this[$appRoot].dbPromise;
+            if (!this.db) return ctx.json({ requests: [...this.metrics.logs].reverse().slice(0, 100) });
             const result = await this.db.findMany('request', {
                 sort: { timestamp: 'desc' },
                 limit: 100
@@ -648,13 +675,103 @@ export class Dashboard implements ShokupanPlugin {
 
         // Request Details Endpoint
         this.router.get("/requests/:id", async (ctx) => {
+            await this[$appRoot].dbPromise;
             if (!this.db) return ctx.json({ request: null });
-            const result = await this.db.get('request', ctx.params['id']);
+
+            let id = decodeURIComponent(ctx.params['id']);
+            if (id.startsWith('request:')) id = id.substring(8);
+            if (id.startsWith('failed_request:')) id = id.substring(15);
+            // Strip decorative brackets if present
+            id = id.replace(/[⟨⟩]/g, '');
+
+            let result = await this.db.get('request', id);
+
+            // Fallback to failed_request table
+            if (!result) {
+                let failedId = id;
+                if (failedId.startsWith('failed_')) failedId = failedId.substring(7);
+                result = await this.db.get('failed_request', failedId);
+
+                // Try with prefix if still not found
+                if (!result) {
+                    result = await this.db.get('failed_request', `failed_${failedId}`);
+                }
+            }
+
             return ctx.json({ request: result });
+        });
+
+        // Request Payload Endpoint (streaming)
+        this.router.get("/requests/:id/payload/:type", async (ctx) => {
+            await this[$appRoot].dbPromise;
+            if (!this.db) return ctx.json({ error: "No database" }, 500);
+            let requestId = decodeURIComponent(ctx.params['id']);
+            const type = ctx.params['type']; // 'request' or 'response'
+
+            // Strip table prefixes if present
+            if (requestId.startsWith('request:')) requestId = requestId.substring(8);
+            if (requestId.startsWith('failed_request:')) requestId = requestId.substring(15);
+            if (requestId.startsWith('failed_')) requestId = requestId.substring(7);
+            // Strip decorative brackets if present
+            requestId = requestId.replace(/[⟨⟩]/g, '');
+
+            let result = await this.db.get<any>('payload', `${requestId}:${type}`);
+
+            // Fallback to failed prefix if not found (older stored format support)
+            if (!result) {
+                result = await this.db.get<any>('payload', `failed_${requestId}:${type}`);
+            }
+
+            if (!result || !result.data) {
+                this[$appRoot].logger?.warn('Dashboard', `Payload NOT FOUND for ${requestId}:${type}`);
+                return ctx.json({ error: "Payload not found" }, 404);
+            }
+
+            const body = result.data;
+
+            // Handle binary data from __binary format
+            if (typeof body === 'object' && body.__binary) {
+                const buffer = Buffer.from(body.data, 'base64');
+
+                // Return as binary stream
+                const stream = new ReadableStream({
+                    start(controller) {
+                        controller.enqueue(new Uint8Array(buffer));
+                        controller.close();
+                    }
+                });
+
+                return new Response(stream, {
+                    headers: {
+                        'Content-Type': 'application/octet-stream',
+                        'Content-Length': buffer.length.toString()
+                    }
+                });
+            }
+
+            // Handle string or JSON
+            const content = typeof body === 'string' ? body : JSON.stringify(body);
+            const encoder = new TextEncoder();
+            const buffer = encoder.encode(content);
+
+            const stream = new ReadableStream({
+                start(controller) {
+                    controller.enqueue(buffer);
+                    controller.close();
+                }
+            });
+
+            return new Response(stream, {
+                headers: {
+                    'Content-Type': typeof body === 'string' ? 'text/plain' : 'application/json',
+                    'Content-Length': buffer.length.toString()
+                }
+            });
         });
 
         // Replay/Failed Requests Endpoints
         this.router.get("/failures", async (ctx) => {
+            await this[$appRoot].dbPromise;
             const result = await this.db.findMany('failed_request', {
                 sort: { timestamp: 'desc' },
                 limit: 50
@@ -872,6 +989,7 @@ export class Dashboard implements ShokupanPlugin {
         this[$appRoot]?.logger?.debug('Dashboard', `Fetching history from timestamp ${startTime}, period: ${periodMs}ms`);
 
         let history: any[] = [];
+        await this[$appRoot].dbPromise;
         try {
             history = await this.db.findMany<any>('metrics', {
                 gt: { timestamp: startTime },
@@ -1045,18 +1163,8 @@ export class Dashboard implements ShokupanPlugin {
             },
 
             onResponseEnd: async (ctx: any, response: any) => {
-                // DEBUG: Trace every call to onResponseEnd
-                const _isUpgrade = !response && ctx.isUpgraded;
-                const _isFiltered = ctx.path.startsWith(this.mountPath);
-                if (_isUpgrade || ctx.method === 'GET' && ctx.request?.headers?.get?.('upgrade') === 'websocket') {
-                    console.log('[Dashboard DEBUG] onResponseEnd WS call:', {
-                        path: ctx.path,
-                        method: ctx.method,
-                        isUpgraded: ctx.isUpgraded,
-                        responseStatus: response?.status,
-                        filtered: _isFiltered,
-                    });
-                }
+                await this[$appRoot].dbPromise;
+
                 // Ignore dashboard requests to prevent noise and loops
                 if (ctx.path.startsWith(this.mountPath)) return;
 
@@ -1102,51 +1210,6 @@ export class Dashboard implements ShokupanPlugin {
                     }, 100);
                 }
 
-                if (response.status >= 400) {
-                    this.metrics.failedRequests++;
-                    if (response.status === 429) {
-                        const path = ctx.path;
-                        this.metrics.rateLimitedCounts[path] = (this.metrics.rateLimitedCounts[path] || 0) + 1;
-                    }
-
-                    // Record failure in Datastore
-                    try {
-                        const headers: Record<string, string> = {};
-                        if (ctx.request.headers && typeof ctx.request.headers.forEach === 'function') {
-                            ctx.request.headers.forEach((v: string, k: string) => {
-                                headers[k] = v;
-                            });
-                        }
-                        const resHeaders: Record<string, string> = {};
-                        if (response.headers && typeof response.headers.forEach === 'function') {
-                            response.headers.forEach((v: string, k: string) => {
-                                resHeaders[k] = v;
-                            });
-                        }
-
-                        const id = `failed_${ctx.requestId}`;
-                        await this.db.upsert('failed_request', id, {
-                            id,
-                            method: ctx.method,
-                            url: ctx.url.toString(),
-                            headers: headers,
-                            status: response.status,
-                            timestamp: Date.now(),
-                            state: ctx.state,
-                            requestBody: (ctx as any).bodyData || (ctx as any).requestBody,
-                            responseHeaders: resHeaders,
-                            responseBody: this.serializeBody((ctx as any).responseBody),
-                            body: this.serializeBody((ctx as any).responseBody)
-                        });
-                    } catch (e) {
-                        this[$appRoot].logger?.error('Dashboard', 'Failed to record failed request', e);
-                    }
-
-                } else {
-                    this.metrics.successfulRequests++;
-                }
-
-                // Calculate metadata
                 const urlObj = new URL(ctx.url.toString());
                 const cookieHeader = ctx.request.headers.get('cookie') || '';
                 const cookiesCount = cookieHeader ? cookieHeader.split(';').length : 0;
@@ -1215,6 +1278,36 @@ export class Dashboard implements ShokupanPlugin {
                     remoteIP = remoteIP.address;
                 }
 
+                if (response.status >= 400) {
+                    this.metrics.failedRequests++;
+                    if (response.status === 429) {
+                        const path = ctx.path;
+                        this.metrics.rateLimitedCounts[path] = (this.metrics.rateLimitedCounts[path] || 0) + 1;
+                    }
+
+                    // Record failure in failed_request table for aggregate tracking
+                    try {
+                        const id = `failed_${ctx.requestId}`;
+                        await this.db.upsert('failed_request', id, {
+                            id,
+                            method: ctx.method,
+                            url: ctx.url.toString(),
+                            headers, // Re-use already extracted headers
+                            status: response.status,
+                            timestamp: Date.now(),
+                            state: ctx.state,
+                            responseHeaders: resHeaders,
+                            hasRequestBody: !!(ctx.requestBody || (ctx as any).bodyData),
+                            hasResponseBody: !!body
+                        });
+                    } catch (e) {
+                        this[$appRoot].logger?.error('Dashboard', 'Failed to record failed request summary', e);
+                    }
+                } else {
+                    this.metrics.successfulRequests++;
+                }
+
+                // Calculate metadata for log entry
                 const logEntry: RequestLog = {
                     method: response.status === 101 ? 'WS' : ctx.method,
                     url: ctx.url.toString(),
@@ -1222,13 +1315,11 @@ export class Dashboard implements ShokupanPlugin {
                     duration,
                     timestamp: (ctx as any)._reqStartTime || (Date.now() - duration),
                     handlerStack: this.serializeHandlerStack((ctx as any).handlerStack),
-                    body: this.serializeBody(body),
-                    requestBody: ctx.requestBody || (ctx as any).bodyData || (ctx as any).requestBody, // ShokupanContext usually stores parsed body here if parsed
                     contentType: resHeaders['content-type'] || resHeaders['Content-Type'],
                     type: response.status === 101 ? 'ws' : 'xhr',
                     direction: 'inbound',
                     size: responseSize,
-                    protocol: (ctx.req as any)?.httpVersion, // Try to get protocol from raw request if available, Bun might expose it
+                    protocol: (ctx.req as any)?.httpVersion,
                     domain: urlObj.hostname,
                     path: urlObj.pathname,
                     scheme: urlObj.protocol.replace(':', ''),
@@ -1237,60 +1328,50 @@ export class Dashboard implements ShokupanPlugin {
                     remoteIP,
                     requestHeaders: headers,
                     responseHeaders: resHeaders,
-                    responseBody: this.serializeBody(body),
-                    wsMessages: (ctx as any)[$wsMessages]
+                    wsMessages: (ctx as any)[$wsMessages],
+                    hasRequestBody: !!(ctx.requestBody || (ctx as any).bodyData),
+                    hasResponseBody: !!body
                 };
 
-                const idString = ctx.requestId;
-                if ((ctx.app as any).applicationConfig.enableWebSocketTracking) {
+                const requestId = ctx.requestId;
 
+                if ((ctx.app as any).applicationConfig.enableWebSocketTracking) {
                     // Attach listener for live updates
                     let updateTimer: any;
                     (ctx as any)[$onWsMessage] = (msg: any) => {
-                        // Link messages array if not yet linked (because upgrade happens after request log creation)
                         if (!logEntry.wsMessages) {
                             logEntry.wsMessages = (ctx as any)[$wsMessages];
                         }
+                        logEntry.duration = Date.now() - logEntry.timestamp;
 
-                        // Update duration
-                        const now = Date.now();
-                        const duration = now - logEntry.timestamp;
-                        logEntry.duration = duration;
-
-                        // Debounce updates
                         if (updateTimer) return;
                         updateTimer = setTimeout(() => {
                             updateTimer = null;
-
-                            // Re-save to DB
-                            this.db.upsert('request', idString, {
-                                ...logEntry,
-                                id: idString
-                            }).catch(() => { });
-
-                            // Broadcast
-                            // Note: broadcasting full log is heavy if messages array is huge.
-                            // But for now it's fine.
-                            this.broadcastRequestUpdates([{ ...logEntry, id: idString }]);
-                        }, 100); // 100ms debounce
+                            this.db.upsert('request', requestId, { ...logEntry, id: requestId }).catch(() => { });
+                            this.broadcastRequestUpdates([{ ...logEntry, id: requestId }]);
+                        }, 100);
                     };
                 }
 
-                const requestData = {
-                    id: ctx.requestId,
-                    ...logEntry
-                };
-
+                const requestData = { id: requestId, ...logEntry };
                 this.metrics.logs.push(requestData as any);
 
-                // Persist to datastore for detailed view
+                // Persist to datastore
                 if (this.db) {
-                    this.db.create('request', ctx.requestId, {
-                        ...requestData,
-                        direction: "inbound"
-                    }).catch(e => {
+                    this.db.create('request', requestId, { ...requestData, direction: "inbound" }).catch(e => {
                         this[$appRoot]?.logger?.error('Dashboard', "Failed to record request log", { error: e });
                     });
+
+                    // Save payloads separately - unified ID handling (no failed_ prefix for payloads)
+                    const reqBody = ctx.requestBody || (ctx as any).bodyData;
+                    if (reqBody) {
+                        const payloadId = `${requestId}:request`;
+                        this.db.upsert('payload', payloadId, { data: this.serializeBody(reqBody, false) }).catch(() => { });
+                    }
+                    if (body) {
+                        const payloadId = `${requestId}:response`;
+                        this.db.upsert('payload', payloadId, { data: this.serializeBody(body, false) }).catch(() => { });
+                    }
                 }
                 const retention = this.dashboardConfig.retentionMs ?? 7200000;
                 const cutoff = Date.now() - retention;
@@ -1378,12 +1459,12 @@ export class Dashboard implements ShokupanPlugin {
         }));
     }
 
-    private serializeBody(body: any): any {
+    private serializeBody(body: any, truncate = true): any {
         if (!body) return undefined;
 
         // Handle strings
         if (typeof body === 'string') {
-            if (body.length > 524288) {
+            if (truncate && body.length > 524288) {
                 return body.substring(0, 524288) + '... (truncated)';
             }
             return body;
@@ -1392,10 +1473,11 @@ export class Dashboard implements ShokupanPlugin {
         // Handle objects (JSON)
         if (typeof body === 'object' && !(body instanceof ArrayBuffer) && !(body instanceof Uint8Array)) {
             try {
-                // Check size roughly
-                const str = JSON.stringify(body);
-                if (str.length > 524288) {
-                    return str.substring(0, 524288) + '... (truncated)';
+                if (truncate) {
+                    const str = JSON.stringify(body);
+                    if (str.length > 524288) {
+                        return str.substring(0, 524288) + '... (truncated)';
+                    }
                 }
                 return body;
             } catch (e) {
@@ -1408,29 +1490,23 @@ export class Dashboard implements ShokupanPlugin {
             const buffer = body instanceof Uint8Array ? body : new Uint8Array(body);
             if (buffer.length === 0) return undefined;
 
-            // If it's small enough and likely text, try to decode it for easy viewing
-            // However, if we want to support browser-side decompression, we should 
-            // probably send it as base64 if it's NOT plain text.
-
             // For now, let's keep the UTF-8 check, but if it fails, return as base64 object
             if (buffer.length < 1024 * 1024) {
                 try {
                     const decoder = new TextDecoder('utf-8', { fatal: true });
                     const text = decoder.decode(buffer);
-                    if (text.length > 524288) {
+                    if (truncate && text.length > 524288) {
                         return text.substring(0, 524288) + '... (truncated)';
                     }
                     return text;
                 } catch (e) {
-                    // Not valid UTF-8, proceed to base64
                 }
             }
 
             // Return as a special object that the browser can recognize
-            // Truncate if extremely large
-            const limit = 1024 * 1024; // 1MB limit for logs
+            const limit = truncate ? 1024 * 1024 : 500 * 1024 * 1024; // 1MB limit for logs, 500MB for payloads
             if (buffer.length > limit) {
-                return `[Binary Data: ${buffer.length} bytes (too large for log)]`;
+                return `[Binary Data: ${buffer.length} bytes (too large)]`;
             }
 
             return {

@@ -1,0 +1,111 @@
+<div class="controls-bar">
+    <label for="timeframe">Timeframe:</label>
+    <select id="timeframe" [ngModel]="timeframe()" (ngModelChange)="onTimeframeChange($event)">
+        <option value="1m">Last 1 Minute</option>
+        <option value="5m">Last 5 Minutes</option>
+        <option value="1h">Last 1 Hour</option>
+        <option value="1d">Last 1 Day</option>
+        <option value="7d">Last 7 Days</option>
+    </select>
+</div>
+<ng-scrollbar class="scrollbar">
+    <div class="overview-content">
+        <div class="stat-cards">
+            <div class="card">
+                <div class="card-label">Total Requests</div>
+                <div class="card-value">{{ metrics().totalRequests | number }}</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Successful</div>
+                <div class="card-value success">{{ metrics().successfulRequests | number }}</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Failed</div>
+                <div class="card-value error">{{ metrics().failedRequests | number }}</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Active</div>
+                <div class="card-value">{{ metrics().activeRequests | number }}</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Avg. Response Time</div>
+                <div class="card-value accent">{{ metrics().averageTotalTime_ms | number:'1.0-2' }}<small>ms</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="chart-container">
+                <echart [config]="responseOptions()" [data]="responseUpdate()" class="chart-box"></echart>
+            </div>
+            <div class="chart-container">
+                <echart [config]="rpsOptions()" [data]="rpsUpdate()" class="chart-box"></echart>
+            </div>
+            <div class="chart-container">
+                <echart [config]="cpuOptions()" [data]="cpuUpdate()" class="chart-box"></echart>
+            </div>
+            <div class="chart-container">
+                <echart [config]="memoryOptions()" [data]="memoryUpdate()" class="chart-box"></echart>
+            </div>
+            <div class="chart-container">
+                <echart [config]="eventLoopOptions()" [data]="eventLoopUpdate()" class="chart-box"></echart>
+            </div>
+            <div class="chart-container">
+                <echart [config]="gcOptions()" [data]="gcUpdate()" class="chart-box"></echart>
+            </div>
+            <div class="chart-container">
+                <echart [config]="thirdPartyOptions()" [data]="thirdPartyUpdate()" class="chart-box"></echart>
+            </div>
+        </div>
+
+        <div class="card log-card">
+            <div class="card-header">
+                <span class="card-title">Recent Activity</span>
+                <div class="ws-status">
+                    <span class="ws-dot" [class.connected]="wsConnected()"></span>
+                    {{ wsConnected() ? 'Live' : 'Offline' }}
+                </div>
+                <button class="icon-btn" (click)="onPurge()" title="Purge History">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path
+                            d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                </button>
+            </div>
+            <ngx-tabulator [dataSource]="requests()" class="network-table" [selectable]="1" [headerSort]="true"
+                [movableColumns]="true" [height]="'100%'" [rowFormatter]="rowFormatter" [layout]="'fitColumns'"
+                (rowClick)="onRowClick($any($event)[1].getData().id)">
+
+                <ngx-tabulator-column field="status" title="Status" [width]="100" [headerSort]="true">
+                    <ng-template let-data>
+                        <div class="status-cell">
+                            <span class="status-dot"
+                                [style.background-color]="data.status >= 500 ? '#ef4444' : data.status >= 400 ? '#f59e0b' : '#10b981'"></span>
+                            {{ data.status || 'Pending' }}
+                        </div>
+                    </ng-template>
+                </ngx-tabulator-column>
+
+                <ngx-tabulator-column field="method" title="Method" [width]="90" [headerSort]="true" />
+
+                <ngx-tabulator-column field="url" title="URL" [headerSort]="true">
+                    <ng-template let-data>
+                        <div class="url-cell" [title]="data.url">{{ data.url }}</div>
+                    </ng-template>
+                </ngx-tabulator-column>
+
+                <ngx-tabulator-column field="duration" title="Time" [width]="90" [headerSort]="true">
+                    <ng-template let-data>
+                        {{ formatDuration(data.duration) }}
+                    </ng-template>
+                </ngx-tabulator-column>
+
+                <ngx-tabulator-column field="timestamp" title="Captured" [width]="100" [headerSort]="true">
+                    <ng-template let-data>
+                        {{ data.timestamp | date:'shortTime' }}
+                    </ng-template>
+                </ngx-tabulator-column>
+            </ngx-tabulator>
+        </div>
+    </div>
+</ng-scrollbar>

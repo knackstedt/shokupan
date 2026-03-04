@@ -1,12 +1,16 @@
 import * as os from 'node:os';
-// import { monitorEventLoopDelay } from 'node:perf_hooks'; // Disabled for stability
+import { monitorEventLoopDelay, PerformanceObserver } from 'node:perf_hooks';
 import type { DatastoreAdapter } from '../../../util/adapter/datastore';
 import type { Logger } from '../../../util/logger';
 
 interface AggregatedMetric {
     timestamp: number;
     interval: string;
-    cpu: number;
+    cpu: {
+        user: number;
+        system: number;
+        total: number;
+    };
     memory: {
         used: number;
         total: number;
@@ -15,6 +19,14 @@ interface AggregatedMetric {
     };
     load: number[];
     eventLoopLatency: {
+        min: number;
+        max: number;
+        mean: number;
+        p50: number;
+        p95: number;
+        p99: number;
+    };
+    gcLatency: {
         min: number;
         max: number;
         mean: number;
@@ -32,7 +44,21 @@ interface AggregatedMetric {
         min: number;
         max: number;
         avg: number;
+        p1: number;
+        p10: number;
+        p25: number;
         p50: number;
+        p75: number;
+        p90: number;
+        p95: number;
+        p99: number;
+    };
+    thirdPartyLatency: {
+        min: number;
+        max: number;
+        avg: number;
+        p50: number;
+        p90: number;
         p95: number;
         p99: number;
     };
@@ -55,8 +81,15 @@ const INTERVALS = [
 export class MetricsCollector {
     private currentIntervalStart: Record<string, number> = {};
     private pendingDetails: Record<string, { duration: number, isError: boolean; }[]> = {};
-    // private eventLoopHistogram: any;
+    private pendingThirdPartyDetails: Record<string, { duration: number, isError: boolean; }[]> = {};
+    private gcLatencies: number[] = [];
+
+    private eventLoopHistogram: any;
+    private gcObserver: PerformanceObserver | null = null;
+
     private timer: NodeJS.Timeout | null = null;
+    private cpuUsageStart = process.cpuUsage();
+    private cpuTimeStart = Date.now();
 
     public db?: DatastoreAdapter;
 
@@ -66,19 +99,36 @@ export class MetricsCollector {
         private logger?: Logger
     ) {
         this.db = db;
-        // try {
-        //     this.eventLoopHistogram = monitorEventLoopDelay({ resolution: 10 });
-        //     this.eventLoopHistogram.enable();
-        // } catch (e) {
-        //     // Ignore if perf hooks fail
-        //     this.logger?.warn('MetricsCollector', 'Failed to initialize event loop monitor', { error: e });
-        // }
+        try {
+            if (monitorEventLoopDelay) {
+                this.eventLoopHistogram = monitorEventLoopDelay({ resolution: 10 });
+                this.eventLoopHistogram.enable();
+            }
+        } catch (e) {
+            this.logger?.warn('MetricsCollector', 'Failed to initialize event loop monitor', { error: e });
+        }
+
+        try {
+            if (PerformanceObserver) {
+                this.gcObserver = new PerformanceObserver((list) => {
+                    const entries = list.getEntries();
+                    for (const entry of entries) {
+                        this.gcLatencies.push(entry.duration);
+                    }
+                });
+                this.gcObserver.observe({ entryTypes: ['gc'] });
+            }
+        } catch (e) {
+            this.logger?.warn('MetricsCollector', 'Failed to initialize GC monitor', { error: e });
+        }
+
 
         // Initialize start times
         const now = Date.now();
         INTERVALS.forEach(int => {
             this.currentIntervalStart[int.label] = this.alignTimestamp(now, int.ms);
             this.pendingDetails[int.label] = [];
+            this.pendingThirdPartyDetails[int.label] = [];
         });
 
         // Start collection loop
@@ -103,6 +153,13 @@ export class MetricsCollector {
         });
     }
 
+    public recordThirdPartyRequest(duration: number, isError: boolean) {
+        INTERVALS.forEach(int => {
+            if (!this.pendingThirdPartyDetails[int.label]) this.pendingThirdPartyDetails[int.label] = [];
+            this.pendingThirdPartyDetails[int.label].push({ duration, isError });
+        });
+    }
+
     private alignTimestamp(ts: number, intervalMs: number): number {
         return Math.floor(ts / intervalMs) * intervalMs;
     }
@@ -116,6 +173,7 @@ export class MetricsCollector {
                 start = this.alignTimestamp(now, int.ms);
                 this.currentIntervalStart[int.label] = start;
                 this.pendingDetails[int.label] = [];
+                this.pendingThirdPartyDetails[int.label] = [];
             }
 
             if (now >= start + int.ms) {
@@ -130,7 +188,33 @@ export class MetricsCollector {
         const reqs = this.pendingDetails[label] || [];
         this.pendingDetails[label] = [];
 
-        // Calculate metrics even if reqs is empty
+        const thirdPartyReqs = this.pendingThirdPartyDetails[label] || [];
+        this.pendingThirdPartyDetails[label] = [];
+
+        // CPU Usage Calc since last flush
+        const cpuUsageEnd = process.cpuUsage();
+        const cpuTimeEnd = Date.now();
+        const elapsedCpuTime = cpuTimeEnd - this.cpuTimeStart;
+        const userUsage = (cpuUsageEnd.user - this.cpuUsageStart.user) / 1000;
+        const systemUsage = (cpuUsageEnd.system - this.cpuUsageStart.system) / 1000;
+
+        let cpuUserPercent = 0;
+        let cpuSystemPercent = 0;
+        let cpuTotalPercent = 0;
+
+        if (elapsedCpuTime > 0) {
+            cpuUserPercent = (userUsage / elapsedCpuTime) * 100;
+            cpuSystemPercent = (systemUsage / elapsedCpuTime) * 100;
+            cpuTotalPercent = cpuUserPercent + cpuSystemPercent;
+        }
+
+        // Only reset CPU usage trackers on the 10s interval (our base grain for system-level stats collection approximation)
+        if (label === '10s') {
+            this.cpuUsageStart = cpuUsageEnd;
+            this.cpuTimeStart = cpuTimeEnd;
+        }
+
+        // Calculate inbound metrics
         const totalReqs = reqs.length;
         const errorReqs = reqs.filter(r => r.isError).length;
         const successReqs = totalReqs - errorReqs;
@@ -140,28 +224,54 @@ export class MetricsCollector {
         const sum = duratons.reduce((a, b) => a + b, 0);
         const avg = totalReqs > 0 ? sum / totalReqs : 0;
 
-        const getP = (p: number) => {
-            if (duratons.length === 0) return 0;
-            const idx = Math.floor(duratons.length * p);
-            return duratons[idx];
+        const getP = (arr: number[], p: number) => {
+            if (arr.length === 0) return 0;
+            const idx = Math.floor(arr.length * p);
+            return arr[idx];
         };
 
+        // Third Party latencies
+        const thirdPartyDurations = thirdPartyReqs.map(r => r.duration).sort((a, b) => a - b);
+        const thirdPartySum = thirdPartyDurations.reduce((a, b) => a + b, 0);
+        const thirdPartyAvg = thirdPartyDurations.length > 0 ? thirdPartySum / thirdPartyDurations.length : 0;
+
         let eventLoopStats = { min: 0, max: 0, mean: 0, p50: 0, p95: 0, p99: 0 };
-        // try {
-        //     eventLoopStats = {
-        //         min: this.eventLoopHistogram.min / 1e6,
-        //         max: this.eventLoopHistogram.max / 1e6,
-        //         mean: this.eventLoopHistogram.mean / 1e6,
-        //         p50: this.eventLoopHistogram.percentile(50) / 1e6,
-        //         p95: this.eventLoopHistogram.percentile(95) / 1e6,
-        //         p99: this.eventLoopHistogram.percentile(99) / 1e6,
-        //     };
-        // } catch (e) { }
+        if (this.eventLoopHistogram) {
+            try {
+                eventLoopStats = {
+                    min: this.eventLoopHistogram.min / 1e6,
+                    max: this.eventLoopHistogram.max / 1e6,
+                    mean: this.eventLoopHistogram.mean / 1e6,
+                    p50: this.eventLoopHistogram.percentile(50) / 1e6,
+                    p95: this.eventLoopHistogram.percentile(95) / 1e6,
+                    p99: this.eventLoopHistogram.percentile(99) / 1e6,
+                };
+                if (label === '10s') this.eventLoopHistogram.reset();
+            } catch (e) { }
+        }
+
+        let gcStats = { min: 0, max: 0, mean: 0, p50: 0, p95: 0, p99: 0 };
+        if (this.gcLatencies.length > 0) {
+            const sortedGcLats = [...this.gcLatencies].sort((a, b) => a - b);
+            gcStats = {
+                min: sortedGcLats[0],
+                max: sortedGcLats[sortedGcLats.length - 1],
+                mean: sortedGcLats.reduce((a, b) => a + b, 0) / sortedGcLats.length,
+                p50: getP(sortedGcLats, 0.50),
+                p95: getP(sortedGcLats, 0.95),
+                p99: getP(sortedGcLats, 0.99),
+            };
+        }
+        if (label === '10s') this.gcLatencies = [];
 
         const metric: AggregatedMetric = {
             timestamp,
             interval: label,
-            cpu: os.loadavg()[0], // Using load avg for simplicity as per requirements (Load)
+            cpu: {
+                user: cpuUserPercent,
+                system: cpuSystemPercent,
+                total: cpuTotalPercent
+            },
             load: os.loadavg(),
             memory: {
                 used: process.memoryUsage().rss,
@@ -170,6 +280,7 @@ export class MetricsCollector {
                 heapTotal: process.memoryUsage().heapTotal,
             },
             eventLoopLatency: eventLoopStats,
+            gcLatency: gcStats,
             requests: {
                 total: totalReqs,
                 rps,
@@ -180,9 +291,23 @@ export class MetricsCollector {
                 min: duratons[0] || 0,
                 max: duratons[duratons.length - 1] || 0,
                 avg,
-                p50: getP(0.50),
-                p95: getP(0.95),
-                p99: getP(0.99),
+                p1: getP(duratons, 0.01),
+                p10: getP(duratons, 0.10),
+                p25: getP(duratons, 0.25),
+                p50: getP(duratons, 0.50),
+                p75: getP(duratons, 0.75),
+                p90: getP(duratons, 0.90),
+                p95: getP(duratons, 0.95),
+                p99: getP(duratons, 0.99),
+            },
+            thirdPartyLatency: {
+                min: thirdPartyDurations[0] || 0,
+                max: thirdPartyDurations[thirdPartyDurations.length - 1] || 0,
+                avg: thirdPartyAvg,
+                p50: getP(thirdPartyDurations, 0.50),
+                p90: getP(thirdPartyDurations, 0.90),
+                p95: getP(thirdPartyDurations, 0.95),
+                p99: getP(thirdPartyDurations, 0.99),
             }
         };
 
@@ -204,6 +329,7 @@ export class MetricsCollector {
     // Cleanup if needed
     public stop() {
         if (this.timer) clearInterval(this.timer);
-        // try { this.eventLoopHistogram.disable(); } catch (e) { }
+        try { if (this.eventLoopHistogram) this.eventLoopHistogram.disable(); } catch (e) { }
+        try { if (this.gcObserver) this.gcObserver.disconnect(); } catch (e) { }
     }
 }
