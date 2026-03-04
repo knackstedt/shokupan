@@ -1,4 +1,3 @@
-import brotliPromise from 'brotli-wasm';
 import { decompressSync, gunzipSync } from 'fflate';
 import { decompress as zstdDecompress } from 'fzstd';
 
@@ -19,7 +18,8 @@ export async function decompress(data: Uint8Array, encoding: string): Promise<Ui
         }
 
         if (enc === 'br') {
-            const brotli = await brotliPromise;
+            const brotliModule: any = await import('brotli-wasm');
+            const brotli = await (brotliModule.default || brotliModule);
             return brotli.decompress(data);
         }
 
