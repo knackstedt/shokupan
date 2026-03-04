@@ -159,6 +159,27 @@ async createUser(@Body() userData: any) {
 }
 ```
 
+:::tip[Automatic Schema Inference]
+When you annotate `@Body()` with a concrete TypeScript type instead of `any`, Shokupan's static AST analyzer automatically reads it to generate OpenAPI request body schemas — no extra annotations required:
+
+```typescript
+interface CreateUserDto {
+    name: string;
+    email: string;
+    age: number;
+}
+
+@Post('/users')
+async createUser(@Body() userData: CreateUserDto) {
+    // The request body schema is automatically inferred from CreateUserDto
+    return { created: userData };
+}
+```
+
+See [Validation → TypeScript AST Inference](/plugins/validation/#typescript-ast-inference-zero-config) for the full details.
+:::
+
+
 ### @Headers
 
 Access request headers:

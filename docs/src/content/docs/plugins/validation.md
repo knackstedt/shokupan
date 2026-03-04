@@ -1,9 +1,136 @@
 ---
 title: Validation
-description: Validate request data with Zod, TypeBox, Ajv, or Valibot
+description: Validate request data automatically via TypeScript AST inference, or explicitly with Zod, TypeBox, Ajv, or Valibot
 ---
 
-Shokupan supports multiple validation libraries, giving you the flexibility to use your preferred validator.
+Shokupan provides two complementary approaches to validation:
+
+1. **TypeScript AST Inference** — Zero-config, zero-runtime-overhead. Shokupan statically analyses your TypeScript source code to automatically infer request and response schemas used for OpenAPI generation, the Debug Dashboard, and request analysis.
+2. **Runtime Validation** — Explicit validation middleware using your preferred library (Zod, TypeBox, Ajv, or Valibot) that throws on bad input at request time.
+
+---
+
+## TypeScript AST Inference (Zero-Config)
+
+> **This feature is unique to Shokupan.** No other comparable framework reads your TypeScript source to automatically derive schemas for your routes.
+
+When Shokupan starts, it launches a **background worker thread** that runs the TypeScript compiler API against your source files. The analyzer walks the AST of every route handler and controller method to extract:
+
+- **Request body schema** — from `ctx.body() as MyType` or handler parameter types
+- **Query parameter types** — from `ctx.query.fieldName` access and coercion calls (`parseInt`, `parseFloat`, `Boolean`)
+- **Path parameter types** — from `ctx.params.id` access patterns
+- **Response schema** — from explicit return type annotations or `ctx.json({...})` call shapes
+
+The analysis happens **asynchronously in a background worker thread** and never blocks startup. Results feed directly into:
+- Auto-generated OpenAPI specifications (no annotations required)
+- The Debug Dashboard's route inspector and middleware tracker
+- The API Explorer's request shape previews
+
+:::tip[Pre-compile in CI for zero startup cost]
+For large codebases you can run `bunx shokupan generate --ast` in your CI/CD pipeline to output a static `shokupan-ast.json`. Shokupan detects this file on startup and skips the worker thread entirely, giving you the same schemas with no analysis overhead. See [Pre-compiling AST Generation](/guides/ast-generation/) for the full CI workflow.
+:::
+
+### Functional Routes
+
+The analyzer understands several patterns automatically:
+
+```typescript
+// Pattern 1: Type assertion on ctx.body()
+// The analyzer reads `as { name: string; email: string }` from the source
+app.post('/users', async (ctx) => {
+    const body = await ctx.body() as { name: string; email: string };
+    return { created: body };
+});
+
+// Pattern 2: Explicit return type annotation
+// The analyzer reads the `Promise<{ id: string; name: string }>` return type
+app.get('/users/:id', async (ctx): Promise<{ id: string; name: string }> => {
+    return { id: ctx.params.id, name: 'Alice' };
+});
+
+// Pattern 3: Query parameter coercion inference
+// ctx.query.page used with parseInt → inferred as integer
+// ctx.query.name used directly → inferred as string
+app.get('/search', (ctx) => {
+    const page = parseInt(ctx.query.page);
+    const name = ctx.query.name;
+    return { page, name };
+});
+
+// Pattern 4: Inline metadata object (also used for OpenAPI)
+app.post('/products', {
+    summary: 'Create a product',
+    tags: ['products'],
+}, async (ctx) => {
+    const body = await ctx.body() as { name: string; price: number };
+    return { created: body };
+});
+```
+
+### Controller Methods
+
+The AST analyzer fully supports decorator-based controllers. It reads parameter decorator types and method return type annotations:
+
+```typescript
+interface CreateUserDto {
+    name: string;
+    email: string;
+    age: number;
+}
+
+interface UserResponse {
+    id: string;
+    name: string;
+    email: string;
+}
+
+@Controller('/users')
+export class UserController {
+
+    // Return type annotation → inferred response schema
+    @Get('/:id')
+    async getUser(@Param('id') id: string): Promise<UserResponse> {
+        return { id, name: 'Alice', email: 'alice@example.com' };
+    }
+
+    // @Body() parameter type → inferred request body schema
+    @Post('/')
+    async createUser(@Body() body: CreateUserDto): Promise<UserResponse> {
+        return { id: 'new-id', ...body };
+    }
+}
+```
+
+### What the Analyzer Detects
+
+| Pattern | Example | Inferred |
+|---------|---------|---------|
+| Body type assertion | `ctx.body() as MyType` | Request body schema from `MyType` |
+| Body param decorator | `@Body() body: MyDto` | Request body schema from `MyDto` |
+| Return type annotation | `async (): Promise<MyType>` | Response schema from `MyType` |
+| `ctx.json({...})` shape | `ctx.json({ id, name })` | Response schema from object shape |
+| Query param access | `ctx.query.page` | Query param `page: string` |
+| Query with `parseInt` | `parseInt(ctx.query.page)` | Query param `page: integer` |
+| Query with `parseFloat` | `parseFloat(ctx.query.price)` | Query param `price: number` |
+| `@Query()` decorator | `@Query('q') q: string` | Query param `q: string` |
+| `@Param()` decorator | `@Param('id') id: string` | Path param `id: string` |
+| `@Headers()` decorator | `@Headers('x-api-key') k: string` | Header `x-api-key: string` |
+
+### Limitations
+
+The AST inference is static analysis — it reads your **TypeScript source files**, not the compiled output. There are some things it cannot detect:
+
+- **Dynamic types**: If your body type is a runtime variable (e.g., `ctx.body() as typeof mySchema`), the analyzer cannot resolve it.
+- **External type re-exports without source**: Types imported from `node_modules` that don't ship `.d.ts` may not be fully resolved.
+- **Conditional/union types in handlers**: Complex conditional logic producing different response shapes may only capture one branch.
+
+For these cases, use the **explicit validation** and **inline OpenAPI metadata** approaches described below, or use `@Spec()` to provide an override.
+
+:::note
+The AST worker runs automatically in development mode. In production, it only runs when [`ScalarPlugin`](/plugins/scalar/), [`DashboardPlugin`](/plugins/dashboard/), or [`APIExplorerPlugin`](/plugins/api-explorer/) are mounted. For CI/CD deployments, **pre-compiling** the AST with `bunx shokupan generate --ast` eliminates the worker entirely — see [Pre-compiling AST Generation](/guides/ast-generation/).
+:::
+
+---
 
 ## Zod Validation
 
