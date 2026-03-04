@@ -466,47 +466,37 @@ export class ShokupanContext<
                     open: (ws: ServerWebSocket<any>) => {
                         // Tracking Logic (if enabled)
                         if (this.app.applicationConfig.enableWebSocketTracking) {
-                            const track = (type: 'open' | 'close' | 'message', dir: 'in' | 'out', size?: number) => {
+                            const track = (type: 'open' | 'close' | 'message', dir: 'in' | 'out' | 'system', data?: any, size?: number) => {
                                 const msg = {
                                     type,
                                     dir,
+                                    data,
                                     size: size || 0,
                                     timestamp: Date.now()
                                 };
                                 (this as any)[$wsMessages].push(msg);
-                                // console.log('[Context Debug] Tracking WS Message:', type, dir, 'Handler:', !!(this as any)[$onWsMessage], 'ID:', this.requestId);
                                 if ((this as any)[$onWsMessage]) {
                                     (this as any)[$onWsMessage](msg);
                                 }
                             };
 
-                            track('open', 'in');
+                            // Track connection open (single event, no duplicate)
+                            track('open', 'system');
 
-                            // Proxy send methods to capture outgoing messages
+                            // Proxy send methods to capture outgoing messages + data
                             const originalSend = ws.send.bind(ws);
                             ws.send = (data, compress) => {
                                 const size = typeof data === 'string' ? data.length : (data as any)?.byteLength || 0;
-                                track('message', 'out', size);
+                                track('message', 'out', typeof data === 'string' ? data : '[binary]', size);
                                 return originalSend(data, compress);
                             };
 
                             const originalPublish = ws.publish.bind(ws);
                             ws.publish = (topic, data, compress) => {
                                 const size = typeof data === 'string' ? data.length : (data as any)?.byteLength || 0;
-                                track('message', 'out', size);
+                                track('message', 'out', typeof data === 'string' ? data : '[binary]', size);
                                 return originalPublish(topic, data, compress);
                             };
-                        }
-
-                        if (this.app.applicationConfig.enableWebSocketTracking) {
-                            const msg = {
-                                type: 'open',
-                                dir: 'in',
-                                size: 0,
-                                timestamp: Date.now()
-                            };
-                            (this as any)[$wsMessages].push(msg);
-                            if ((this as any)[$onWsMessage]) (this as any)[$onWsMessage](msg);
                         }
 
                         if (handlers.open) handlers.open(this, ws);
@@ -517,6 +507,7 @@ export class ShokupanContext<
                             const msg = {
                                 type: 'message',
                                 dir: 'in',
+                                data: typeof message === 'string' ? message : '[binary]',
                                 size,
                                 timestamp: Date.now()
                             };
@@ -530,7 +521,8 @@ export class ShokupanContext<
                         if (this.app.applicationConfig.enableWebSocketTracking) {
                             const msg = {
                                 type: 'close',
-                                dir: 'in',
+                                dir: 'system',
+                                data: message ? `code=${code} ${message}` : `code=${code}`,
                                 size: 0,
                                 timestamp: Date.now()
                             };
@@ -547,7 +539,8 @@ export class ShokupanContext<
                         if (this.app.applicationConfig.enableWebSocketTracking) {
                             const msg = {
                                 type: 'error',
-                                dir: 'in',
+                                dir: 'system',
+                                data: error?.message || 'WebSocket error',
                                 size: 0,
                                 timestamp: Date.now()
                             };
@@ -661,14 +654,6 @@ export class ShokupanContext<
     }
 
 
-    /**
-     * Read request body with caching to avoid double parsing.
-     * The body is only parsed once and cached for subsequent reads.
-     */
-    /**
-     * Read request body with caching to avoid double parsing.
-     * The body is only parsed once and cached for subsequent reads.
-     */
     async body<T = any>(): Promise<T> {
         // If there was an error during pre-parsing, throw it now
         if (this[$bodyParseError] !== undefined) {
@@ -688,6 +673,13 @@ export class ShokupanContext<
         this[$bodyParsed] = true;
 
         return this[$cachedBody] as T;
+    }
+
+    /**
+     * Gets the parsed request body if it has been read.
+     */
+    get requestBody() {
+        return this[$cachedBody];
     }
 
     /**

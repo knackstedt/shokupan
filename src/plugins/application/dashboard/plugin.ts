@@ -62,6 +62,7 @@ export interface RequestLog {
     requestHeaders?: Record<string, string>;
     responseHeaders?: Record<string, string>;
     requestBody?: any;
+    responseBody?: any;
     wsMessages?: any[];
 }
 
@@ -228,7 +229,7 @@ export class Dashboard implements ShokupanPlugin {
                 timestamp: log.startTime, // Use startTime as timestamp
                 type: 'fetch',
                 direction: 'outbound',
-                size: log.responseBody ? String(log.responseBody).length : 0,
+                size: log.responseSize || (log.responseBody ? (typeof log.responseBody === 'string' ? log.responseBody.length : ((log.responseBody instanceof ArrayBuffer || log.responseBody instanceof Uint8Array) ? log.responseBody.byteLength : 0)) : 0),
                 contentType: log.responseHeaders['content-type'] || log.responseHeaders['Content-Type'],
                 body: log.responseBody,
                 requestBody: log.requestBody,
@@ -766,7 +767,7 @@ export class Dashboard implements ShokupanPlugin {
 
             const ignorePaths = [
                 // Add default ignores for integrations
-                ...Object.values(integrations).filter(p => !!p).flatMap(p => {
+                ...Object.values(integrations).filter(p => !!p && p !== '/' && p.startsWith('/')).flatMap(p => {
                     const clean = p!.endsWith('/') ? p!.slice(0, -1) : p!;
                     return [clean, `${clean}/**`];
                 })
@@ -1044,6 +1045,18 @@ export class Dashboard implements ShokupanPlugin {
             },
 
             onResponseEnd: async (ctx: any, response: any) => {
+                // DEBUG: Trace every call to onResponseEnd
+                const _isUpgrade = !response && ctx.isUpgraded;
+                const _isFiltered = ctx.path.startsWith(this.mountPath);
+                if (_isUpgrade || ctx.method === 'GET' && ctx.request?.headers?.get?.('upgrade') === 'websocket') {
+                    console.log('[Dashboard DEBUG] onResponseEnd WS call:', {
+                        path: ctx.path,
+                        method: ctx.method,
+                        isUpgraded: ctx.isUpgraded,
+                        responseStatus: response?.status,
+                        filtered: _isFiltered,
+                    });
+                }
                 // Ignore dashboard requests to prevent noise and loops
                 if (ctx.path.startsWith(this.mountPath)) return;
 
@@ -1120,9 +1133,10 @@ export class Dashboard implements ShokupanPlugin {
                             status: response.status,
                             timestamp: Date.now(),
                             state: ctx.state,
-                            body: this.serializeBody((ctx as any).bodyData || (ctx as any).requestBody),
+                            requestBody: (ctx as any).bodyData || (ctx as any).requestBody,
                             responseHeaders: resHeaders,
-                            responseBody: this.serializeBody((ctx as any).responseBody)
+                            responseBody: this.serializeBody((ctx as any).responseBody),
+                            body: this.serializeBody((ctx as any).responseBody)
                         });
                     } catch (e) {
                         this[$appRoot].logger?.error('Dashboard', 'Failed to record failed request', e);
@@ -1150,8 +1164,44 @@ export class Dashboard implements ShokupanPlugin {
                     });
                 }
 
-                const responseHeadersSize = Object.entries(response.headers || {}).reduce((acc, [k, v]) => acc + k.length + String(v).length + 2, 0);
-                const responseSize = (ctx as any).responseBody ? String((ctx as any).responseBody).length : 0;
+                const responseHeadersSize = Object.entries(resHeaders).reduce((acc, [k, v]) => acc + k.length + String(v).length + 2, 0);
+
+                let body = (ctx as any).responseBody;
+
+                // If body is missing (manual response), try to capture it
+                if (!body && response instanceof Response && response.body && !response.bodyUsed) {
+                    try {
+                        const clone = response.clone();
+                        const contentType = response.headers.get('content-type') || '';
+                        const contentEncoding = response.headers.get('content-encoding') || '';
+
+                        // Expand detection for common static file types
+                        const isTextLike = contentType.includes('json') ||
+                            contentType.includes('text') ||
+                            contentType.includes('xml') ||
+                            contentType.includes('html') ||
+                            contentType.includes('javascript') ||
+                            contentType.includes('css') ||
+                            contentType.includes('svg');
+
+                        const isCompressed = contentEncoding && contentEncoding !== 'identity';
+
+                        if (contentType.includes('json') && !isCompressed) {
+                            body = await clone.json();
+                        } else if (isTextLike && !isCompressed) {
+                            body = await clone.text();
+                        } else {
+                            body = await clone.arrayBuffer();
+                        }
+                    } catch (e) {
+                        // Ignore body capture errors
+                    }
+                }
+
+                const contentLength = response.headers.get('content-length');
+                const responseSize = (contentLength ? parseInt(contentLength, 10) : 0) || (body
+                    ? (typeof body === 'string' ? body.length : (body instanceof ArrayBuffer || body instanceof Uint8Array ? body.byteLength : 0))
+                    : 0);
 
                 // Try to get remote IP from various headers or socket, or use cached value
                 let remoteIP = (ctx as any)._cachedRemoteIP || (ctx as any).ip || ctx.request.headers.get('x-forwarded-for') || (ctx.req as any)?.socket?.remoteAddress;
@@ -1172,10 +1222,10 @@ export class Dashboard implements ShokupanPlugin {
                     duration,
                     timestamp: (ctx as any)._reqStartTime || (Date.now() - duration),
                     handlerStack: this.serializeHandlerStack((ctx as any).handlerStack),
-                    body: this.serializeBody((ctx as any).responseBody),
-                    requestBody: (ctx as any).bodyData || (ctx as any).requestBody, // ShokupanContext usually stores parsed body here if parsed
-                    contentType: response.headers['content-type'] || response.headers['Content-Type'],
-                    type: 'xhr',
+                    body: this.serializeBody(body),
+                    requestBody: ctx.requestBody || (ctx as any).bodyData || (ctx as any).requestBody, // ShokupanContext usually stores parsed body here if parsed
+                    contentType: resHeaders['content-type'] || resHeaders['Content-Type'],
+                    type: response.status === 101 ? 'ws' : 'xhr',
                     direction: 'inbound',
                     size: responseSize,
                     protocol: (ctx.req as any)?.httpVersion, // Try to get protocol from raw request if available, Bun might expose it
@@ -1187,6 +1237,7 @@ export class Dashboard implements ShokupanPlugin {
                     remoteIP,
                     requestHeaders: headers,
                     responseHeaders: resHeaders,
+                    responseBody: this.serializeBody(body),
                     wsMessages: (ctx as any)[$wsMessages]
                 };
 
@@ -1225,26 +1276,27 @@ export class Dashboard implements ShokupanPlugin {
                     };
                 }
 
-                this.metrics.logs.push(logEntry);
+                const requestData = {
+                    id: ctx.requestId,
+                    ...logEntry
+                };
+
+                this.metrics.logs.push(requestData as any);
 
                 // Persist to datastore for detailed view
-                this.db.create('request', ctx.requestId, {
-                    ...logEntry,
-                    id: ctx.requestId,
-                    direction: "inbound"
-                }).catch(e => {
-                    this[$appRoot]?.logger?.error('Dashboard', "Failed to record request log", { error: e });
-                });
+                if (this.db) {
+                    this.db.create('request', ctx.requestId, {
+                        ...requestData,
+                        direction: "inbound"
+                    }).catch(e => {
+                        this[$appRoot]?.logger?.error('Dashboard', "Failed to record request log", { error: e });
+                    });
+                }
                 const retention = this.dashboardConfig.retentionMs ?? 7200000;
                 const cutoff = Date.now() - retention;
                 if (this.metrics.logs.length > 0 && this.metrics.logs[0].timestamp < cutoff) {
                     this.metrics.logs = this.metrics.logs.filter(log => log.timestamp >= cutoff);
                 }
-
-                const requestData = {
-                    id: ctx.requestId,
-                    ...logEntry
-                };
 
                 const strategy = this.dashboardConfig.updateStrategy || 'immediate';
 
@@ -1338,12 +1390,7 @@ export class Dashboard implements ShokupanPlugin {
         }
 
         // Handle objects (JSON)
-        // If it's already an object, we can return it directly if it's JSON-safe
-        // But for safety and to avoid circular deps in logs, let's try to stringify if needed
-        // Or better yet, we can store it as object and let the JSON serializer handle it when sending over WS
-        // But for DB, we might want it as object too (surrealdb handles json)
-        // Let's truncate if too big
-        if (typeof body === 'object') {
+        if (typeof body === 'object' && !(body instanceof ArrayBuffer) && !(body instanceof Uint8Array)) {
             try {
                 // Check size roughly
                 const str = JSON.stringify(body);
@@ -1354,6 +1401,43 @@ export class Dashboard implements ShokupanPlugin {
             } catch (e) {
                 return '[Circular or Non-Serializable Body]';
             }
+        }
+
+        // Handle binary/buffers (common for static files)
+        if (body instanceof ArrayBuffer || body instanceof Uint8Array) {
+            const buffer = body instanceof Uint8Array ? body : new Uint8Array(body);
+            if (buffer.length === 0) return undefined;
+
+            // If it's small enough and likely text, try to decode it for easy viewing
+            // However, if we want to support browser-side decompression, we should 
+            // probably send it as base64 if it's NOT plain text.
+
+            // For now, let's keep the UTF-8 check, but if it fails, return as base64 object
+            if (buffer.length < 1024 * 1024) {
+                try {
+                    const decoder = new TextDecoder('utf-8', { fatal: true });
+                    const text = decoder.decode(buffer);
+                    if (text.length > 524288) {
+                        return text.substring(0, 524288) + '... (truncated)';
+                    }
+                    return text;
+                } catch (e) {
+                    // Not valid UTF-8, proceed to base64
+                }
+            }
+
+            // Return as a special object that the browser can recognize
+            // Truncate if extremely large
+            const limit = 1024 * 1024; // 1MB limit for logs
+            if (buffer.length > limit) {
+                return `[Binary Data: ${buffer.length} bytes (too large for log)]`;
+            }
+
+            return {
+                __binary: true,
+                data: Buffer.from(buffer).toString('base64'),
+                length: buffer.length
+            };
         }
 
         return '[Binary or Unreadable Body]';

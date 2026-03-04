@@ -76,6 +76,10 @@ export interface OutboundRequestLog {
      * The estimated transfer size in bytes.
      */
     transferred?: number;
+    /**
+     * The actual size of the response body in bytes.
+     */
+    responseSize?: number;
 }
 
 /**
@@ -393,13 +397,17 @@ export class FetchInterceptor {
 
         let responseBody: any;
         let transferred = 0;
+        let responseSize = 0;
 
         try {
             // Check content type to decide how to read
             const contentType = response.headers.get('content-type') || '';
             let bodyText = '';
+            const contentEncoding = response.headers.get('content-encoding') || '';
+            const isCompressed = contentEncoding && contentEncoding !== 'identity' && contentEncoding !== 'none';
+            const isTextLike = contentType.includes('application/json') || contentType.includes('text/') || contentType.includes('xml') || contentType.includes('javascript') || contentType.includes('css');
 
-            if (contentType.includes('application/json') || contentType.includes('text/')) {
+            if (isTextLike && !isCompressed) {
                 bodyText = await response.text();
                 // truncate if too large
                 if (bodyText.length > 524288) { // 512KB limit from previous task
@@ -408,21 +416,37 @@ export class FetchInterceptor {
                     responseBody = bodyText;
                 }
             } else {
-                responseBody = '[Binary Content]';
-                // Try to get size from content-length if binary
-                const cl = response.headers.get('content-length');
-                if (cl) transferred = parseInt(cl, 10);
+                const buffer = await response.arrayBuffer();
+                responseSize = buffer.byteLength;
+                transferred = responseSize;
+
+                if (responseSize > 0) {
+                    if (responseSize > 1024 * 1024) {
+                        responseBody = `[Binary Content: ${responseSize} bytes (too large)]`;
+                    } else {
+                        responseBody = {
+                            __binary: true,
+                            data: Buffer.from(buffer).toString('base64'),
+                            length: responseSize
+                        };
+                    }
+                } else {
+                    responseBody = undefined;
+                }
+            }
+
+            if (!responseSize && bodyText) {
+                responseSize = bodyText.length;
             }
 
             // Calculate transferred size (headers + body)
             // Approximate headers size
-            const headersSize = Object.entries(responseHeaders).reduce((acc, [k, v]) => acc + k.length + v.length + 2, 0);
-            if (!transferred && bodyText) {
-                transferred = headersSize + bodyText.length;
-            } else if (!transferred) {
-                transferred = headersSize; // minimal fallback
+            const headersSize = Object.entries(responseHeaders).reduce((acc, [k, v]) => acc + k.length + (v?.length || 0) + 2, 0);
+            if (!transferred) {
+                transferred = headersSize + responseSize;
+            } else {
+                transferred += headersSize;
             }
-
         } catch (e) {
             responseBody = '[Failed to read response body]';
         }
@@ -431,6 +455,7 @@ export class FetchInterceptor {
             ...meta,
             responseHeaders,
             responseBody,
+            responseSize,
             transferred
         });
     }

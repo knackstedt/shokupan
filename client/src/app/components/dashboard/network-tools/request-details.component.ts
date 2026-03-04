@@ -1,5 +1,5 @@
 import { CommonModule, KeyValuePipe } from '@angular/common';
-import { Component, computed, input, output, signal } from '@angular/core';
+import { CUSTOM_ELEMENTS_SCHEMA, Component, DestroyRef, computed, effect, inject, input, output, signal } from '@angular/core';
 import { MonacoEditorComponent } from '@dotglitch/ngx-common/monaco-editor';
 import { NgScrollbarModule } from 'ngx-scrollbar';
 import { ButtonModule } from 'primeng/button';
@@ -7,6 +7,7 @@ import { Tab, TabList, TabPanel, TabPanels, Tabs } from 'primeng/tabs';
 import { TooltipModule } from 'primeng/tooltip';
 import { HeaderTokensPipe } from './header-tokens.pipe';
 import { NetworkRequest, formatBytes, formatDurationPretty, generateCurlCode, generateFetchCode, generateHAR } from './network-utils';
+import { isSupportedEncoding } from './util/decompression';
 
 @Component({
     selector: 'skp-request-details',
@@ -26,13 +27,73 @@ import { NetworkRequest, formatBytes, formatDurationPretty, generateCurlCode, ge
         HeaderTokensPipe
     ],
     templateUrl: './request-details.component.html',
-    styleUrl: './request-details.component.scss'
+    styleUrl: './request-details.component.scss',
+    schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class RequestDetailsComponent {
     request = input.required<NetworkRequest>();
     onClose = output<void>();
 
+    private worker: Worker | null = null;
+
+    private destroyRef = inject(DestroyRef);
+
     readonly activeTab = signal<string | number>('headers');
+
+    readonly decodedBody = signal<string | null>(null);
+    readonly isDecoding = signal(false);
+
+    readonly loadedRequestBody = signal<any>(null);
+    readonly loadedResponseBody = signal<any>(null);
+    readonly isLoadingPayload = signal(false);
+
+    constructor() {
+        this.destroyRef.onDestroy(() => {
+            this.worker?.terminate();
+        });
+
+        // Effect for request change: reset states
+        effect(() => {
+            const _ = this.request();
+            this.decodedBody.set(null);
+            this.isDecoding.set(false);
+            this.loadedRequestBody.set(null);
+            this.loadedResponseBody.set(null);
+            this.isLoadingPayload.set(false);
+
+            if (this.worker) {
+                this.worker.terminate();
+                this.worker = null;
+            }
+        });
+
+        // Effect for tab change: load payload if needed
+        effect(() => {
+            const tab = this.activeTab();
+            const req = this.request();
+
+            if (tab === 'payload' && !this.loadedRequestBody() && req.hasRequestBody) {
+                this.loadPayload('request');
+            } else if (tab === 'response' && !this.loadedResponseBody() && req.hasResponseBody) {
+                this.loadPayload('response');
+            }
+        });
+
+        // Effect for decompression: trigger when response body is loaded and has compression
+        effect(() => {
+            const req = this.request();
+            const body = this.loadedResponseBody();
+            if (this.hasCompression() && body && !this.decodedBody() && !this.isDecoding()) {
+                this.triggerDecompression();
+            }
+        });
+    }
+
+    readonly hasCompression = computed(() => {
+        const req = this.request();
+        const encoding = req.responseHeaders?.['content-encoding'] || req.responseHeaders?.['Content-Encoding'];
+        return isSupportedEncoding(encoding);
+    });
 
     /** Parse query parameters from the request URL */
     readonly queryParams = computed(() => {
@@ -151,21 +212,129 @@ export class RequestDetailsComponent {
     /** Serialize body to a pretty-printed string for Monaco */
     bodyString(body: any): string {
         if (!body) return '';
+
+        let target = body;
+        // If it's a string, try to see if it's a stringified binary object
         if (typeof body === 'string') {
-            try { return JSON.stringify(JSON.parse(body), null, 2); } catch { return body; }
+            if (body.startsWith('{') && body.includes('__binary')) {
+                try {
+                    const parsed = JSON.parse(body);
+                    if (parsed && typeof parsed === 'object' && parsed.__binary) {
+                        target = parsed;
+                    }
+                } catch { }
+            } else {
+                return body;
+            }
         }
-        return JSON.stringify(body, null, 2);
+
+        // Handle our special binary object
+        if (target && typeof target === 'object' && target.__binary) {
+            return this.getBinaryPlaceholder(target);
+        }
+
+        // If it's an object but not our binary one, stringify it
+        if (target && typeof target === 'object') {
+            try {
+                return JSON.stringify(target, null, 2);
+            } catch {
+                return '[Non-serializable Object]';
+            }
+        }
+
+        return String(target);
+    }
+
+    private getBinaryPlaceholder(body: any): string {
+        return `[Binary Data: ${body.length || 0} bytes]`;
     }
 
     /** Detect language for Monaco from the content-type or body shape */
     bodyLanguage(body: any, contentType?: string): string {
+        if (body && typeof body === 'object' && body.__binary) return 'plaintext';
         const ct = (contentType || '').toLowerCase();
-        if (ct.includes('json') || (typeof body === 'object' && body !== null)) return 'json';
+        if (ct.includes('json') || (typeof body === 'object' && body !== null && !body.__binary)) return 'json';
         if (ct.includes('html') || (typeof body === 'string' && body.trimStart().startsWith('<'))) return 'html';
         if (ct.includes('xml')) return 'xml';
         if (ct.includes('css')) return 'css';
         if (ct.includes('javascript') || ct.includes('js')) return 'javascript';
         return 'plaintext';
+    }
+
+    async loadPayload(type: 'request' | 'response') {
+        const req = this.request();
+        this.isLoadingPayload.set(true);
+
+        try {
+            const res = await fetch(`/dashboard/requests/${req.id}/payload/${type}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            const contentType = res.headers.get('content-type') || '';
+            let data: any;
+
+            if (contentType.includes('application/json')) {
+                data = await res.json();
+            } else if (contentType.includes('text/')) {
+                data = await res.text();
+            } else {
+                // Binary data - Handle large buffers by chunking to avoid stack limits
+                const buffer = await res.arrayBuffer();
+                const uint8 = new Uint8Array(buffer);
+                let binary = '';
+                const chunkSize = 8192;
+                for (let i = 0; i < uint8.length; i += chunkSize) {
+                    binary += String.fromCharCode(...uint8.slice(i, i + chunkSize));
+                }
+
+                data = {
+                    __binary: true,
+                    data: btoa(binary),
+                    length: buffer.byteLength
+                };
+            }
+
+            if (type === 'request') this.loadedRequestBody.set(data);
+            else this.loadedResponseBody.set(data);
+        } catch (err) {
+            console.error(`Failed to load ${type} payload:`, err);
+            if (type === 'request') this.loadedRequestBody.set(`[Error loading request body: ${err}]`);
+            else this.loadedResponseBody.set(`[Error loading response body: ${err}]`);
+        } finally {
+            this.isLoadingPayload.set(false);
+        }
+    }
+
+    async triggerDecompression() {
+        const req = this.request();
+        const bodyData = this.loadedResponseBody();
+        const encoding = req.responseHeaders?.['content-encoding'] || req.responseHeaders?.['Content-Encoding'];
+
+        if (!bodyData || !encoding || !isSupportedEncoding(encoding)) {
+            this.decodedBody.set(null);
+            return;
+        }
+
+        this.isDecoding.set(true);
+
+        this.worker ??= new Worker(new URL('./util/decompression.worker.ts', import.meta.url), { type: 'module' });
+
+        this.worker.onmessage = ({ data }) => {
+            if (data.error) {
+                console.error('Worker decompression failed:', data.error);
+                this.decodedBody.set(`[Decompression Error: ${data.error}]`);
+            } else {
+                this.decodedBody.set(data.result);
+            }
+            this.isDecoding.set(false);
+        };
+
+        this.worker.onerror = (err) => {
+            console.error('Worker error:', err);
+            this.decodedBody.set(`[Worker Error]`);
+            this.isDecoding.set(false);
+        };
+
+        this.worker.postMessage({ bodyData, encoding });
     }
 
     formatBytes(b: number) { return formatBytes(b); }
@@ -217,12 +386,14 @@ export class RequestDetailsComponent {
 
     downloadResponse() {
         const req = this.request();
-        const content = typeof req.responseBody === 'object' ? JSON.stringify(req.responseBody, null, 2) : String(req.responseBody || '');
-        const blob = new Blob([content], { type: req.contentType || 'text/plain' });
+        const decoded = this.decodedBody();
+        const body = this.loadedResponseBody() || req.responseBody;
+        const content = decoded || (typeof body === 'object' ? JSON.stringify(body, null, 2) : String(body || ''));
+        const blob = new Blob([content], { type: decoded ? 'text/plain' : (req.contentType || 'text/plain') });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `response-${req.id}.txt`;
+        a.download = `response-${req.id}${decoded ? '.txt' : ''}`;
         a.click();
         URL.revokeObjectURL(url);
     }
@@ -239,10 +410,12 @@ export class RequestDetailsComponent {
     }
 
     copyAsCurl() {
-        this.copyToClipboard(generateCurlCode(this.request()));
+        const req = { ...this.request(), requestBody: this.loadedRequestBody() || this.request().requestBody };
+        this.copyToClipboard(generateCurlCode(req as any));
     }
 
     copyAsFetch() {
-        this.copyToClipboard(generateFetchCode(this.request()));
+        const req = { ...this.request(), requestBody: this.loadedRequestBody() || this.request().requestBody };
+        this.copyToClipboard(generateFetchCode(req as any));
     }
 }

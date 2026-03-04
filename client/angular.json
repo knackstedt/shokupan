@@ -25,6 +25,7 @@
                         "polyfills": [
                             "zone.js"
                         ],
+                        "webWorkerTsConfig": "tsconfig.worker.json",
                         "tsConfig": "tsconfig.app.json",
                         "inlineStyleLanguage": "scss",
                         "assets": [
@@ -36,6 +37,11 @@
                                 "glob": "**/*",
                                 "input": "node_modules/monaco-editor/min/vs/",
                                 "output": "./lib/monaco/vs"
+                            },
+                            {
+                                "glob": "brotli_wasm_bg.wasm",
+                                "input": "node_modules/brotli-wasm/pkg.web",
+                                "output": "/"
                             }
                         ],
                         "styles": [

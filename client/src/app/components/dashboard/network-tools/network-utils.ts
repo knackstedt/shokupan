@@ -23,6 +23,8 @@ export interface NetworkRequest {
     body?: any; // legacy compatibility
     wsMessages?: any[];
     handlerStack?: any[];
+    hasRequestBody?: boolean;
+    hasResponseBody?: boolean;
 }
 
 export function formatBytes(bytes: number, decimals: number = 2): string {

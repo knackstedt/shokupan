@@ -50,38 +50,40 @@
                         </svg>
                     </button>
                 </div>
-                <ng-scrollbar class="log-scroll">
-                    <table class="request-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 66px;">Method</th>
-                                <th>URL</th>
-                                <th style="width: 54px;">Status</th>
-                                <th style="width: 66px;">Time</th>
-                                <th style="width: 68px;">Captured</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @for (req of requests(); track $index) {
-                            <tr [class.row-error]="req.status >= 400" (click)="selectRequest(req.id)" class="clickable">
-                                <td class="status-cell">
-                                    <span class="status-dot"
-                                        [style.background-color]="req.status >= 500 ? '#ef4444' : req.status >= 400 ? '#f59e0b' : '#10b981'"></span>
-                                    <strong>{{ req.method }}</strong>
-                                </td>
-                                <td class="url-cell" [title]="req.url">{{ req.url }}</td>
-                                <td><span [class.status-error]="req.status >= 400">{{ req.status }}</span></td>
-                                <td>{{ req.duration | number:'1.0-2' }}ms</td>
-                                <td>{{ req.timestamp | date:'shortTime' }}</td>
-                            </tr>
-                            } @empty {
-                            <tr>
-                                <td colspan="5" class="empty-row">No requests recorded yet</td>
-                            </tr>
-                            }
-                        </tbody>
-                    </table>
-                </ng-scrollbar>
+                <ngx-tabulator [dataSource]="requests()" class="network-table" [selectable]="1" [headerSort]="true"
+                    [movableColumns]="true" [height]="'100%'" [rowFormatter]="rowFormatter" [layout]="'fitColumns'"
+                    (rowClick)="selectRequest($any($event)[1].getData().id)">
+
+                    <ngx-tabulator-column field="status" title="Status" [width]="100" [headerSort]="true">
+                        <ng-template let-data>
+                            <div class="status-cell">
+                                <span class="status-dot"
+                                    [style.background-color]="data.status >= 500 ? '#ef4444' : data.status >= 400 ? '#f59e0b' : '#10b981'"></span>
+                                {{ data.status || 'Pending' }}
+                            </div>
+                        </ng-template>
+                    </ngx-tabulator-column>
+
+                    <ngx-tabulator-column field="method" title="Method" [width]="90" [headerSort]="true" />
+
+                    <ngx-tabulator-column field="url" title="URL" [headerSort]="true">
+                        <ng-template let-data>
+                            <div class="url-cell" [title]="data.url">{{ data.url }}</div>
+                        </ng-template>
+                    </ngx-tabulator-column>
+
+                    <ngx-tabulator-column field="duration" title="Time" [width]="90" [headerSort]="true">
+                        <ng-template let-data>
+                            {{ formatDuration(data.duration) }}
+                        </ng-template>
+                    </ngx-tabulator-column>
+
+                    <ngx-tabulator-column field="timestamp" title="Captured" [width]="100" [headerSort]="true">
+                        <ng-template let-data>
+                            {{ data.timestamp | date:'shortTime' }}
+                        </ng-template>
+                    </ngx-tabulator-column>
+                </ngx-tabulator>
             </div>
         </div>
         }

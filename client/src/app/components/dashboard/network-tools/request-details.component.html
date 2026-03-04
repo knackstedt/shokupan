@@ -197,13 +197,23 @@
                     <div class="editor-header">
                         <span>Request Payload</span>
                         <button pButton class="p-button-text p-button-sm"
-                            (click)="copyToClipboard(bodyString(request().requestBody))">Copy</button>
+                            (click)="copyToClipboard(bodyString(loadedRequestBody() || request().requestBody))">Copy</button>
                     </div>
                     <div class="monaco-wrapper">
-                        <ngx-monaco-editor [code]="bodyString(request().requestBody)"
-                            [language]="bodyLanguage(request().requestBody, request().contentType)" [readOnly]="true"
-                            [lineNumbers]="'off'" [minimapEnabled]="false" [scrollBeyondLastLine]="false"
-                            [automaticLayout]="true" theme="vs-dark" installationLocation="/_app/lib/monaco/vs">
+                        @if (isLoadingPayload() && !loadedRequestBody()) {
+                        <div class="empty-msg flex flex-column gap-3 align-items-center justify-content-center">
+                            <i class="pi pi-spin pi-spinner" style="font-size: 2rem; color: var(--primary)"></i>
+                            <span>Loading request body...</span>
+                        </div>
+                        } @else if (!bodyString(loadedRequestBody() || request().requestBody)) {
+                        <div class="empty-msg">No request body content available</div>
+                        }
+
+                        <ngx-monaco-editor [code]="bodyString(loadedRequestBody() || request().requestBody)"
+                            [language]="bodyLanguage(loadedRequestBody() || request().requestBody, request().requestHeaders?.['content-type'] || request().requestHeaders?.['Content-Type'])"
+                            [readOnly]="true" [lineNumbers]="'off'" [minimapEnabled]="false"
+                            [scrollBeyondLastLine]="false" [automaticLayout]="true" theme="vs-dark"
+                            installationLocation="/_app/lib/monaco/vs">
                         </ngx-monaco-editor>
                     </div>
                     } @else {
@@ -217,21 +227,57 @@
                 <ng-scrollbar class="tab-content">
                     @if (request().responseBody || request().body) {
                     <div class="editor-header">
-                        <span>Response Body</span>
+                        <div class="flex-1 flex gap-2 align-items-center">
+                            <span>Response Body</span>
+                            @if ((hasCompression() && isDecoding()) || isLoadingPayload()) {
+                            <i class="pi pi-spin pi-spinner" style="font-size: 1rem; color: var(--primary)"></i>
+                            <span class="text-xs text-muted">{{ isLoadingPayload() ? 'Loading...' : 'Decoding...'
+                                }}</span>
+                            }
+                        </div>
                         <div class="actions">
                             <button pButton class="p-button-text p-button-sm"
-                                (click)="copyToClipboard(bodyString(request().responseBody || request().body))">Copy</button>
+                                (click)="copyToClipboard(bodyString(decodedBody() || loadedResponseBody() || request().responseBody || request().body))">Copy</button>
                             <button pButton class="p-button-text p-button-sm"
                                 (click)="downloadResponse()">Download</button>
                         </div>
                     </div>
                     <div class="monaco-wrapper">
-                        <ngx-monaco-editor [code]="bodyString(request().responseBody || request().body)"
-                            [language]="bodyLanguage(request().responseBody || request().body, request().contentType)"
+                        <!-- Diagnostic check -->
+                        @if (isLoadingPayload() && !loadedResponseBody()) {
+                        <div class="empty-msg flex flex-column gap-3 align-items-center justify-content-center">
+                            <i class="pi pi-spin pi-spinner" style="font-size: 2rem; color: var(--primary)"></i>
+                            <span>Loading response body...</span>
+                        </div>
+                        } @else if (isDecoding()) {
+                        <div class="empty-msg flex flex-column gap-3 align-items-center justify-content-center">
+                            <i class="pi pi-spin pi-spinner" style="font-size: 2rem; color: var(--primary)"></i>
+                            <span>Decompressing payload ({{ request().responseHeaders?.['content-encoding'] || 'encoded'
+                                }})...</span>
+                        </div>
+                        } @else if (bodyString(decodedBody() || loadedResponseBody()).includes('[Error') ||
+                        bodyString(decodedBody() || loadedResponseBody()).includes('[Decompression Error')) {
+                        <div class="empty-msg error-msg">
+                            <i class="pi pi-exclamation-triangle" style="font-size: 2rem;"></i>
+                            <pre>{{ bodyString(decodedBody() || loadedResponseBody()) }}</pre>
+                        </div>
+                        } @else if (!bodyString(decodedBody() || loadedResponseBody() || request().responseBody ||
+                        request().body)) {
+                        <div class="empty-msg">No body content available</div>
+                        }
+
+                        <ngx-monaco-editor
+                            [code]="bodyString(decodedBody() || loadedResponseBody() || request().responseBody || request().body)"
+                            [language]="bodyLanguage(decodedBody() || loadedResponseBody() || request().responseBody || request().body, request().contentType || request().responseHeaders?.['content-type'])"
                             [readOnly]="true" [lineNumbers]="'off'" [minimapEnabled]="false"
                             [scrollBeyondLastLine]="false" [automaticLayout]="true" theme="vs-dark"
                             installationLocation="/_app/lib/monaco/vs">
                         </ngx-monaco-editor>
+
+                        <!-- Fallback in case Monaco fails to render -->
+                        <div class="monaco-fallback">
+                            <pre>{{ bodyString(decodedBody() || loadedResponseBody() || request().responseBody || request().body) }}</pre>
+                        </div>
                     </div>
                     } @else {
                     <div class="empty-msg">No response body captured</div>

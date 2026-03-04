@@ -920,7 +920,15 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                         response = ctx[$finalResponse];
                     }
                     else if (ctx.isUpgraded) {
-                        // Request was successfully upgraded to WebSocket
+                        // Request was successfully upgraded to WebSocket.
+                        // Manually fire onResponseEnd here BEFORE returning so the
+                        // dashboard can log the WS connection — Bun needs us to
+                        // return undefined from the fetch handler immediately for WS.
+                        if (this.hasOnResponseEndHook) {
+                            Promise.resolve(this.runHooks('onResponseEnd', ctx, undefined)).catch(e => {
+                                this.logger?.debug("Shokupan", "Error in onResponseEnd hook (ws):", { error: e });
+                            });
+                        }
                         return undefined as unknown as Response;
                     }
                     else if (ctx[$routeMatched]) {
