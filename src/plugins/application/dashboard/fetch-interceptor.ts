@@ -194,9 +194,9 @@ export class FetchInterceptor {
             const timestamp = Date.now();
 
             // Capture stacktrace to identify where this request originated from
-            let stackTrace = new Error().stack;
+            let callStack = new Error().stack;
 
-            const lines = stackTrace.split('\n');
+            const lines = callStack.split('\n');
             let linesToSkip = 0;
             for (let i = 2; i < lines.length; i++) {
                 // Should skip node_modules and native Promise messages that don't help anything
@@ -207,7 +207,7 @@ export class FetchInterceptor {
             }
 
             // Add one to skip the first line ("Error") title
-            const callStack = lines.slice(linesToSkip + 2).join('\n');
+            callStack = lines.slice(linesToSkip + 2).join('\n');
 
 
             let url = '';
@@ -290,9 +290,9 @@ export class FetchInterceptor {
                 const timestamp = Date.now();
 
                 // Capture stacktrace to identify where this request originated from
-                let stackTrace = new Error().stack;
+                let callStack = new Error().stack;
 
-                const lines = stackTrace.split('\n');
+                const lines = callStack.split('\n');
                 let linesToSkip = 0;
                 for (let i = 2; i < lines.length; i++) {
                     // Should skip node_modules and native Promise messages that don't help anything
@@ -302,8 +302,8 @@ export class FetchInterceptor {
                     linesToSkip++;
                 }
 
-                // Add one to skip the first line ("Error") title
-                const callStack = lines.slice(linesToSkip + 2).join('\n');
+                // Add one to skip the first line ("Error") title and reassign
+                callStack = lines.slice(linesToSkip + 2).join('\n');
 
                 let options: any = {};
                 let urlObj: URL | undefined;

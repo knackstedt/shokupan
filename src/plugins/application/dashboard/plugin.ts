@@ -49,7 +49,7 @@ export interface RequestLog {
     body?: any;          // Optional: for small payloads or compatibility
     contentType?: string;
     // New fields
-    type: 'xhr' | 'fetch' | 'ws';
+    type: 'xhr' | 'fetch' | 'ws' | 'inbound';
     direction: 'inbound' | 'outbound';
     size?: number;
     protocol?: string;
@@ -1318,7 +1318,7 @@ export class Dashboard implements ShokupanPlugin {
                     timestamp: (ctx as any)._reqStartTime || (Date.now() - duration),
                     handlerStack: this.serializeHandlerStack((ctx as any).handlerStack),
                     contentType: resHeaders['content-type'] || resHeaders['Content-Type'],
-                    type: response.status === 101 ? 'ws' : 'xhr',
+                    type: response.status === 101 ? 'ws' : 'inbound',
                     direction: 'inbound',
                     size: responseSize,
                     protocol: (ctx.req as any)?.httpVersion,
