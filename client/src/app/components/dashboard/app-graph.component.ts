@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, Inject, Inp
 
 // ngx-vflow features
 import { createEdges, createNodes, Edge, Node, Vflow, VflowComponent } from 'ngx-vflow';
+import { TooltipModule } from 'primeng/tooltip';
 
 // elkjs logic
 import ELK from 'elkjs/lib/elk.bundled.js';
@@ -12,7 +13,8 @@ import ELK from 'elkjs/lib/elk.bundled.js';
     standalone: true,
     imports: [
         CommonModule,
-        Vflow
+        Vflow,
+        TooltipModule
     ],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     templateUrl: './app-graph.component.html',
@@ -263,4 +265,118 @@ export class AppGraphComponent {
             edges
         };
     }
+
+    /**
+     * Highlights :params, * wildcards, .well-known segments in the path.
+     * Returns an HTML string safe for [innerHTML].
+     */
+    highlightPath(path: string | undefined): string {
+        if (!path) return '';
+        return path.split('/').map((seg, i) => {
+            if (!seg) return i === 0 ? '' : '';      // empty (leading slash)
+            if (seg.startsWith(':')) {
+                return `<span class="path-param">${escHtml(seg)}</span>`;
+            }
+            if (seg === '*' || seg === '**') {
+                return `<span class="path-wildcard">${escHtml(seg)}</span>`;
+            }
+            if (seg.startsWith('.')) {
+                return `<span class="path-dotfile">${escHtml(seg)}</span>`;
+            }
+            return escHtml(seg);
+        }).join('<span class="path-sep">/</span>');
+    }
+
+    getNodeStats(item: any): any {
+        if (!item || !item.data) return null;
+
+        // Graph node data maps kind, label, endpoints.
+        // We will try to match based on endpoints to replicate tree matching
+        const requests = this.requests || [];
+        const kind = item.data.kind;
+        const nameOrPath = item.data.label;
+
+        const hits = requests.filter(req => {
+            if (req.handlerStack && req.handlerStack.some((h: any) =>
+                h.name === nameOrPath ||
+                (item.data.endpoints && item.data.endpoints.some((e: any) => e.path === h.name))
+            )) return true;
+
+            // Route matching fallback
+            if (kind === 'route' || kind === 'router') {
+                if (nameOrPath && req.url && req.url.includes(nameOrPath)) return true;
+            }
+            return false;
+        });
+
+        const count = hits.length;
+        if (count === 0) {
+            return {
+                requests: 0,
+                trafficPercent: '0.0',
+                failures: 0,
+                p1: '0.00', p10: '0.00', p25: '0.00',
+                p50: '0.00', p75: '0.00', p90: '0.00', p99: '0.00',
+                statusCodes: {}
+            };
+        }
+
+        const totalReqs = this.requests.length;
+        const trafficPercent = ((count / totalReqs) * 100).toFixed(1);
+        const durations = hits.map(h => h.duration).sort((a, b) => a - b);
+
+        const getP = (p: number) => {
+            if (durations.length === 0) return '0.00';
+            let index = Math.ceil((p / 100) * durations.length) - 1;
+            index = Math.max(0, Math.min(index, durations.length - 1));
+            return durations[index].toFixed(2);
+        };
+
+        const statusCodes = hits.reduce((acc: any, req: any) => {
+            acc[req.status] = (acc[req.status] || 0) + 1;
+            return acc;
+        }, {});
+
+        const failures = hits.filter(h => h.status >= 400).length;
+
+        return {
+            requests: count, trafficPercent, failures,
+            p1: getP(1), p10: getP(10), p25: getP(25), p50: getP(50),
+            p75: getP(75), p90: getP(90), p99: getP(99),
+            statusCodes
+        };
+    }
+
+    /** Builds an HTML string for PrimeNG's [pTooltip] with [escape]="false" */
+    buildTooltipHtml(item: any): string {
+        const stats = this.getNodeStats(item);
+        if (!stats) return '';
+
+        const row = (label: string, value: string | number, color?: string) =>
+            `<div class="tt-row"><span>${label}</span><span${color ? ` style="color:${color}"` : ''}>${value}</span></div>`;
+
+        const statusRows = Object.keys(stats.statusCodes).map(code =>
+            row(`HTTP ${code}`, stats.statusCodes[code])
+        ).join('');
+
+        return `<div class="tt-body">
+                <div class="tt-header">Metrics</div>
+                ${row('Requests', stats.requests)}
+                ${row('Traffic', stats.trafficPercent + '%')}
+                ${row('Failures', stats.failures, stats.failures > 0 ? '#ef4444' : undefined)}
+                <div class="tt-header" style="margin-top:8px">Response Times</div>
+                ${row('p1', stats.p1 + 'ms')}
+                ${row('p10', stats.p10 + 'ms')}
+                ${row('p25', stats.p25 + 'ms')}
+                ${row('p50', stats.p50 + 'ms')}
+                ${row('p75', stats.p75 + 'ms')}
+                ${row('p90', stats.p90 + 'ms')}
+                ${row('p99', stats.p99 + 'ms')}
+                ${statusRows ? `<div class="tt-divider"></div>${statusRows}` : ''}
+            </div>`;
+    }
+}
+
+function escHtml(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

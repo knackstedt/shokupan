@@ -28,7 +28,7 @@
         "ngx-echarts": "^21.0.0",
         "ngx-extended-pdf-viewer": "^25.6.4",
         "ngx-scrollbar": "^19.1.4",
-        "ngx-tabulator-tables": "^0.2.8",
+        "ngx-tabulator-tables": "^0.3.1",
         "ngx-vflow": "^2.4.0",
         "primeflex": "^4.0.0",
         "primeng": "^21.1.1",
@@ -48,6 +48,7 @@
         "karma-coverage": "^2.2.1",
         "karma-jasmine": "^5.1.0",
         "karma-jasmine-html-reporter": "^2.2.0",
+        "localforage": "^1.10.0",
         "typescript": "~5.9.2",
       },
     },
@@ -867,6 +868,8 @@
 
     "ignore-walk": ["ignore-walk@8.0.0", "", { "dependencies": { "minimatch": "^10.0.3" } }, "sha512-FCeMZT4NiRQGh+YkeKMtWrOmBgWjHjMJ26WQWrRQyoyzqevdaGSakUaJW5xQYmjLlUVk2qUnCjYVBax9EKKg8A=="],
 
+    "immediate": ["immediate@3.0.6", "", {}, "sha512-XXOFtyqDjNDAQxVfYxuF7g9Il/IbWmmlQg2MYKOH8ExIT1qg6xc4zyS3HaEEATgs1btfzxq15ciUiY7gjSXRGQ=="],
+
     "immutable": ["immutable@5.1.4", "", {}, "sha512-p6u1bG3YSnINT5RQmx/yRZBpenIl30kVxkTLDyHLIMk0gict704Q9n+thfDI7lTRm9vXdDYutVzXhzcThxTnXA=="],
 
     "imurmurhash": ["imurmurhash@0.1.4", "", {}, "sha512-JmXMZ6wuvDmLiHEml9ykzqO6lwFbof0GG4IkcGaENdCRDDmMVnny7s5HsIgHCbaq0w2MyPhDqkhTUgS2LU2PHA=="],
@@ -951,9 +954,13 @@
 
     "karma-jasmine-html-reporter": ["karma-jasmine-html-reporter@2.2.0", "", { "peerDependencies": { "jasmine-core": "^4.0.0 || ^5.0.0 || ^6.0.0", "karma": "^6.0.0", "karma-jasmine": "^5.0.0" } }, "sha512-J0laEC43Oy2RdR5V5R3bqmdo7yRIYySq6XHKbA+e5iSAgLjhR1oICLGeSREPlJXpeyNcdJf3J17YcdhD0mRssQ=="],
 
+    "lie": ["lie@3.1.1", "", { "dependencies": { "immediate": "~3.0.5" } }, "sha512-RiNhHysUjhrDQntfYSfY4MU24coXXdEOgw9WGcKHNeEwffDYbF//u87M1EWaMGzuFoSbqW0C9C6lEEhDOAswfw=="],
+
     "listr2": ["listr2@9.0.5", "", { "dependencies": { "cli-truncate": "^5.0.0", "colorette": "^2.0.20", "eventemitter3": "^5.0.1", "log-update": "^6.1.0", "rfdc": "^1.4.1", "wrap-ansi": "^9.0.0" } }, "sha512-ME4Fb83LgEgwNw96RKNvKV4VTLuXfoKudAmm2lP8Kk87KaMK0/Xrx/aAkMWmT8mDb+3MlFDspfbCs7adjRxA2g=="],
 
     "lmdb": ["lmdb@3.4.4", "", { "dependencies": { "msgpackr": "^1.11.2", "node-addon-api": "^6.1.0", "node-gyp-build-optional-packages": "5.2.2", "ordered-binary": "^1.5.3", "weak-lru-cache": "^1.2.2" }, "optionalDependencies": { "@lmdb/lmdb-darwin-arm64": "3.4.4", "@lmdb/lmdb-darwin-x64": "3.4.4", "@lmdb/lmdb-linux-arm": "3.4.4", "@lmdb/lmdb-linux-arm64": "3.4.4", "@lmdb/lmdb-linux-x64": "3.4.4", "@lmdb/lmdb-win32-arm64": "3.4.4", "@lmdb/lmdb-win32-x64": "3.4.4" }, "bin": { "download-lmdb-prebuilds": "bin/download-prebuilds.js" } }, "sha512-+Y2DqovevLkb6DrSQ6SXTYLEd6kvlRbhsxzgJrk7BUfOVA/mt21ak6pFDZDKxiAczHMWxrb02kXBTSTIA0O94A=="],
+
+    "localforage": ["localforage@1.10.0", "", { "dependencies": { "lie": "3.1.1" } }, "sha512-14/H1aX7hzBBmmh7sGPd+AOMkkIrHM3Z1PAyGgZigA1H1p5O5ANnMyWzvpAETtG68/dC4pC0ncy3+PPGzXZHPg=="],
 
     "lodash": ["lodash@4.17.23", "", {}, "sha512-LgVTMpQtIopCi79SJeDiP0TfWi5CNEc/L/aRdTh3yIvmZXTnheWpKjSZhnvMl8iXbC1tFg9gdHHDMLoV7CnG+w=="],
 
@@ -1031,7 +1038,7 @@
 
     "ngx-scrollbar": ["ngx-scrollbar@19.1.4", "", { "dependencies": { "tslib": "^2.3.0" }, "peerDependencies": { "@angular/cdk": ">=20.0.0", "@angular/common": ">=20.0.0", "@angular/core": ">=20.0.0", "rxjs": ">=7.0.0" } }, "sha512-VzmLli1Uq+tZ40s5BpBDVO5mxjeNL7L7JbVluuokKsrIfi1GmXmkx69iz0zruyVWmyzU5VeuiqhMobPYazGKOQ=="],
 
-    "ngx-tabulator-tables": ["ngx-tabulator-tables@0.2.8", "", { "dependencies": { "@types/tabulator-tables": ">=6.0.0", "tabulator-tables": ">=6.3.0", "tslib": ">=2.6.0" }, "peerDependencies": { "@angular/common": ">=17.0.0", "@angular/core": ">=17.0.0" } }, "sha512-hXO2VhAiuC8PJ6I9BiIaZa2irDY/yfgoYuu1ypsbSbyQyZyvfoVjUhSis6vP4VBePJkQeDr3MNUhA+Be0XRW7Q=="],
+    "ngx-tabulator-tables": ["ngx-tabulator-tables@0.3.1", "", { "dependencies": { "@types/tabulator-tables": ">=6.0.0", "tabulator-tables": ">=6.3.0", "tslib": ">=2.6.0" }, "peerDependencies": { "@angular/common": ">=17.0.0", "@angular/core": ">=17.0.0" } }, "sha512-hWFzZjVK7tspv6/CFkIEPXQbKgwpGz0RxdMTa5fiqOfb5P+8/xr6xAXQyfuoag2tOueXyp1vtY514QwuzfA3dA=="],
 
     "ngx-vflow": ["ngx-vflow@2.4.0", "", { "dependencies": { "tslib": "^2.3.0" }, "peerDependencies": { "@angular/common": "^19.2.17 || 20.x || 21.x", "@angular/core": "^19.2.17 || 20.x || 21.x", "@types/d3-drag": "^3.0.7", "@types/d3-selection": "^3.0.10", "@types/d3-zoom": "^3.0.8", "d3-drag": "^3.0.0", "d3-selection": "^3.0.0", "d3-zoom": "^3.0.0", "rxjs": ">=6.0.0" } }, "sha512-5udvfpg+mhr9EVIsIsidTDow0WbOVZMnW6fc+n1ZN74esOpaHiYIpYaeUOWC/rHhPxe+CjIYXVzHgcYfJ/LHfg=="],
 

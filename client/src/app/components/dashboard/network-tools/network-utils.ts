@@ -23,6 +23,7 @@ export interface NetworkRequest {
     body?: any; // legacy compatibility
     wsMessages?: any[];
     handlerStack?: any[];
+    stackTrace?: string;
     hasRequestBody?: boolean;
     hasResponseBody?: boolean;
 }

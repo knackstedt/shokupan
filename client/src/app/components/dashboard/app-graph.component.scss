@@ -207,3 +207,54 @@
 ::ng-deep .vflow-node {
     background: transparent !important;
 }
+
+/* ── PrimeNG tooltip override (tooltipStyleClass="skp-tt") ───────────── */
+::ng-deep .skp-tt {
+    &.p-tooltip .p-tooltip-text {
+        background: var(--bg-card, #1e2029) !important;
+        border: 1px solid var(--card-border, #333) !important;
+        border-radius: 6px !important;
+        padding: 6px 10px !important;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5) !important;
+        font-size: 0.78rem !important;
+        min-width: 200px;
+    }
+
+    .p-tooltip-arrow {
+        display: none !important;
+    }
+}
+
+/* ── Tooltip content built by buildTooltipHtml() ─────────────────────── */
+::ng-deep .tt-body {
+    font-family: var(--skp-font-mono, monospace);
+    font-size: 0.85rem;
+    color: var(--text-primary, #e0e0e0);
+    display: flex;
+    flex-direction: column;
+
+    .tt-header {
+        font-family: var(--skp-font, sans-serif);
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-bottom: 2px;
+        color: var(--primary, #FFB380);
+    }
+
+    .tt-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 1px 0;
+        line-height: 1.3;
+
+        span:first-child {
+            color: var(--text-secondary, #a8a8a8);
+        }
+    }
+
+    .tt-divider {
+        height: 1px;
+        background: var(--card-border, #333);
+        margin: 4px 0;
+    }
+}

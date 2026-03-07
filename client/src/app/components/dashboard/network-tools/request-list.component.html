@@ -1,4 +1,18 @@
 <div class="list-container">
+    <p-contextMenu #colContextMenu [model]="colMenuItems()">
+        <ng-template pTemplate="item" let-item>
+            @if (item.isVisible) {
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="margin-right: 8px; color: var(--palette-primary);">
+                    <path d="M3 8L6.5 11.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            }
+            @else {
+                <span style="display: inline-block; width: 24px;"></span>
+            }
+            <span>{{ item.header }}</span>
+        </ng-template>
+    </p-contextMenu>
+
     <div class="list-header">
         <div class="p-input-icon-left filter-wrapper">
             <i class="pi pi-search"></i>
@@ -6,13 +20,13 @@
                 placeholder="Filter" class="filter-input" />
         </div>
         <p-multiSelect [options]="cols" [ngModel]="selectedCols()" (ngModelChange)="selectedCols.set($event)"
-            optionLabel="header" selectedItemsLabel="{0} columns selected" [style]="{'min-width': '200px'}"
+            optionLabel="header" optionValue="field" selectedItemsLabel="{0} columns selected" [style]="{'min-width': '200px'}"
             placeholder="Choose Columns"></p-multiSelect>
     </div>
 
     <ngx-tabulator [dataSource]="filteredRequests()" class="network-table" [selectable]="1" [headerSort]="true"
         [movableColumns]="true" [height]="'100%'" [rowFormatter]="rowFormatter" (rowClick)="onRowSelect($any($event))"
-        (cellClick)="debug('cell', $event)" (rowContext)="onRowContext($any($event))">
+        (cellClick)="debug('cell', $event)" (rowContext)="onRowContext($any($event))" (headerContext)="onHeaderContext($any($event))">
         <ngx-tabulator-column field="status" title="Status" [width]="100" [headerSort]="true"
             (onCellClick)="debug('cell', $event)" [visible]="isColVisible('status')">
             <ng-template let-data>
@@ -31,14 +45,46 @@
                 <div class="name-cell" [title]="data.url">{{ getName(data.url) }}</div>
             </ng-template>
         </ngx-tabulator-column>
-        <ngx-tabulator-column field="url" title="Path" [width]="200" [headerSort]="true"
+        <ngx-tabulator-column field="domain" title="Domain" [width]="120" [headerSort]="true"
+            [visible]="isColVisible('domain')" />
+        <ngx-tabulator-column field="path" title="Path" [width]="200" [headerSort]="true"
+            [visible]="isColVisible('path')">
+            <ng-template let-data>
+                <div class="path-cell" [title]="data.path">{{ data.path || data.url }}</div>
+            </ng-template>
+        </ngx-tabulator-column>
+        <ngx-tabulator-column field="url" title="URL" [width]="250" [headerSort]="true"
             [visible]="isColVisible('url')">
             <ng-template let-data>
-                <div class="path-cell" [title]="data.url">{{ data.url }}</div>
+                <div class="url-cell" [title]="data.url">{{ data.url }}</div>
+            </ng-template>
+        </ngx-tabulator-column>
+        <ngx-tabulator-column field="protocol" title="Protocol" [width]="80" [headerSort]="true"
+            [visible]="isColVisible('protocol')">
+            <ng-template let-data>
+                {{ data.protocol && data.protocol !== 'http' && data.protocol !== 'https' ? data.protocol : (data.scheme || data.protocol || '-') }}
+            </ng-template>
+        </ngx-tabulator-column>
+        <ngx-tabulator-column field="scheme" title="Scheme" [width]="80" [headerSort]="true"
+            [visible]="isColVisible('scheme')" />
+        <ngx-tabulator-column field="remoteIP" title="Remote IP" [width]="110" [headerSort]="true"
+            [visible]="isColVisible('remoteIP')" />
+        <ngx-tabulator-column field="initiator" title="Initiator" [width]="90" [headerSort]="true"
+            [visible]="isColVisible('initiator')">
+            <ng-template let-data>
+                {{ data.direction === 'outbound' ? 'Server' : 'Client' }}
             </ng-template>
         </ngx-tabulator-column>
         <ngx-tabulator-column field="type" title="Type" [width]="80" [headerSort]="true"
             [visible]="isColVisible('type')" />
+        <ngx-tabulator-column field="cookies" title="Cookies" [width]="80" [headerSort]="true"
+            [visible]="isColVisible('cookies')" />
+        <ngx-tabulator-column field="transferred" title="Transferred" [width]="100" [headerSort]="true"
+            [visible]="isColVisible('transferred')">
+            <ng-template let-data>
+                {{ formatBytes(data.transferred || 0) }}
+            </ng-template>
+        </ngx-tabulator-column>
         <ngx-tabulator-column field="size" title="Size" [width]="100" [headerSort]="true"
             [visible]="isColVisible('size')">
             <ng-template let-data>
@@ -49,6 +95,12 @@
             [visible]="isColVisible('duration')">
             <ng-template let-data>
                 {{ formatDuration(data.duration) }}
+            </ng-template>
+        </ngx-tabulator-column>
+        <ngx-tabulator-column field="caller" title="Caller" [width]="200" [headerSort]="true"
+            [visible]="isColVisible('caller')">
+            <ng-template let-data>
+                <div class="caller-cell" [title]="data.callStack">{{ extractCaller(data.callStack) }}</div>
             </ng-template>
         </ngx-tabulator-column>
         <ngx-tabulator-column field="waterfall" title="Waterfall" [widthGrow]="1" [visible]="isColVisible('waterfall')">

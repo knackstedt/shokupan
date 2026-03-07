@@ -7,7 +7,8 @@
                 [style.min-height.px]="ctx.node.data?.()?.nodeHeight || 44">
                 <!-- Source Handle (Incoming Connections) -->
                 <handle id="top" type="target" position="top" class="vflow-handle target-handle"></handle>
-                <div class="node-header">
+                <div class="node-header" [pTooltip]="buildTooltipHtml(ctx.node)" [escape]="false"
+                    tooltipPosition="bottom" tooltipStyleClass="skp-tt">
                     <span class="node-kind">{{ ctx.node.data?.()?.kind | uppercase }}</span>
                     <span class="node-title">{{ ctx.node.data?.()?.label }}</span>
                 </div>
@@ -15,7 +16,8 @@
                 @if (ctx.node.data?.()?.endpoints?.length) {
                 <div class="endpoints-list">
                     @for (ep of ctx.node.data?.()?.endpoints; track $index) {
-                    <div class="endpoint-row">
+                    <div class="endpoint-row" [pTooltip]="buildTooltipHtml(ep)" [escape]="false"
+                        tooltipPosition="bottom" tooltipStyleClass="skp-tt">
                         <span class="badge-{{ ep.method }}">{{ ep.method }}</span>
                         <span class="ep-path">{{ ep.path }}</span>
                     </div>

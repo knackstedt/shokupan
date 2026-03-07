@@ -16,43 +16,52 @@
 }
 
 .tree-root {
-    padding: 1rem;
+    padding: 0.75rem 0.75rem 0.75rem 0.5rem;
 }
 
 .tree-node {
-    padding-left: 1rem;
-    margin-left: 0.5rem;
+    padding-left: 0.75rem;
+    margin-left: 0.25rem;
     border-left: 1px dashed var(--card-border);
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.15rem;
 }
 
 .tree-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.25rem 0.5rem;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0.15rem 0.4rem;
     border-radius: 4px;
     font-family: var(--skp-font-mono);
+    font-size: 0.82rem;
     color: var(--text-secondary);
-}
+    cursor: default;
 
-.tree-item:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
+    &:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+    }
 }
 
 .tree-label {
     flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-/* Badges */
+/* ── Badges ─────────────────────────────────────────────────────────────── */
 .badge {
-    font-size: 0.857rem;
+    flex-shrink: 0;
+    font-size: 0.7rem;
     font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 4px;
+    padding: 1px 5px;
+    border-radius: 3px;
     color: white;
     text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
 
 .badge-MIDDLEWARE {
@@ -78,6 +87,7 @@
 
 .badge-POST {
     background: #f59e0b;
+    color: #000;
 }
 
 .badge-PUT {
@@ -101,132 +111,150 @@
     background: #ec4899;
 }
 
-/* Specific Item Styling */
+/* ── URI path syntax highlighting ─────────────────────────────────────── */
+::ng-deep {
+    .path-param {
+        color: #f59e0b;
+        font-style: italic;
+    }
+
+    .path-wildcard {
+        color: #fb923c;
+    }
+
+    .path-dotfile {
+        color: #60a5fa;
+    }
+
+    .path-sep {
+        color: var(--text-secondary);
+    }
+}
+
+/* ── Group headers ───────────────────────────────────────────────────── */
 .router-header {
     font-weight: 600;
-    margin-top: 0.5rem;
+    margin-top: 0.4rem;
 }
 
 .controller-header {
     font-weight: 600;
-    margin-top: 0.5rem;
+    margin-top: 0.4rem;
     font-family: var(--skp-font);
-}
 
-.controller-header strong {
-    font-size: 0.9rem;
-    color: var(--text-primary);
+    strong {
+        font-size: 0.88rem;
+        color: var(--text-primary);
+    }
 }
 
 .path-context {
     color: var(--text-muted);
     font-weight: normal;
-    font-size: 0.85rem;
-    margin-left: 0.5rem;
+    font-size: 0.8rem;
+    margin-left: 0.35rem;
 }
 
+/* ── Children ─────────────────────────────────────────────────────────── */
 .tree-children {
-    margin-top: 0.25rem;
+    margin-top: 0.15rem;
 }
 
 .routes-list {
-    padding-left: 1rem;
-    margin-left: 0.5rem;
+    padding-left: 0.75rem;
+    margin-left: 0.25rem;
     border-left: 1px dashed var(--card-border);
 }
 
 .empty-routes {
     font-style: italic;
     color: var(--text-muted);
-    padding: 0.25rem 1.5rem;
-    font-size: 0.857rem;
+    padding: 0.2rem 1.25rem;
+    font-size: 0.78rem;
 }
 
+/* ── Inline meta (filename:line) ─────────────────────────────────────── */
 .handler-name {
     color: var(--text-muted);
-    font-size: 0.857rem;
+    font-size: 0.78rem;
+    flex-shrink: 0;
 }
 
 .plugin-name {
     color: #6ee7b7;
-    font-size: 0.857rem;
+    font-size: 0.78rem;
+    flex-shrink: 0;
 }
 
 .tree-meta {
     color: var(--text-muted);
-    font-size: 0.857rem;
-    text-decoration: underline;
-    cursor: pointer;
-}
+    font-size: 0.75rem;
+    text-decoration: none;
+    border-bottom: 1px dashed var(--text-muted);
+    opacity: 0.7;
+    flex-shrink: 0;
+    margin-left: auto; // float right when on the same flex row
+    white-space: nowrap;
 
-.tree-meta:hover {
-    color: var(--primary);
+    &:hover {
+        color: var(--primary);
+        opacity: 1;
+        border-bottom-color: var(--primary);
+    }
 }
 
 .builtin-badge {
     background: #059669;
     color: white;
-    font-size: 0.857rem;
-    padding: 2px 4px;
-    border-radius: 4px;
+    font-size: 0.7rem;
+    padding: 1px 4px;
+    border-radius: 3px;
+    flex-shrink: 0;
 }
 
-/* Tooltip Styles */
-.tooltip {
-    position: relative;
-    display: inline-flex;
+/* ── PrimeNG tooltip override (tooltipStyleClass="skp-tt") ───────────── */
+::ng-deep .skp-tt {
+    .p-tooltip-text {
+        background: var(--bg-card, #1e2029) !important;
+        border: 1px solid var(--card-border, #333) !important;
+        border-radius: 6px !important;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5) !important;
+        min-width: 200px;
+    }
+
+    .p-tooltip-arrow {
+        display: none !important;
+    }
 }
 
-.tooltip .tooltip-text {
-    visibility: hidden;
-    width: 280px;
-    background-color: var(--bg-card);
-    /* Match theme */
-    color: var(--text-primary);
-    text-align: left;
-    border-radius: 6px;
-    padding: 12px 14px;
-    position: absolute;
-    z-index: 1000;
-
-    /* Flow tooltip downwards to avoid top viewport clipping */
-    top: 100%;
-    left: 20%;
-    margin-top: 8px;
-
-    opacity: 0;
-    transition: opacity 0.2s, transform 0.2s;
-    transform: translateY(-4px);
-    border: 1px solid var(--card-border);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.25);
-    line-height: 1.4;
-    font-size: 0.857rem;
-}
-
-.tooltip:hover .tooltip-text {
-    visibility: visible;
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.tooltip-text .perf-row {
+/* ── Tooltip content built by buildTooltipHtml() ─────────────────────── */
+::ng-deep .tt-body {
+    font-family: var(--skp-font-mono, monospace);
+    font-size: 0.85rem;
+    color: var(--text-primary, #e0e0e0);
     display: flex;
-    justify-content: space-between;
-    font-family: var(--skp-font-mono);
-    margin-bottom: 3px;
-}
+    flex-direction: column;
 
-.tooltip-text .perf-header {
-    font-weight: 600;
-    border-bottom: 1px solid var(--text-secondary);
-    margin-bottom: 6px;
-    padding-bottom: 2px;
-    font-family: var(--skp-font);
-    color: var(--primary);
-}
+    .tt-header {
+        font-family: var(--skp-font, sans-serif);
+        font-weight: 600;
+        font-size: 0.72rem;
+        color: var(--primary, #3b82f6);
+        border-bottom: 1px solid var(--card-border, #333);
+        padding-bottom: 2px;
+        margin-bottom: 3px;
+    }
 
-.tooltip-text .status-list {
-    margin-top: 8px;
-    border-top: 1px dashed var(--text-secondary);
-    padding-top: 6px;
+    .tt-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 1px;
+        color: var(--text-secondary, #a0a0a0);
+    }
+
+    .tt-divider {
+        border-top: 1px dashed var(--card-border, #333);
+        margin: 4px 0;
+    }
 }

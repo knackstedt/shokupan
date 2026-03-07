@@ -1,9 +1,9 @@
 import { NgStyle } from '@angular/common';
-import { Component, computed, input, model, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, model, output, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TabulatorModule } from 'ngx-tabulator-tables';
 import { ButtonModule } from 'primeng/button';
-import { ContextMenuModule } from 'primeng/contextmenu';
+import { ContextMenu, ContextMenuModule } from 'primeng/contextmenu';
 import { InputTextModule } from 'primeng/inputtext';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { TooltipModule } from 'primeng/tooltip';
@@ -14,7 +14,8 @@ import { formatBytes, formatDurationPretty, NetworkRequest } from './network-uti
     standalone: true,
     imports: [TabulatorModule, InputTextModule, ButtonModule, TooltipModule, MultiSelectModule, FormsModule, ContextMenuModule, NgStyle],
     templateUrl: './request-list.component.html',
-    styleUrl: './request-list.component.scss'
+    styleUrl: './request-list.component.scss',
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class RequestListComponent {
     requests = input<NetworkRequest[]>([]);
@@ -30,14 +31,59 @@ export class RequestListComponent {
         { field: 'status', header: 'Status', width: '100px' },
         { field: 'method', header: 'Method', width: '90px' },
         { field: 'name', header: 'Name', width: '150px' },
+        { field: 'domain', header: 'Domain', width: '120px' },
         { field: 'path', header: 'Path', width: '200px' },
+        { field: 'url', header: 'URL', width: '250px' },
+        { field: 'protocol', header: 'Protocol', width: '80px' },
+        { field: 'scheme', header: 'Scheme', width: '80px' },
+        { field: 'remoteIP', header: 'Remote IP', width: '110px' },
+        { field: 'initiator', header: 'Initiator', width: '90px' },
         { field: 'type', header: 'Type', width: '80px' },
+        { field: 'cookies', header: 'Cookies', width: '80px' },
+        { field: 'transferred', header: 'Transferred', width: '100px' },
         { field: 'size', header: 'Size', width: '100px' },
         { field: 'duration', header: 'Time', width: '90px' },
+        { field: 'caller', header: 'Caller', width: '200px' },
         { field: 'waterfall', header: 'Waterfall', width: 'auto' }
     ];
 
-    selectedCols = signal(this.cols.filter(c => c.field !== 'path'));
+    // Context menu for column headers
+    colContextMenu = viewChild.required<ContextMenu>('colContextMenu');
+
+    // Column menu items - simple text labels with unicode checkmarks
+    colMenuItems = computed(() => {
+        const selected = new Set(this.selectedCols());
+        return this.cols.map(col => {
+            const isVisible = selected.has(col.field);
+            return {
+                label: isVisible ? `✓ ${col.header}` : `  ${col.header}`,
+                header: col.header,
+                isVisible: isVisible,
+                command: () => this.toggleColumn(col.field)
+            };
+        });
+    });
+
+    // Default visible column fields (matching old dashboard defaults)
+    selectedCols = signal<string[]>(
+        ['status', 'method', 'name', 'path', 'caller', 'type', 'size', 'duration', 'waterfall']
+    );
+
+    toggleColumn(field: string) {
+        const current = this.selectedCols();
+        const hasField = current.includes(field);
+        if (hasField) {
+            this.selectedCols.set(current.filter(f => f !== field));
+        } else {
+            this.selectedCols.set([...current, field]);
+        }
+    }
+
+    onHeaderContext(args: [UIEvent, any]) {
+        const [event] = args;
+        event.preventDefault();
+        this.colContextMenu().show(event);
+    }
 
     // Waterfall range
 
@@ -125,7 +171,7 @@ export class RequestListComponent {
     });
 
     isColVisible(field: string): boolean {
-        return this.selectedCols().some(c => c.field === field);
+        return this.selectedCols().includes(field);
     }
 
     getName(url: string) {
@@ -221,4 +267,13 @@ export class RequestListComponent {
             row.getElement().classList.remove('row-error');
         }
     };
+
+    extractCaller(callStack: string): string {
+        if (!callStack) return '';
+
+        // Extract the first line from the call stack
+        const line = callStack.split('\n')[0];
+        const file = line.match(/\/([^\/]+\.[tj]sx?):\d+:\d+/);
+        return file ? file[1] : '';
+    }
 }

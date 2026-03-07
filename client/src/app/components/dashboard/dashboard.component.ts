@@ -45,21 +45,47 @@ export class DashboardComponent implements OnInit, OnDestroy {
     private reconnectTimer: any;
 
     ngOnInit(): void {
+        this.syncHashUrl();
+        window.addEventListener('hashchange', this.onHashChange);
         this.fetchRequests();
         this.fetchRegistry();
         this.connectWs();
     }
 
     ngOnDestroy(): void {
+        window.removeEventListener('hashchange', this.onHashChange);
         this.ws?.close();
         clearTimeout(this.reconnectTimer);
     }
 
+    private onHashChange = () => {
+        this.syncHashUrl();
+    };
+
+    private syncHashUrl() {
+        const hash = window.location.hash; // e.g. '#/dashboard/overview'
+        if (hash.startsWith('#/dashboard/')) {
+            const tab = hash.replace('#/dashboard/', '') as 'overview' | 'network' | 'application';
+            if (['overview', 'network', 'application'].includes(tab)) {
+                this.activeTab.set(tab);
+                if (tab === 'application' && !this.appData()) {
+                    this.fetchRegistry();
+                }
+                return;
+            }
+        }
+        // default fallback if hash is missing or invalid
+        if (hash !== '#/dashboard/overview') {
+            window.location.hash = '#/dashboard/overview';
+        } else {
+            this.activeTab.set('overview');
+        }
+    }
+
     setTab(tab: 'overview' | 'network' | 'application') {
         console.log("Dashboard: setting tab to", tab);
-        this.activeTab.set(tab);
-        if (tab === 'application' && !this.appData()) {
-            this.fetchRegistry();
+        if (window.location.hash !== '#/dashboard/' + tab) {
+            window.location.hash = '#/dashboard/' + tab;
         }
     }
 
@@ -71,7 +97,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         console.log("Dashboard: selectRequest called with ID", id);
         this.selectedRequestId.set(id);
         if (id) {
-            this.activeTab.set('network');
+            this.setTab('network');
         }
     }
 
