@@ -79,7 +79,6 @@ export class EChartComponent implements AfterViewInit, OnDestroy {
     ) { }
 
     ngAfterViewInit() {
-        console.log('[EChartComponent] ngAfterViewInit triggered. Element:', this.chartContainer?.nativeElement);
         EChartComponent._selfInstances.push(this);
         if (this.dataExists && this.chartContainer) {
             this.zone.runOutsideAngular(() => {
@@ -100,7 +99,6 @@ export class EChartComponent implements AfterViewInit, OnDestroy {
                         this.zone.run(() => this.click.next(evt));
                     });
                     this.zone.run(() => this.load.next(this.chart));
-                    console.log('[EChartComponent] Successfully initialized ECharts instance:', this.chart.id);
                 } catch (err) {
                     console.error('[EChartComponent] Crashed during initialization!', err);
                 }
