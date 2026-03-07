@@ -788,62 +788,118 @@ export class Dashboard implements ShokupanPlugin {
 
         if (!this.dashboardConfig.disableReplay) {
             this.router.post("/replay", async (ctx) => {
-                const body = await ctx.body();
-                // Logic to replay request:
-                // If direction is outbound, we fetch from the server.
-                // If inbound, we process via app.internalRequest.
+                try {
+                    const body = await ctx.body();
+                    console.log('Dashboard', 'Replay request received', { body });
 
-                const direction = body.direction || 'inbound';
+                    // Logic to replay request:
+                    // If direction is outbound, we fetch from the server.
+                    // If inbound, we process via app.internalRequest.
 
-                if (direction === 'outbound') {
-                    // Replay outbound request
-                    const start = performance.now();
-                    try {
-                        const res = await fetch(body.url, {
-                            method: body.method,
-                            headers: body.headers,
-                            body: body.body ? (typeof body.body === 'object' ? JSON.stringify(body.body) : body.body) : undefined
-                        });
+                    const direction = body.direction || 'inbound';
 
-                        // Read response text
-                        const text = await res.text();
-                        const duration = performance.now() - start;
+                    if (direction === 'outbound') {
+                        // Replay outbound request
+                        const start = performance.now();
+                        try {
+                            const res = await fetch(body.url, {
+                                method: body.method,
+                                headers: body.headers,
+                                body: body.body ? (typeof body.body === 'object' ? JSON.stringify(body.body) : body.body) : undefined
+                            });
 
-                        const resHeaders: Record<string, string> = {};
-                        res.headers.forEach((v, k) => resHeaders[k] = v);
+                            // Read response text
+                            const text = await res.text();
+                            const duration = performance.now() - start;
 
-                        return ctx.json({
-                            status: res.status,
-                            statusText: res.statusText,
-                            headers: resHeaders,
-                            data: text,
-                            duration
-                        });
-                    } catch (e) {
-                        return ctx.json({ error: String(e) }, 500);
+                            const resHeaders: Record<string, string> = {};
+                            res.headers.forEach((v, k) => resHeaders[k] = v);
+
+                            return ctx.json({
+                                status: res.status,
+                                statusText: res.statusText,
+                                headers: resHeaders,
+                                data: text,
+                                duration
+                            });
+                        } catch (e) {
+                            this[$appRoot]?.logger?.error('Dashboard', 'Outbound replay failed', { error: e });
+                            return ctx.json({ error: String(e) }, 500);
+                        }
+                    } else {
+                        // Replay inbound request against the app
+                        const app = this[$appRoot];
+                        if (!app) {
+                            this[$appRoot]?.logger?.error('Dashboard', 'App not available for replay');
+                            return ctx.json({ error: "App not available" }, 500);
+                        }
+
+                        // Construct request
+                        const start = performance.now();
+                        try {
+                            // Extract path from URL if it's a full URL
+                            let path = body.url;
+                            try {
+                                const urlObj = new URL(body.url);
+                                path = urlObj.pathname + urlObj.search + urlObj.hash;
+                            } catch {
+                                // If URL parsing fails, assume it's already a path
+                            }
+
+                            // Prefill IP address from the current requester (the person replaying)
+                            const headers = { ...body.headers };
+                            const currentIP = (ctx as any)._cachedRemoteIP || ctx.request.headers.get('x-forwarded-for') || (ctx.req as any)?.socket?.remoteAddress;
+                            if (currentIP && !headers['x-forwarded-for']) {
+                                headers['x-forwarded-for'] = currentIP;
+                            }
+
+                            this[$appRoot]?.logger?.debug('Dashboard', 'Replaying inbound request', {
+                                method: body.method,
+                                url: body.url,
+                                path: path,
+                                hasHeaders: !!body.headers,
+                                hasBody: !!body.body,
+                                requesterIP: currentIP
+                            });
+
+                            // body should contain method, url, headers, body
+                            const result = await app.internalRequest({
+                                method: body.method,
+                                path: path,
+                                headers: headers,
+                                body: body.body
+                            });
+
+                            this[$appRoot]?.logger?.debug('Dashboard', 'Internal request completed', {
+                                status: result.status,
+                                hasHeaders: !!result.headers
+                            });
+
+                            // Extract headers from Response object
+                            const resHeaders: Record<string, string> = {};
+                            result.headers.forEach((v, k) => resHeaders[k] = v);
+
+                            // Extract body from Response object
+                            const text = await result.text();
+                            const duration = performance.now() - start;
+
+                            this[$appRoot]?.logger?.debug('Dashboard', 'Replay successful', { status: result.status, duration });
+
+                            return ctx.json({
+                                status: result.status,
+                                statusText: result.statusText,
+                                headers: resHeaders,
+                                data: text,
+                                duration
+                            });
+                        } catch (e) {
+                            this[$appRoot]?.logger?.error('Dashboard', 'Inbound replay failed', { error: e, stack: (e as Error).stack });
+                            return ctx.json({ error: String(e) }, 500);
+                        }
                     }
-                } else {
-                    // Replay inbound request against the app
-                    const app = this[$appRoot];
-                    if (!app) return unknownError(ctx);
-
-                    // Construct request
-                    try {
-                        // body should contain method, url, headers, body
-                        const result = await app.internalRequest({
-                            method: body.method,
-                            path: body.url, // or path
-                            headers: body.headers,
-                            body: body.body
-                        });
-                        return ctx.json({
-                            status: result.status,
-                            headers: result.headers,
-                            data: result.body
-                        });
-                    } catch (e) {
-                        return ctx.json({ error: String(e) }, 500);
-                    }
+                } catch (e) {
+                    this[$appRoot]?.logger?.error('Dashboard', 'Replay endpoint error', { error: e, stack: (e as Error).stack });
+                    return ctx.json({ error: String(e) }, 500);
                 }
             });
         }
@@ -1141,7 +1197,12 @@ export class Dashboard implements ShokupanPlugin {
                 let cachedRemoteIP = (ctx as any).ip || ctx.request.headers.get('x-forwarded-for') || (ctx.req as any)?.socket?.remoteAddress;
                 // Fallback for Bun
                 if (!cachedRemoteIP && typeof (globalThis as any).Bun !== 'undefined' && (ctx.app as any).server) {
-                    cachedRemoteIP = (ctx.app as any).server.requestIP(ctx.req);
+                    try {
+                        cachedRemoteIP = (ctx.app as any).server.requestIP(ctx.req);
+                    } catch {
+                        // requestIP fails for internal requests (ShokupanRequest objects)
+                        // This is expected for replayed/internal requests
+                    }
                 }
                 if (cachedRemoteIP && typeof cachedRemoteIP === 'object') {
                     cachedRemoteIP = cachedRemoteIP.address;

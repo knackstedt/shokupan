@@ -19,6 +19,7 @@
                 <p-tab [value]="0">Body</p-tab>
                 <p-tab [value]="1">Headers</p-tab>
                 <p-tab [value]="2">Response</p-tab>
+                <p-tab [value]="3">Response Headers</p-tab>
             </p-tablist>
             <p-tabpanels>
                 <p-tabpanel [value]="0">
@@ -43,19 +44,65 @@
                     </div>
                 </p-tabpanel>
                 <p-tabpanel [value]="2">
-                    <div class="tab-padding">
+                    <div class="tab-padding response-tab">
                         @if (replayState().response) {
                         @let res = replayState().response;
                         <div class="response-meta">
                             <span class="status" [class]="'status-' + (res.status / 100 | number:'1.0-0')">
                                 {{res.status}} {{res.statusText}}
                             </span>
-                            <span class="size">{{formatBytes(res.body?.length || 0)}}</span>
-                            <span class="time">{{res.duration}}ms</span>
+                            <span class="size">{{formatBytes(res.data?.length || 0)}}</span>
+                            <span class="time">{{res.duration | number:'1.0-0'}}ms</span>
+                            <span class="content-type">{{responseContentType()}}</span>
+                            @if (responseDisplayType() === 'binary' || responseDisplayType() === 'pdf' || responseDisplayType() === 'image') {
+                            <button pButton icon="pi pi-download" label="Download" class="p-button-sm p-button-text"
+                                (click)="downloadResponse()"></button>
+                            }
                         </div>
 
                         <div class="response-body">
-                            <pre><code>{{res.body | json}}</code></pre>
+                            @switch (responseDisplayType()) {
+                                @case ('text') {
+                                    <ngx-monaco-editor
+                                        [code]="formattedResponseBody()"
+                                        [language]="responseLanguage()"
+                                        [readOnly]="true"
+                                        [minimapEnabled]="false"
+                                        [scrollBeyondLastLine]="false"
+                                        [automaticLayout]="true"
+                                        [lineNumbers]="'on'"
+                                        theme="vs-dark"
+                                        installationLocation="/_app/lib/monaco/vs"
+                                        class="monaco-viewer">
+                                    </ngx-monaco-editor>
+                                }
+                                @case ('image') {
+                                    <div class="embedded-viewer">
+                                        @if (responseDataUrl()) {
+                                            <img [src]="responseDataUrl()!" alt="Response image" />
+                                        } @else {
+                                            <div class="error-msg">Failed to load image</div>
+                                        }
+                                    </div>
+                                }
+                                @case ('pdf') {
+                                    <div class="embedded-viewer">
+                                        @if (responseDataUrl()) {
+                                            <iframe [src]="responseDataUrl()!" class="pdf-viewer"></iframe>
+                                        } @else {
+                                            <div class="error-msg">Failed to load PDF</div>
+                                        }
+                                    </div>
+                                }
+                                @case ('binary') {
+                                    <div class="binary-placeholder">
+                                        <i class="pi pi-file" style="font-size: 3rem; opacity: 0.5;"></i>
+                                        <p>Binary content ({{formatBytes(res.data?.length || 0)}})</p>
+                                        <button pButton icon="pi pi-download" label="Download"
+                                            (click)="downloadResponse()"></button>
+                                    </div>
+                                }
+                            }
                         </div>
                         } @else if (replayState().loading) {
                         <div class="loading-state">
@@ -64,6 +111,36 @@
                         </div>
                         } @else {
                         <div class="empty-state">No response yet. Send a request to see the result.</div>
+                        }
+                    </div>
+                </p-tabpanel>
+                <p-tabpanel [value]="3">
+                    <div class="tab-padding">
+                        @if (replayState().response?.headers) {
+                        @let headers = replayState().response.headers;
+                        <section>
+                            <h3>Response Headers</h3>
+                            <div class="kv-grid">
+                                @for (h of headers | keyvalue; track h.key) {
+                                <div class="key">{{ h.key }}:</div>
+                                <div class="val" [class]="headerValueClass($any(h.key), $any(h.value))">{{ h.value }}</div>
+                                <button class="copy-btn" (click)="copyToClipboard($any(h.value))" title="Copy value">
+                                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                        <path
+                                            d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z" />
+                                        <path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h-1v1H2V6h1V5H2z" />
+                                    </svg>
+                                </button>
+                                }
+                            </div>
+                        </section>
+                        } @else if (replayState().loading) {
+                        <div class="empty-state">
+                            <i class="pi pi-spin pi-spinner"></i>
+                            <span>Sending request...</span>
+                        </div>
+                        } @else {
+                        <div class="empty-state">No response headers yet. Send a request to see the headers.</div>
                         }
                     </div>
                 </p-tabpanel>
