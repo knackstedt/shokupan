@@ -1,5 +1,5 @@
 import { NgStyle } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, input, model, output, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, input, model, output, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TabulatorModule } from 'ngx-tabulator-tables';
 import { ButtonModule } from 'primeng/button';
@@ -64,10 +64,147 @@ export class RequestListComponent {
         });
     });
 
+    // Default column widths
+    private readonly DEFAULT_WIDTHS: Record<string, number> = {
+        status: 100,
+        method: 90,
+        name: 150,
+        domain: 120,
+        path: 200,
+        url: 250,
+        protocol: 80,
+        scheme: 80,
+        remoteIP: 110,
+        initiator: 90,
+        type: 80,
+        cookies: 80,
+        transferred: 100,
+        size: 100,
+        duration: 90,
+        caller: 200,
+        waterfall: 300
+    };
+
+    // Storage key for column settings
+    private readonly COLUMN_STORAGE_KEY = 'shokupan-request-list-columns';
+
+    // Cache loaded settings to avoid multiple reads
+    private _cachedSettings: { visible: string[]; widths: Record<string, number> } | null | undefined = undefined;
+
     // Default visible column fields (matching old dashboard defaults)
     selectedCols = signal<string[]>(
-        ['status', 'method', 'name', 'path', 'caller', 'type', 'size', 'duration', 'waterfall']
+        this.loadColumnVisibility()
     );
+
+    // Column widths signal - loaded from localStorage or defaults
+    colWidths = signal<Record<string, number>>(this.loadColumnWidths());
+
+    constructor() {
+        // Effect to save column visibility and width changes to localStorage
+        // Skip the initial run to avoid overwriting loaded settings
+        let isFirstRun = true;
+        effect(() => {
+            const visibleCols = this.selectedCols();
+            const widths = this.colWidths();
+
+            if (isFirstRun) {
+                isFirstRun = false;
+                return;
+            }
+
+            this.saveColumnSettings(visibleCols, widths);
+        });
+    }
+
+    /**
+     * Get width for a specific column
+     */
+    getColWidth(field: string): number {
+        return this.colWidths()[field] ?? this.DEFAULT_WIDTHS[field] ?? 100;
+    }
+
+    /**
+     * Load column settings from localStorage
+     */
+    private loadColumnSettings(): { visible: string[]; widths: Record<string, number> } | null {
+        // Return cached value if already loaded
+        if (this._cachedSettings !== undefined) {
+            return this._cachedSettings;
+        }
+
+        try {
+            const stored = localStorage.getItem(this.COLUMN_STORAGE_KEY);
+            console.log('[RequestList] Loading from localStorage:', stored);
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                console.log('[RequestList] Parsed settings:', parsed);
+                this._cachedSettings = parsed;
+                return parsed;
+            }
+        } catch (e) {
+            console.error('[RequestList] Error loading settings:', e);
+        }
+        this._cachedSettings = null;
+        return null;
+    }
+
+    /**
+     * Load column visibility from localStorage
+     */
+    private loadColumnVisibility(): string[] {
+        const settings = this.loadColumnSettings();
+        if (settings?.visible) {
+            // Validate that all stored columns exist in current col definitions
+            const validCols = settings.visible.filter((field: string) =>
+                this.cols.some(col => col.field === field)
+            );
+            if (validCols.length > 0) {
+                console.log('[RequestList] Loaded visible columns:', validCols);
+                return validCols;
+            }
+        }
+        // Default visible columns
+        const defaults = ['status', 'method', 'name', 'path', 'caller', 'type', 'size', 'duration', 'waterfall'];
+        console.log('[RequestList] Using default visible columns:', defaults);
+        return defaults;
+    }
+
+    /**
+     * Load column widths from localStorage
+     */
+    private loadColumnWidths(): Record<string, number> {
+        const settings = this.loadColumnSettings();
+        const widths = { ...this.DEFAULT_WIDTHS, ...(settings?.widths || {}) };
+        console.log('[RequestList] Loaded column widths:', widths);
+        return widths;
+    }
+
+    /**
+     * Save column settings to localStorage
+     */
+    private saveColumnSettings(visibleCols: string[], widths: Record<string, number>): void {
+        try {
+            const data = {
+                visible: visibleCols,
+                widths: widths,
+                timestamp: Date.now()
+            };
+            console.log('[RequestList] Saving to localStorage:', data);
+            localStorage.setItem(this.COLUMN_STORAGE_KEY, JSON.stringify(data));
+        } catch (e) {
+            console.error('[RequestList] Error saving settings:', e);
+        }
+    }
+
+    /**
+     * Handle column resize event from tabulator
+     */
+    onColumnResized(field: string, newWidth: number): void {
+        this.colWidths.update(widths => ({
+            ...widths,
+            [field]: newWidth
+        }));
+    }
 
     toggleColumn(field: string) {
         const current = this.selectedCols();

@@ -26,8 +26,9 @@
 
     <ngx-tabulator [dataSource]="filteredRequests()" class="network-table" [selectable]="1" [headerSort]="true"
         [movableColumns]="true" [height]="'100%'" [rowFormatter]="rowFormatter" (rowClick)="onRowSelect($any($event))"
-        (cellClick)="debug('cell', $event)" (rowContext)="onRowContext($any($event))" (headerContext)="onHeaderContext($any($event))">
-        <ngx-tabulator-column field="status" title="Status" [width]="100" [headerSort]="true"
+        (cellClick)="debug('cell', $event)" (rowContext)="onRowContext($any($event))" (headerContext)="onHeaderContext($any($event))"
+        (columnResized)="onColumnResized($event[0].getField(), $event[0].getWidth())">
+        <ngx-tabulator-column field="status" title="Status" [width]="getColWidth('status')" [headerSort]="true"
             (onCellClick)="debug('cell', $event)" [visible]="isColVisible('status')">
             <ng-template let-data>
                 <div class="status-cell">
@@ -37,67 +38,67 @@
                 </div>
             </ng-template>
         </ngx-tabulator-column>
-        <ngx-tabulator-column field="method" title="Method" [width]="90" [headerSort]="true"
+        <ngx-tabulator-column field="method" title="Method" [width]="getColWidth('method')" [headerSort]="true"
             [visible]="isColVisible('method')" />
-        <ngx-tabulator-column field="name" title="Name" [width]="150" [headerSort]="true"
+        <ngx-tabulator-column field="name" title="Name" [width]="getColWidth('name')" [headerSort]="true"
             [visible]="isColVisible('name')">
             <ng-template let-data>
                 <div class="name-cell" [title]="data.url">{{ getName(data.url) }}</div>
             </ng-template>
         </ngx-tabulator-column>
-        <ngx-tabulator-column field="domain" title="Domain" [width]="120" [headerSort]="true"
+        <ngx-tabulator-column field="domain" title="Domain" [width]="getColWidth('domain')" [headerSort]="true"
             [visible]="isColVisible('domain')" />
-        <ngx-tabulator-column field="path" title="Path" [width]="200" [headerSort]="true"
+        <ngx-tabulator-column field="path" title="Path" [width]="getColWidth('path')" [headerSort]="true"
             [visible]="isColVisible('path')">
             <ng-template let-data>
                 <div class="path-cell" [title]="data.path">{{ data.path || data.url }}</div>
             </ng-template>
         </ngx-tabulator-column>
-        <ngx-tabulator-column field="url" title="URL" [width]="250" [headerSort]="true"
+        <ngx-tabulator-column field="url" title="URL" [width]="getColWidth('url')" [headerSort]="true"
             [visible]="isColVisible('url')">
             <ng-template let-data>
                 <div class="url-cell" [title]="data.url">{{ data.url }}</div>
             </ng-template>
         </ngx-tabulator-column>
-        <ngx-tabulator-column field="protocol" title="Protocol" [width]="80" [headerSort]="true"
+        <ngx-tabulator-column field="protocol" title="Protocol" [width]="getColWidth('protocol')" [headerSort]="true"
             [visible]="isColVisible('protocol')">
             <ng-template let-data>
                 {{ data.protocol && data.protocol !== 'http' && data.protocol !== 'https' ? data.protocol : (data.scheme || data.protocol || '-') }}
             </ng-template>
         </ngx-tabulator-column>
-        <ngx-tabulator-column field="scheme" title="Scheme" [width]="80" [headerSort]="true"
+        <ngx-tabulator-column field="scheme" title="Scheme" [width]="getColWidth('scheme')" [headerSort]="true"
             [visible]="isColVisible('scheme')" />
-        <ngx-tabulator-column field="remoteIP" title="Remote IP" [width]="110" [headerSort]="true"
+        <ngx-tabulator-column field="remoteIP" title="Remote IP" [width]="getColWidth('remoteIP')" [headerSort]="true"
             [visible]="isColVisible('remoteIP')" />
-        <ngx-tabulator-column field="initiator" title="Initiator" [width]="90" [headerSort]="true"
+        <ngx-tabulator-column field="initiator" title="Initiator" [width]="getColWidth('initiator')" [headerSort]="true"
             [visible]="isColVisible('initiator')">
             <ng-template let-data>
                 {{ data.direction === 'outbound' ? 'Server' : 'Client' }}
             </ng-template>
         </ngx-tabulator-column>
-        <ngx-tabulator-column field="type" title="Type" [width]="80" [headerSort]="true"
+        <ngx-tabulator-column field="type" title="Type" [width]="getColWidth('type')" [headerSort]="true"
             [visible]="isColVisible('type')" />
-        <ngx-tabulator-column field="cookies" title="Cookies" [width]="80" [headerSort]="true"
+        <ngx-tabulator-column field="cookies" title="Cookies" [width]="getColWidth('cookies')" [headerSort]="true"
             [visible]="isColVisible('cookies')" />
-        <ngx-tabulator-column field="transferred" title="Transferred" [width]="100" [headerSort]="true"
+        <ngx-tabulator-column field="transferred" title="Transferred" [width]="getColWidth('transferred')" [headerSort]="true"
             [visible]="isColVisible('transferred')">
             <ng-template let-data>
                 {{ formatBytes(data.transferred || 0) }}
             </ng-template>
         </ngx-tabulator-column>
-        <ngx-tabulator-column field="size" title="Size" [width]="100" [headerSort]="true"
+        <ngx-tabulator-column field="size" title="Size" [width]="getColWidth('size')" [headerSort]="true"
             [visible]="isColVisible('size')">
             <ng-template let-data>
                 {{ formatBytes(data.size || 0) }}
             </ng-template>
         </ngx-tabulator-column>
-        <ngx-tabulator-column field="duration" title="Time" [width]="90" [headerSort]="true"
+        <ngx-tabulator-column field="duration" title="Time" [width]="getColWidth('duration')" [headerSort]="true"
             [visible]="isColVisible('duration')">
             <ng-template let-data>
                 {{ formatDuration(data.duration) }}
             </ng-template>
         </ngx-tabulator-column>
-        <ngx-tabulator-column field="caller" title="Caller" [width]="200" [headerSort]="true"
+        <ngx-tabulator-column field="caller" title="Caller" [width]="getColWidth('caller')" [headerSort]="true"
             [visible]="isColVisible('caller')">
             <ng-template let-data>
                 @if (['ws', 'inbound'].includes(data.type)) {
@@ -115,7 +116,7 @@
             }
             </ng-template>
         </ngx-tabulator-column>
-        <ngx-tabulator-column field="waterfall" title="Waterfall" [widthGrow]="1" [visible]="isColVisible('waterfall')">
+        <ngx-tabulator-column field="waterfall" title="Waterfall" [width]="getColWidth('waterfall')" [visible]="isColVisible('waterfall')">
             <ng-template let-data>
                 <div class="waterfall-cell">
                     @if (data.type === 'ws' || data.status === 101) {
