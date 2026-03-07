@@ -416,50 +416,6 @@ app.register(new AsyncApiPlugin({ path: "/asyncapi" }));
 app.register(new WebAppPlugin({ path: '/_app' }));
 
 
-// ============================================================================
-// START SERVER
-// ============================================================================
-
-console.log(`
-╔═══════════════════════════════════════════════════════════════╗
-║                                                               ║
-║         🍞 Shokupan Comprehensive Example Server 🍞           ║
-║                                                               ║
-╚═══════════════════════════════════════════════════════════════╝
-
-🚀 Server starting with ALL features enabled:
-
-📦 Middleware:
-   ✓ CORS (cross-origin requests)
-   ✓ Compression (gzip/brotli)
-   ✓ Rate Limiting (100 req/min)
-   ✓ Security Headers (XSS, CSRF protection)
-   ✓ Session Management
-
-✅ Validation Examples (5 libraries):
-   • /validation/zod
-   • /validation/typebox
-   • /validation/ajv
-   • /validation/valibot
-   • /validation/class-validator
-
-🎯 Feature Examples:
-   • /decorators - Decorator-based controllers
-   • /di - Dependency injection
-   • /hooks - Event lifecycle hooks
-   • /jsx - JSX rendering
-
-📖 Documentation:
-   • /scalar - Interactive API docs
-   • / - API overview
-
-⏱️  Timeouts:
-   • Request: 30s
-   • Read: 10s
-
-🌐 Starting server...
-`);
-
 console.log('--- Checking Middleware Stack before Listen ---');
 app.middleware.forEach((m: any, i) => {
     console.log(`MW[${i}]: ${typeof m} ${m.constructor?.name} ${m.name}`);
