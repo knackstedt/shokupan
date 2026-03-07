@@ -100,7 +100,19 @@
         <ngx-tabulator-column field="caller" title="Caller" [width]="200" [headerSort]="true"
             [visible]="isColVisible('caller')">
             <ng-template let-data>
-                <div class="caller-cell" [title]="data.callStack">{{ extractCaller(data.callStack) }}</div>
+                @if (['ws', 'inbound'].includes(data.type)) {
+                    <span style="color: var(--text-muted)">External</span>
+                }
+                @else {
+                    @let callerInfo = extractCallerInfo(data.callStack);
+                    @if (callerInfo) {
+                    <a class="caller-cell" [href]="getIdeLink(callerInfo.fullPath, callerInfo.line)" [title]="data.callStack" (click)="$event.stopPropagation()">
+                        {{ callerInfo.displayText }}:{{ callerInfo.line }}
+                    </a>
+                } @else {
+                    <div class="caller-cell" [title]="data.callStack">{{ extractCaller(data.callStack) }}</div>
+                }
+            }
             </ng-template>
         </ngx-tabulator-column>
         <ngx-tabulator-column field="waterfall" title="Waterfall" [widthGrow]="1" [visible]="isColVisible('waterfall')">

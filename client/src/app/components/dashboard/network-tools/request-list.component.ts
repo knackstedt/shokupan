@@ -276,4 +276,44 @@ export class RequestListComponent {
         const file = line.match(/\/([^\/]+\.[tj]sx?):\d+:\d+/);
         return file ? file[1] : '';
     }
+
+    /**
+     * Extracts the full file path, line, and column from a call stack line.
+     * Returns null if no valid file path is found.
+     */
+    extractCallerInfo(callStack: string): { displayText: string; fullPath: string; line: number; column: number } | null {
+        if (!callStack) {
+            return null;
+        };
+
+        const line = callStack.split('\n')[0]?.trim();
+
+        // Match file paths with line and column numbers: /path/file.ts:123:45
+        const match = line.match(/\s*at\s+(?<function>\S+?)?\s+\(?(?<filePath>.+?):(?<line>\d+):(?<column>\d+)\)?/);
+        if (match) {
+            const { filePath, line: lineStr, column: colStr } = match.groups as { filePath: string; line: string; column: string };
+
+            // Extract just the filename for display
+            const parts = filePath.split('/');
+            const shortPath = parts.slice(-1)[0];
+
+            return {
+                displayText: shortPath || filePath,
+                fullPath: filePath,
+                line: parseInt(lineStr, 10) || 1,
+                column: parseInt(colStr, 10) || 1
+            };
+        }
+
+        console.log('No valid caller info found in call stack:', callStack);
+        return null;
+    }
+
+    /**
+     * Generates an IDE link (vscode://file) for opening the file at a specific line.
+     * Uses the shared logic from the backend's ide.ts
+     */
+    getIdeLink(absolutePath: string, line?: number): string {
+        return `vscode://file${absolutePath}${line ? ':' + line : ''}`;
+    }
 }
