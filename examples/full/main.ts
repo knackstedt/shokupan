@@ -1,21 +1,23 @@
 import "./otel";
 
-// Default to memory DB for example/dev server to avoid file locks (rocksdb)
-// when running multiple instances or tests concurrently.
-process.env['SHOKUPAN_DB_ENGINE'] = process.env['SHOKUPAN_DB_ENGINE'] || 'memory';
 Error.stackTraceLimit = 50;
 
 import { ApiExplorerPlugin } from '../../src/plugins/application/api-explorer/plugin';
 import { AsyncApiPlugin } from '../../src/plugins/application/asyncapi/plugin';
+import { AuthPlugin } from '../../src/plugins/application/auth';
 import { Dashboard } from '../../src/plugins/application/dashboard/plugin';
+import { MCPServerPlugin } from '../../src/plugins/application/mcp-server/plugin';
+import { ScalarPlugin } from '../../src/plugins/application/scalar';
+import { WebAppPlugin } from '../../src/plugins/application/web-app/plugin';
 import { Compression } from '../../src/plugins/middleware/compression';
-import { Cors } from '../../src/plugins/middleware/cors';
 import { RateLimitMiddleware } from '../../src/plugins/middleware/rate-limit';
 import { SecurityHeaders } from '../../src/plugins/middleware/security-headers';
 import { Session } from '../../src/plugins/middleware/session';
 import { Shokupan } from '../../src/shokupan';
 import { DecoratorTestController } from './controllers/decorator-controller';
 import { UserController } from './controllers/implicit-controller';
+import { ChunkedResponseRouter } from './routes/chunked-response';
+import { HealthRouter } from './routes/health';
 import { appLevelHooks, HooksExampleRouter, PerRouteHooksRouter } from './routes/hooks-example';
 import { JSXExampleRouter } from './routes/jsx-example';
 import { NestedRouter } from './routes/nested_router';
@@ -58,11 +60,11 @@ interface AppState {
 
 
 // Create app with typed state for session management
-const port = parseInt(process.env['PORT'] || '3000');
+const port = parseInt(process.env['PORT'] || '4220');
 const app = new Shokupan<AppState>({
     port,
     development: true,
-    enableOpenApiGen: true,
+    enableOpenApiGen: true, // Enabled for verification
 
     // Timeout Configuration
     requestTimeout: 30000,  // 30 seconds
@@ -78,51 +80,67 @@ const app = new Shokupan<AppState>({
     // Enable Middleware Tracking for Demo
     enableMiddlewareTracking: true,
 
+    // Enable WebSocket Visualization
+    enableWebSocketTracking: true,
+
     // Event Hooks (app-level)
     hooks: [
         appLevelHooks
     ],
 
+    surreal: {
+        url: 'mem://'
+    }
 });
 
+app.get("simple", (ctx) => {
+    if (true) {
+        ctx.json({ message: Date.now() });
+    }
+    else {
+        ctx.json({ message: Date.now() });
+    }
 
-app.event("trivial", (ctx) => {
-    console.log("Trivial event received. We will now hug your face!");
-});
-app.event("warning", (ctx) => {
-    ctx.emit(process.env['FOO'] || 'bar');
-});
-
-// Simple websocket echo server
-app.event("simple", (ctx) => {
-    ctx.emit("simpleResponse", { message: Date.now() });
-});
-app.event("simple.specialAction", (ctx) => {
-    ctx.emit("simple.specialResponse", { message: Date.now() });
-});
-app.event("simple/otherDomains", (ctx) => {
-    ctx.emit("simple/otherDomainsResponse", { message: Date.now() });
+    ctx.json({ message: "Bad things happened here." });
 });
 
-app.event("complex/action1", (ctx) => {
-    ctx.emit("complex/action1Result", { message: Date.now() });
-});
-app.event("complex/action2", (ctx) => {
-    ctx.emit("complex/action2Result", { message: Date.now() });
-});
+// ============================================================================
+// TEST WEBSOCKET ENDPOINT
+// ============================================================================
 
+// Simple echo WebSocket for testing dashboard WS recording
+app.socket("/ws/echo", (ctx) => {
+    const success = ctx.upgrade({
+        data: {
+            handler: {
+                open: (ws: any) => {
+                    console.log('[WS/echo] Client connected');
+                    ws.send(JSON.stringify({ type: 'welcome', message: 'Connected to echo server' }));
+                },
+                message: (ws: any, message: any) => {
+                    console.log('[WS/echo] Received:', message);
+                    ws.send(typeof message === 'string' ? message : JSON.stringify({ type: 'binary' }));
+                },
+                close: (ws: any, code: number) => {
+                    console.log('[WS/echo] Client disconnected', code);
+                }
+            }
+        }
+    });
+    if (!success) return ctx.text('WebSocket upgrade failed', 400);
+});
 
 // ============================================================================
 // MIDDLEWARE PLUGINS
 // ============================================================================
 
 // CORS: Enable cross-origin requests
-app.use(Cors({
-    origin: '*', // In production, specify allowed origins
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    credentials: true,
-    maxAge: 86400 // 24 hours
-}));
+// app.use(Cors({
+//     origin: '*', // In production, specify allowed origins
+//     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+//     credentials: true,
+//     maxAge: 86400 // 24 hours
+// }));
 
 // Compression: Gzip/Brotli response compression
 app.use(Compression({
@@ -163,7 +181,10 @@ app.use(Session({
 app.get("/", {
     summary: "API Root",
     description: "Welcome endpoint with links to all example sections"
-}, (ctx) => {
+}, (ctx, next) => {
+    if (ctx.request.headers.get('upgrade')?.toLowerCase() === 'websocket') {
+        return next();
+    }
     return ctx.json({
         message: "🍞 Welcome to Shokupan Comprehensive Example",
         version: "1.0.0",
@@ -214,7 +235,18 @@ app.get("/implicit", ctx => {
     ctx.text("Implicit");
 });
 
+app.get("/multiResponse", ctx => {
+    if (Math.random() > 0.5) {
+        ctx.json({ payload: "version1" });
+    } else {
+        ctx.json({ message: "version2" });
+    }
+});
+
+
+
 app.mount("/nested", NestedRouter);
+app.register(new ScalarPlugin({ path: "/scalar" }));
 
 // Health check endpoint
 app.get("/health", {
@@ -273,7 +305,8 @@ app.get("/path/:param", ctx => {
 // ============================================================================
 
 // Decorator-based controller
-app.mount('/decorator_test', DecoratorTestController);
+app.mount('/api/v1/decorator_test', DecoratorTestController);
+app.mount('/api/v1/health', HealthRouter);
 
 // Dependency Injection examples
 // Note: DIExampleController and DIStatsRouter require full DI setup
@@ -295,8 +328,40 @@ app.mount('/jsx', new JSXExampleRouter());
 app.mount("/api/user", UserController);
 app.mount("/api/service_fetch", ServiceFetchRouter);
 app.mount("/api/tracking", new TrackingDemoRouter());
-app.register(new Dashboard({
-    path: "/admin"
+app.mount("/api/chunked", ChunkedResponseRouter);
+await app.register(new Dashboard({
+    path: "/dashboard"
+}));
+await app.register(new MCPServerPlugin({
+    rootDir: './examples/full'
+}));
+
+await app.register(new AuthPlugin({
+    jwtSecret: process.env['SESSION_SECRET'] || 'dev-secret-change-in-production',
+    successRedirect: '/_app/',
+    providers: {
+        github: {
+            clientId: process.env['GITHUB_CLIENT_ID'] || 'dummy-client-id',
+            clientSecret: process.env['GITHUB_CLIENT_SECRET'] || 'dummy-client-secret',
+            redirectUri: `https://localhost:${port}/auth/github/callback`
+        },
+        google: {
+            clientId: process.env['GOOGLE_CLIENT_ID'] || 'dummy-client-id',
+            clientSecret: process.env['GOOGLE_CLIENT_SECRET'] || 'dummy-client-secret',
+            redirectUri: `http://localhost:${port}/auth/google/callback`
+        },
+        microsoft: {
+            tenantId: process.env['MICROSOFT_TENANT_ID'] || 'common',
+            clientId: process.env['MICROSOFT_CLIENT_ID'] || 'dummy-client-id',
+            clientSecret: process.env['MICROSOFT_CLIENT_SECRET'] || 'dummy-client-secret',
+            redirectUri: `http://localhost:${port}/auth/microsoft/callback`
+        }
+    },
+    onSuccess: (user, ctx) => {
+        // Automatically grant all permissions to the example user
+        user.permissions = ["dashboard:read", "api:read", "asyncapi:read", "scalar:read"];
+        // Return nothing so AuthPlugin proceeds to issue the session cookie and redirect
+    }
 }));
 
 // ============================================================================
@@ -304,8 +369,6 @@ app.register(new Dashboard({
 // ============================================================================
 
 app.mount('/openapi', new ApiExplorerPlugin({
-    showCode: true,
-    showLinks: true,
     baseDocument: {
         info: {
             title: 'Shokupan Comprehensive Example API',
@@ -350,6 +413,7 @@ Explore the different sections to see examples of each feature.
 }));
 
 app.register(new AsyncApiPlugin({ path: "/asyncapi" }));
+app.register(new WebAppPlugin({ path: '/_app' }));
 
 
 // ============================================================================
@@ -396,6 +460,12 @@ console.log(`
 🌐 Starting server...
 `);
 
+console.log('--- Checking Middleware Stack before Listen ---');
+app.middleware.forEach((m: any, i) => {
+    console.log(`MW[${i}]: ${typeof m} ${m.constructor?.name} ${m.name}`);
+});
+console.log('-----------------------------------------------');
+
 app.listen().then(() => {
     console.log(`
 Shokupan Example Server is listening on http://localhost:${port}
@@ -403,5 +473,5 @@ Shokupan Example Server is listening on http://localhost:${port}
 Access the debug dashboard at http://localhost:${port}/admin
 Access the OpenAPI docs at http://localhost:${port}/openapi
 Access the Websocket playground at http://localhost:${port}/asyncapi
-    `);
+`);
 });

@@ -26,6 +26,9 @@ export interface NetworkRequest {
     callStack?: string;
     hasRequestBody?: boolean;
     hasResponseBody?: boolean;
+    isChunked?: boolean;
+    isStreamed?: boolean;
+    chunkTimings?: Array<{ timestamp: number; size: number; duration: number }>;
 }
 
 export function formatBytes(bytes: number, decimals: number = 2): string {

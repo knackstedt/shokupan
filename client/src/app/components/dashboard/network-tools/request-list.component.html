@@ -89,13 +89,25 @@
         <ngx-tabulator-column field="size" title="Size" [width]="getColWidth('size')" [headerSort]="true"
             [visible]="isColVisible('size')">
             <ng-template let-data>
-                {{ formatBytes(data.size || 0) }}
+                @if (data.isChunked) {
+                    <span class="transfer-mode"> (chunked)</span>
+                } @else if (data.isStreamed) {
+                    <span class="transfer-mode"> (stream)</span>
+                }
+                @else {
+                    {{ formatBytes(data.size || 0) }}
+                }
             </ng-template>
         </ngx-tabulator-column>
         <ngx-tabulator-column field="duration" title="Time" [width]="getColWidth('duration')" [headerSort]="true"
             [visible]="isColVisible('duration')">
             <ng-template let-data>
                 {{ formatDuration(data.duration) }}
+                @if (data.isChunked) {
+                    <span class="transfer-mode"> (chunked)</span>
+                } @else if (data.isStreamed) {
+                    <span class="transfer-mode"> (stream)</span>
+                }
             </ng-template>
         </ngx-tabulator-column>
         <ngx-tabulator-column field="caller" title="Caller" [width]="getColWidth('caller')" [headerSort]="true"

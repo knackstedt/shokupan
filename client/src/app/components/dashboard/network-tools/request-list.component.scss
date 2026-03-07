@@ -121,6 +121,12 @@
         font-family: var(--skp-font-mono);
     }
 
+    .transfer-mode {
+        font-size: 0.85em;
+        color: var(--text-muted);
+        font-style: italic;
+    }
+
     .waterfall-cell {
         position: relative;
         height: 100%;

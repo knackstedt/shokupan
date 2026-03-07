@@ -67,6 +67,9 @@ export interface RequestLog {
     hasRequestBody?: boolean;
     hasResponseBody?: boolean;
     callStack?: string;
+    isChunked?: boolean;
+    isStreamed?: boolean;
+    chunkTimings?: Array<{ timestamp: number; size: number; duration: number }>;
 }
 
 export interface DashboardConfig {
@@ -1309,6 +1312,12 @@ export class Dashboard implements ShokupanPlugin {
                     this.metrics.successfulRequests++;
                 }
 
+                // Detect chunked or streamed responses
+                const transferEncoding = resHeaders['transfer-encoding'] || resHeaders['Transfer-Encoding'];
+                const isChunked = transferEncoding?.includes('chunked') || false;
+                const contentType = resHeaders['content-type'] || resHeaders['Content-Type'] || '';
+                const isStreamed = contentType.includes('stream') || contentType.includes('event-stream') || false;
+
                 // Calculate metadata for log entry
                 const logEntry: RequestLog = {
                     method: response.status === 101 ? 'WS' : ctx.method,
@@ -1332,7 +1341,10 @@ export class Dashboard implements ShokupanPlugin {
                     responseHeaders: resHeaders,
                     wsMessages: (ctx as any)[$wsMessages],
                     hasRequestBody: !!(ctx.requestBody || (ctx as any).bodyData),
-                    hasResponseBody: !!body
+                    hasResponseBody: !!body,
+                    isChunked,
+                    isStreamed,
+                    chunkTimings: (ctx as any)._chunkTimings || undefined
                 };
 
                 const requestId = ctx.requestId;

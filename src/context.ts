@@ -1070,26 +1070,39 @@ export class ShokupanContext<
         const encoder = new TextEncoder();
         let helper: THelper;
 
+        // Track chunk timings for dashboard
+        const chunkTimings: Array<{ timestamp: number; size: number; duration: number }> = [];
+        let lastChunkTime = Date.now();
+        const ctx = this;
+
         const stream = new ReadableStream({
             start(ctrl) {
                 controller = ctrl;
                 // Create helper after controller is initialized
-                helper = helperFactory(controller, aborted, abortCallbacks, encoder);
+                const originalHelper = helperFactory(controller, aborted, abortCallbacks, encoder);
+                
+                // Wrap helper methods to track chunk timings
+                helper = ctx.wrapHelperWithTiming(originalHelper, encoder, chunkTimings, lastChunkTime);
 
                 // Execute callback asynchronously
                 (async () => {
                     try {
                         await callback(helper);
                         controller.close();
+                        
+                        // Store chunk timings in context for dashboard to capture
+                        if (chunkTimings.length > 0) {
+                            (ctx as any)._chunkTimings = chunkTimings;
+                        }
                     } catch (err) {
                         if (onError) {
                             try {
                                 await onError(err as Error, helper);
                             } catch (handlerErr) {
-                                this.app.logger?.error('Context', 'Stream error handler', handlerErr);
+                                ctx.app.logger?.error('Context', 'Stream error handler', handlerErr);
                             }
                         } else {
-                            this.app.logger?.error('Context', 'Stream error', err);
+                            ctx.app.logger?.error('Context', 'Stream error', err);
                         }
                         if (!aborted.value) {
                             controller.close();
@@ -1106,13 +1119,74 @@ export class ShokupanContext<
                     try {
                         cb();
                     } catch (err) {
-                        this.app.logger?.error('Context', 'Stream abort callback', err);
+                        ctx.app.logger?.error('Context', 'Stream abort callback', err);
                     }
                 });
             }
         });
 
         return this.pipe(stream, { headers });
+    }
+
+    /**
+     * Wraps stream helper methods to automatically track chunk timings
+     * @private
+     */
+    private wrapHelperWithTiming<T>(originalHelper: any, encoder: TextEncoder, chunkTimings: Array<{ timestamp: number; size: number; duration: number }>, initialTime: number): T {
+        const wrappedHelper: any = { ...originalHelper };
+        let lastTime = initialTime;
+        
+        // Wrap write method if it exists
+        if (originalHelper.write) {
+            const originalWrite = originalHelper.write.bind(originalHelper);
+            wrappedHelper.write = async function(data: any) {
+                const now = Date.now();
+                const duration = now - lastTime;
+                
+                // Calculate size
+                let size = 0;
+                if (typeof data === 'string') {
+                    size = encoder.encode(data).length;
+                } else if (data instanceof Uint8Array) {
+                    size = data.length;
+                } else if (data instanceof ArrayBuffer) {
+                    size = data.byteLength;
+                }
+                
+                chunkTimings.push({
+                    timestamp: now,
+                    size,
+                    duration
+                });
+                
+                lastTime = now;
+                return originalWrite(data);
+            };
+        }
+        
+        // Wrap writeSSE method if it exists
+        if (originalHelper.writeSSE) {
+            const originalWriteSSE = originalHelper.writeSSE.bind(originalHelper);
+            wrappedHelper.writeSSE = async function(message: any) {
+                const now = Date.now();
+                const duration = now - lastTime;
+                
+                // Estimate SSE message size
+                const messageStr = JSON.stringify(message);
+                const size = encoder.encode(messageStr).length;
+                
+                chunkTimings.push({
+                    timestamp: now,
+                    size,
+                    duration
+                });
+                
+                lastTime = now;
+                return originalWriteSSE(message);
+            };
+        }
+        
+        return wrappedHelper as T;
     }
 
     /**

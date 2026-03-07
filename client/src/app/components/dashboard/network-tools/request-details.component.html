@@ -398,6 +398,26 @@
                         </div>
                     </section>
 
+                    @if (request().chunkTimings && request().chunkTimings!.length > 0) {
+                    <section class="chunk-timings-section">
+                        <h3>Chunk Timings</h3>
+                        <div class="chunk-timings-list">
+                            @for (chunk of request().chunkTimings; track $index) {
+                            <div class="chunk-timing-item">
+                                <div class="chunk-info">
+                                    <span class="chunk-index">Chunk {{ $index + 1 }}</span>
+                                    <span class="chunk-size">{{ formatBytes(chunk.size) }}</span>
+                                </div>
+                                <div class="chunk-times">
+                                    <span class="chunk-timestamp">{{ chunk.timestamp | date:'HH:mm:ss.SSS' }}</span>
+                                    <span class="chunk-duration">{{ formatDuration(chunk.duration) }}</span>
+                                </div>
+                            </div>
+                            }
+                        </div>
+                    </section>
+                    }
+
                     @if (request().handlerStack && request().handlerStack!.length > 0) {
                     <div class="middleware-tab-content">
                         @let pathMap = shortestUniquePaths();
