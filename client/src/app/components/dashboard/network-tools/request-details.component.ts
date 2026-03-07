@@ -6,9 +6,9 @@ import { ButtonModule } from 'primeng/button';
 import { Tab, TabList, TabPanel, TabPanels, Tabs } from 'primeng/tabs';
 import { TooltipModule } from 'primeng/tooltip';
 import { HeaderTokensPipe } from './header-tokens.pipe';
+import { getHeaderUrl, getStatusCodeUrl, isHeaderDocumented } from './http-reference.data';
 import { NetworkRequest, formatBytes, formatDurationPretty, generateCurlCode, generateFetchCode, generateHAR } from './network-utils';
 import { isSupportedEncoding } from './util/decompression';
-
 @Component({
     selector: 'skp-request-details',
     standalone: true,
@@ -382,6 +382,28 @@ export class RequestDetailsComponent {
 
     copyToClipboard(text: string) {
         navigator.clipboard.writeText(text);
+    }
+
+    /**
+     * Get the reference URL for the current request's status code
+     */
+    getStatusCodeRefUrl(statusCode: number): string {
+        return getStatusCodeUrl(statusCode);
+    }
+
+    /**
+     * Get the reference URL for a given header name
+     * Returns null if the header is not documented
+     */
+    getHeaderRefUrl(headerName: string): string | null {
+        return getHeaderUrl(headerName);
+    }
+
+    /**
+     * Check if a header is documented on ref.shokupan.dev
+     */
+    headerHasRefLink(headerName: string): boolean {
+        return isHeaderDocumented(headerName);
     }
 
     downloadResponse() {

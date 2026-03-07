@@ -65,7 +65,13 @@
                             <div class="key">Status Code:</div>
                             <div class="val"
                                 [class]="'hl-status hl-status-' + ((request().status | number:'1.0-0') ?? '0')[0]">
-                                {{ request().status }}</div>
+                                {{ request().status }}
+                                <a class="ref-link" [href]="getStatusCodeRefUrl(request().status)" target="_blank" rel="noopener" title="View documentation">
+                                    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zm0 12a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm0-3a1 1 0 0 1-1-1V5a1 1 0 0 1 2 0v3a1 1 0 0 1-1 1z"/>
+                                    </svg>
+                                </a>
+                            </div>
                             <button class="copy-btn" (click)="copyToClipboard('' + request().status)" title="Copy">
                                 <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
                                     <path
@@ -117,7 +123,16 @@
                         <h3>Response Headers</h3>
                         <div class="kv-grid">
                             @for (h of request().responseHeaders | keyvalue; track $index) {
-                            <div class="key">{{ h.key }}:</div>
+                            <div class="key">
+                                @if (headerHasRefLink(h.key)) {
+                                <a class="ref-link" [href]="getHeaderRefUrl(h.key)" target="_blank" rel="noopener" title="View documentation">
+                                    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zm0 12a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm0-3a1 1 0 0 1-1-1V5a1 1 0 0 1 2 0v3a1 1 0 0 1-1 1z"/>
+                                    </svg>
+                                </a>
+                                }
+                                {{ h.key }}:
+                            </div>
                             <div class="val" [class]="headerValueClass(h.key, h.value)">
                                 @let tokens = (h.value | headerTokens:h.key);
                                 @if (tokens) {
@@ -146,7 +161,16 @@
                         <h3>Request Headers</h3>
                         <div class="kv-grid">
                             @for (h of request().requestHeaders | keyvalue; track $index) {
-                            <div class="key">{{ h.key }}:</div>
+                            <div class="key">
+                                @if (headerHasRefLink(h.key)) {
+                                <a class="ref-link" [href]="getHeaderRefUrl(h.key)" target="_blank" rel="noopener" title="View documentation">
+                                    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zm0 12a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm0-3a1 1 0 0 1-1-1V5a1 1 0 0 1 2 0v3a1 1 0 0 1-1 1z"/>
+                                    </svg>
+                                </a>
+                                }
+                                {{ h.key }}:
+                            </div>
                             <div class="val" [class]="headerValueClass(h.key, h.value)">
                                 @let tokens = (h.value | headerTokens:h.key);
                                 @if (tokens) {

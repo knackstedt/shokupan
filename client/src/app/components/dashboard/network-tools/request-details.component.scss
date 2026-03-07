@@ -280,6 +280,25 @@
                 }
             }
 
+            .ref-link {
+                display: inline-flex;
+                align-items: center;
+                margin-right: 6px;
+                color: var(--text-secondary);
+                text-decoration: none;
+                opacity: 0.7;
+                transition: opacity 0.12s, color 0.12s;
+
+                &:hover {
+                    color: var(--primary);
+                    opacity: 1;
+                }
+
+                svg {
+                    display: block;
+                }
+            }
+
             // Reveal the copy button when hovering any sibling cell in the same row
             &:has(.key:hover) .copy-btn,
             &:has(.val:hover) .copy-btn,
