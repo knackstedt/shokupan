@@ -29,9 +29,6 @@
             }
             <p-tab value="cookies">Cookies</p-tab>
             <p-tab value="timings">Timings</p-tab>
-            @if (request().handlerStack && request().handlerStack!.length > 0) {
-            <p-tab value="middleware">Middleware</p-tab>
-            }
             @if (request().callStack) {
             <p-tab value="caller">Caller</p-tab>
             }
@@ -375,35 +372,33 @@
             <!-- ── Timings ──────────────────────────────────────────────── -->
             <p-tabpanel value="timings">
                 <ng-scrollbar class="tab-content">
-                    <div class="kv-grid">
-                        <div class="key">Started:</div>
-                        <div class="val hl-date">{{ request().timestamp | date:'mediumTime' }}</div>
-                        <button class="copy-btn" (click)="copyToClipboard(formatTimestamp(request().timestamp))"
-                            title="Copy">
-                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
-                                <path
-                                    d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z" />
-                                <path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h-1v1H2V6h1V5H2z" />
-                            </svg>
-                        </button>
-                        <div class="key">Duration:</div>
-                        <div class="val hl-num">{{ formatDuration(request().duration) }}</div>
-                        <button class="copy-btn" (click)="copyToClipboard(formatDuration(request().duration))"
-                            title="Copy">
-                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
-                                <path
-                                    d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z" />
-                                <path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h-1v1H2V6h1V5H2z" />
-                            </svg>
-                        </button>
-                    </div>
-                </ng-scrollbar>
-            </p-tabpanel>
+                    <section>
+                        <h3>Request Timing</h3>
+                        <div class="kv-grid">
+                            <div class="key">Started:</div>
+                            <div class="val hl-date">{{ request().timestamp | date:'mediumTime' }}</div>
+                            <button class="copy-btn" (click)="copyToClipboard(formatTimestamp(request().timestamp))"
+                                title="Copy">
+                                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                    <path
+                                        d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z" />
+                                    <path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h-1v1H2V6h1V5H2z" />
+                                </svg>
+                            </button>
+                            <div class="key">Duration:</div>
+                            <div class="val hl-num">{{ formatDuration(request().duration) }}</div>
+                            <button class="copy-btn" (click)="copyToClipboard(formatDuration(request().duration))"
+                                title="Copy">
+                                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                    <path
+                                        d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z" />
+                                    <path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h-1v1H2V6h1V5H2z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </section>
 
-            <!-- ── Middleware ────────────────────────────────────────────── -->
-            @if (request().handlerStack && request().handlerStack!.length > 0) {
-            <p-tabpanel value="middleware">
-                <ng-scrollbar class="tab-content" orientation="vertical">
+                    @if (request().handlerStack && request().handlerStack!.length > 0) {
                     <div class="middleware-tab-content">
                         @let pathMap = shortestUniquePaths();
                         @let groups = handlerGroups();
@@ -448,9 +443,9 @@
                         </section>
                         }
                     </div>
+                    }
                 </ng-scrollbar>
             </p-tabpanel>
-            }
 
             <!-- ── Caller ──────────────────────────────────────────────── -->
             @if (request().callStack) {
