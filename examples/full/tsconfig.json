@@ -1,0 +1,8 @@
+{
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "rootDir": ".",
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true
+    }
+}

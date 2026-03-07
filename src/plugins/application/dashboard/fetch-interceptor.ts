@@ -135,6 +135,8 @@ export class FetchInterceptor {
         this.originalFetch = FetchInterceptor.originalFetch || global.fetch;
         this.originalHttpRequest = FetchInterceptor.originalHttpRequest || http.request;
         this.originalHttpsRequest = FetchInterceptor.originalHttpsRequest || https.request;
+        this.originalHttpGet = FetchInterceptor.originalHttpGet || http.get;
+        this.originalHttpsGet = FetchInterceptor.originalHttpsGet || https.get;
     }
 
     /**
@@ -161,6 +163,12 @@ export class FetchInterceptor {
         }
         if (FetchInterceptor.originalHttpsRequest) {
             https.request = FetchInterceptor.originalHttpsRequest;
+        }
+        if (FetchInterceptor.originalHttpGet) {
+            http.get = FetchInterceptor.originalHttpGet;
+        }
+        if (FetchInterceptor.originalHttpsGet) {
+            https.get = FetchInterceptor.originalHttpsGet;
         }
         if (process.env.NODE_ENV !== 'test') {
             process.stdout.write('[FetchInterceptor] Network layer restored (static).\n');
@@ -283,9 +291,18 @@ export class FetchInterceptor {
 
     private patchNodeRequests() {
         const self = this;
+        
+        this.logger.debug('FetchInterceptor', 'Patching http/https modules via require()', { 
+            httpRequestType: typeof http.request,
+            httpsRequestType: typeof https.request
+        });
+        
         const intercept = (module: typeof http | typeof https, original: Function, defaultScheme: string) => {
-            // @ts-ignore
-            module.request = function (...args: any[]) {
+            this.logger.debug('FetchInterceptor', `Patching ${defaultScheme}.request`);
+            
+            module.request = function (...args: Parameters<typeof import('node:http').request>) {
+                self.logger.debug('FetchInterceptor', `✓ Intercepted ${defaultScheme}.request call`);
+                
                 const startTime = performance.now();
                 const timestamp = Date.now();
 
@@ -389,6 +406,110 @@ export class FetchInterceptor {
 
                 return req;
             };
+
+            module.get = function (...args: Parameters<typeof import('node:http').request>) {
+                // http.get is a convenience method that calls http.request
+                // We need to intercept it the same way
+                const startTime = performance.now();
+                const timestamp = Date.now();
+
+                // Capture stacktrace
+                let callStack = new Error().stack;
+                const lines = callStack.split('\n');
+                let linesToSkip = 0;
+                for (let i = 2; i < lines.length; i++) {
+                    if (!lines[i].includes('/node_modules/') && !lines[i].includes('at new Promise (native')) {
+                        break;
+                    }
+                    linesToSkip++;
+                }
+                callStack = lines.slice(linesToSkip + 2).join('\n');
+
+                let options: any = {};
+                let urlObj: URL | undefined;
+
+                // Argument normalization for get method
+                if (typeof args[0] === 'string' || args[0] instanceof URL) {
+                    try {
+                        urlObj = new URL(args[0]);
+                        options = typeof args[1] === 'object' ? args[1] : {};
+                    } catch (e) { }
+                } else {
+                    options = args[0] || {};
+                    try {
+                        const protocol = options.protocol || defaultScheme + ':';
+                        const host = options.hostname || options.host || 'localhost';
+                        const port = options.port ? ':' + options.port : '';
+                        const path = options.path || '/';
+                        urlObj = new URL(`${protocol}//${host}${port}${path}`);
+                    } catch (e) { }
+                }
+
+                const method = 'GET';
+                const url = urlObj ? urlObj.toString() : 'unknown';
+                const isHttps = defaultScheme === 'https' || url.startsWith('https://');
+
+                // Call original get method
+                const req = (defaultScheme === 'https' ? self.originalHttpsGet : self.originalHttpGet).apply(this, args);
+
+                // Helper to get headers
+                const getReqHeaders = () => {
+                    try {
+                        const h = req.getHeaders();
+                        const normalized: Record<string, string> = {};
+                        for (const k in h) {
+                            const v = h[k];
+                            normalized[k] = Array.isArray(v) ? v.join(', ') : String(v);
+                        }
+                        return normalized;
+                    } catch (e) { return {}; }
+                };
+
+                // Intercept response
+                req.on('response', (res: IncomingMessage) => {
+                    const duration = performance.now() - startTime;
+
+                    // Normalize response headers
+                    const resHeaders: Record<string, string> = {};
+                    if (res.headers) {
+                        for (const k in res.headers) {
+                            const v = res.headers[k];
+                            resHeaders[k] = Array.isArray(v) ? v.join(', ') : String(v || '');
+                        }
+                    }
+
+
+                    self.notify({
+                        method,
+                        url,
+                        requestHeaders: getReqHeaders(),
+                        status: res.statusCode || 0,
+                        responseHeaders: resHeaders,
+                        startTime: timestamp,
+                        duration,
+                        callStack,
+                        ...self.extractRequestMeta(url, getReqHeaders()),
+                        protocol: req.httpVersion
+                    });
+                });
+
+                req.on('error', (err: Error) => {
+                    const duration = performance.now() - startTime;
+                    self.notify({
+                        method,
+                        url,
+                        requestHeaders: getReqHeaders(),
+                        status: 0,
+                        responseHeaders: {},
+                        responseBody: `Error: ${err.message}`,
+                        startTime: timestamp,
+                        duration,
+                        callStack
+                    });
+                });
+
+                return req;
+            }
         };
 
         intercept(http, this.originalHttpRequest, 'http');
@@ -403,6 +524,8 @@ export class FetchInterceptor {
         global.fetch = this.originalFetch;
         http.request = this.originalHttpRequest;
         https.request = this.originalHttpsRequest;
+        http.get = this.originalHttpGet;
+        https.get = this.originalHttpsGet;
 
         this.isPatched = false;
         this.logger.debug('FetchInterceptor', 'Network layer restored.');

@@ -112,6 +112,15 @@ Shokupan has a rich ecosystem of plugins.
 - **[API Reference](https://shokupan.dev/api)**: Complete API documentation.
 - **[Roadmap](https://shokupan.dev/reference/roadmap)**: Future plans and features.
 
+## ⚠️ Known Limitations
+
+### HTTP/HTTPS Client Outbound Request Monitoring (Bun Runtime)
+
+When running on Bun, Shokupan has **limited or no visibility** into outbound requests made via the `node:http` and `node:https` clients. This severely limits Shokupan's capability to monitor outgoing HTTP(S) requests. This is caused due to Bun's native networking implementation, which does not yet have support for intercepting these modules.
+
+Requests made via the global `fetch` function are still monitored. Requests from `node:http` and `node:https` can be partially monitored if they are imported via `require` or from the `shokupan` package.
+
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.

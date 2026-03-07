@@ -170,5 +170,41 @@ router.get('/regular-data', async (ctx) => {
     });
 });
 
+/**
+ * Test endpoint that makes an outbound HTTPS request using Node.js https module.
+ * This should show the Security tab with TLS/certificate information.
+ */
+
+router.get('/test-outbound-https', async (ctx) => {
+    try {
+        // Has to be loaded as require to be instrumented
+        const https = require('https');
+        
+        const data = await new Promise<string>((resolve, reject) => {
+            https.get('https://api.github.com/zen', {
+                headers: {
+                    'User-Agent': 'Shokupan-Test'
+                }
+            }, (res) => {
+                let body = '';
+                res.on('data', chunk => body += chunk);
+                res.on('end', () => resolve(body));
+            }).on('error', reject);
+        });
+        
+        return ctx.json({
+            success: true,
+            message: 'Outbound HTTPS request completed using Node.js https.get',
+            data,
+            note: 'Check the Network tool - the outbound request to api.github.com should appear with a Security tab showing TLS/certificate details'
+        });
+    } catch (error) {
+        return ctx.json({
+            success: false,
+            error: error.message
+        }, 500);
+    }
+});
+
 export const ChunkedResponseRouter = router;
 
