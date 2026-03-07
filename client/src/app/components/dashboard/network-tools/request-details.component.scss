@@ -537,3 +537,53 @@
 .method-ws {
     color: #a78bfa !important;
 }
+
+// Call Stack styling
+.caller-tab-content {
+    overflow-x: auto;
+}
+
+.callstack-list {
+    font-family: var(--skp-font-mono);
+    font-size: 0.85rem;
+    padding: 12px;
+    min-width: max-content;
+}
+
+.callstack-item {
+    padding: 4px 8px;
+    line-height: 1.6;
+    white-space: nowrap;
+
+    &:hover {
+        background: var(--surface-hover);
+    }
+}
+
+.callstack-prefix {
+    color: var(--text-muted);
+}
+
+.callstack-function {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.callstack-paren {
+    color: var(--text-muted);
+}
+
+.callstack-link {
+    color: var(--primary-color);
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover {
+        text-decoration: underline;
+    }
+}
+
+.callstack-text {
+    color: var(--text-secondary);
+    font-weight: 500;
+}

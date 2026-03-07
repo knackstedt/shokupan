@@ -32,6 +32,9 @@
             @if (request().handlerStack && request().handlerStack!.length > 0) {
             <p-tab value="middleware">Middleware</p-tab>
             }
+            @if (request().callStack) {
+            <p-tab value="caller">Caller</p-tab>
+            }
             @if (isWs()) {
             <p-tab value="timeline">Timeline</p-tab>
             }
@@ -443,6 +446,34 @@
                                 }
                             </div>
                         </section>
+                        }
+                    </div>
+                </ng-scrollbar>
+            </p-tabpanel>
+            }
+
+            <!-- ── Caller ──────────────────────────────────────────────── -->
+            @if (request().callStack) {
+            <p-tabpanel value="caller">
+                <ng-scrollbar class="tab-content caller-tab-content" orientation="vertical">
+                    <div class="callstack-list">
+                        @for (line of parsedCallStack(); track $index) {
+                            @if (line.type === 'stack') {
+                                <div class="callstack-item">
+                                    <span class="callstack-prefix">{{ line.prefix }}</span>
+                                    @if (line.functionName) {
+                                        <span class="callstack-function">{{ line.functionName }}</span>
+                                    }
+                                    <span class="callstack-paren">{{ line.parenOpen }}</span>
+                                    <a class="callstack-link"
+                                       [href]="getIdeLink(line.filePath, line.line)"
+                                       (click)="$event.preventDefault(); openIdeLink(line.filePath, line.line)"
+                                       >{{ line.fileName }}:{{ line.line }}:{{ line.column }}</a>
+                                    <span class="callstack-paren">{{ line.parenClose }}</span>
+                                </div>
+                            } @else {
+                                <div class="callstack-item callstack-text">{{ line.content }}</div>
+                            }
                         }
                     </div>
                 </ng-scrollbar>

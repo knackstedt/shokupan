@@ -352,6 +352,51 @@ export class RequestDetailsComponent {
     }
 
     /**
+     * Parse the call stack into structured lines with file path info.
+     * Returns array of parsed stack frames for rendering with clickable links.
+     */
+    parsedCallStack = computed((): ({ type: 'stack'; prefix: string; functionName?: string; parenOpen: string; filePath: string; fileName: string; line: number; column: number; parenClose: string; raw: string } | { type: 'text'; content: string; raw: string })[] => {
+        const callStack = this.request().callStack;
+        if (!callStack) return [];
+
+        const lines = callStack.split('\n');
+        return lines.map(line => {
+            const trimmed = line.trim();
+            if (!trimmed) return null;
+
+            // Match stack trace lines: "    at functionName (path:line:col)" or "    at path:line:col"
+            // Also handles: "    at functionName path:line:col" (no parens)
+            const match = trimmed.match(/^(\s*at\s+)(\S+\s+)?(\()?(.+?):(\d+):(\d+)(\))?$/);
+            if (match) {
+                const [, prefix, funcName, parenOpen, filePath, lineNum, colNum, parenClose] = match;
+                // Extract just the filename from the full path
+                const fileName = filePath.split('/').pop() || filePath;
+                // Clean up function name (remove trailing space if present)
+                const functionName = funcName?.trim();
+                return {
+                    type: 'stack' as const,
+                    prefix: prefix,
+                    functionName: functionName,
+                    parenOpen: parenOpen || '',
+                    filePath,
+                    fileName,
+                    line: parseInt(lineNum, 10),
+                    column: parseInt(colNum, 10),
+                    parenClose: parenClose || '',
+                    raw: trimmed
+                };
+            }
+
+            // Match lines without file paths (Error lines, etc.)
+            return {
+                type: 'text' as const,
+                content: trimmed,
+                raw: trimmed
+            };
+        }).filter((item): item is NonNullable<typeof item> => item !== null);
+    });
+
+    /**
      * For each entry in handlerStack, compute the shortest path suffix that
      * uniquely identifies the file among all stack entries.
      * Returns a Map<file, displayLabel>.
