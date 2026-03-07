@@ -20,11 +20,28 @@ export function FailedRequestRecorder(options: FailedRequestRecorderOptions = {}
     const ttl = options.ttl ?? 86400000;
 
     const recorderMiddleware: Middleware = async (ctx: ShokupanContext, next) => {
+
+        // Capture stacktrace to identify where this request originated from
+        let stackTrace = new Error().stack;
+
+        const lines = stackTrace.split('\n');
+        let linesToSkip = 0;
+        for (let i = 2; i < lines.length; i++) {
+            // Should skip node_modules and native Promise messages that don't help anything
+            if (!lines[i].includes('/node_modules/') && !lines[i].includes('at new Promise (native')) {
+                break;
+            }
+            linesToSkip++;
+        }
+
+        // Add one to skip the first line ("Error") title
+        const callStack = lines.slice(linesToSkip + 2).join('\n');
+
         try {
             return await next();
         } catch (err: any) {
             // Capture the error
-            await recordFailedRequest(ctx, err, maxCapacity, ttl);
+            await recordFailedRequest(ctx, err, maxCapacity, ttl, callStack);
             // Re-throw so standard error handling (or other middleware) can process it
             throw err;
         }
@@ -35,7 +52,7 @@ export function FailedRequestRecorder(options: FailedRequestRecorderOptions = {}
     return recorderMiddleware;
 }
 
-async function recordFailedRequest(ctx: ShokupanContext, error: any, maxCapacity: number, ttl: number) {
+async function recordFailedRequest(ctx: ShokupanContext, error: any, maxCapacity: number, ttl: number, callStack?: string) {
     try {
         const timestamp = Date.now();
         const requestPath = ctx.path;
@@ -56,7 +73,8 @@ async function recordFailedRequest(ctx: ShokupanContext, error: any, maxCapacity
             method: method,
             body: body,
             error: errorMsg,
-            timestamp
+            timestamp,
+            callStack
         };
 
         // Middleware Tracking

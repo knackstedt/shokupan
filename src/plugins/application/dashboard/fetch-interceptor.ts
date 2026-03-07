@@ -80,6 +80,10 @@ export interface OutboundRequestLog {
      * The actual size of the response body in bytes.
      */
     responseSize?: number;
+    /**
+     * Stack trace capturing where the request was initiated from.
+     */
+    callStack?: string;
 }
 
 /**
@@ -189,6 +193,23 @@ export class FetchInterceptor {
             const startTime = performance.now();
             const timestamp = Date.now();
 
+            // Capture stacktrace to identify where this request originated from
+            let stackTrace = new Error().stack;
+
+            const lines = stackTrace.split('\n');
+            let linesToSkip = 0;
+            for (let i = 2; i < lines.length; i++) {
+                // Should skip node_modules and native Promise messages that don't help anything
+                if (!lines[i].includes('/node_modules/') && !lines[i].includes('at new Promise (native')) {
+                    break;
+                }
+                linesToSkip++;
+            }
+
+            // Add one to skip the first line ("Error") title
+            const callStack = lines.slice(linesToSkip + 2).join('\n');
+
+
             let url = '';
             let method = 'GET';
             let requestHeaders: Record<string, string> = {};
@@ -228,6 +249,7 @@ export class FetchInterceptor {
                     startTime: timestamp,
                     duration,
                     status: response.status,
+                    callStack,
                     ...self.extractRequestMeta(url, requestHeaders)
                 }).catch(err => self.logger.error('FetchInterceptor', "Error processing response:", { error: err }));
 
@@ -243,6 +265,7 @@ export class FetchInterceptor {
                     startTime: timestamp,
                     duration,
                     responseBody: `Error: ${error.message}`,
+                    callStack,
                     ...self.extractRequestMeta(url, requestHeaders)
                 });
                 throw error;
@@ -265,6 +288,23 @@ export class FetchInterceptor {
             module.request = function (...args: any[]) {
                 const startTime = performance.now();
                 const timestamp = Date.now();
+
+                // Capture stacktrace to identify where this request originated from
+                let stackTrace = new Error().stack;
+
+                const lines = stackTrace.split('\n');
+                let linesToSkip = 0;
+                for (let i = 2; i < lines.length; i++) {
+                    // Should skip node_modules and native Promise messages that don't help anything
+                    if (!lines[i].includes('/node_modules/') && !lines[i].includes('at new Promise (native')) {
+                        break;
+                    }
+                    linesToSkip++;
+                }
+
+                // Add one to skip the first line ("Error") title
+                const callStack = lines.slice(linesToSkip + 2).join('\n');
+
                 let options: any = {};
                 let urlObj: URL | undefined;
 
@@ -326,6 +366,7 @@ export class FetchInterceptor {
                         responseHeaders: resHeaders,
                         startTime: timestamp,
                         duration,
+                        callStack,
                         ...self.extractRequestMeta(url, getReqHeaders()),
                         protocol: req.httpVersion
                     });
@@ -341,7 +382,8 @@ export class FetchInterceptor {
                         responseHeaders: {},
                         responseBody: `Error: ${err.message}`, // Capture error
                         startTime: timestamp,
-                        duration
+                        duration,
+                        callStack
                     });
                 });
 

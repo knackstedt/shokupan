@@ -66,6 +66,7 @@ export interface RequestLog {
     wsMessages?: any[];
     hasRequestBody?: boolean;
     hasResponseBody?: boolean;
+    callStack?: string;
 }
 
 export interface DashboardConfig {
@@ -244,6 +245,7 @@ export class Dashboard implements ShokupanPlugin {
                 requestHeaders: log.requestHeaders,
                 hasRequestBody: !!log.requestBody,
                 hasResponseBody: !!log.responseBody,
+                callStack: log.callStack
             };
 
             // Check ignore options
