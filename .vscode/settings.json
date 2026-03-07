@@ -2,7 +2,11 @@
     "cSpell.words": [
         "analogjs",
         "bodyinit",
-        "Shokupan"
+        "echart",
+        "primeng",
+        "Shokupan",
+        "surrealdb",
+        "surrealkv"
     ],
     "javascript.format.semicolons": "insert",
     "typescript.format.semicolons": "insert",

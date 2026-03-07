@@ -8,7 +8,35 @@
             "program": "examples/full/main.ts",
             "cwd": "${workspaceRoot}/",
             "env": {
-                "PORT": "8372"
+                "PORT": "4220",
+                "ANGULAR_DEV_PORT": "4200",
+                "NODE_ENV": "development"
+            },
+            "watchMode": true,
+            "stopOnEntry": false
+        },
+        {
+            "name": "Example (Auth)",
+            "type": "bun",
+            "request": "launch",
+            "program": "examples/features/auth.ts",
+            "cwd": "${workspaceRoot}/",
+            "env": {
+                "PORT": "5010",
+                "NODE_ENV": "development"
+            },
+            "watchMode": true,
+            "stopOnEntry": false
+        },
+        {
+            "name": "Example (API Paths)",
+            "type": "bun",
+            "request": "launch",
+            "program": "examples/api_paths/main.ts",
+            "cwd": "${workspaceRoot}/",
+            "env": {
+                "PORT": "5020",
+                "NODE_ENV": "development"
             },
             "watchMode": true,
             "stopOnEntry": false

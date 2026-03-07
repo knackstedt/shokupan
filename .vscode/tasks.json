@@ -3,6 +3,44 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "▶ ng",
+            "type": "shell",
+            "command": "ng",
+            "args": [
+                "serve",
+                "--port",
+                "4200",
+                "--no-open",
+                "--configuration",
+                "development"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/client"
+            },
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "ng",
+                "pattern": [
+                    {
+                        "severity": 1,
+                        "message": 3,
+                        "file": 2,
+                        "kind": "file",
+                        "regexp": "^([^ ]+)  ([A-Z]+) ([^ ]+): (.+)$"
+                    }
+                ],
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": {
+                        "regexp": "Building..."
+                    },
+                    "endsPattern": {
+                        "regexp": "press h \\+ enter to show help"
+                    }
+                }
+            }
+        },
+        {
             "label": "▶ otel viewer",
             "type": "shell",
             "command": "podman",
