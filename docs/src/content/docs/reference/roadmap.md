@@ -7,7 +7,6 @@ description: Future features and development plans
 
 ### Frontend Support (Partially Implemented)
 - Built-in support for next.js, remix, nuxt, angular SSR, and sveltekit
-- OpenAPI client generation (e.g. Orval, superagent, typed-rest-client)
 
 ### Runtime Compatibility (Partially Implemented)
 - Improved support for Deno, Node.js, and WinterCG
@@ -16,7 +15,27 @@ description: Future features and development plans
 ### Framework Plugins (Partially Implemented)
 - Drop-in adapters for Express, Koa, Hono, Fastify, Elysia etc.
 
+### Scaling
+- Automatic clustering
+- Load balancing
+
+### Transmission Format Support
+> These may end up just being documentation examples rather than actual plugins
+- tRPC/gRPC integration
+- Protobuf
+- MessagePack
+- Streaming JSON/Form-data
+- BullMQ
+- Nats.js
+
+### Performance
+- Improved Bun performance
+- Improved NodeJS performance
+- Improved multiprocessing support
+
 ## Plugins
+
+### New/Revamped Plugins
 - Better GraphQL support (sse, ws, endpoints, subscriptions)
 - ODataV4
 - Database plugin integration (e.g. Prisma, Sequelize, mongoose, redis, knex, pg etc)
@@ -26,24 +45,9 @@ description: Future features and development plans
 - superjson
 - mime
 
-### Scaling
-- Automatic clustering
-- Load balancing
-
-### Transmission Format Support
-- tRPC integration
-- gRPC
-- CBOR
-- SSE
-- Protobuf
-- MessagePack
-- Streaming JSON/Form-data
-- BullMQ
-- Nats.js
-
-### Performance
-- Improved NodeJS performance
-- Improved multiprocessing support
+### Base Plugin features
+- Support for plugins with interfaces on service ports instead of the same HTTP server
+- Interface for plugin-to-plugin communication
 
 ## Contributing
 

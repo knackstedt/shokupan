@@ -1,0 +1,144 @@
+name: Bug Report
+description: Report a bug or unexpected behavior in Shokupan
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the information below to help us resolve the issue.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight Checklist
+      description: Please ensure you've completed all of the following.
+      options:
+        - label: I have searched existing issues to ensure this bug has not already been reported
+          required: true
+        - label: I am using the latest version of Shokupan
+          required: true
+        - label: I have read the [documentation](https://shokupan.dev)
+          required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: When I do X, Y happens instead of Z...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Detailed steps to reproduce the behavior
+      placeholder: |
+        1. Create a route with '...'
+        2. Send a request to '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen
+      placeholder: The route should return...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened
+      placeholder: Instead, it returns...
+    validations:
+      required: true
+
+  - type: textarea
+    id: code
+    attributes:
+      label: Minimal Reproducible Example
+      description: Please provide a minimal code example that reproduces the issue
+      placeholder: |
+        ```typescript
+        import { Shokupan } from 'shokupan';
+        
+        const app = new Shokupan();
+        // Your code here
+        ```
+      render: typescript
+    validations:
+      required: false
+
+  - type: input
+    id: shokupan-version
+    attributes:
+      label: Shokupan Version
+      description: What version of Shokupan are you using?
+      placeholder: "0.16.5"
+    validations:
+      required: true
+
+  - type: input
+    id: bun-version
+    attributes:
+      label: Bun Version
+      description: What version of Bun are you using? (Run `bun --version`)
+      placeholder: "1.3.0"
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js Version (if applicable)
+      description: If you're using Node.js instead of Bun, what version? (Run `node --version`)
+      placeholder: "20.0.0"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      description: What operating system are you using?
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: os-version
+    attributes:
+      label: OS Version
+      description: What version of your operating system?
+      placeholder: "macOS 14.0, Ubuntu 22.04, Windows 11, etc."
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Logs
+      description: Please paste any relevant error logs or stack traces
+      placeholder: Paste error logs here...
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here (screenshots, related issues, etc.)
+    validations:
+      required: false
