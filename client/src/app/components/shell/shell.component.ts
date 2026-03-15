@@ -1,5 +1,7 @@
 import {
-  Component, inject, signal
+    Component,
+    computed,
+    inject, signal
 } from '@angular/core';
 import { AngularSplitModule } from 'angular-split';
 import { AuthService } from '../../services/auth.service';
@@ -42,8 +44,14 @@ export class ShellComponent {
     { id: 'scalar', label: 'Reference', icon: '📖', permission: 'scalar' },
   ];
 
-  readonly visibleTabs = () =>
-    this.allTabs.filter(t => this.perms.canRead(t.permission));
+  readonly visibleTabs = computed(() => {
+    const visible = this.allTabs.filter(t => {
+      const canRead = this.perms.canRead(t.permission);
+      return canRead;
+    });
+
+    return visible;
+  });
 
   readonly activeTab = signal<TabId>('dashboard');
 
