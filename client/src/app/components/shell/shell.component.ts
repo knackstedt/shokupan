@@ -1,7 +1,10 @@
 import {
     Component,
     computed,
-    inject, signal
+    effect,
+    inject,
+    OnInit,
+    signal
 } from '@angular/core';
 import { AngularSplitModule } from 'angular-split';
 import { AuthService } from '../../services/auth.service';
@@ -33,7 +36,7 @@ interface NavTab {
   templateUrl: './shell.component.html',
   styleUrl: './shell.component.scss',
 })
-export class ShellComponent {
+export class ShellComponent implements OnInit {
   readonly auth = inject(AuthService);
   readonly perms = inject(PermissionService);
 
@@ -54,6 +57,39 @@ export class ShellComponent {
   });
 
   readonly activeTab = signal<TabId>('dashboard');
+  private isInitializing = true;
+
+  constructor() {
+    // Update URL hash when tab changes (but preserve endpoint part)
+    effect(() => {
+      const tab = this.activeTab();
+      if (tab && !this.isInitializing) {
+        // Preserve the endpoint part of the hash if it exists
+        const currentHash = window.location.hash.slice(1);
+        const currentParts = currentHash.split('/');
+        if (currentParts[0] === tab && currentParts.length > 1) {
+          // Hash already has this tab with an endpoint, don't overwrite
+          return;
+        }
+        window.location.hash = tab;
+      }
+    });
+  }
+
+  ngOnInit(): void {
+    // Restore tab from URL hash on init
+    const hash = window.location.hash.slice(1); // Remove '#'
+    const tabFromHash = hash.split('/')[0] as TabId; // Get first segment
+
+    if (tabFromHash && this.visibleTabs().some(t => t.id === tabFromHash)) {
+      this.activeTab.set(tabFromHash);
+    }
+
+    // Allow effect to run after initialization
+    setTimeout(() => {
+      this.isInitializing = false;
+    }, 0);
+  }
 
   setTab(id: TabId): void {
     this.activeTab.set(id);
