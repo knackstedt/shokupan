@@ -7,21 +7,30 @@
 .explorer {
     display: flex;
     height: 100%;
+
+    as-split {
+        height: 100%;
+    }
+
+    as-split-area {
+        overflow: hidden;
+    }
 }
 
 .sidebar {
-    width: 280px;
-    min-width: 200px;
-    border-right: 1px solid var(--card-border);
+    height: 100%;
     background: var(--bg-card);
     display: flex;
     flex-direction: column;
-    flex-shrink: 0;
+    position: relative;
 }
 
 .sidebar-header {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--card-border);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 
     h2 {
         margin: 0;
@@ -32,6 +41,56 @@
     small {
         color: var(--text-muted);
         font-size: 0.857rem;
+    }
+}
+
+.toggle-sidebar {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+
+    &:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+    }
+
+    &:active {
+        transform: scale(0.95);
+    }
+}
+
+.version {
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    padding: 0.25rem 0.5rem;
+    background: var(--bg-primary);
+    border-radius: 4px;
+    font-family: var(--skp-font-mono);
+}
+
+// Angular Split gutter customization
+:host ::ng-deep {
+    .as-split-gutter {
+        background-color: var(--card-border);
+        transition: background-color 0.2s ease;
+
+        &:hover {
+            background-color: var(--text-muted);
+        }
+    }
+
+    .as-split-gutter-icon {
+        background-image: none;
     }
 }
 
@@ -106,11 +165,29 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
+
+    .path-segment {
+        &.path-param {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        &.path-glob {
+            color: #f59e0b;
+            font-weight: 600;
+        }
+
+        &.path-normal {
+            color: inherit;
+        }
+    }
 }
 
 .content {
-    flex: 1;
-    overflow: auto;
+    height: 100%;
+    overflow: hidden;
 }
 
 .detail-header {
@@ -156,6 +233,17 @@
     height: 38px;
 }
 
+.route-detail-panel {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+
+    p-tabs {
+        flex: 1;
+        overflow: hidden;
+    }
+}
+
 .badge-lg {
     font-size: 0.8rem !important;
     padding: 3px 10px !important;
@@ -163,8 +251,28 @@
 
 .route-path {
     font-family: var(--skp-font-mono);
-    font-size: 1.1rem;
+    font-size: 0.95rem;
     color: var(--text-primary);
+    word-break: break-all;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+
+    .path-segment {
+        &.path-param {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        &.path-glob {
+            color: #f59e0b;
+            font-weight: 600;
+        }
+
+        &.path-normal {
+            color: inherit;
+        }
+    }
 }
 
 .route-summary {
@@ -380,6 +488,12 @@
 
             &:hover {
                 background: var(--bg-hover);
+            }
+
+            svg {
+                width: 14px;
+                height: 14px;
+                flex-shrink: 0;
             }
         }
     }
@@ -684,5 +798,15 @@ pre.try-body {
     .p-tablist,
     .p-tabpanels {
         background: none;
+    }
+
+    .p-tabpanels {
+        flex: 1;
+        overflow: hidden;
+        padding: 0;
+    }
+
+    ng-scroll-content {
+        padding: 1rem;
     }
 }

@@ -1,388 +1,423 @@
 <div class="explorer">
-  <aside class="sidebar" [class.collapsed]="sidebarCollapsed()">
-    <div class="resize-handle"></div>
+    <as-split direction="horizontal" unit="pixel" [gutterSize]="8">
+        <as-split-area [size]="280" [minSize]="200" [maxSize]="600">
+            <aside class="sidebar">
+                <header class="sidebar-header">
+                    <button class="toggle-sidebar" (click)="toggleSidebar()">☰</button>
+                    <div class="version">{{ spec()?.info?.version }}</div>
+                </header>
 
-    <header class="sidebar-header">
-      <button class="toggle-sidebar" (click)="toggleSidebar()">☰</button>
-      <!-- <h1>{{ spec()?.info?.title || 'API Explorer' }}</h1> -->
-      <div class="version">{{ spec()?.info?.version }}</div>
-    </header>
+                <ng-scrollbar class="sidebar-scroll">
+                    @for (group of hierarchicalGroups(); track group.name) {
+                        <div class="nav-group" [class.collapsed]="!isGroupExpanded(group.name)">
+                            <div class="nav-group-title" (click)="toggleGroup(group.name)">
+                                <span class="chevron">
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="9 18 15 12 9 6"></polyline>
+                                    </svg>
+                                </span>
+                                <span>{{ group.name }}</span>
+                                @if (group.isBuiltin) {
+                                    <span class="builtin-badge">⬡</span>
+                                }
+                            </div>
 
-    <div class="sidebar-collapse-trigger" (click)="toggleSidebar()">➔</div>
-      <ng-scrollbar class="sidebar-scroll">
-        @for (group of hierarchicalGroups(); track group.name) {
-          <div class="nav-group" [class.collapsed]="!isGroupExpanded(group.name)">
-            <div class="nav-group-title" (click)="toggleGroup(group.name)">
-              <span class="chevron">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-              </span>
-              <span>{{ group.name }}</span>
-              @if (group.isBuiltin) {
-                <span class="builtin-badge">⬡</span>
-              }
-            </div>
-
-            @if (isGroupExpanded(group.name)) {
-              <div class="nav-items">
-                @for (child of group.children; track $index) {
-                  @if (child.type === 'route') {
-                    @for (route of child.routes || []; track route.method + ':' + route.path) {
-                      <button
-                        class="nav-item"
-                        [class.active]="selectedOp() === route.op.operationId"
-                        (click)="selectRoute(route)"
-                      >
-                        <span class="badge" [class]="'badge-' + route.method.toUpperCase()">{{ route.method.toUpperCase() }}</span>
-                        <span class="nav-label">{{ stripPrefix(route.path, group.commonPrefixPath || '') }}</span>
-                      </button>
-                    }
-                  } @else if (child.type === 'subgroup') {
-                    <div
-                      class="nav-subgroup"
-                      [class.collapsed]="!isSubgroupExpanded(child.name)"
-                      style="padding-left: 12px;"
-                    >
-                      <div class="nav-subgroup-title" (click)="toggleSubgroup(child.name)">
-                        <span class="chevron">
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="9 18 15 12 9 6"></polyline>
-                          </svg>
-                        </span>
-                        <span>{{ child.name }}</span>
-                      </div>
-                      <div class="nav-subgroup-items" [class.expanded]="isSubgroupExpanded(child.name)">
-                        @for (subChild of child.children; track $index) {
-                          @if (subChild.type === 'route') {
-                            @for (route of subChild.routes || []; track route.method + ':' + route.path) {
-                              <button
-                                class="nav-item"
-                                [class.active]="selectedOp() === route.op.operationId"
-                                (click)="selectRoute(route)"
-                              >
-                                <span class="badge" [class]="'badge-' + route.method.toUpperCase()">{{ route.method.toUpperCase() }}</span>
-                                <span class="nav-label">{{ stripPrefix(route.path, child.commonPrefixPath || '') }}</span>
-                              </button>
+                            @if (isGroupExpanded(group.name)) {
+                                <div class="nav-items">
+                                    @for (child of group.children; track $index) {
+                                        @if (child.type === 'route') {
+                                            @for (route of child.routes || []; track route.method + ':' + route.path) {
+                                                <button
+                                                class="nav-item"
+                                                [class.active]="selectedOp() === route.op.operationId"
+                                                (click)="selectRoute(route)"
+                                                >
+                                                <span class="badge" [class]="'badge-' + route.method.toUpperCase()">{{ route.method.toUpperCase() }}</span>
+                                                <span class="nav-label">
+                                                    @for (segment of parsePathSegments(stripPrefix(route.path, group.commonPrefixPath || '')); track $index) {
+                                                        <span [class]="'path-segment path-' + segment.type">{{ segment.text }}</span>
+                                                    }
+                                                </span>
+                                            </button>
+                                        }
+                                    } @else if (child.type === 'subgroup') {
+                                        <div
+                                        class="nav-subgroup"
+                                        [class.collapsed]="!isSubgroupExpanded(child.name)"
+                                        style="padding-left: 12px;"
+                                        >
+                                        <div class="nav-subgroup-title" (click)="toggleSubgroup(child.name)">
+                                            <span class="chevron">
+                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                                </svg>
+                                            </span>
+                                            <span>{{ child.name }}</span>
+                                        </div>
+                                        <div class="nav-subgroup-items" [class.expanded]="isSubgroupExpanded(child.name)">
+                                            @for (subChild of child.children; track $index) {
+                                                @if (subChild.type === 'route') {
+                                                    @for (route of subChild.routes || []; track route.method + ':' + route.path) {
+                                                        <button
+                                                        class="nav-item"
+                                                        [class.active]="selectedOp() === route.op.operationId"
+                                                        (click)="selectRoute(route)"
+                                                        >
+                                                        <span class="badge" [class]="'badge-' + route.method.toUpperCase()">{{ route.method.toUpperCase() }}</span>
+                                                        <span class="nav-label">
+                                                            @for (segment of parsePathSegments(stripPrefix(route.path, child.commonPrefixPath || '')); track $index) {
+                                                                <span [class]="'path-segment path-' + segment.type">{{ segment.text }}</span>
+                                                            }
+                                                        </span>
+                                                    </button>
+                                                }
+                                            }
+                                        }
+                                    </div>
+                                </div>
                             }
-                          }
                         }
-                      </div>
                     </div>
-                  }
                 }
-              </div>
-            }
-          </div>
-        }
-      </ng-scrollbar>
-  </aside>
-
-  <main class="content" #mainContent>
-    @if (activeRoute(); as route) {
-      <div class="route-detail-panel">
-    <!-- Header with SEND button and copy buttons -->
-    <div class="detail-header">
-      <div class="route-title-row">
-        <div class="route-title">
-          <span class="badge" [class]="'badge-' + route.method.toUpperCase()">{{ route.method.toUpperCase() }}</span>
-          <span class="route-path">{{ route.path }}</span>
-        </div>
-        @if (isLoading()) {
-            <span class="spinner"></span>
-            Sending...
-        } @else {
-            <p-button [style]="{width: '70px'}" (click)="executeRequest()" [disabled]="isLoading()">
-                Send
-            </p-button>
-        }
-      </div>
-
-      <div class="copy-buttons">
-        <p-button variant="text" (click)="copyToClipboard(generateCurl())">Copy cURL</p-button>
-        <p-button variant="text" (click)="copyToClipboard(generateWget())">Copy wget</p-button>
-        <p-button variant="text" (click)="copyToClipboard(generateFetch())">Copy Fetch</p-button>
-      </div>
-    </div>
-
-    <!-- Tabs -->
-    <p-tabs value="0">
-      <p-tablist>
-        <p-tab value="0">Info</p-tab>
-        <p-tab value="1">Params</p-tab>
-        <p-tab value="2">Headers</p-tab>
-        @if (['POST', 'PUT', 'PATCH'].includes(requestMethod())) {
-          <p-tab value="3">Payload</p-tab>
-        }
-        <p-tab [value]="['POST', 'PUT', 'PATCH'].includes(requestMethod()) ? '4' : '3'">Auth</p-tab>
-        <p-tab [value]="['POST', 'PUT', 'PATCH'].includes(requestMethod()) ? '5' : '4'">
-          Response
-          @if (responseStatus()) {
-            <span class="status-badge" [class]="'status-' + Math.floor(responseStatus()! / 100)">
-              {{ responseStatus() }}
-            </span>
-          }
-        </p-tab>
-      </p-tablist>
-
-      <p-tabpanels>
-        <!-- Info Tab -->
-        <p-tabpanel value="0">
-          <div class="info-tab">
-          @if (route.op.description) {
-            @if (route.op.summary) {
-            <div class="route-summary">{{ route.op.summary }}</div>
-            }
-            <div class="section">
-              <h3>Description</h3>
-              <div [innerHTML]="route.op.description"></div>
             </div>
-          }
+        }
+    </ng-scrollbar>
+</aside>
+</as-split-area>
 
-          @if (route.op.responses) {
-            <div class="section">
-              <h3>Responses</h3>
-              <div class="response-codes">
-                @for (code of getObjectKeys(route.op.responses); track code) {
-                  <div class="response-code-item">
-                    <div class="response-code-header">
-                      <span class="code-badge" [class]="'status-' + Math.floor(+code / 100)">{{ code }}</span>
-                      <span class="code-desc">{{ route.op.responses[code].description || 'Response' }}</span>
-                    </div>
-
-                    @if (route.op.responses[code].content) {
-                      <div class="response-content-types">
-                        @for (contentType of getObjectKeys(route.op.responses[code].content); track $index) {
-                          <code class="content-type-badge">{{ contentType }}</code>
-                        }
-                      </div>
-
-                      @if (route.op.responses[code].content['application/json']?.schema) {
-                        <div class="response-schema">
-                          <h4 style="font-size: 0.875rem; margin: 0.75rem 0 0.5rem; color: var(--text-secondary); font-weight: 600;">Response Body Schema</h4>
-                          <div class="schema-content" [innerHTML]="renderResponseSchema(route.op.responses[code].content['application/json'].schema)"></div>
+<as-split-area [size]="'*'">
+        <main class="content" #mainContent>
+            @if (activeRoute(); as route) {
+                <div class="route-detail-panel">
+                    <!-- Header with SEND button and copy buttons -->
+                    <div class="detail-header">
+                        <div class="route-title-row">
+                            <div class="route-title">
+                                <span class="badge" [class]="'badge-' + route.method.toUpperCase()">{{ route.method.toUpperCase() }}</span>
+                                <span class="route-path">
+                                    @for (segment of parsePathSegments(route.path); track $index) {
+                                        <span [class]="'path-segment path-' + segment.type">{{ segment.text }}</span>
+                                    }
+                                </span>
+                            </div>
+                            @if (isLoading()) {
+                                <span class="spinner"></span>
+                                Sending...
+                            } @else {
+                                <p-button [style]="{width: '70px'}" (click)="executeRequest()" [disabled]="isLoading()">
+                                    Send
+                                </p-button>
+                            }
                         </div>
-                      }
-                    }
-                  </div>
-                }
-              </div>
-            </div>
-          }
 
-          @if (route.op['x-shokupan-middleware']) {
-            <div class="section">
-              <h3>Middleware Pipeline</h3>
-              <div class="middleware-list">
-                @for (mw of route.op['x-shokupan-middleware']; track $index) {
-                  <div class="middleware-item">
-                    <span class="middleware-index">{{ $index + 1 }}.</span>
-                    <span class="middleware-name">{{ mw.name || mw }}</span>
-                    @if (mw.file && mw.startLine) {
-                      <a [href]="generateEditorLink(mw.file, mw.startLine)" class="middleware-link">
-                        📄 {{ mw.file.split('/').pop() }}:{{ mw.startLine }}
-                      </a>
-                    }
-                  </div>
-                }
-              </div>
-            </div>
-          }
+                        <div class="copy-buttons">
+                            <p-button variant="text" (click)="copyToClipboard(generateCurl())">Copy cURL</p-button>
+                            <p-button variant="text" (click)="copyToClipboard(generateWget())">Copy wget</p-button>
+                            <p-button variant="text" (click)="copyToClipboard(generateFetch())">Copy Fetch</p-button>
+                        </div>
+                    </div>
 
-          @if (route.op['x-shokupan-source']) {
-            <div class="section">
-              <h3>Source Code</h3>
-              <div class="source-info">
-                <a [href]="generateEditorLink(route.op['x-shokupan-source'].file, route.op['x-shokupan-source'].line)" class="source-link">
-                  📄 {{ route.op['x-shokupan-source'].file.split('/').pop() }}:{{ route.op['x-shokupan-source'].line }}
-                </a>
-              </div>
-              @if (route.op['x-shokupan-source'].code) {
-                <div class="monaco-container">
-                  <ngx-monaco-editor
-                    [code]="route.op['x-shokupan-source'].code"
-                    language="typescript"
-                    [readOnly]="true"
-                    [minimapEnabled]="false"
-                    [lineNumbers]="'on'"
-                    theme="vs-dark"
-                    [fontSize]="13"
-                    [automaticLayout]="true"
-                    [scrollBeyondLastLine]="false"
-                    style="height: 400px; border: 1px solid var(--card-border); border-radius: 6px; overflow: hidden;"
-                  ></ngx-monaco-editor>
+                    <!-- Tabs -->
+                    <p-tabs value="0">
+                        <p-tablist>
+                            <p-tab value="0">Info</p-tab>
+                            <p-tab value="1">Params</p-tab>
+                            <p-tab value="2">Headers</p-tab>
+                            @if (['POST', 'PUT', 'PATCH'].includes(requestMethod())) {
+                                <p-tab value="3">Payload</p-tab>
+                            }
+                            <p-tab [value]="['POST', 'PUT', 'PATCH'].includes(requestMethod()) ? '4' : '3'">Auth</p-tab>
+                            <p-tab [value]="['POST', 'PUT', 'PATCH'].includes(requestMethod()) ? '5' : '4'">
+                                Response
+                                @if (responseStatus()) {
+                                    <span class="status-badge" [class]="'status-' + Math.floor(responseStatus()! / 100)">
+                                        {{ responseStatus() }}
+                                    </span>
+                                }
+                            </p-tab>
+                        </p-tablist>
+
+                        <p-tabpanels>
+                            <!-- Info Tab -->
+                            <p-tabpanel value="0">
+                                <ng-scrollbar style="height: 100%;" orientation="vertical">
+                                    <div class="info-tab">
+                                        @if (route.op.description) {
+                                            @if (route.op.summary) {
+                                                <div class="route-summary">{{ route.op.summary }}</div>
+                                            }
+                                            <div class="section">
+                                                <h3>Description</h3>
+                                                <div [innerHTML]="route.op.description"></div>
+                                            </div>
+                                        }
+
+                                        @if (route.op.responses) {
+                                            <div class="section">
+                                                <h3>Responses</h3>
+                                                <div class="response-codes">
+                                                    @for (code of getObjectKeys(route.op.responses); track code) {
+                                                        <div class="response-code-item">
+                                                            <div class="response-code-header">
+                                                                <span class="code-badge" [class]="'status-' + Math.floor(+code / 100)">{{ code }}</span>
+                                                                <span class="code-desc">{{ route.op.responses[code].description || 'Response' }}</span>
+                                                            </div>
+
+                                                            @if (route.op.responses[code].content) {
+                                                                <div class="response-content-types">
+                                                                    @for (contentType of getObjectKeys(route.op.responses[code].content); track $index) {
+                                                                        <code class="content-type-badge">{{ contentType }}</code>
+                                                                    }
+                                                                </div>
+
+                                                                @if (route.op.responses[code].content['application/json']?.schema) {
+                                                                    <div class="response-schema">
+                                                                        <h4 style="font-size: 0.875rem; margin: 0.75rem 0 0.5rem; color: var(--text-secondary); font-weight: 600;">Response Body Schema</h4>
+                                                                        <div class="schema-content" [innerHTML]="renderResponseSchema(route.op.responses[code].content['application/json'].schema)"></div>
+                                                                    </div>
+                                                                }
+                                                            }
+                                                        </div>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+
+                                        @if (route.op['x-shokupan-source']) {
+                                            <div class="section">
+                                                <h3>Source Code</h3>
+                                                <div class="source-info">
+                                                    <a [href]="generateEditorLink(route.op['x-shokupan-source'].file, route.op['x-shokupan-source'].line)" class="source-link">
+                                                        <svg
+                                                            aria-hidden="true"
+                                                            focusable="false"
+                                                            width="14"
+                                                            height="14"
+                                                            viewBox="0 0 24 24"
+                                                            fill="none"
+                                                            xmlns="http://www.w3.org/2000/svg"
+                                                        >
+                                                            <rect
+                                                                x="5"
+                                                                y="3"
+                                                                width="12"
+                                                                height="18"
+                                                                rx="1.5"
+                                                                ry="1.5"
+                                                                stroke="currentColor"
+                                                                stroke-width="1.8"
+                                                            />
+                                                            <path
+                                                                d="M9 8H15M9 12H15M9 16H13"
+                                                                stroke="currentColor"
+                                                                stroke-width="1.8"
+                                                                stroke-linecap="round"
+                                                            />
+                                                        </svg>
+                                                        <span>{{ route.op['x-shokupan-source'].file.split('/').pop() }}:{{ route.op['x-shokupan-source'].line }}</span>
+                                                    </a>
+                                                </div>
+                                                @if (route.op['x-shokupan-source'].code) {
+                                                    <div class="monaco-container">
+                                                        <ngx-monaco-editor
+                                                            installationLocation="/_app/lib/monaco/vs"
+                                                            [code]="route.op['x-shokupan-source'].code"
+                                                            language="typescript"
+                                                            [readOnly]="true"
+                                                            [minimapEnabled]="false"
+                                                            [lineNumbers]="'on'"
+                                                            theme="vs-dark"
+                                                            [fontSize]="13"
+                                                            [automaticLayout]="true"
+                                                            [scrollBeyondLastLine]="false"
+                                                            style="height: 400px; border: 1px solid var(--card-border); border-radius: 6px; overflow: hidden;"
+                                                        />
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                </ng-scrollbar>
+                            </p-tabpanel>
+
+                            <!-- Params Tab -->
+                            <p-tabpanel value="1">
+                                <ng-scrollbar style="height: 100%;" orientation="vertical">
+                                    <div class="params-tab">
+                                        @if (getObjectKeys(pathParams()).length > 0) {
+                                            <div class="section">
+                                                <h3>Path Parameters</h3>
+                                                @for (key of getObjectKeys(pathParams()); track key) {
+                                                    <div class="param-row">
+                                                        <label>{{ key }}</label>
+                                                        <input
+                                                        pInputText
+                                                        type="text"
+                                                        [value]="pathParams()[key]"
+                                                        (input)="updatePathParam(key, $any($event.target).value)"
+                                                        [placeholder]="'Enter ' + key"
+                                                        />
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+
+                                        @if (getObjectKeys(queryParams()).length > 0) {
+                                            <div class="section">
+                                                <h3>Query Parameters</h3>
+                                                @for (key of getObjectKeys(queryParams()); track key) {
+                                                    <div class="param-row">
+                                                        <label>{{ key }}</label>
+                                                        <input
+                                                        pInputText
+                                                        type="text"
+                                                        [value]="queryParams()[key]"
+                                                        (input)="updateQueryParam(key, $any($event.target).value)"
+                                                        [placeholder]="'Enter ' + key"
+                                                        />
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+
+                                        @if (getObjectKeys(pathParams()).length === 0 && getObjectKeys(queryParams()).length === 0) {
+                                            <div class="empty-message">No parameters for this endpoint</div>
+                                        }
+                                    </div>
+                                </ng-scrollbar>
+                            </p-tabpanel>
+
+                            <!-- Headers Tab -->
+                            <p-tabpanel value="2">
+                                <ng-scrollbar style="height: 100%;" orientation="vertical">
+                                    <div class="headers-tab">
+                                        <div class="section">
+                                            <h3>Request Headers</h3>
+                                            @for (key of getObjectKeys(requestHeaders()); track key) {
+                                                <div class="param-row">
+                                                    <label>{{ key }}</label>
+                                                    <input
+                                                    pInputText
+                                                    type="text"
+                                                    [value]="requestHeaders()[key]"
+                                                    (input)="updateHeader(key, $any($event.target).value)"
+                                                    />
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                </ng-scrollbar>
+                            </p-tabpanel>
+
+                            <!-- Payload Tab -->
+                            @if (['POST', 'PUT', 'PATCH'].includes(requestMethod())) {
+                                <p-tabpanel value="3">
+                                    <ng-scrollbar style="height: 100%;" orientation="vertical">
+                                        <div class="payload-tab">
+                                            <div class="section">
+                                                <h3>Request Body</h3>
+                                                <textarea
+                                                class="request-body-editor"
+                                                [value]="requestBody()"
+                                                (input)="requestBody.set($any($event.target).value)"
+                                                placeholder="Enter JSON request body"
+                                                rows="15"
+                                                ></textarea>
+                                            </div>
+                                        </div>
+                                    </ng-scrollbar>
+                                </p-tabpanel>
+                            }
+
+                            <!-- Auth Tab -->
+                            <p-tabpanel [value]="['POST', 'PUT', 'PATCH'].includes(requestMethod()) ? '4' : '3'">
+                                <ng-scrollbar style="height: 100%;" orientation="vertical">
+                                    <div class="auth-tab">
+                                        <div class="section">
+                                            <h3>Authentication Headers</h3>
+                                            <div class="param-row">
+                                                <label>Authorization</label>
+                                                <input
+                                                pInputText
+                                                type="text"
+                                                [value]="authHeaders()['Authorization'] || ''"
+                                                (input)="updateAuthHeader('Authorization', $any($event.target).value)"
+                                                placeholder="Bearer token or Basic credentials"
+                                                />
+                                            </div>
+                                            <div class="param-row">
+                                                <label>API-Key</label>
+                                                <input
+                                                pInputText
+                                                type="text"
+                                                [value]="authHeaders()['API-Key'] || ''"
+                                                (input)="updateAuthHeader('API-Key', $any($event.target).value)"
+                                                placeholder="API key"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </ng-scrollbar>
+                            </p-tabpanel>
+
+                            <!-- Response Tab -->
+                            <p-tabpanel [value]="['POST', 'PUT', 'PATCH'].includes(requestMethod()) ? '5' : '4'">
+                                <ng-scrollbar style="height: 100%;" orientation="vertical">
+                                    <div class="response-tab">
+                                        @if (responseData(); as response) {
+                                            <div class="response-section">
+                                                <div class="response-meta">
+                                                    <span class="response-status" [class]="'status-' + Math.floor(responseStatus()! / 100)">
+                                                        Status: {{ responseStatus() }}
+                                                    </span>
+                                                    @if (response.duration) {
+                                                        <span class="response-duration">Duration: {{ response.duration }}ms</span>
+                                                    }
+                                                    @if (response.timestamp) {
+                                                        <span class="response-time">{{ response.timestamp }}</span>
+                                                    }
+                                                </div>
+
+                                                @if (getObjectKeys(responseHeaders()).length > 0) {
+                                                    <div class="response-headers">
+                                                        <h4>Response Headers</h4>
+                                                        <div class="headers-list">
+                                                            @for (key of getObjectKeys(responseHeaders()); track key) {
+                                                                <div class="header-row">
+                                                                    <span class="header-key">{{ key }}:</span>
+                                                                    <span class="header-value">{{ responseHeaders()[key] }}</span>
+                                                                </div>
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                }
+
+                                                <div class="response-body">
+                                                    <h4>Response Body</h4>
+                                                    <pre class="response-code">{{ response.body || response.error | json }}</pre>
+                                                </div>
+                                            </div>
+                                        } @else {
+                                            <div class="empty-response">
+                                                <p>No response yet. Click SEND to execute the request.</p>
+                                            </div>
+                                        }
+                                    </div>
+                                </ng-scrollbar>
+                            </p-tabpanel>
+                        </p-tabpanels>
+                    </p-tabs>
+
                 </div>
-              }
-            </div>
-          }
-          </div>
-        </p-tabpanel>
-
-        <!-- Params Tab -->
-        <p-tabpanel value="1">
-          <div class="params-tab">
-          @if (getObjectKeys(pathParams()).length > 0) {
-            <div class="section">
-              <h3>Path Parameters</h3>
-              @for (key of getObjectKeys(pathParams()); track key) {
-                <div class="param-row">
-                  <label>{{ key }}</label>
-                  <input
-                    pInputText
-                    type="text"
-                    [value]="pathParams()[key]"
-                    (input)="updatePathParam(key, $any($event.target).value)"
-                    [placeholder]="'Enter ' + key"
-                  />
+            } @else {
+                <div class="empty-state">
+                    <div class="empty-icon">📡</div>
+                    <h3>Select an endpoint</h3>
+                    <p>Choose an API endpoint from the sidebar to view details and test requests</p>
                 </div>
-              }
-            </div>
-          }
-
-          @if (getObjectKeys(queryParams()).length > 0) {
-            <div class="section">
-              <h3>Query Parameters</h3>
-              @for (key of getObjectKeys(queryParams()); track key) {
-                <div class="param-row">
-                  <label>{{ key }}</label>
-                  <input
-                    pInputText
-                    type="text"
-                    [value]="queryParams()[key]"
-                    (input)="updateQueryParam(key, $any($event.target).value)"
-                    [placeholder]="'Enter ' + key"
-                  />
-                </div>
-              }
-            </div>
-          }
-
-          @if (getObjectKeys(pathParams()).length === 0 && getObjectKeys(queryParams()).length === 0) {
-            <div class="empty-message">No parameters for this endpoint</div>
-          }
-          </div>
-        </p-tabpanel>
-
-        <!-- Headers Tab -->
-        <p-tabpanel value="2">
-          <div class="headers-tab">
-          <div class="section">
-            <h3>Request Headers</h3>
-            @for (key of getObjectKeys(requestHeaders()); track key) {
-              <div class="param-row">
-                <label>{{ key }}</label>
-                <input
-                  pInputText
-                  type="text"
-                  [value]="requestHeaders()[key]"
-                  (input)="updateHeader(key, $any($event.target).value)"
-                />
-              </div>
             }
-          </div>
-          </div>
-        </p-tabpanel>
-
-        <!-- Payload Tab -->
-        @if (['POST', 'PUT', 'PATCH'].includes(requestMethod())) {
-          <p-tabpanel value="3">
-            <div class="payload-tab">
-          <div class="section">
-            <h3>Request Body</h3>
-            <textarea
-              class="request-body-editor"
-              [value]="requestBody()"
-              (input)="requestBody.set($any($event.target).value)"
-              placeholder="Enter JSON request body"
-              rows="15"
-            ></textarea>
-          </div>
-        </div>
-      </p-tabpanel>
-        }
-
-        <!-- Auth Tab -->
-        <p-tabpanel [value]="['POST', 'PUT', 'PATCH'].includes(requestMethod()) ? '4' : '3'">
-          <div class="auth-tab">
-          <div class="section">
-            <h3>Authentication Headers</h3>
-            <div class="param-row">
-              <label>Authorization</label>
-              <input
-                pInputText
-                type="text"
-                [value]="authHeaders()['Authorization'] || ''"
-                (input)="updateAuthHeader('Authorization', $any($event.target).value)"
-                placeholder="Bearer token or Basic credentials"
-              />
-            </div>
-            <div class="param-row">
-              <label>API-Key</label>
-              <input
-                pInputText
-                type="text"
-                [value]="authHeaders()['API-Key'] || ''"
-                (input)="updateAuthHeader('API-Key', $any($event.target).value)"
-                placeholder="API key"
-              />
-            </div>
-          </div>
-          </div>
-        </p-tabpanel>
-
-        <!-- Response Tab -->
-        <p-tabpanel [value]="['POST', 'PUT', 'PATCH'].includes(requestMethod()) ? '5' : '4'">
-          <div class="response-tab">
-          @if (responseData(); as response) {
-            <div class="response-section">
-              <div class="response-meta">
-                <span class="response-status" [class]="'status-' + Math.floor(responseStatus()! / 100)">
-                  Status: {{ responseStatus() }}
-                </span>
-                @if (response.duration) {
-                  <span class="response-duration">Duration: {{ response.duration }}ms</span>
-                }
-                @if (response.timestamp) {
-                  <span class="response-time">{{ response.timestamp }}</span>
-                }
-              </div>
-
-              @if (getObjectKeys(responseHeaders()).length > 0) {
-                <div class="response-headers">
-                  <h4>Response Headers</h4>
-                  <div class="headers-list">
-                    @for (key of getObjectKeys(responseHeaders()); track key) {
-                      <div class="header-row">
-                        <span class="header-key">{{ key }}:</span>
-                        <span class="header-value">{{ responseHeaders()[key] }}</span>
-                      </div>
-                    }
-                  </div>
-                </div>
-              }
-
-              <div class="response-body">
-                <h4>Response Body</h4>
-                <pre class="response-code">{{ response.body || response.error | json }}</pre>
-              </div>
-            </div>
-          } @else {
-            <div class="empty-response">
-              <p>No response yet. Click SEND to execute the request.</p>
-            </div>
-          }
-          </div>
-        </p-tabpanel>
-      </p-tabpanels>
-    </p-tabs>
-  </div>
-    } @else {
-      <div class="empty-state">
-        <div class="empty-icon">📡</div>
-        <h3>Select an endpoint</h3>
-        <p>Choose an API endpoint from the sidebar to view details and test requests</p>
-      </div>
-    }
-  </main>
+        </main>
+</as-split-area>
+</as-split>
 </div>
 <p-toast position="bottom-center" [baseZIndex]="5000"></p-toast>
