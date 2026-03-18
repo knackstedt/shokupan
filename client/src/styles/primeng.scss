@@ -1,0 +1,95 @@
+// ─── PrimeNG overrides ───────────────────────────────────────────────────────
+.p-button.p-button-primary {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--button-text);
+
+    &:hover {
+        background: var(--link-hover);
+        border-color: var(--link-hover);
+    }
+}
+
+// Global overrides for PrimeNG MultiSelect to fit Shokupan dark theme
+.p-multiselect {
+    background: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+
+    &:not(.p-disabled):hover {
+        border-color: var(--primary) !important;
+    }
+
+    .p-multiselect-label {
+        color: var(--text-primary) !important;
+    }
+
+    .p-multiselect-trigger {
+        color: var(--text-secondary) !important;
+    }
+}
+
+.p-multiselect-panel {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+
+    .p-multiselect-header {
+        background: var(--bg-header) !important;
+        border-bottom: 1px solid var(--table-header-border-color) !important;
+        color: var(--text-primary) !important;
+
+        .p-multiselect-close {
+            color: var(--text-secondary) !important;
+
+            &:hover {
+                color: var(--text-primary) !important;
+                background: rgba(255, 255, 255, 0.05) !important;
+            }
+        }
+
+        .p-checkbox-box {
+            background: var(--bg-primary) !important;
+            border-color: var(--border-color) !important;
+
+            &.p-highlight {
+                background: var(--primary) !important;
+                border-color: var(--primary) !important;
+            }
+        }
+    }
+
+    .p-multiselect-items {
+        .p-multiselect-item {
+            color: var(--text-primary) !important;
+
+            &:not(.p-highlight):not(.p-disabled):hover {
+                background: var(--table-row-hover-color) !important;
+                color: var(--text-primary) !important;
+            }
+
+            &.p-highlight {
+                background: var(--table-row-selected-color) !important;
+                color: var(--text-primary) !important;
+
+                &:hover {
+                    background: var(--table-row-hover-color) !important;
+                }
+            }
+
+            .p-checkbox-box {
+                background: var(--bg-primary) !important;
+                border-color: var(--border-color) !important;
+
+                &.p-highlight {
+                    background: var(--primary) !important;
+                    border-color: var(--primary) !important;
+                }
+            }
+        }
+
+        .p-multiselect-empty-message {
+            color: var(--text-muted) !important;
+        }
+    }
+}
