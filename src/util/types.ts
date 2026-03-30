@@ -382,11 +382,6 @@ export type ShokupanRouteConfig = DeepPartial<{
      * Hooks for this route/router.
      */
     hooks: ShokupanHooks | ShokupanHooks[];
-    /**
-     * Whether to enforce that only controller classes (constructors) are accepted by the router.
-     * @default false
-     */
-    controllersOnly: boolean;
 
     /**
      * Whether to enable automatic backpressure based on system CPU load.
@@ -565,11 +560,6 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      * @default false
      */
     reusePort: boolean;
-    /**
-     * Whether to enforce that only controller classes (constructors) are accepted by the router.
-     * @default false
-     */
-    controllersOnly: boolean;
     /**
      * Whether to enable OpenTelemetry tracing.
      * @default false

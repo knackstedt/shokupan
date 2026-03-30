@@ -33,7 +33,6 @@ const app = new Shokupan({
 | :--- | :--- | :--- | :--- |
 | `development` | `boolean` | `auto` | Enable development mode (affects error pages, etc.). |
 | `enableAsyncLocalStorage` | `boolean` | `false` | Enable `AsyncLocalStorage` for request-scoped globals. |
-| `controllersOnly` | `boolean` | `false` | If true, disables `app.get()`, `app.post()` etc., enforcing controller-only architecture. |
 
 ### Features
 

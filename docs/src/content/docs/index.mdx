@@ -41,7 +41,7 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
     CORS, Sessions, Auth, Validation, Rate Limiting, and more out of the box
   </Card>
   <Card title="Flexible Routing" icon="random">
-    Express-style routes or decorator-based controllers - your choice
+    Express-style routes and decorator-based controllers - fully interoperable and first-class
   </Card>
   <Card title="Express Compatible" icon="seti:config">
     Works with [Express](https://expressjs.com/) middleware patterns you already know
@@ -95,6 +95,17 @@ Shokupan (食パン - Japanese for "white bread") provides the foundation for yo
 - **Performance**: Built on Bun for exceptional speed
 - **Developer Experience**: Full TypeScript support with excellent type inference
 - **Ecosystem**: Compatible with the vast Express plugin ecosystem
+
+## Design Philosophy
+
+**Shokupan makes a fundamental design decision: both functional routers and decorative controllers are first-class citizens and fully interoperable.**
+
+You can freely mix and match routing styles:
+- **Functional routing** (`app.get()`, `app.post()`) for simple APIs and rapid prototyping
+- **Decorator-based controllers** (`@Get()`, `@Post()`) for structured, enterprise applications
+- **Combine both** seamlessly in the same application
+
+For large applications, choose whichever style your team prefers and stick with it for consistency. If you encounter gaps or limitations, [file an issue](https://github.com/knackstedt/shokupan/issues) - Shokupan solves problems at the fundamental level, not through monkeypatches.
 
 ## Next Steps
 

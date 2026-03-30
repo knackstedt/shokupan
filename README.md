@@ -68,6 +68,17 @@ Shokupan provides a familiar yet modern API.
 - **[Static Files](https://shokupan.dev/core/static-files)**: Serve static assets with ease.
 - **[WebSockets](https://shokupan.dev/core/websockets)**: Native WebSocket handling and HTTP Bridge feature.
 
+## 🎯 Design Philosophy
+
+**Shokupan makes a fundamental design decision: both functional routers and decorative controllers are first-class citizens and fully interoperable.**
+
+You can freely mix and match routing styles based on what works best for your team:
+- Use **functional routing** (`app.get()`, `app.post()`) for simple APIs and rapid prototyping
+- Use **decorator-based controllers** (`@Get()`, `@Post()`) for structured, enterprise-scale applications
+- **Combine both** in the same application - they work seamlessly together
+
+For large applications, we recommend choosing whichever style your team is most comfortable with and sticking with it for consistency. If you encounter any gaps or limitations in either approach, please [file an issue](https://github.com/knackstedt/shokupan/issues) - Shokupan's goal is to solve problems at the fundamental level, not to monkeypatch them.
+
 ## 🔌 Plugins
 
 Shokupan has a rich ecosystem of plugins.

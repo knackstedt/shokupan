@@ -5,6 +5,10 @@ description: Use decorators for structured class-based routing
 
 Controllers provide a structured, class-based approach to defining routes using TypeScript decorators. This pattern is familiar to NestJS developers and helps organize your application.
 
+:::tip[Controllers & Functional Routing are Interoperable]
+Shokupan treats decorator-based controllers and functional routing as first-class citizens. You can freely mix both styles in the same application - they work seamlessly together. Choose whichever approach fits your team's preferences, or combine them as needed. See [Routing](/core/routing/) for the functional approach.
+:::
+
 ## Basic Controller
 
 Create a controller using the `@Get`, `@Post`, etc. decorators:

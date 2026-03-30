@@ -399,15 +399,6 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             // This allows the framework to work even if decorators aren't used
         }
 
-        // strict controller check
-        const isRouter = this.isRouterInstance(controller);
-        const isFunction = typeof controller === 'function';
-        const controllersOnly = this.config?.controllersOnly ?? this.rootConfig?.controllersOnly ?? false;
-
-        if (controllersOnly && !isFunction && !isRouter) {
-            throw new Error(`[Shokupan] strict controller check failed: ${controller.constructor.name || typeof controller} is not a class constructor.`);
-        }
-
         if (this.isRouterInstance(controller)) {
             this.mountRouter(prefix, controller);
         }
