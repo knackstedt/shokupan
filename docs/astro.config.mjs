@@ -28,7 +28,30 @@ export default defineConfig({
             plugins: [
                 starlightImageZoom({ showCaptions: true }),
                 starlightThemeFlexoki(),
-                starlightLlmsTxt(),
+                starlightLlmsTxt({
+                    projectName: 'Shokupan',
+                    description: 'A low-lift modern web framework for Bun and Node',
+                    promote: ['index*', 'getting-started/**', 'core/**'],
+                    demote: ['api/**'],
+                    exclude: ['api/**'],
+                    customSets: [
+                        {
+                            label: 'Guides',
+                            description: 'Conceptual docs for routing, middleware, plugins, and migration',
+                            paths: ['getting-started/**', 'core/**', 'plugins/**', 'migration/**'],
+                        },
+                        {
+                            label: 'API Reference',
+                            description: 'Full TypeDoc API reference',
+                            paths: ['api/**'],
+                        },
+                        {
+                            label: 'Architecture',
+                            description: 'System architecture and design principles',
+                            paths: ['core/**', 'performance/**'],
+                        },
+                    ]
+                }),
                 starlightTypeDoc({
                     typeDoc: {
                         interfacePropertiesFormat: 'htmlTable',
