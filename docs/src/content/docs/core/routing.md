@@ -5,6 +5,10 @@ description: Learn about routing in Shokupan
 
 Shokupan supports Express-style routing with a clean, intuitive API. Routes can be defined using HTTP method helpers or the generic `add()` method.
 
+:::tip[Functional Routing & Controllers are Interoperable]
+Shokupan treats functional routing and decorator-based controllers as first-class citizens. You can freely mix both styles in the same application - they work seamlessly together. Choose whichever approach fits your team's preferences, or combine them as needed. See [Controllers](/core/controllers/) for the decorator-based approach.
+:::
+
 ## Basic Routes
 
 Define routes for different HTTP methods:
