@@ -1,113 +1,720 @@
 ---
 title: WebSockets
-description: Learn how to handle WebSocket events in Shokupan using native support or Socket.IO.
+description: Build real-time applications with Shokupan's first-class WebSocket support using routers, controllers, and decorators.
 ---
 
-> **Note:** WebSockets support is currently in an experimental stage and may change in the future. You have been warned.
+Shokupan provides **first-class WebSocket support** with three flexible approaches: decorator-based controllers, functional routers, and inline handlers. All approaches are fully interoperable and work seamlessly with Bun's native WebSocket implementation.
 
-Shokupan provides a unified way to handle WebSocket events using decorators, whether you are using native Bun WebSockets or integrating with libraries like Socket.IO.
+> **Note:** WebSocket support is currently in an experimental stage and may change in future releases.
 
-## Key Features
+## Why Shokupan WebSockets?
 
-- **Decorators**: Use `@Event("name")` to define event handlers in your controllers.
-- **Native Support**: Built-in support for Bun's native WebSocket server.
-- **HTTP Bridge**: Optionally expose your existing HTTP API over WebSockets to reduce connection overhead.
-- **Runtime Agnostic**: Works with both Bun (native) and Node.js (via adapters/Socket.IO).
+- **Three Patterns**: Choose between controllers (`@WebsocketController`), routers (`ShokupanWebsocketRouter`), or inline handlers (`ctx.upgrade()`)
+- **Full Lifecycle Control**: Handle upgrade, open, message, event, close, and error events
+- **Type-Safe**: Full TypeScript support with excellent type inference
+- **Native Performance**: Built on Bun's high-performance WebSocket implementation
+- **Event-Based**: Structured event routing with `@Event()` decorators or `.event()` methods
+- **HTTP Bridge**: Optional HTTP-over-WebSocket for unified API access
+- **Socket.IO Compatible**: Easy integration with Socket.IO for Node.js environments
 
 ---
 
-## Defining Events
+## Quick Start
 
-You can define WebSocket event handlers inside your controllers using the `@Event` decorator.
+Here's a simple WebSocket echo server using the controller pattern:
 
 ```typescript
-import { Controller, Event, ShokupanContext } from 'shokupan';
+import { Shokupan, WebsocketController, OnOpen, OnMessage } from 'shokupan';
 
-@Controller('/chat')
-export class ChatController {
-
-    @Event('join')
-    onJoin(ctx: ShokupanContext) {
-        console.log('User joined room');
-        // Reply using the underlying socket
-        // For native Bun WebSockets, ctx.socket is the ws instance
-        // For Socket.IO, ctx.socket is the socket instance
-        ctx.emit("welcome", { message: 'Hello!' });
+@WebsocketController()
+class EchoController {
+    @OnOpen()
+    handleOpen(ctx, ws) {
+        console.log('Client connected');
+        return { connectedAt: Date.now() };
     }
 
-    @Event('message')
-    async onMessage(ctx: ShokupanContext) {
-        // The event payload is available via ctx.body()
-        const message = await ctx.body();
-        console.log('Received:', message);
+    @OnMessage()
+    handleMessage(ctx, ws, message) {
+        ws.send(message); // Echo back
+    }
+}
+
+const app = new Shokupan();
+app.mount('/echo', EchoController);
+app.listen(3000);
+```
+
+---
+
+## Three Approaches to WebSockets
+
+Shokupan offers three ways to handle WebSockets, all fully interoperable:
+
+### 1. Controller Pattern (Decorator-Based)
+
+Best for structured, enterprise applications with complex event handling.
+
+```typescript
+import { WebsocketController, OnOpen, OnClose, Event } from 'shokupan';
+
+@WebsocketController()
+class ChatController {
+    @OnOpen()
+    handleOpen(ctx, ws) {
+        return { userId: ctx.query.userId, joinedAt: Date.now() };
+    }
+
+    @Event('chat.message')
+    handleMessage(ctx, data) {
+        ctx.broadcast('chat.message', {
+            user: ctx.state.userId,
+            message: data.text,
+            timestamp: Date.now()
+        });
+    }
+
+    @Event('chat.typing')
+    handleTyping(ctx, data) {
+        ctx.broadcast('chat.typing', { user: ctx.state.userId });
+    }
+
+    @OnClose()
+    handleClose(ctx, ws) {
+        console.log(`User ${ctx.state.userId} disconnected`);
+    }
+}
+
+app.mount('/chat', ChatController);
+```
+
+### 2. Router Pattern (Functional)
+
+Best for simple APIs and rapid prototyping.
+
+```typescript
+import { ShokupanWebsocketRouter } from 'shokupan';
+
+const chatRouter = new ShokupanWebsocketRouter();
+
+chatRouter.onOpen((ctx, ws) => {
+    return { userId: ctx.query.userId, joinedAt: Date.now() };
+});
+
+chatRouter.event('chat.message', (ctx, data) => {
+    ctx.broadcast('chat.message', {
+        user: ctx.state.userId,
+        message: data.text,
+        timestamp: Date.now()
+    });
+});
+
+chatRouter.event('chat.typing', (ctx, data) => {
+    ctx.broadcast('chat.typing', { user: ctx.state.userId });
+});
+
+chatRouter.onClose((ctx, ws) => {
+    console.log(`User ${ctx.state.userId} disconnected`);
+});
+
+app.mount('/chat', chatRouter);
+```
+
+### 3. Inline Handlers
+
+Best for simple WebSocket endpoints with minimal logic.
+
+```typescript
+app.get('/echo', (ctx) => {
+    ctx.upgrade({
+        open: (ctx, ws) => {
+            ws.send('Connected!');
+        },
+        message: (ctx, ws, msg) => {
+            ws.send(msg); // Echo back
+        },
+        close: (ctx, ws) => {
+            console.log('Client disconnected');
+        }
+    });
+});
+```
+
+---
+
+## WebSocket Controller API
+
+The `@WebsocketController` decorator provides a complete lifecycle API for WebSocket connections.
+
+### Available Decorators
+
+| Decorator | Purpose | Return Value |
+|-----------|---------|--------------|
+| `@WebsocketController(path?)` | Marks a class as a WebSocket controller | - |
+| `@OnUpgrade()` | Validates upgrade requests | `false` to reject, `true` or `undefined` to accept |
+| `@OnOpen()` | Handles connection open | Object is set to `ctx.state` and `ws.data` |
+| `@OnEvent()` | Middleware for all events | `false` to prevent routing |
+| `@OnMessage()` | Handles raw messages | - |
+| `@Event(name)` | Handles specific events | - |
+| `@OnClose()` | Handles connection close | - |
+| `@OnError()` | Handles errors | - |
+
+### Complete Controller Example
+
+```typescript
+import { 
+    WebsocketController, 
+    OnUpgrade, 
+    OnOpen, 
+    OnEvent,
+    OnMessage,
+    Event, 
+    OnClose, 
+    OnError 
+} from 'shokupan';
+
+@WebsocketController()
+class FullFeaturedController {
+    // Validate upgrade request
+    @OnUpgrade()
+    handleUpgrade(ctx) {
+        const token = ctx.query.token;
+        if (!isValidToken(token)) {
+            return false; // Reject upgrade
+        }
+        return true;
+    }
+
+    // Initialize connection
+    @OnOpen()
+    handleOpen(ctx, ws) {
+        const userId = getUserIdFromToken(ctx.query.token);
+        console.log(`User ${userId} connected`);
+        
+        // Return value is stored in ctx.state and ws.data
+        return { 
+            userId, 
+            connectedAt: Date.now(),
+            permissions: ['read', 'write']
+        };
+    }
+
+    // Event middleware - runs before specific event handlers
+    @OnEvent()
+    handleEvent(ctx, ws, eventName, data) {
+        console.log(`Event: ${eventName}`, data);
+        
+        // Block private events
+        if (eventName.startsWith('_')) {
+            return false; // Prevent routing
+        }
+        
+        // Check permissions
+        if (!ctx.state.permissions.includes('write')) {
+            ctx.emit('error', { message: 'Insufficient permissions' });
+            return false;
+        }
+    }
+
+    // Raw message handler - runs for every message
+    @OnMessage()
+    handleMessage(ctx, ws, message) {
+        console.log('Raw message:', message);
+    }
+
+    // Specific event handlers
+    @Event('user.join')
+    handleUserJoin(ctx, data) {
+        ctx.broadcast('user.joined', {
+            userId: ctx.state.userId,
+            room: data.room
+        });
+    }
+
+    @Event('message.send')
+    handleMessageSend(ctx, data) {
+        ctx.broadcast('message.new', {
+            from: ctx.state.userId,
+            text: data.text,
+            timestamp: Date.now()
+        });
+    }
+
+    @Event('user.typing')
+    handleTyping(ctx, data) {
+        ctx.broadcast('user.typing', {
+            userId: ctx.state.userId
+        });
+    }
+
+    // Connection close
+    @OnClose()
+    handleClose(ctx, ws, code, reason) {
+        console.log(`User ${ctx.state.userId} disconnected: ${code} ${reason}`);
+    }
+
+    // Error handling
+    @OnError()
+    handleError(ctx, ws, error) {
+        console.error('WebSocket error:', error);
+    }
+}
+
+app.mount('/ws', FullFeaturedController);
+```
+
+---
+
+## WebSocket Router API
+
+The `ShokupanWebsocketRouter` provides a functional API for WebSocket handling.
+
+### Available Methods
+
+```typescript
+const router = new ShokupanWebsocketRouter();
+
+// Lifecycle hooks
+router.onUpgrade((ctx) => boolean);
+router.onOpen((ctx, ws) => object);
+router.onEvent((ctx, ws, event, data) => boolean);
+router.onMessage((ctx, ws, message) => void);
+router.onClose((ctx, ws, code, reason) => void);
+router.onError((ctx, ws, error) => void);
+
+// Event handlers
+router.event(eventName, (ctx, data) => void);
+
+// Utility
+router.getEvents(); // Returns Map of registered events
+ShokupanWebsocketRouter.isWebSocketRouter(obj); // Type guard
+```
+
+### Complete Router Example
+
+```typescript
+import { ShokupanWebsocketRouter } from 'shokupan';
+
+const notificationRouter = new ShokupanWebsocketRouter();
+
+// Validate upgrade
+notificationRouter.onUpgrade((ctx) => {
+    const apiKey = ctx.get('x-api-key');
+    return isValidApiKey(apiKey);
+});
+
+// Initialize connection
+notificationRouter.onOpen((ctx, ws) => {
+    const userId = getUserFromApiKey(ctx.get('x-api-key'));
+    subscribeToNotifications(userId, ws);
+    
+    return { userId, subscribedAt: Date.now() };
+});
+
+// Event middleware
+notificationRouter.onEvent((ctx, ws, event, data) => {
+    // Rate limiting
+    if (isRateLimited(ctx.state.userId)) {
+        ctx.emit('error', { message: 'Rate limit exceeded' });
+        return false;
+    }
+});
+
+// Event handlers
+notificationRouter.event('subscribe', (ctx, data) => {
+    const { channel } = data;
+    subscribeToChannel(ctx.state.userId, channel);
+    ctx.emit('subscribed', { channel });
+});
+
+notificationRouter.event('unsubscribe', (ctx, data) => {
+    const { channel } = data;
+    unsubscribeFromChannel(ctx.state.userId, channel);
+    ctx.emit('unsubscribed', { channel });
+});
+
+// Cleanup on close
+notificationRouter.onClose((ctx, ws) => {
+    unsubscribeAll(ctx.state.userId);
+});
+
+app.mount('/notifications', notificationRouter);
+```
+
+---
+
+## Context Helpers
+
+The `ShokupanContext` provides several WebSocket-specific helpers:
+
+### ctx.emit()
+
+Send an event to the current client:
+
+```typescript
+@Event('ping')
+handlePing(ctx) {
+    ctx.emit('pong', { timestamp: Date.now() });
+}
+```
+
+### ctx.broadcast()
+
+Send an event to all connected clients:
+
+```typescript
+@Event('chat.message')
+handleMessage(ctx, data) {
+    ctx.broadcast('chat.message', {
+        user: ctx.state.userId,
+        text: data.text
+    });
+}
+```
+
+### ctx.socket
+
+Access the underlying WebSocket instance:
+
+```typescript
+@OnOpen()
+handleOpen(ctx, ws) {
+    // ws is the same as ctx.socket
+    ctx.socket.send('Direct message');
+    
+    // For Bun: ctx.socket is ServerWebSocket
+    // For Socket.IO: ctx.socket is Socket
+}
+```
+
+### ctx.state
+
+Shared state object available across all handlers:
+
+```typescript
+@OnOpen()
+handleOpen(ctx, ws) {
+    // Return value is merged into ctx.state
+    return { userId: '123', role: 'admin' };
+}
+
+@Event('message')
+handleMessage(ctx, data) {
+    // Access state from onOpen
+    console.log(ctx.state.userId); // '123'
+    console.log(ctx.state.role);   // 'admin'
+}
+```
+
+### ctx.upgrade()
+
+Upgrade an HTTP request to WebSocket (inline handler pattern):
+
+```typescript
+app.get('/ws', (ctx) => {
+    ctx.upgrade({
+        open: (ctx, ws) => { },
+        message: (ctx, ws, msg) => { },
+        close: (ctx, ws) => { }
+    });
+});
+```
+
+---
+
+## Client-Side Protocol
+
+When using native Bun WebSockets, clients must send messages in a specific JSON format.
+
+### Event Message Format
+
+Shokupan recognizes multiple envelope formats for flexibility:
+
+**Option 1: Using `event` field**
+```json
+{
+    "event": "chat.message",
+    "data": { "text": "Hello!" }
+}
+```
+
+**Option 2: Using `type` and `name` fields**
+```json
+{
+    "type": "EVENT",
+    "name": "chat.message",
+    "data": { "text": "Hello!" }
+}
+```
+
+### Data Extraction
+
+The event data is extracted in this order:
+
+1. **Explicit data fields**: `data`, `body`, or `payload`
+2. **Fallback**: The entire message object (excluding `event`/`type`/`name`)
+
+**Examples:**
+
+```json
+// Explicit data field
+{ "event": "ping", "data": { "timestamp": 123 } }
+
+// Body field
+{ "event": "ping", "body": { "timestamp": 123 } }
+
+// Payload field
+{ "event": "ping", "payload": { "timestamp": 123 } }
+
+// Fallback - entire object is data
+{ "event": "ping", "timestamp": 123 }
+// Data will be: { "timestamp": 123 }
+```
+
+### Client Example (JavaScript)
+
+```javascript
+const ws = new WebSocket('ws://localhost:3000/chat');
+
+ws.onopen = () => {
+    // Send event
+    ws.send(JSON.stringify({
+        event: 'user.join',
+        data: { room: 'general' }
+    }));
+};
+
+ws.onmessage = (event) => {
+    const message = JSON.parse(event.data);
+    console.log('Received:', message);
+};
+
+// Send chat message
+function sendMessage(text) {
+    ws.send(JSON.stringify({
+        event: 'chat.message',
+        data: { text }
+    }));
+}
+```
+
+### Client Example (TypeScript)
+
+```typescript
+interface WebSocketMessage<T = any> {
+    event: string;
+    data?: T;
+}
+
+class ChatClient {
+    private ws: WebSocket;
+
+    constructor(url: string) {
+        this.ws = new WebSocket(url);
+        this.ws.onmessage = this.handleMessage.bind(this);
+    }
+
+    send<T>(event: string, data?: T) {
+        this.ws.send(JSON.stringify({ event, data }));
+    }
+
+    private handleMessage(event: MessageEvent) {
+        const message: WebSocketMessage = JSON.parse(event.data);
+        console.log(`Event: ${message.event}`, message.data);
+    }
+}
+
+const client = new ChatClient('ws://localhost:3000/chat');
+client.send('user.join', { room: 'general' });
+```
+
+---
+
+## Advanced Features
+
+### Authentication & Authorization
+
+Validate connections in the `@OnUpgrade()` handler:
+
+```typescript
+@WebsocketController()
+class SecureController {
+    @OnUpgrade()
+    handleUpgrade(ctx) {
+        // Check token in query params
+        const token = ctx.query.token;
+        if (!isValidToken(token)) {
+            return false; // Reject upgrade
+        }
+        
+        // Or check in headers
+        const authHeader = ctx.get('authorization');
+        if (!authHeader?.startsWith('Bearer ')) {
+            return false;
+        }
+        
+        return true;
+    }
+
+    @OnOpen()
+    handleOpen(ctx, ws) {
+        const userId = getUserFromToken(ctx.query.token);
+        return { userId, authenticated: true };
     }
 }
 ```
 
-### Accessing the Socket
+### Room/Channel Management
 
-The underlying WebSocket connection is available via `ctx.socket`.
-- **Native Bun**: `ctx.socket` is the `ServerWebSocket` instance.
-- **Socket.IO**: `ctx.socket` is the `Socket` instance. You also have access to `ctx.io` for the server instance.
+Implement pub/sub patterns with Bun's built-in publish/subscribe:
+
+```typescript
+@WebsocketController()
+class RoomController {
+    @Event('room.join')
+    handleJoinRoom(ctx, data) {
+        const { room } = data;
+        
+        // Subscribe to room
+        ctx.socket.subscribe(room);
+        
+        // Notify room
+        ctx.socket.publish(room, JSON.stringify({
+            event: 'user.joined',
+            data: { userId: ctx.state.userId }
+        }));
+    }
+
+    @Event('room.leave')
+    handleLeaveRoom(ctx, data) {
+        const { room } = data;
+        ctx.socket.unsubscribe(room);
+        
+        ctx.socket.publish(room, JSON.stringify({
+            event: 'user.left',
+            data: { userId: ctx.state.userId }
+        }));
+    }
+
+    @Event('room.message')
+    handleRoomMessage(ctx, data) {
+        const { room, text } = data;
+        
+        // Publish to all subscribers
+        ctx.socket.publish(room, JSON.stringify({
+            event: 'message',
+            data: {
+                user: ctx.state.userId,
+                text,
+                timestamp: Date.now()
+            }
+        }));
+    }
+}
+```
+
+### Event Middleware & Validation
+
+Use `@OnEvent()` for cross-cutting concerns:
+
+```typescript
+@WebsocketController()
+class ValidatedController {
+    @OnEvent()
+    handleEvent(ctx, ws, eventName, data) {
+        // Rate limiting
+        if (this.isRateLimited(ctx.state.userId)) {
+            ctx.emit('error', { message: 'Rate limit exceeded' });
+            return false; // Block event
+        }
+        
+        // Permission checking
+        if (!this.hasPermission(ctx.state.userId, eventName)) {
+            ctx.emit('error', { message: 'Insufficient permissions' });
+            return false;
+        }
+        
+        // Logging
+        console.log(`[${ctx.state.userId}] ${eventName}`, data);
+        
+        return true; // Allow event to proceed
+    }
+
+    @Event('protected.action')
+    handleProtectedAction(ctx, data) {
+        // Only reached if @OnEvent() returns true
+    }
+}
+```
+
+### Multiple WebSocket Endpoints
+
+Mount different controllers/routers on different paths:
+
+```typescript
+const app = new Shokupan();
+
+// Chat endpoint
+@WebsocketController()
+class ChatController { /* ... */ }
+app.mount('/chat', ChatController);
+
+// Notifications endpoint
+const notificationRouter = new ShokupanWebsocketRouter();
+notificationRouter.event('subscribe', (ctx, data) => { /* ... */ });
+app.mount('/notifications', notificationRouter);
+
+// Admin endpoint
+app.get('/admin/ws', (ctx) => {
+    if (!ctx.state.isAdmin) {
+        return ctx.text('Forbidden', 403);
+    }
+    
+    ctx.upgrade({
+        open: (ctx, ws) => { /* ... */ }
+    });
+});
+
+app.listen(3000);
+```
 
 ---
 
 ## Native Bun WebSockets
 
-When running on Bun, Shokupan automatically hooks into `Bun.serve`'s WebSocket handling.
+When running on Bun, Shokupan automatically hooks into `Bun.serve`'s WebSocket handling for optimal performance.
 
-To make this work, the client must follow a specific envelope format. Shokupan supports a few variations to be flexible.
+### Direct App-Level Events
 
-### Event Name Resolution
-
-The event name is determined by one of the following fields:
-
-```json
-{ "type": "EVENT", "name": "eventName" }
-// OR
-{ "event": "eventName" }
-```
-
-### Data Payload
-
-The data payload is determined by checks in the following order:
-
-1.  **Recognized Properties:** `data`, `body`, or `payload`.
-2.  **Fallback:** If none of the above are present, the entire message object is used as the data.
-
-**Examples:**
-
-```json
-// Uses "123" as data
-{ "event": "foo", "id": "123" }
-
-// Explicit data properties
-{ "event": "foo", "data": "123" }
-{ "event": "foo", "body": "123" }
-{ "event": "foo", "payload": "123" }
-
-// Object payloads
-{ "event": "foo", "data": { "prop": 123 } }
-
-// Fallback: Uses the entire object as data
-{ "event": "foo", "prop": 123 }
-```
-
-The server will dispatch these messages to the corresponding `@Event("eventName")` handler.
-
-### Example Setup
+You can also register events directly on the app instance:
 
 ```typescript
 const app = new Shokupan();
 
-app.mount('/', new ChatController()); // ChatController as seen above
-
-// Or directly listen for WS events on the app
+// App-level event handler
 app.event("ping", (ctx) => {
-    ctx.emit("pong", { message: Date.now() });
+    ctx.emit("pong", { timestamp: Date.now() });
 });
 
+// Works alongside controllers and routers
+app.mount('/chat', ChatController);
+
 app.listen(3000);
+```
+
+### WebSocket Compression
+
+Bun supports WebSocket compression out of the box:
+
+```typescript
+const app = new Shokupan({
+    websocket: {
+        perMessageDeflate: true,
+        maxPayloadLength: 16 * 1024 * 1024, // 16MB
+        idleTimeout: 120, // seconds
+        backpressureLimit: 1024 * 1024 // 1MB
+    }
+});
 ```
 
 ---
@@ -187,7 +794,7 @@ export function WebSocketAuth() {
 
 ## Socket.IO Integration
 
-Shokupan provides a helper utility to easily integrate Socket.IO, wiring up your `@Event` handlers to Socket.IO events automatically.
+For Node.js environments or when you need Socket.IO compatibility, Shokupan provides seamless integration.
 
 ### Installation
 
@@ -197,47 +804,78 @@ bun add socket.io
 npm install socket.io
 ```
 
-### Setup
-
-Use the `attachSocketIOBridge` utility.
+### Setup with Node.js
 
 ```typescript
 import { Shokupan, attachSocketIOBridge } from "shokupan";
 import { Server } from "socket.io";
 
-const app = new Shokupan({
-    enableHttpBridge: true // Optional: enables HTTP-over-WebSocket
-});
+const app = new Shokupan();
 
-// For Node.js
-const server = await app.listen(3000);
-const nodeServer = (server as any).nodeServer;
-if (nodeServer) {
-    const io = new Server(nodeServer);
-    attachSocketIOBridge(io, app);
+// Define your controllers
+@WebsocketController()
+class ChatController {
+    @Event('join')
+    handleJoin(ctx, data) {
+        ctx.emit('welcome', { message: 'Hello!' });
+    }
 }
 
-// For Bun
-// You can attach to a standalone IO server or use Bun compatibility layers
-const io = new Server({ /* ... */ });
-attachSocketIOBridge(io, app);
+app.mount('/chat', ChatController);
+
+// Start server
+const server = await app.listen(3000);
+const nodeServer = (server as any).nodeServer;
+
+if (nodeServer) {
+    const io = new Server(nodeServer, {
+        cors: { origin: "*" }
+    });
+    
+    // Bridge Socket.IO to Shokupan
+    attachSocketIOBridge(io, app);
+}
 ```
 
-With this setup, when a client emits an event:
+### Client-Side (Socket.IO)
+
 ```javascript
-socket.emit('join', { roomId: 1 });
+import { io } from 'socket.io-client';
+
+const socket = io('http://localhost:3000');
+
+socket.on('connect', () => {
+    // Emit events - they'll be routed to @Event handlers
+    socket.emit('join', { roomId: 1 });
+});
+
+socket.on('welcome', (data) => {
+    console.log(data.message); // 'Hello!'
+});
 ```
-The `onJoin` handler in `ChatController` will be executed.
+
+### How It Works
+
+The `attachSocketIOBridge` utility:
+1. Listens for Socket.IO client connections
+2. Routes Socket.IO events to your `@Event` handlers
+3. Makes `ctx.socket` available as the Socket.IO socket instance
+4. Provides `ctx.io` for accessing the Socket.IO server
 
 ---
 
 ## HTTP Bridge (Experimental)
 
-The HTTP Bridge allowing you to call your existing HTTP endpoints (GET/POST/etc.) through a WebSocket connection. This is useful for maintaining a single connection for both real-time events and standard API calls.
+The HTTP Bridge allows you to call your existing HTTP endpoints through a WebSocket connection, reducing connection overhead for API-heavy applications.
+
+### Why Use HTTP Bridge?
+
+- **Single Connection**: Maintain one WebSocket for both real-time events and API calls
+- **Reduced Latency**: No TCP handshake overhead for each request
+- **Simplified Client**: One connection type to manage
+- **Firewall Friendly**: Works in environments that restrict HTTP connections
 
 ### Enabling the Bridge
-
-Set `enableHttpBridge: true` in your Shokupan configuration.
 
 ```typescript
 const app = new Shokupan({
@@ -245,46 +883,378 @@ const app = new Shokupan({
 });
 ```
 
-### Protocol
+### Protocol Specification
 
-**Request:**
-Send a message (or emit `shokupan:request` in Socket.IO) with the following structure:
+**Request Format:**
 
 ```typescript
 {
     type: "HTTP",
-    id: string | number, // Unique Request ID
+    id: string | number,     // Unique request ID for matching responses
     method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
-    path: string,        // e.g. "/api/users/123"
+    path: string,            // e.g. "/api/users/123"
     headers?: Record<string, string>,
-    body?: string | object
+    body?: any               // Request body (will be JSON stringified)
 }
 ```
 
-**Example:**
+**Response Format:**
 
-```json
+```typescript
 {
-    "type": "HTTP", 
-    "id": "req-1",
-    "method": "POST",
-    "path": "/api/users",
-    "headers": { "Content-Type": "application/json" },
-    "body": { "name": "Alice" }
+    type: "RESPONSE",
+    id: string | number,     // Matches request ID
+    status: number,          // HTTP status code
+    headers: Record<string, string>,
+    body: any                // Response body
 }
 ```
 
-**Response:**
-The server will respond with:
+### Client Example (Native WebSocket)
 
-```json
-{
-    "type": "RESPONSE",
-    "id": "unique-request-id",
-    "status": 200,
-    "headers": { ... },
-    "body": { "id": 123, "name": "Alice" }
+```typescript
+class WebSocketHTTPClient {
+    private ws: WebSocket;
+    private pendingRequests = new Map<string, (response: any) => void>();
+    private requestId = 0;
+
+    constructor(url: string) {
+        this.ws = new WebSocket(url);
+        this.ws.onmessage = this.handleMessage.bind(this);
+    }
+
+    async request(method: string, path: string, body?: any) {
+        const id = `req-${this.requestId++}`;
+        
+        return new Promise((resolve) => {
+            this.pendingRequests.set(id, resolve);
+            
+            this.ws.send(JSON.stringify({
+                type: 'HTTP',
+                id,
+                method,
+                path,
+                headers: { 'Content-Type': 'application/json' },
+                body
+            }));
+        });
+    }
+
+    private handleMessage(event: MessageEvent) {
+        const message = JSON.parse(event.data);
+        
+        if (message.type === 'RESPONSE') {
+            const callback = this.pendingRequests.get(message.id);
+            if (callback) {
+                callback(message);
+                this.pendingRequests.delete(message.id);
+            }
+        }
+    }
+
+    // Convenience methods
+    get(path: string) {
+        return this.request('GET', path);
+    }
+
+    post(path: string, body: any) {
+        return this.request('POST', path, body);
+    }
+
+    put(path: string, body: any) {
+        return this.request('PUT', path, body);
+    }
+
+    delete(path: string) {
+        return this.request('DELETE', path);
+    }
+}
+
+// Usage
+const client = new WebSocketHTTPClient('ws://localhost:3000');
+
+const response = await client.post('/api/users', {
+    name: 'Alice',
+    email: 'alice@example.com'
+});
+
+console.log(response.status); // 201
+console.log(response.body);   // { id: 123, name: 'Alice', ... }
+```
+
+### Full Example
+
+```typescript
+// Server
+const app = new Shokupan({
+    enableHttpBridge: true
+});
+
+// Regular HTTP endpoints
+app.post('/api/users', async (ctx) => {
+    const data = await ctx.body();
+    const user = await createUser(data);
+    return ctx.json(user, 201);
+});
+
+app.get('/api/users/:id', async (ctx) => {
+    const user = await getUser(ctx.params.id);
+    return ctx.json(user);
+});
+
+// WebSocket events
+@WebsocketController()
+class NotificationController {
+    @Event('subscribe')
+    handleSubscribe(ctx, data) {
+        ctx.socket.subscribe(`user:${data.userId}`);
+    }
+}
+
+app.mount('/ws', NotificationController);
+app.listen(3000);
+
+// Client
+const client = new WebSocketHTTPClient('ws://localhost:3000/ws');
+
+// Make HTTP calls over WebSocket
+const user = await client.post('/api/users', {
+    name: 'Bob'
+});
+
+// Also handle real-time events
+client.ws.send(JSON.stringify({
+    event: 'subscribe',
+    data: { userId: user.body.id }
+}));
+```
+
+---
+
+## Best Practices
+
+### 1. Choose the Right Pattern
+
+- **Controllers**: Complex applications with many events and lifecycle needs
+- **Routers**: Simple APIs, microservices, or when you prefer functional style
+- **Inline**: Quick prototypes, simple echo servers, or minimal WebSocket needs
+
+### 2. State Management
+
+Always initialize state in `@OnOpen()` or `onOpen()`:
+
+```typescript
+@OnOpen()
+handleOpen(ctx, ws) {
+    // Return value is automatically set to ctx.state and ws.data
+    return {
+        userId: ctx.query.userId,
+        connectedAt: Date.now(),
+        subscriptions: new Set()
+    };
 }
 ```
 
-This allows you to build a wrapper on the client side to use WebSockets as a transport for your fetch calls transparently.
+### 3. Error Handling
+
+Always implement error handlers:
+
+```typescript
+@OnError()
+handleError(ctx, ws, error) {
+    console.error('WebSocket error:', error);
+    ctx.emit('error', { message: 'An error occurred' });
+}
+```
+
+### 4. Graceful Cleanup
+
+Clean up resources in `@OnClose()`:
+
+```typescript
+@OnClose()
+handleClose(ctx, ws, code, reason) {
+    // Unsubscribe from all channels
+    ctx.state.subscriptions?.forEach(channel => {
+        ws.unsubscribe(channel);
+    });
+    
+    // Clean up database connections, timers, etc.
+}
+```
+
+### 5. Security
+
+- Validate all upgrade requests in `@OnUpgrade()`
+- Sanitize and validate all event data
+- Use rate limiting in `@OnEvent()` middleware
+- Never trust client-provided data
+
+```typescript
+@OnUpgrade()
+handleUpgrade(ctx) {
+    const token = ctx.query.token;
+    if (!isValidToken(token)) {
+        return false;
+    }
+    return true;
+}
+
+@OnEvent()
+handleEvent(ctx, ws, eventName, data) {
+    // Rate limiting
+    if (isRateLimited(ctx.state.userId)) {
+        return false;
+    }
+    
+    // Input validation
+    if (!isValidEventData(eventName, data)) {
+        ctx.emit('error', { message: 'Invalid data' });
+        return false;
+    }
+}
+```
+
+---
+
+## Complete Real-World Example
+
+Here's a complete chat application demonstrating all WebSocket features:
+
+```typescript
+import { Shokupan, WebsocketController, OnUpgrade, OnOpen, OnEvent, Event, OnClose } from 'shokupan';
+
+interface ChatState {
+    userId: string;
+    username: string;
+    currentRoom: string | null;
+}
+
+@WebsocketController()
+class ChatController {
+    @OnUpgrade()
+    handleUpgrade(ctx) {
+        const token = ctx.query.token;
+        if (!token) {
+            return false;
+        }
+        return true;
+    }
+
+    @OnOpen()
+    handleOpen(ctx, ws): ChatState {
+        const userId = getUserIdFromToken(ctx.query.token);
+        const username = getUsernameFromToken(ctx.query.token);
+        
+        console.log(`${username} connected`);
+        
+        return {
+            userId,
+            username,
+            currentRoom: null
+        };
+    }
+
+    @OnEvent()
+    handleEvent(ctx, ws, eventName, data) {
+        // Log all events
+        console.log(`[${ctx.state.username}] ${eventName}`, data);
+        
+        // Rate limiting
+        if (isRateLimited(ctx.state.userId)) {
+            ctx.emit('error', { message: 'Too many requests' });
+            return false;
+        }
+        
+        return true;
+    }
+
+    @Event('room.join')
+    handleJoinRoom(ctx, data) {
+        const { room } = data;
+        
+        // Leave current room
+        if (ctx.state.currentRoom) {
+            ctx.socket.unsubscribe(ctx.state.currentRoom);
+            ctx.socket.publish(ctx.state.currentRoom, JSON.stringify({
+                event: 'user.left',
+                data: { username: ctx.state.username }
+            }));
+        }
+        
+        // Join new room
+        ctx.socket.subscribe(room);
+        ctx.state.currentRoom = room;
+        
+        // Notify room
+        ctx.socket.publish(room, JSON.stringify({
+            event: 'user.joined',
+            data: { username: ctx.state.username }
+        }));
+        
+        ctx.emit('room.joined', { room });
+    }
+
+    @Event('message.send')
+    handleMessage(ctx, data) {
+        if (!ctx.state.currentRoom) {
+            ctx.emit('error', { message: 'Not in a room' });
+            return;
+        }
+        
+        const message = {
+            id: generateId(),
+            username: ctx.state.username,
+            text: data.text,
+            timestamp: Date.now()
+        };
+        
+        // Publish to room
+        ctx.socket.publish(ctx.state.currentRoom, JSON.stringify({
+            event: 'message.new',
+            data: message
+        }));
+    }
+
+    @Event('typing.start')
+    handleTypingStart(ctx) {
+        if (ctx.state.currentRoom) {
+            ctx.socket.publish(ctx.state.currentRoom, JSON.stringify({
+                event: 'user.typing',
+                data: { username: ctx.state.username }
+            }));
+        }
+    }
+
+    @OnClose()
+    handleClose(ctx, ws) {
+        console.log(`${ctx.state.username} disconnected`);
+        
+        // Leave current room
+        if (ctx.state.currentRoom) {
+            ctx.socket.publish(ctx.state.currentRoom, JSON.stringify({
+                event: 'user.left',
+                data: { username: ctx.state.username }
+            }));
+        }
+    }
+}
+
+const app = new Shokupan();
+app.mount('/chat', ChatController);
+app.listen(3000);
+```
+
+---
+
+## Summary
+
+Shokupan's WebSocket support provides:
+
+- **Three flexible patterns**: Controllers, Routers, and Inline handlers
+- **Full lifecycle control**: Upgrade, open, message, event, close, and error hooks
+- **Type-safe and performant**: Built on Bun's native WebSocket implementation
+- **Event-based architecture**: Structured event routing with decorators
+- **Production-ready features**: Authentication, rate limiting, pub/sub, and more
+
+Choose the pattern that fits your needs and build real-time applications with confidence!
