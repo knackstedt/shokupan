@@ -10,10 +10,12 @@ Shokupan provides **first-class WebSocket support** with three flexible approach
 ## Why Shokupan WebSockets?
 
 - **Three Patterns**: Choose between controllers (`@WebsocketController`), routers (`ShokupanWebsocketRouter`), or inline handlers (`ctx.upgrade()`)
+- **Nested Routers**: Mount multiple WebSocket routers onto a parent router to share a single connection
 - **Full Lifecycle Control**: Handle upgrade, open, message, event, close, and error events
 - **Type-Safe**: Full TypeScript support with excellent type inference
 - **Native Performance**: Built on Bun's high-performance WebSocket implementation
 - **Event-Based**: Structured event routing with `@Event()` decorators or `.event()` methods
+- **Binary Support**: No strict payload format - supports JSON, protobuf, msgpack, and any binary format
 - **HTTP Bridge**: Optional HTTP-over-WebSocket for unified API access
 - **Socket.IO Compatible**: Easy integration with Socket.IO for Node.js environments
 
@@ -285,8 +287,13 @@ router.onError((ctx, ws, error) => void);
 // Event handlers
 router.event(eventName, (ctx, data) => void);
 
+// Nested mounting (NEW)
+router.mount(prefix, childRouter); // Mount child router/controller
+
 // Utility
 router.getEvents(); // Returns Map of registered events
+router.getAllEvents(); // Returns all events including from children
+router.getAllHandlers(); // Returns merged lifecycle handlers
 ShokupanWebsocketRouter.isWebSocketRouter(obj); // Type guard
 ```
 
@@ -678,6 +685,83 @@ app.get('/admin/ws', (ctx) => {
 app.listen(3000);
 ```
 
+### Nested WebSocket Routers (NEW)
+
+Mount multiple WebSocket routers onto a parent router to share a single connection. Events are automatically prefixed based on the mount path:
+
+```typescript
+import { ShokupanWebsocketRouter, WebsocketController, Event } from 'shokupan';
+
+// Create specialized routers
+const chatRouter = new ShokupanWebsocketRouter();
+chatRouter.event('message', (ctx, data) => {
+    ctx.broadcast('chat.message', data);
+});
+chatRouter.event('typing', (ctx, data) => {
+    ctx.broadcast('chat.typing', data);
+});
+
+const notificationRouter = new ShokupanWebsocketRouter();
+notificationRouter.event('subscribe', (ctx, data) => {
+    ctx.emit('notifications.subscribed', data);
+});
+
+// Or use controllers
+@WebsocketController()
+class PresenceController {
+    @Event('online')
+    handleOnline(ctx, data) {
+        ctx.broadcast('presence.online', data);
+    }
+}
+
+// Create main router with shared authentication
+const mainRouter = new ShokupanWebsocketRouter();
+
+mainRouter.onUpgrade((ctx) => {
+    const token = ctx.get('authorization');
+    if (!token) return false; // Reject upgrade
+    return true;
+});
+
+mainRouter.onOpen((ctx, ws) => {
+    return {
+        userId: ctx.get('x-user-id'),
+        connectedAt: Date.now()
+    };
+});
+
+// Mount child routers - they share the same WebSocket connection!
+mainRouter.mount('chat', chatRouter);
+mainRouter.mount('notifications', notificationRouter);
+mainRouter.mount('presence', PresenceController);
+
+// Mount to app - creates ONE WebSocket endpoint at /ws
+app.mount('/ws', mainRouter);
+
+// Client connects to: ws://localhost:3000/ws
+// Client can send:
+// - { "event": "chat.message", "data": {...} }
+// - { "event": "chat.typing", "data": {...} }
+// - { "event": "notifications.subscribe", "data": {...} }
+// - { "event": "presence.online", "data": {...} }
+```
+
+**Benefits of Nested Routers:**
+- **Single Connection**: All routers share one WebSocket connection
+- **Modular Organization**: Separate concerns into focused routers
+- **Event Prefixing**: Events are automatically namespaced (e.g., `chat.message`)
+- **Shared Lifecycle**: Parent handlers run before children (authentication, logging, etc.)
+- **Deep Nesting**: Routers can be nested multiple levels deep
+
+**Lifecycle Handler Merging:**
+- `onUpgrade`: Parent runs first, then children. Any `false` rejects the upgrade.
+- `onOpen`: Parent runs first, then children. Return values are merged into state.
+- `onEvent`: Parent runs first, then children. Any `false` prevents event routing.
+- `onMessage`, `onClose`, `onError`: All handlers are called in order (parent first).
+
+See the [Nested WebSocket Routers Guide](../guides/websocket-nested-routers.md) for more details.
+
 ---
 
 ## Native Bun WebSockets
@@ -721,7 +805,13 @@ const app = new Shokupan({
 
 ## Middleware and WebSocket Upgrades
 
-**Important**: Middleware runs **before** WebSocket upgrade handling. This is generally desirable (e.g., authentication, CORS, rate limiting should apply to WebSocket connections), but middleware authors need to be aware of this behavior.
+**✅ Verified Behavior**: Middleware runs **before** WebSocket upgrade handling. The initial HTTP upgrade request must satisfy all middleware before the WebSocket connection is established.
+
+This means:
+- Authentication middleware can validate tokens before upgrade
+- Rate limiting applies to WebSocket connection attempts
+- CORS headers are set on the upgrade response
+- Any middleware that returns a response will prevent the upgrade
 
 ### Request Flow
 
@@ -789,6 +879,32 @@ export function WebSocketAuth() {
 ```
 
 > **Note**: WebSocket upgrade requests use the HTTP GET method with an `Upgrade: websocket` header. They cannot have a request body, so authentication must use headers, query parameters, or cookies.
+
+### Verified Implementation Details
+
+**✅ Connection Sharing**: Multiple WebSocket routers mounted on different paths create separate connections. To share a connection, use nested mounting (see [Nested WebSocket Routers](#nested-websocket-routers-new)).
+
+**✅ Middleware Execution**: The initial HTTP upgrade request passes through the full middleware chain before the WebSocket connection is established.
+
+**✅ Payload Format**: There is **no strict format** for WebSocket payloads. The framework supports:
+- **JSON messages** for event routing (parsed automatically)
+- **Binary messages** (ArrayBuffer, Buffer) passed directly to `onMessage` handlers
+- **Protobuf, msgpack, or any custom format** - handle in your `onMessage` handler
+
+```typescript
+// Binary message handling
+router.onMessage((ctx, ws, message) => {
+    if (message instanceof ArrayBuffer || message instanceof Buffer) {
+        // Handle binary data (protobuf, msgpack, etc.)
+        const decoded = decodeProtobuf(message);
+        // Process decoded data
+    } else if (typeof message === 'string') {
+        // Handle text/JSON data
+    }
+});
+```
+
+**✅ Nested Router Mounting**: WebSocket routers and controllers can be mounted onto other WebSocket routers to share the same underlying connection. Events are automatically prefixed, and lifecycle handlers are intelligently merged.
 
 ---
 
@@ -1252,9 +1368,18 @@ app.listen(3000);
 Shokupan's WebSocket support provides:
 
 - **Three flexible patterns**: Controllers, Routers, and Inline handlers
+- **Nested router mounting**: Share a single connection across multiple routers/controllers
 - **Full lifecycle control**: Upgrade, open, message, event, close, and error hooks
 - **Type-safe and performant**: Built on Bun's native WebSocket implementation
 - **Event-based architecture**: Structured event routing with decorators
+- **Binary format support**: No strict payload format - use JSON, protobuf, msgpack, or any format
+- **Middleware integration**: HTTP middleware applies to WebSocket upgrade requests
 - **Production-ready features**: Authentication, rate limiting, pub/sub, and more
 
 Choose the pattern that fits your needs and build real-time applications with confidence!
+
+## Additional Resources
+
+- [Nested WebSocket Routers Guide](../guides/websocket-nested-routers.md)
+- [WebSocket Controller API Reference](../api/functions/WebsocketController.md)
+- [Example: Nested Routers](https://github.com/knackstedt/shokupan/blob/main/examples/websocket-nested-routers.ts)
