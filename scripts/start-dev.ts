@@ -37,12 +37,10 @@ const showCursor = '\x1b[?25h';
 const saveCursor = '\x1b[s';
 const restoreCursor = '\x1b[u';
 
-// Setup raw mode for keyboard input and enable mouse tracking
+// Setup raw mode for keyboard input
 stdin.setRawMode(true);
 stdin.resume();
 stdout.write(hideCursor);
-stdout.write('\x1b[?1000h'); // Enable mouse tracking
-stdout.write('\x1b[?1006h'); // Enable SGR mouse mode for better compatibility
 
 function drawUI() {
     stdout.write(clearScreen);
@@ -141,10 +139,10 @@ function drawUI() {
         stdout.write('\n');
     }
     
-    // Show help text
+// Show help text
     const helpText = searchMode 
         ? '[ESC: Exit search | Enter: Next result | Ctrl+C: Exit]'
-        : '[TAB/←→: Switch tabs | ↑↓: Scroll | PgUp/PgDn: Page | /: Search | Ctrl+C: Exit]';
+        : '[TAB/←→: Switch tabs | ↑↓: Scroll | PgUp/PgDn: Page | /: Search | F5: Hard Reload | Ctrl+C: Exit]';
     stdout.write(`\x1b[2m${helpText}\x1b[0m`);
 }
 
@@ -174,13 +172,19 @@ function addToBuffer(tabIndex, line) {
 
 function showPrettyStartupLog() {
     if (angularStarted && apiStarted) {
+        const apiUrl = `http://localhost:${apiPort}`;
+        const appUrl = `http://localhost:${apiPort}/_app/`;
+        
+        const apiLink = `\x1b]8;;${apiUrl}\x1b\\${apiUrl}\x1b]8;;\x1b\\`;
+        const appLink = `\x1b]8;;${appUrl}\x1b\\${appUrl}\x1b]8;;\x1b\\`;
+        
         const banner = [
             '🍞 ═══════════════════════════════════════════════════════════',
             '   Shokupan Development Environment Ready!',
             '   ─────────────────────────────────────────────────────────',
-            `   🌐 Angular Dev Server: http://localhost:${ngPort}`,
-            `   🚀 API Server:        http://localhost:${apiPort}`,
-            `   🔗 Proxied App:       http://localhost:${apiPort}/_app/`,
+            `   🔧 Angular (internal): localhost:${ngPort}`,
+            `   🚀 API Server:         ${apiLink}`,
+            `   🔗 Proxied App:        ${appLink}`,
             '   ─────────────────────────────────────────────────────────',
             '   Use TAB or arrow keys to switch between tabs',
             '═══════════════════════════════════════════════════════════'
@@ -259,15 +263,8 @@ stdin.on('data', (key) => {
         } else if (keyStr === '\x1b[B') { // Down arrow - scroll down (show newer content)
             scrollOffset[activeTab] = Math.max(0, scrollOffset[activeTab] - 1);
             drawUI();
-        } else if (keyStr.startsWith('\x1b[<') && keyStr.includes('64;')) { // Mouse wheel up
-            const totalRows = process.stdout.rows || 24;
-            const contentRows = totalRows - 3;
-            const maxScrollUp = Math.max(0, buffers[activeTab].length - contentRows);
-            scrollOffset[activeTab] = Math.min(maxScrollUp, scrollOffset[activeTab] + 3); // Scroll 3 lines up
-            drawUI();
-        } else if (keyStr.startsWith('\x1b[<') && keyStr.includes('65;')) { // Mouse wheel down
-            scrollOffset[activeTab] = Math.max(0, scrollOffset[activeTab] - 3); // Scroll 3 lines down
-            drawUI();
+        } else if (keyStr === '\x1b[15~' || keyStr === '\x1b[[E' || keyStr === '\x1b[11~') { // F5 key (various terminals)
+            restartProcesses();
         } else if (keyStr === '\x1b[5~') { // Page Up
             const pageSize = (process.stdout.rows || 24) - 4;
             scrollOffset[activeTab] = Math.max(0, scrollOffset[activeTab] - pageSize);
@@ -298,7 +295,7 @@ const ng = spawn({
 
 // Handle Angular output
 async function readAngularOutput() {
-    const reader = ng.stdout.getReader();
+    const reader = ngProcess.stdout.getReader();
     const decoder = new TextDecoder();
     
     try {
@@ -310,7 +307,6 @@ async function readAngularOutput() {
             const lines = text.split('\n');
             lines.forEach(line => {
                 if (line.trim()) {
-                    addToBuffer(0, line);
                     // Check if Angular has started - look for multiple indicators
                     if (line.includes('Local:') || line.includes('served at') || 
                         line.includes('Application bundle generation complete') ||
@@ -320,18 +316,25 @@ async function readAngularOutput() {
                             showPrettyStartupLog();
                         }
                     }
+                    
+                    // Filter out the "Local:" line that shows the internal Angular port
+                    if (line.includes('Local:') && line.includes('http://localhost:')) {
+                        return;
+                    }
+                    
+                    addToBuffer(0, line);
                 }
             });
         }
     } catch (error) {
-        // Process ended
+        // Process ended - likely from restart
     } finally {
         reader.releaseLock();
     }
 }
 
 async function readAngularErrors() {
-    const reader = ng.stderr.getReader();
+    const reader = ngProcess.stderr.getReader();
     const decoder = new TextDecoder();
     
     try {
@@ -348,7 +351,7 @@ async function readAngularErrors() {
             });
         }
     } catch (error) {
-        // Process ended
+        // Process ended - likely from restart
     } finally {
         reader.releaseLock();
     }
@@ -365,9 +368,56 @@ const server = spawn({
     stderr: 'pipe',
 });
 
-// Handle API server output
+// Track spawned processes for restart capability
+let ngProcess = ng;
+let serverProcess = server;
+
+function restartProcesses() {
+    addToBuffer(0, '\x1b[33m🔄 Hard reloading Angular and API server...\x1b[0m');
+    addToBuffer(1, '\x1b[33m🔄 Hard reloading Angular and API server...\x1b[0m');
+    
+    // Kill existing processes
+    ngProcess.kill();
+    serverProcess.kill();
+    
+    // Reset startup flags
+    angularStarted = false;
+    apiStarted = false;
+    
+    // Clear buffers
+    buffers[0] = [];
+    buffers[1] = [];
+    scrollOffset[0] = 0;
+    scrollOffset[1] = 0;
+    
+    // Restart Angular
+    ngProcess = spawn({
+        cmd: ['ng', 'serve', '--port', String(ngPort), '--no-open', '--configuration', 'development'],
+        cwd: new URL('../client', import.meta.url).pathname,
+        env: { ...process.env, FORCE_COLOR: '1' },
+        stdout: 'pipe',
+        stderr: 'pipe',
+    });
+    
+    // Restart server
+    serverProcess = spawn({
+        cmd: ['bun', '--watch', 'main.ts'],
+        cwd: new URL('../examples/full', import.meta.url).pathname,
+        env: serverEnv,
+        stdout: 'pipe',
+        stderr: 'pipe',
+    });
+    
+    // Re-attach output readers
+    readAngularOutput();
+    readAngularErrors();
+    readServerOutput();
+    readServerErrors();
+    
+    drawUI();
+}
 async function readServerOutput() {
-    const reader = server.stdout.getReader();
+    const reader = serverProcess.stdout.getReader();
     const decoder = new TextDecoder();
     
     try {
@@ -393,14 +443,14 @@ async function readServerOutput() {
             });
         }
     } catch (error) {
-        // Process ended
+        // Process ended - likely from restart
     } finally {
         reader.releaseLock();
     }
 }
 
 async function readServerErrors() {
-    const reader = server.stderr.getReader();
+    const reader = serverProcess.stderr.getReader();
     const decoder = new TextDecoder();
     
     try {
@@ -417,7 +467,7 @@ async function readServerErrors() {
             });
         }
     } catch (error) {
-        // Process ended
+        // Process ended - likely from restart
     } finally {
         reader.releaseLock();
     }
@@ -426,17 +476,13 @@ async function readServerErrors() {
 // Kill child processes when parent exits
 process.on('SIGINT', () => {
     stdout.write(showCursor);
-    stdout.write('\x1b[?1000l'); // Disable mouse tracking
-    stdout.write('\x1b[?1006l'); // Disable SGR mouse mode
-    ng.kill();
-    server.kill();
+    ngProcess.kill();
+    serverProcess.kill();
     process.exit(0);
 });
 
 process.on('exit', () => {
     stdout.write(showCursor);
-    stdout.write('\x1b[?1000l'); // Disable mouse tracking
-    stdout.write('\x1b[?1006l'); // Disable SGR mouse mode
 });
 
 // Initial UI draw
@@ -448,4 +494,4 @@ readAngularErrors();
 readServerOutput();
 readServerErrors();
 
-await Promise.all([ng.exited, server.exited]);
+await Promise.all([ngProcess.exited, serverProcess.exited]);
