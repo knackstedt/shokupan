@@ -360,6 +360,231 @@ describe('WebSocket API - Integration', () => {
         const normalRouter = { notWs: true };
         expect(ShokupanWebsocketRouter.isWebSocketRouter(normalRouter)).toBe(false);
     });
+
+    test('Nested WebSocket routers - same connection with event prefixing', () => {
+        const app = new Shokupan();
+        const mainRouter = new ShokupanWebsocketRouter();
+        const chatRouter = new ShokupanWebsocketRouter();
+        const notificationRouter = new ShokupanWebsocketRouter();
+
+        // Main router events
+        mainRouter.event('ping', () => { });
+
+        // Chat router events
+        chatRouter.event('message', () => { });
+        chatRouter.event('typing', () => { });
+
+        // Notification router events
+        notificationRouter.event('alert', () => { });
+
+        // Mount child routers onto main router
+        mainRouter.mount('chat', chatRouter);
+        mainRouter.mount('notifications', notificationRouter);
+
+        // Mount main router to app
+        app.mount('/ws', mainRouter);
+
+        // Verify all events are accessible with proper prefixes
+        const allEvents = mainRouter.getAllEvents();
+        expect(allEvents.has('ping')).toBe(true);
+        expect(allEvents.has('chat.message')).toBe(true);
+        expect(allEvents.has('chat.typing')).toBe(true);
+        expect(allEvents.has('notifications.alert')).toBe(true);
+
+        // Verify only one route is created (shared connection)
+        const routes = app.getRoutes();
+        expect(routes.filter(r => r.path === '/ws').length).toBe(1);
+    });
+
+    test('Nested WebSocket routers - lifecycle handlers merge correctly', () => {
+        const mainRouter = new ShokupanWebsocketRouter();
+        const childRouter = new ShokupanWebsocketRouter();
+
+        const calls: string[] = [];
+
+        mainRouter.onUpgrade(() => {
+            calls.push('main-upgrade');
+            return true;
+        });
+
+        mainRouter.onOpen(() => {
+            calls.push('main-open');
+            return { mainData: true };
+        });
+
+        childRouter.onUpgrade(() => {
+            calls.push('child-upgrade');
+            return true;
+        });
+
+        childRouter.onOpen(() => {
+            calls.push('child-open');
+            return { childData: true };
+        });
+
+        mainRouter.mount('child', childRouter);
+
+        const allHandlers = mainRouter.getAllHandlers();
+
+        // Verify handlers are merged
+        expect(allHandlers.onUpgrade).toBeDefined();
+        expect(allHandlers.onOpen).toBeDefined();
+    });
+
+    test('Nested WebSocket routers - onUpgrade rejection propagates', async () => {
+        const mainRouter = new ShokupanWebsocketRouter();
+        const childRouter = new ShokupanWebsocketRouter();
+
+        mainRouter.onUpgrade(() => true);
+        childRouter.onUpgrade(() => false); // Child rejects
+
+        mainRouter.mount('child', childRouter);
+
+        const allHandlers = mainRouter.getAllHandlers();
+
+        // Mock context
+        const mockCtx = {} as any;
+
+        // Child rejection should prevent upgrade
+        const result = await allHandlers.onUpgrade!(mockCtx);
+        expect(result).toBe(false);
+    });
+
+    test('Nested WebSocket routers - onOpen state merging', async () => {
+        const mainRouter = new ShokupanWebsocketRouter();
+        const childRouter = new ShokupanWebsocketRouter();
+
+        mainRouter.onOpen(() => {
+            return { userId: '123' };
+        });
+
+        childRouter.onOpen(() => {
+            return { sessionId: 'abc' };
+        });
+
+        mainRouter.mount('child', childRouter);
+
+        const allHandlers = mainRouter.getAllHandlers();
+
+        const mockCtx = {} as any;
+        const mockWs = {} as any;
+
+        const state = await allHandlers.onOpen!(mockCtx, mockWs);
+        expect(state).toEqual({ userId: '123', sessionId: 'abc' });
+    });
+
+    test('Nested WebSocket routers - deeply nested structure', () => {
+        const level1 = new ShokupanWebsocketRouter();
+        const level2 = new ShokupanWebsocketRouter();
+        const level3 = new ShokupanWebsocketRouter();
+
+        level3.event('deepEvent', () => { });
+        level2.event('midEvent', () => { });
+        level2.mount('deep', level3);
+        level1.event('topEvent', () => { });
+        level1.mount('mid', level2);
+
+        const allEvents = level1.getAllEvents();
+        expect(allEvents.has('topEvent')).toBe(true);
+        expect(allEvents.has('mid.midEvent')).toBe(true);
+        expect(allEvents.has('mid.deep.deepEvent')).toBe(true);
+    });
+
+    test('Nested WebSocket routers - mounting controllers', () => {
+        @WebsocketController()
+        class ChatController {
+            @Event('message')
+            handleMessage() { }
+
+            @Event('typing')
+            handleTyping() { }
+        }
+
+        const mainRouter = new ShokupanWebsocketRouter();
+        mainRouter.event('ping', () => { });
+        mainRouter.mount('chat', ChatController);
+
+        const allEvents = mainRouter.getAllEvents();
+        expect(allEvents.has('ping')).toBe(true);
+        expect(allEvents.has('chat.message')).toBe(true);
+        expect(allEvents.has('chat.typing')).toBe(true);
+    });
+
+    test('Nested WebSocket routers - onMessage handlers chain', async () => {
+        const mainRouter = new ShokupanWebsocketRouter();
+        const childRouter = new ShokupanWebsocketRouter();
+
+        const messages: string[] = [];
+
+        mainRouter.onMessage(() => {
+            messages.push('main');
+        });
+
+        childRouter.onMessage(() => {
+            messages.push('child');
+        });
+
+        mainRouter.mount('child', childRouter);
+
+        const allHandlers = mainRouter.getAllHandlers();
+
+        const mockCtx = {} as any;
+        const mockWs = {} as any;
+
+        await allHandlers.onMessage!(mockCtx, mockWs, 'test');
+        expect(messages).toEqual(['main', 'child']);
+    });
+
+    test('Nested WebSocket routers - onClose handlers chain', async () => {
+        const mainRouter = new ShokupanWebsocketRouter();
+        const childRouter = new ShokupanWebsocketRouter();
+
+        const closeCalls: string[] = [];
+
+        mainRouter.onClose(() => {
+            closeCalls.push('main');
+        });
+
+        childRouter.onClose(() => {
+            closeCalls.push('child');
+        });
+
+        mainRouter.mount('child', childRouter);
+
+        const allHandlers = mainRouter.getAllHandlers();
+
+        const mockCtx = {} as any;
+        const mockWs = {} as any;
+
+        await allHandlers.onClose!(mockCtx, mockWs, 1000, 'normal');
+        expect(closeCalls).toEqual(['main', 'child']);
+    });
+
+    test('Nested WebSocket routers - onError handlers chain', async () => {
+        const mainRouter = new ShokupanWebsocketRouter();
+        const childRouter = new ShokupanWebsocketRouter();
+
+        const errorCalls: string[] = [];
+
+        mainRouter.onError(() => {
+            errorCalls.push('main');
+        });
+
+        childRouter.onError(() => {
+            errorCalls.push('child');
+        });
+
+        mainRouter.mount('child', childRouter);
+
+        const allHandlers = mainRouter.getAllHandlers();
+
+        const mockCtx = {} as any;
+        const mockWs = {} as any;
+        const mockError = new Error('test');
+
+        await allHandlers.onError!(mockCtx, mockWs, mockError);
+        expect(errorCalls).toEqual(['main', 'child']);
+    });
 });
 
 describe('WebSocket API - Context Helpers', () => {

@@ -421,8 +421,9 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         }
         (this as any)[$childRouters].push(wsRouter);
 
-        const handlers = wsRouter.getHandlers();
-        const events = wsRouter.getEvents();
+        // Use getAllHandlers() and getAllEvents() to include nested routers
+        const handlers = wsRouter.getAllHandlers ? wsRouter.getAllHandlers() : wsRouter.getHandlers();
+        const events = wsRouter.getAllEvents ? wsRouter.getAllEvents() : wsRouter.getEvents();
 
         // Register WebSocket route using .socket() method
         this.socket(prefix, (ctx) => {

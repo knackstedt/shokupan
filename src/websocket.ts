@@ -1,8 +1,9 @@
 import type { ServerWebSocket } from 'bun';
 import type { ShokupanContext } from './context';
 import { getCallerInfo } from './decorators/util/stack';
+import { getEventHandlers, isWebSocketController } from './decorators/websocket';
 import type { Shokupan } from './shokupan';
-import { $childControllers, $childRouters, $isWebSocketRouter, $routes } from './util/symbol';
+import { $childControllers, $childRouters, $isWebSocketRouter, $mountPath, $routes } from './util/symbol';
 
 /**
  * WebSocket lifecycle handlers
@@ -82,6 +83,7 @@ export class ShokupanWebsocketRouter<T = any> {
     private handlers: WebSocketHandlers<T> = {};
     public middleware: any[] = [];
     private events: Map<string, EventHandler<T>> = new Map();
+    private childRouters: Array<{ prefix: string; router: ShokupanWebsocketRouter<any> | any }> = [];
 
     /**
      * Register upgrade validation handler.
@@ -183,11 +185,53 @@ export class ShokupanWebsocketRouter<T = any> {
     }
 
     /**
-     * Get registered events.
+     * Get registered events (local only, not including children).
      * @internal
      */
     public getEvents(): Map<string, EventHandler<T>> {
         return this.events;
+    }
+
+    /**
+     * Get all events including from child routers, with prefixed event names.
+     * @internal
+     */
+    public getAllEvents(): Map<string, EventHandler<T>> {
+        const allEvents = new Map<string, EventHandler<T>>();
+        
+        // Add local events
+        for (const [event, handler] of this.events) {
+            allEvents.set(event, handler);
+        }
+        
+        // Add child router events with prefix
+        for (const { prefix, router } of this.childRouters) {
+            if (ShokupanWebsocketRouter.isWebSocketRouter(router)) {
+                const childEvents = router.getAllEvents();
+                for (const [event, handler] of childEvents) {
+                    const prefixedEvent = prefix ? `${prefix}.${event}` : event;
+                    allEvents.set(prefixedEvent, handler);
+                }
+            } else if (isWebSocketController(router)) {
+                // Handle controller
+                const instance = typeof router === 'function' ? new router() : router;
+                const constructor = instance.constructor;
+                const eventHandlers = getEventHandlers(constructor);
+                
+                for (const eh of eventHandlers) {
+                    const eventMethod = instance[eh.methodName as string];
+                    if (eventMethod) {
+                        const handler: EventHandler<T> = async (ctx, data) => {
+                            return eventMethod.call(instance, ctx, data);
+                        };
+                        const prefixedEvent = prefix ? `${prefix}.${eh.event}` : eh.event;
+                        allEvents.set(prefixedEvent, handler);
+                    }
+                }
+            }
+        }
+        
+        return allEvents;
     }
 
     /**
@@ -203,11 +247,41 @@ export class ShokupanWebsocketRouter<T = any> {
     }
 
     /**
-     * Get child routers (always empty for WebSocket router).
+     * Mount a child WebSocket router or controller to share the same connection.
+     * Events from the child will be prefixed with the mount path.
+     * 
+     * @param prefix - Event prefix for the child router (e.g., "chat" makes "message" become "chat.message")
+     * @param router - Child WebSocket router or controller to mount
+     * 
+     * @example
+     * ```ts
+     * const mainRouter = new ShokupanWebsocketRouter();
+     * const chatRouter = new ShokupanWebsocketRouter();
+     * chatRouter.event("message", (ctx, data) => { ... });
+     * 
+     * // Events will be accessible as "chat.message"
+     * mainRouter.mount("chat", chatRouter);
+     * ```
+     */
+    public mount(prefix: string, router: ShokupanWebsocketRouter<any> | any): this {
+        // Normalize prefix - remove leading/trailing dots
+        const normalizedPrefix = prefix.replace(/^\.+|\.+$/g, '');
+        
+        // Mark the child router as mounted
+        if (router && typeof router === 'object') {
+            (router as any)[$mountPath] = normalizedPrefix;
+        }
+        
+        this.childRouters.push({ prefix: normalizedPrefix, router });
+        return this;
+    }
+
+    /**
+     * Get child routers.
      * @internal
      */
     public get [$childRouters](): any[] {
-        return [];
+        return this.childRouters.map(c => c.router);
     }
 
     /**
@@ -265,12 +339,139 @@ export class ShokupanWebsocketRouter<T = any> {
     }
 
     /**
+     * Get all handlers merged from this router and children.
+     * Child handlers are called after parent handlers.
+     * @internal
+     */
+    public getAllHandlers(): WebSocketHandlers<T> {
+        const merged: WebSocketHandlers<T> = { ...this.handlers };
+        
+        // Collect child handlers
+        const childUpgradeHandlers: NonNullable<WebSocketHandlers<T>['onUpgrade']>[] = [];
+        const childOpenHandlers: NonNullable<WebSocketHandlers<T>['onOpen']>[] = [];
+        const childEventHandlers: NonNullable<WebSocketHandlers<T>['onEvent']>[] = [];
+        const childMessageHandlers: NonNullable<WebSocketHandlers<T>['onMessage']>[] = [];
+        const childCloseHandlers: NonNullable<WebSocketHandlers<T>['onClose']>[] = [];
+        const childErrorHandlers: NonNullable<WebSocketHandlers<T>['onError']>[] = [];
+        
+        for (const { router } of this.childRouters) {
+            if (ShokupanWebsocketRouter.isWebSocketRouter(router)) {
+                const childHandlers = router.getAllHandlers();
+                if (childHandlers.onUpgrade) childUpgradeHandlers.push(childHandlers.onUpgrade);
+                if (childHandlers.onOpen) childOpenHandlers.push(childHandlers.onOpen);
+                if (childHandlers.onEvent) childEventHandlers.push(childHandlers.onEvent);
+                if (childHandlers.onMessage) childMessageHandlers.push(childHandlers.onMessage);
+                if (childHandlers.onClose) childCloseHandlers.push(childHandlers.onClose);
+                if (childHandlers.onError) childErrorHandlers.push(childHandlers.onError);
+            }
+        }
+        
+        // Merge onUpgrade: parent runs first, any false rejects
+        if (this.handlers.onUpgrade || childUpgradeHandlers.length > 0) {
+            const parentHandler = this.handlers.onUpgrade;
+            merged.onUpgrade = async (ctx) => {
+                if (parentHandler) {
+                    const result = await parentHandler(ctx);
+                    if (result === false) return false;
+                }
+                for (const handler of childUpgradeHandlers) {
+                    const result = await handler(ctx);
+                    if (result === false) return false;
+                }
+                return true;
+            };
+        }
+        
+        // Merge onOpen: parent runs first, children can augment state
+        if (this.handlers.onOpen || childOpenHandlers.length > 0) {
+            const parentHandler = this.handlers.onOpen;
+            merged.onOpen = async (ctx, ws) => {
+                let state: any;
+                if (parentHandler) {
+                    state = await parentHandler(ctx, ws);
+                }
+                for (const handler of childOpenHandlers) {
+                    const childState = await handler(ctx, ws);
+                    if (childState !== undefined) {
+                        state = { ...state, ...childState };
+                    }
+                }
+                return state;
+            };
+        }
+        
+        // Merge onEvent: parent runs first, any false prevents routing
+        if (this.handlers.onEvent || childEventHandlers.length > 0) {
+            const parentHandler = this.handlers.onEvent;
+            merged.onEvent = async (ctx, ws, event, data) => {
+                if (parentHandler) {
+                    const result = await parentHandler(ctx, ws, event, data);
+                    if (result === false) return false;
+                }
+                for (const handler of childEventHandlers) {
+                    const result = await handler(ctx, ws, event, data);
+                    if (result === false) return false;
+                }
+                return true;
+            };
+        }
+        
+        // Merge onMessage: all handlers are called in order
+        if (this.handlers.onMessage || childMessageHandlers.length > 0) {
+            const parentHandler = this.handlers.onMessage;
+            merged.onMessage = async (ctx, ws, message) => {
+                if (parentHandler) {
+                    await parentHandler(ctx, ws, message);
+                }
+                for (const handler of childMessageHandlers) {
+                    await handler(ctx, ws, message);
+                }
+            };
+        }
+        
+        // Merge onClose: all handlers are called in order
+        if (this.handlers.onClose || childCloseHandlers.length > 0) {
+            const parentHandler = this.handlers.onClose;
+            merged.onClose = async (ctx, ws, code, reason) => {
+                if (parentHandler) {
+                    await parentHandler(ctx, ws, code, reason);
+                }
+                for (const handler of childCloseHandlers) {
+                    await handler(ctx, ws, code, reason);
+                }
+            };
+        }
+        
+        // Merge onError: all handlers are called in order
+        if (this.handlers.onError || childErrorHandlers.length > 0) {
+            const parentHandler = this.handlers.onError;
+            merged.onError = async (ctx, ws, error) => {
+                if (parentHandler) {
+                    await parentHandler(ctx, ws, error);
+                }
+                for (const handler of childErrorHandlers) {
+                    await handler(ctx, ws, error);
+                }
+            };
+        }
+        
+        return merged;
+    }
+
+    /**
      * Execute onStop hooks recursively.
      * @internal
      */
     public async runOnStopHooks(app: Shokupan): Promise<void> {
         if (this.handlers.onStop) {
             await this.handlers.onStop(app);
+        }
+        
+        // Run child onStop hooks
+        for (const { router } of this.childRouters) {
+            if (ShokupanWebsocketRouter.isWebSocketRouter(router)) {
+                await router.runOnStopHooks(app);
+            }
         }
     }
 }
