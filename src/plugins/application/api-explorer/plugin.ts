@@ -54,8 +54,10 @@ export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin 
     private static getBasePath() {
         const dir = dirname(fileURLToPath(import.meta.url));
         // In production (dist/), files are in dist/plugins/application/api-explorer/
-        if (dir.endsWith('dist')) {
-            return dir + '/plugins/application/api-explorer';
+        // Check if we're in the dist directory by looking for '/dist/' in the path
+        if (dir.includes('/dist/')) {
+            // Already in the correct directory (dist/plugins/application/api-explorer/)
+            return dir;
         }
         // In dev mode (src/plugins/application/api-explorer/), files are in same directory
         return dir;
@@ -123,7 +125,7 @@ export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin 
             const spec = (this.root as any).openApiSpec
                 ? structuredClone((this.root as any).openApiSpec)
                 : await (this.root || this).generateApiSpec();
-            return ctx.json(stripSourceCode(spec));
+            return ctx.json(spec);
         });
 
         this.get('/', async (ctx) => {
@@ -132,7 +134,7 @@ export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin 
                 : await (this.root || this).generateApiSpec();
             const asyncSpec = (ctx.app as any).asyncApiSpec;
             const base = this.pluginOptions.path!;
-            const element = ApiExplorerApp({ spec: stripSourceCode(spec), base, asyncSpec });
+            const element = ApiExplorerApp({ spec: spec, base, asyncSpec });
             const html = renderToString(element);
             if (html.length === 0) throw new Error('ApiExplorerPlugin: rendered page is blank.');
             return ctx.html(html);

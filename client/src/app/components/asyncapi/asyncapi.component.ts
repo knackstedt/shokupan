@@ -1,26 +1,49 @@
-import { JsonPipe } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import {
-  Component,
-  inject,
-  OnDestroy, OnInit, signal
-} from '@angular/core';
+import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { AngularSplitModule } from 'angular-split';
 import { NgScrollbarModule } from 'ngx-scrollbar';
 
+interface SourceInfo {
+  file: string;
+  line: number;
+  startLine?: number;
+  endLine?: number;
+}
 
 interface ChannelItem {
   name: string;
   type: 'publish' | 'subscribe';
   op: any;
   tag: string;
-  sourceInfo?: any;
+  sourceInfo?: SourceInfo;
+}
+
+interface NavTreeNode {
+  children: Record<string, NavTreeNode>;
+  isLeaf?: boolean;
+  data?: {
+    name: string;
+    op: any;
+    type: 'publish' | 'subscribe';
+  };
+}
+
+/** Flat leaf entry used for rendering in the sidebar. */
+export interface FlatLeaf {
+  /** Human-readable label (last path segment, or joined segments). */
+  label: string;
+  /** Full channel name (the key from spec.channels). */
+  name: string;
+  op: any;
+  type: 'publish' | 'subscribe';
 }
 
 @Component({
   selector: 'skp-asyncapi',
   standalone: true,
-  imports: [JsonPipe, NgScrollbarModule, AngularSplitModule],
+  imports: [CommonModule, FormsModule, NgScrollbarModule, AngularSplitModule],
   templateUrl: './asyncapi.component.html',
   styleUrl: './asyncapi.component.scss',
 })
@@ -28,62 +51,264 @@ export class AsyncApiComponent implements OnInit, OnDestroy {
   private http = inject(HttpClient);
 
   readonly spec = signal<any>(null);
-  readonly channels = signal<ChannelItem[]>([]);
-  readonly channelTags = () => [...new Set(this.channels().map(c => c.tag))];
-  readonly channelsByTag = (tag: string) => this.channels().filter(c => c.tag === tag);
+  readonly navTree = signal<NavTreeNode>({ children: {} });
   readonly selectedChannel = signal<ChannelItem | null>(null);
-  readonly wsConnected = signal(false);
-  readonly wsLogs = signal<{ dir: 'send' | 'recv'; data: string; }[]>([]);
-  readonly wsUrl = signal(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}`);
+  readonly wsConnected = signal<boolean>(false);
+  readonly wsLogs = signal<{ dir: 'send' | 'recv'; data: string; timestamp: Date }[]>([]);
+  readonly serverUrl = signal<string>(location.host);
+  readonly wsProtocol = signal<string>(location.protocol === 'https:' ? 'wss' : 'ws');
+  readonly targetEvent = signal<string>('--');
+
+  /** IDE link pattern from the server, e.g. "vscode://file/{{absolute}}:{{line}}:{{column}}" */
+  private ideLinkPattern = 'vscode://file/{{absolute}}:{{line}}:{{column}}';
 
   private ws: WebSocket | null = null;
 
   ngOnInit(): void {
+    this.loadSpec();
+  }
+
+  private loadSpec(): void {
     this.http.get<any>('/asyncapi/json').subscribe({
-      next: (spec) => { this.spec.set(spec); this.buildChannels(spec); },
-      error: () => { },
+      next: (spec) => {
+        // Pull out the server-computed IDE link pattern before storing the spec
+        if (spec?.['x-ide-link-pattern']) {
+          this.ideLinkPattern = spec['x-ide-link-pattern'];
+        }
+
+        this.spec.set(spec);
+        const navTree = this.buildNavTree(spec);
+        this.navTree.set(navTree);
+
+        // Auto-connect WebSocket (will handle spec updates via messages)
+        if (!this.wsConnected()) {
+          setTimeout(() => this.connectWebSocket(), 100);
+        }
+      },
+      error: (err) => {
+        console.error('Failed to load AsyncAPI spec:', err);
+      },
     });
   }
 
-  ngOnDestroy(): void { this.ws?.close(); }
-
-  selectChannel(ch: ChannelItem): void { this.selectedChannel.set(ch); }
-
-  connectWs(url: string): void {
+  ngOnDestroy(): void {
     this.ws?.close();
-    this.ws = new WebSocket(url);
-    this.ws.addEventListener('open', () => this.wsConnected.set(true));
-    this.ws.addEventListener('close', () => this.wsConnected.set(false));
-    this.ws.addEventListener('message', (ev) => {
-      this.wsLogs.update(l => [...l, { dir: 'recv' as const, data: this.tryFormat(ev.data) }].slice(-200));
-    });
   }
 
-  disconnectWs(): void { this.ws?.close(); }
+  /**
+   * Returns the first SourceInfo object from the op's x-source-info array (or the
+   * object itself for backwards-compatibility if it is not an array).
+   */
+  getFirstSourceInfo(op: any): SourceInfo | undefined {
+    const si = op?.['x-source-info'];
+    if (!si) return undefined;
+    if (Array.isArray(si)) return si[0] as SourceInfo | undefined;
+    return si as SourceInfo;
+  }
 
-  sendMessage(msg: string): void {
+  selectChannel(channelName: string, op: any, type: 'publish' | 'subscribe'): void {
+    const channel: ChannelItem = {
+      name: channelName,
+      type,
+      op,
+      tag: op.tags?.[0]?.name ?? 'General',
+      sourceInfo: this.getFirstSourceInfo(op),
+    };
+    this.selectedChannel.set(channel);
+    this.targetEvent.set(channelName);
+  }
+
+  connectWebSocket(): void {
+    let url = this.serverUrl();
+    const protocol = this.wsProtocol();
+
+    this.ws?.close();
+
+    if (protocol === 'socket.io') {
+      console.warn('Socket.IO support not yet implemented');
+      return;
+    }
+
+    // Strip any existing protocol prefix
+    url = url.replace(/^(wss?:\/\/)?/, '');
+    const wsUrl = `${protocol}://${url}/asyncapi/ws`;
+
+    try {
+      this.ws = new WebSocket(wsUrl);
+
+      this.ws.addEventListener('open', () => {
+        this.wsConnected.set(true);
+        this.addLog(`Connected to ${wsUrl}`, 'system');
+      });
+
+      this.ws.addEventListener('close', (event) => {
+        this.wsConnected.set(false);
+        this.addLog(`Disconnected (code: ${event.code})`, 'system');
+      });
+
+      this.ws.addEventListener('message', (event) => {
+        this.addLog(event.data, 'recv');
+
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'spec-updated' || data.event === 'ast-complete') {
+            this.loadSpec();
+          }
+        } catch {
+          // Non-JSON message — fine
+        }
+      });
+
+      this.ws.addEventListener('error', () => {
+        this.addLog(`Connection error — check console for details`, 'system');
+      });
+    } catch (err: any) {
+      this.addLog(`Failed to connect: ${err.message}`, 'system');
+    }
+  }
+
+  disconnectWebSocket(): void {
+    this.ws?.close();
+    this.wsConnected.set(false);
+  }
+
+  sendMessage(message: string): void {
     if (!this.wsConnected() || !this.ws) return;
-    this.ws.send(msg);
-    this.wsLogs.update(l => [...l, { dir: 'send' as const, data: this.tryFormat(msg) }].slice(-200));
+    this.ws.send(message);
+    this.addLog(message, 'send');
   }
 
-  private tryFormat(s: string): string {
-    try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return s; }
+  clearLogs(): void {
+    this.wsLogs.set([]);
   }
 
-  private buildChannels(spec: any): void {
-    const channels: ChannelItem[] = [];
-    Object.entries(spec.channels ?? {}).forEach(([name, ch]: [string, any]) => {
-      const op = ch.publish ?? ch.subscribe;
-      if (!op) return;
-      channels.push({
-        name,
-        type: ch.publish ? 'publish' : 'subscribe',
-        op,
-        tag: op.tags?.[0]?.name ?? 'General',
-        sourceInfo: op['x-source-info'],
+  /**
+   * Generates an IDE link using the pattern provided by the server.
+   * Substitutes {{absolute}} and {{line}} (and optionally {{column}}).
+   */
+  generateEditorLink(file: string, line: number = 1, column: number = 1): string {
+    return this.ideLinkPattern
+      .replace('{{absolute}}', file)
+      .replace('{{relative}}', file) // fallback for web-based patterns
+      .replace('{{line}}', String(line))
+      .replace('{{column}}', String(column));
+  }
+
+  formatChannelType(type: 'publish' | 'subscribe'): string {
+    return type === 'publish' ? 'SEND' : 'RECV';
+  }
+
+  // ── Nav tree helpers ────────────────────────────────────────────────────
+
+  private buildNavTree(spec: any): NavTreeNode {
+    if (!spec || !spec.channels) return { children: {} };
+
+    const root: NavTreeNode = { children: {} };
+
+    Object.keys(spec.channels).forEach(name => {
+      const ch = spec.channels[name];
+      const op = ch.publish || ch.subscribe;
+      const type = ch.publish ? 'publish' : 'subscribe';
+
+      // Get Tag (Controller Name)
+      const tag = (op.tags && op.tags.length > 0) ? op.tags[0].name : 'General';
+
+      // Ensure Tag Group Exists
+      if (!root.children[tag]) root.children[tag] = { children: {} };
+
+      const parts = name.split(/[\.\/]/);
+      let current = root.children[tag];
+
+      parts.forEach((part, i) => {
+        if (!current.children[part]) current.children[part] = { children: {} };
+        current = current.children[part];
+
+        if (i === parts.length - 1) {
+          current.isLeaf = true;
+          current.data = { name, op, type };
+        }
       });
     });
-    this.channels.set(channels);
+
+    return root;
+  }
+
+  /** Returns sorted top-level entries (tag groups). */
+  getSortedEntries(node: NavTreeNode): [string, NavTreeNode][] {
+    return Object.entries(node.children || {}).sort((a, b) => {
+      const [aKey, aItem] = a;
+      const [bKey, bItem] = b;
+
+      // Prioritize Warnings
+      const isWarningA = aItem.data?.op?.['x-warning'];
+      const isWarningB = bItem.data?.op?.['x-warning'];
+      if (isWarningA && !isWarningB) return -1;
+      if (!isWarningA && isWarningB) return 1;
+
+      if (aKey === bKey) return 0;
+      if (aKey === 'Warning' || aKey === 'Warnings') return -1;
+      if (bKey === 'Warning' || bKey === 'Warnings') return 1;
+      if (aKey === 'Application') return -1;
+      if (bKey === 'Application') return 1;
+
+      if (aKey[0] === '/') return 1;
+      if (bKey[0] === '/') return -1;
+
+      return aKey.localeCompare(bKey);
+    });
+  }
+
+  /**
+   * Recursively collects all leaf nodes from a subtree, sorted in the same
+   * order as the Preact NavNode component. Non-leaf intermediate nodes are
+   * included as non-selectable labels (isLeaf === false, no data).
+   */
+  getFlatItems(node: NavTreeNode): Array<{ label: string; depth: number; isLeaf: boolean; node: NavTreeNode }> {
+    const result: Array<{ label: string; depth: number; isLeaf: boolean; node: NavTreeNode }> = [];
+    const walk = (n: NavTreeNode, depth: number) => {
+      const sorted = this.getSortedEntries(n);
+      for (const [key, child] of sorted) {
+        result.push({ label: key, depth, isLeaf: !!child.isLeaf, node: child });
+        if (!child.isLeaf && Object.keys(child.children || {}).length > 0) {
+          walk(child, depth + 1);
+        }
+      }
+    };
+    walk(node, 0);
+    return result;
+  }
+
+  hasChildren(node: NavTreeNode): boolean {
+    return Object.keys(node.children || {}).length > 0;
+  }
+
+  isWarning(item: NavTreeNode): boolean {
+    return item.data?.op?.['x-warning'] === true;
+  }
+
+  isPlugin(item: NavTreeNode): boolean {
+    return !!(item.data?.op?.['x-shokupan-plugin-name'] || this.getFirstSourceInfo(item.data?.op)?.file);
+  }
+
+  hasChannels(): boolean {
+    const spec = this.spec();
+    return spec && spec.channels && Object.keys(spec.channels).length > 0;
+  }
+
+  private addLog(data: string, direction: 'send' | 'recv' | 'system'): void {
+    const formattedData = this.tryFormatJSON(data);
+    this.wsLogs.update(logs => [
+      ...logs,
+      { dir: direction as 'send' | 'recv', data: formattedData, timestamp: new Date() }
+    ].slice(-200)); // Keep last 200 logs
+  }
+
+  private tryFormatJSON(data: string): string {
+    try {
+      const parsed = JSON.parse(data);
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      return data;
+    }
   }
 }

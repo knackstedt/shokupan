@@ -286,7 +286,28 @@
     margin-bottom: 1.5rem;
 }
 
-.info-tab, .params-tab, .headers-tab, .payload-tab, .param-row {
+.param-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+
+    label {
+        min-width: 120px;
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    input {
+        flex: 1;
+    }
+
+    p-button {
+        flex-shrink: 0;
+    }
+}
+
+.info-tab, .params-tab, .headers-tab, .payload-tab {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
