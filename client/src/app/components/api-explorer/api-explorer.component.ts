@@ -305,8 +305,60 @@ export class ApiExplorerComponent implements OnInit {
         this.queryParams.update(params => ({ ...params, [key]: value }));
     }
 
+    addQueryParam(): void {
+        let counter = 1;
+        let newKey = `param${counter}`;
+        const existing = this.queryParams();
+        while (existing[newKey] !== undefined) {
+            counter++;
+            newKey = `param${counter}`;
+        }
+        this.queryParams.update(params => ({ ...params, [newKey]: '' }));
+    }
+
+    removeQueryParam(key: string): void {
+        this.queryParams.update(params => {
+            const { [key]: _, ...rest } = params;
+            return rest;
+        });
+    }
+
+    renameQueryParam(oldKey: string, newKey: string): void {
+        if (oldKey === newKey || !newKey) return;
+        this.queryParams.update(params => {
+            const { [oldKey]: value, ...rest } = params;
+            return { ...rest, [newKey]: value };
+        });
+    }
+
     updateHeader(key: string, value: string): void {
         this.requestHeaders.update(headers => ({ ...headers, [key]: value }));
+    }
+
+    addHeader(): void {
+        let counter = 1;
+        let newKey = `X-Custom-${counter}`;
+        const existing = this.requestHeaders();
+        while (existing[newKey] !== undefined) {
+            counter++;
+            newKey = `X-Custom-${counter}`;
+        }
+        this.requestHeaders.update(headers => ({ ...headers, [newKey]: '' }));
+    }
+
+    removeHeader(key: string): void {
+        this.requestHeaders.update(headers => {
+            const { [key]: _, ...rest } = headers;
+            return rest;
+        });
+    }
+
+    renameHeader(oldKey: string, newKey: string): void {
+        if (oldKey === newKey || !newKey) return;
+        this.requestHeaders.update(headers => {
+            const { [oldKey]: value, ...rest } = headers;
+            return { ...rest, [newKey]: value };
+        });
     }
 
     updateAuthHeader(key: string, value: string): void {

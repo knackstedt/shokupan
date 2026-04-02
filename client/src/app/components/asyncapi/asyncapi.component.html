@@ -1,93 +1,277 @@
-<div class="asyncapi">
-    <as-split direction="horizontal" [gutterSize]="4">
-        <!-- Sidebar -->
-        <as-split-area [size]="25" [minSize]="15">
-            <div class="sidebar">
-                <div class="sidebar-header">
-                    <h2>AsyncAPI</h2>
-                    <small>{{ spec()?.info?.version }}</small>
-                </div>
-                <ng-scrollbar class="sidebar-scroll">
-                    @for (tag of channelTags(); track tag) {
-                    <div class="group-label">{{ tag }}</div>
-                    @for (ch of channelsByTag(tag); track ch.name) {
-                    <button class="nav-item" [class.active]="selectedChannel()?.name === ch.name"
-                        (click)="selectChannel(ch)">
-                        <span class="badge-{{ ch.type === 'publish' ? 'SEND' : 'RECV' }}">
-                            {{ ch.type === 'publish' ? 'SEND' : 'RECV' }}
-                        </span>
-                        <span class="nav-label">{{ ch.name }}</span>
-                    </button>
+<div class="asyncapi-explorer">
+  <as-split direction="horizontal" [gutterSize]="8">
+    <!-- Sidebar -->
+    <as-split-area [size]="20" [minSize]="15" [maxSize]="40">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <h2>AsyncAPI Events</h2>
+        </div>
+
+        <ng-scrollbar class="sidebar-scroll" orientation="vertical">
+          @if (hasChannels()) {
+            @for (topLevelEntry of getSortedEntries(navTree()); track topLevelEntry[0]) {
+              <div>
+                <!-- Top-level group label -->
+                <div class="group-label">{{ topLevelEntry[0] }}</div>
+
+                <!-- Recursively-flattened items within this group -->
+                @if (hasChildren(topLevelEntry[1])) {
+                  <div class="tree-node" style="margin-left: 0">
+                    @for (item of getFlatItems(topLevelEntry[1]); track item.label + item.node.data?.name) {
+                      @if (item.isLeaf) {
+                        @if (item.node.data; as data) {
+                          @if (isWarning(item.node)) {
+                            <!-- Warning leaf -->
+                            <div
+                              class="tree-item"
+                              [style.paddingLeft.px]="item.depth * 12"
+                              [attr.data-event]="data.name"
+                              style="color: #fbbf24"
+                              (click)="selectChannel(data.name, data.op, data.type)"
+                            >
+                              <span style="margin-right: 6px;">⚠️</span>
+                              <span class="tree-label">{{ item.label }}</span>
+                            </div>
+                          } @else {
+                            <!-- Normal leaf -->
+                            <div
+                              class="tree-item"
+                              [style.paddingLeft.px]="item.depth * 12"
+                              [attr.data-event]="data.name"
+                              [class.active]="selectedChannel()?.name === data.name"
+                              (click)="selectChannel(data.name, data.op, data.type)"
+                            >
+                              <span class="badge" [class]="'badge-' + formatChannelType(data.type)">
+                                {{ formatChannelType(data.type) }}
+                              </span>
+                              @if (isPlugin(item.node)) {
+                                <span class="builtin-icon" title="Built-in Plugin">
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                                  </svg>
+                                </span>
+                              }
+                              <span class="tree-label">{{ item.label }}</span>
+                              @if (getFirstSourceInfo(data.op); as si) {
+                                <a
+                                  [href]="generateEditorLink(si.file, si.line)"
+                                  class="source-link"
+                                  (click)="$event.stopPropagation()"
+                                  [title]="si.file + ':' + si.line"
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block">
+                                    <polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline>
+                                  </svg>
+                                </a>
+                              }
+                            </div>
+                          }
+                        }
+                      } @else {
+                        <!-- Non-leaf intermediate node (path segment) -->
+                        <div class="tree-item" [style.paddingLeft.px]="item.depth * 12" style="color: var(--text-muted); cursor: default;">
+                          <span class="tree-label">{{ item.label }}</span>
+                        </div>
+                      }
                     }
-                    }
-                </ng-scrollbar>
+                  </div>
+                }
+              </div>
+            }
+          } @else {
+            <div class="empty-state" style="padding: 2rem; text-align: center;">
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto 1rem; opacity: 0.5;">
+                <path d="M12 20h9"></path>
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+              </svg>
+              <h3 style="margin: 0 0 0.5rem; font-size: 1.1rem; font-weight: 600;">No WebSocket Events Found</h3>
+              <p style="margin: 0; color: var(--text-muted); font-size: 0.9rem; line-height: 1.5;">
+                Add event handlers to your WebSocket router to see them here.
+              </p>
+              <p style="margin: 1rem 0 0; color: var(--text-muted); font-size: 0.85rem;">
+                Example: <code style="background: rgba(0,0,0,0.1); padding: 0.2rem 0.4rem; border-radius: 3px;">wsRouter.event("eventName", handler)</code>
+              </p>
             </div>
-        </as-split-area>
+          }
+        </ng-scrollbar>
+      </aside>
+    </as-split-area>
 
-        <!-- Detail + Console -->
-        <as-split-area [size]="75">
-            <as-split direction="horizontal" [gutterSize]="4">
-                <as-split-area [size]="55">
-                    <div class="detail-panel">
-                        @if (selectedChannel()) {
-                        <h2 class="channel-name">{{ selectedChannel()!.name }}</h2>
-                        @if (selectedChannel()!.op.summary) {
-                        <p class="channel-summary">{{ selectedChannel()!.op.summary }}</p>
-                        }
-                        @if (selectedChannel()!.op.description) {
-                        <p class="channel-desc">{{ selectedChannel()!.op.description }}</p>
-                        }
-                        @if (selectedChannel()!.op.payload) {
-                        <div class="schema-section">
-                            <h3>Payload Schema</h3>
-                            <pre>{{ selectedChannel()!.op.payload | json }}</pre>
-                        </div>
-                        }
-                        } @else {
-                        <div class="empty-state"><span>⚡</span>
-                            <p>Select a channel</p>
-                        </div>
-                        }
-                    </div>
-                </as-split-area>
+    <!-- Main Content -->
+    <as-split-area [size]="50" [minSize]="30">
+      <div class="content-area">
+        @if (selectedChannel(); as channel) {
+          <div class="detail-panel">
+            <div class="detail-header">
+              <div class="route-title">
+                <span class="badge" [class]="'badge-' + formatChannelType(channel.type)">
+                  {{ formatChannelType(channel.type) }}
+                </span>
+                <span class="route-path">{{ channel.name }}</span>
+              </div>
+            </div>
 
-                <!-- WS Console -->
-                <as-split-area [size]="45">
-                    <div class="console-panel">
-                        <div class="console-header">
-                            <h3>Console</h3>
-                            <div class="ws-status">
-                                <span class="ws-dot" [class.connected]="wsConnected()"></span>
-                                {{ wsConnected() ? 'Connected' : 'Disconnected' }}
-                            </div>
-                        </div>
-                        <div class="connection-bar">
-                            <input #urlInput type="text" [value]="wsUrl()"
-                                (change)="wsUrl.set($any($event.target).value)" placeholder="ws://..." />
-                            <button class="btn" (click)="wsConnected() ? disconnectWs() : connectWs(urlInput.value)">
-                                {{ wsConnected() ? 'Disconnect' : 'Connect' }}
-                            </button>
-                        </div>
-                        <ng-scrollbar class="log-scroll">
-                            <div class="log-container">
-                                @for (log of wsLogs(); track $index) {
-                                <div class="log-entry" [class.sent]="log.dir === 'send'"
-                                    [class.recv]="log.dir === 'recv'">
-                                    <span class="log-dir">{{ log.dir === 'send' ? '↑' : '↓' }}</span>
-                                    <pre class="log-data">{{ log.data }}</pre>
-                                </div>
-                                } @empty {
-                                <div class="log-empty">No messages yet.</div>
-                                }
-                            </div>
-                        </ng-scrollbar>
-                        <div class="compose-area">
-                            <textarea #payload rows="3" placeholder="JSON payload…"></textarea>
-                            <button class="btn send" (click)="sendMessage(payload.value)">Send</button>
-                        </div>
+            <ng-scrollbar class="detail-content" orientation="vertical">
+              <div class="detail-body">
+                @if (channel.op.summary) {
+                  <div class="route-summary">{{ channel.op.summary }}</div>
+                }
+
+                @if (channel.op.description) {
+                  <div class="route-desc">{{ channel.op.description }}</div>
+                }
+
+                @if (channel.op.message?.payload) {
+                  <div class="section">
+                    <h3>Payload Schema</h3>
+                    <pre class="schema-code">{{ channel.op.message.payload | json }}</pre>
+                  </div>
+                }
+
+                @if (channel.sourceInfo) {
+                  <div class="section">
+                    <h3>Source Information</h3>
+                    <div class="source-info">
+                      <a [href]="generateEditorLink(channel.sourceInfo.file, channel.sourceInfo.line)" class="source-link-inline">
+                        {{ channel.sourceInfo.file }}:{{ channel.sourceInfo.line }}
+                      </a>
                     </div>
-                </as-split-area>
-            </as-split>
-        </as-split-area>
-    </as-split>
+                  </div>
+                }
+
+                <!-- All source locations (if multiple handlers share an event) -->
+                @if (channel.op['x-source-info']?.length > 1) {
+                  <div class="section">
+                    <h3>All Source Locations</h3>
+                    @for (si of channel.op['x-source-info']; track si.file + ':' + si.line) {
+                      <div class="source-info">
+                        <a [href]="generateEditorLink(si.file, si.line)" class="source-link-inline">
+                          {{ si.file }}:{{ si.line }}
+                        </a>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            </ng-scrollbar>
+          </div>
+        } @else {
+          <div class="empty-state">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M12 20h9"></path>
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+            </svg>
+            <h3>Select an event to view details</h3>
+            <p>Choose an event from the sidebar to see its documentation and test it</p>
+          </div>
+        }
+      </div>
+    </as-split-area>
+
+    <!-- Console Panel -->
+    <as-split-area [size]="30" [minSize]="20" [maxSize]="50">
+      <div class="console-panel">
+        <div class="console-header">
+          <h3>WebSocket Console</h3>
+
+          <div class="connection-controls">
+            <div class="connection-bar">
+              <select
+                class="protocol-select"
+                [value]="wsProtocol()"
+                (change)="wsProtocol.set($any($event.target).value)"
+              >
+                <option value="ws">WS</option>
+                <option value="wss">WSS</option>
+                <option value="socket.io">Socket.IO</option>
+              </select>
+              <input
+                type="text"
+                class="url-input"
+                [value]="serverUrl()"
+                (input)="serverUrl.set($any($event.target).value)"
+                placeholder="WebSocket URL"
+              />
+            </div>
+
+            <div class="action-bar">
+              <button
+                class="btn-connect"
+                [class.connected]="wsConnected()"
+                (click)="wsConnected() ? disconnectWebSocket() : connectWebSocket()"
+              >
+                <span class="status-dot" [class.connected]="wsConnected()"></span>
+                {{ wsConnected() ? 'Disconnect' : 'Connect' }}
+              </button>
+              <button
+                class="btn-clear"
+                title="Clear Logs"
+                (click)="clearLogs()"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <ng-scrollbar class="logs-container" orientation="vertical">
+          @if (wsLogs().length > 0) {
+            <div class="logs-list">
+              @for (log of wsLogs(); track $index) {
+                <div
+                  class="log-entry"
+                  [class.sent]="log.dir === 'send'"
+                  [class.received]="log.dir === 'recv'"
+                >
+                  <div class="log-meta">
+                    <span class="log-badge" [class]="'badge-' + (log.dir === 'send' ? 'SEND' : 'RECV')">
+                      {{ log.dir === 'send' ? 'SEND' : 'RECV' }}
+                    </span>
+                    <span class="log-time">{{ log.timestamp.toLocaleTimeString() }}</span>
+                  </div>
+                  <pre class="log-data">{{ log.data }}</pre>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="log-empty">
+              <p>No messages yet. Connect and send a message to see logs.</p>
+            </div>
+          }
+        </ng-scrollbar>
+
+        <div class="compose-area">
+          <div class="compose-header">
+            <span>Compose Message</span>
+            <span class="target-event">{{ targetEvent() }}</span>
+          </div>
+          <div class="editor-container">
+            <textarea
+              #payloadEditor
+              rows="8"
+              placeholder="Enter JSON payload..."
+              class="payload-editor"
+            ></textarea>
+          </div>
+          <div class="send-bar">
+            <button
+              class="btn-send"
+              [disabled]="!wsConnected()"
+              (click)="sendMessage(payloadEditor.value)"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+              Send Message
+            </button>
+          </div>
+        </div>
+      </div>
+    </as-split-area>
+  </as-split>
 </div>

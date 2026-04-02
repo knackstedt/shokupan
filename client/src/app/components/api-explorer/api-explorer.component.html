@@ -262,23 +262,33 @@
                                             </div>
                                         }
 
-                                        @if (getObjectKeys(queryParams()).length > 0) {
-                                            <div class="section">
-                                                <h3>Query Parameters</h3>
-                                                @for (key of getObjectKeys(queryParams()); track key) {
-                                                    <div class="param-row">
-                                                        <label>{{ key }}</label>
-                                                        <input
-                                                        pInputText
-                                                        type="text"
-                                                        [value]="queryParams()[key]"
-                                                        (input)="updateQueryParam(key, $any($event.target).value)"
-                                                        [placeholder]="'Enter ' + key"
-                                                        />
-                                                    </div>
-                                                }
+                                        <div class="section">
+                                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                                                <h3 style="margin: 0;">Query Parameters</h3>
+                                                <p-button size="small" variant="text" (click)="addQueryParam()">+ Add</p-button>
                                             </div>
-                                        }
+                                            @for (key of getObjectKeys(queryParams()); track key) {
+                                                <div class="param-row">
+                                                    <input
+                                                    pInputText
+                                                    type="text"
+                                                    [value]="key"
+                                                    (input)="renameQueryParam(key, $any($event.target).value)"
+                                                    placeholder="Parameter name"
+                                                    style="flex: 0 0 35%;"
+                                                    />
+                                                    <input
+                                                    pInputText
+                                                    type="text"
+                                                    [value]="queryParams()[key]"
+                                                    (input)="updateQueryParam(key, $any($event.target).value)"
+                                                    placeholder="Value"
+                                                    style="flex: 1;"
+                                                    />
+                                                    <p-button size="small" variant="text" severity="danger" (click)="removeQueryParam(key)">×</p-button>
+                                                </div>
+                                            }
+                                        </div>
 
                                         @if (getObjectKeys(pathParams()).length === 0 && getObjectKeys(queryParams()).length === 0) {
                                             <div class="empty-message">No parameters for this endpoint</div>
@@ -292,16 +302,29 @@
                                 <ng-scrollbar style="height: 100%;" orientation="vertical">
                                     <div class="headers-tab">
                                         <div class="section">
-                                            <h3>Request Headers</h3>
+                                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                                                <h3 style="margin: 0;">Request Headers</h3>
+                                                <p-button size="small" variant="text" (click)="addHeader()">+ Add</p-button>
+                                            </div>
                                             @for (key of getObjectKeys(requestHeaders()); track key) {
                                                 <div class="param-row">
-                                                    <label>{{ key }}</label>
+                                                    <input
+                                                    pInputText
+                                                    type="text"
+                                                    [value]="key"
+                                                    (input)="renameHeader(key, $any($event.target).value)"
+                                                    placeholder="Header name"
+                                                    style="flex: 0 0 35%;"
+                                                    />
                                                     <input
                                                     pInputText
                                                     type="text"
                                                     [value]="requestHeaders()[key]"
                                                     (input)="updateHeader(key, $any($event.target).value)"
+                                                    placeholder="Value"
+                                                    style="flex: 1;"
                                                     />
+                                                    <p-button size="small" variant="text" severity="danger" (click)="removeHeader(key)">×</p-button>
                                                 </div>
                                             }
                                         </div>

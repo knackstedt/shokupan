@@ -1,3 +1,4 @@
+import type { ServerWebSocket } from 'bun';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -8,6 +9,7 @@ import type { Shokupan } from '../../../shokupan';
 import { deepMerge } from '../../../util/deep-merge';
 import { $isMounted } from '../../../util/symbol';
 import type { DeepPartial, ShokupanPlugin, ShokupanPluginOptions } from '../../../util/types';
+import { getEditorLinkPattern } from '../../../util/ide';
 import { AsyncApiApp, buildNavTree } from './components.tsx';
 import { generateAsyncApi } from './generator';
 
@@ -19,12 +21,16 @@ export interface AsyncApiPluginOptions {
 }
 
 export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
+    private clients = new Set<ServerWebSocket<any>>();
+    private testBroadcastInterval: any = null;
 
     private static getBasePath() {
         const dir = dirname(fileURLToPath(import.meta.url));
         // In production (dist/), files are in dist/plugins/application/asyncapi/
-        if (dir.endsWith('dist')) {
-            return dir + '/plugins/application/asyncapi';
+        // Check if we're in the dist directory by looking for '/dist/' in the path
+        if (dir.includes('/dist/')) {
+            // Already in the correct directory (dist/plugins/application/asyncapi/)
+            return dir;
         }
         // In dev mode (src/plugins/application/asyncapi/), files are in same directory
         return dir;
@@ -45,7 +51,7 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
         this.init();
     }
 
-    onInit(app: Shokupan, options?: ShokupanPluginOptions) {
+    async onInit(app: Shokupan, options?: ShokupanPluginOptions) {
         if (!(this as any)[$isMounted]) {
             const path = this.pluginOptions.path || options?.path || '/asyncapi';
             app.mount(path, this);
@@ -63,6 +69,36 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
         // Ensure async api gen is enabled if this plugin is used
         if (app.applicationConfig.enableAsyncApiGen !== true && !existsSync(specPath)) {
             app.logger?.warn('AsyncApiPlugin', 'enableAsyncApiGen is disabled. AsyncApiPlugin will not generate spec.');
+        }
+
+        // Hook into AST analyzer to broadcast spec updates when analysis completes
+        const useAsyncScanning = app.applicationConfig?.enableAsyncAstScanning ?? true;
+        app.logger?.info('AsyncApiPlugin', `Async scanning enabled: ${useAsyncScanning}`);
+        
+        if (useAsyncScanning) {
+            try {
+                const { getGlobalAnalyzer } = await import('../../../util/ast-analyzer-worker');
+                const analyzer = getGlobalAnalyzer();
+                const state = analyzer.getState();
+                
+                app.logger?.info('AsyncApiPlugin', `AST analyzer state: ${state}`);
+                
+                // Listen for analysis completion
+                analyzer.on('completed', (result) => {
+                    app.logger?.info('AsyncApiPlugin', 'AST analysis completed event fired, broadcasting spec update');
+                    this.broadcastSpecUpdate();
+                });
+                
+                app.logger?.info('AsyncApiPlugin', 'Registered listener for AST analyzer completed event');
+                
+                // If already completed, we missed the event - broadcast now
+                if (state === 'completed') {
+                    app.logger?.info('AsyncApiPlugin', 'AST analysis already completed, broadcasting immediately');
+                    this.broadcastSpecUpdate();
+                }
+            } catch (err) {
+                app.logger?.warn('AsyncApiPlugin', 'Could not hook into AST analyzer:', err);
+            }
         }
     }
 
@@ -107,7 +143,12 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
             if (this.pluginOptions.spec) {
                 deepMerge(spec, this.pluginOptions.spec);
             }
-            return ctx.json(spec);
+
+            // Inject the IDE link pattern so the Angular client can build links client-side
+            return ctx.json({
+                ...spec,
+                'x-ide-link-pattern': getEditorLinkPattern()
+            });
         });
 
         this.get('/_code', async ctx => {
@@ -132,5 +173,72 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
                 return ctx.text('File not found: ' + e.message, 404);
             }
         });
+
+        // WebSocket endpoint for spec updates
+        this.get('/ws', ctx => {
+            ctx.upgrade({
+                open: (ctx, ws) => {
+                    this.clients.add(ws);
+                    console.log(`[AsyncAPI] Client connected. Total clients: ${this.clients.size}`);
+                    
+                    // Start test broadcast if not already running
+                    if (!this.testBroadcastInterval) {
+                        console.log('[AsyncAPI] Starting test broadcast interval');
+                        this.testBroadcastInterval = setInterval(() => {
+                            this.broadcastTestEvent();
+                        }, 5000);
+                    }
+                },
+                message: (ctx, ws, message) => {
+                    // Handle client messages if needed
+                    console.log('[AsyncAPI] Received message from client:', message);
+                },
+                close: (ctx, ws) => {
+                    this.clients.delete(ws);
+                    console.log(`[AsyncAPI] Client disconnected. Total clients: ${this.clients.size}`);
+                    
+                    // Stop test broadcast if no clients
+                    if (this.clients.size === 0 && this.testBroadcastInterval) {
+                        console.log('[AsyncAPI] Stopping test broadcast interval');
+                        clearInterval(this.testBroadcastInterval);
+                        this.testBroadcastInterval = null;
+                    }
+                }
+            });
+        });
+    }
+
+    private broadcastSpecUpdate() {
+        if (this.clients.size === 0) return;
+
+        const data = JSON.stringify({
+            type: 'spec-updated',
+            event: 'ast-complete'
+        });
+
+        for (const client of this.clients) {
+            if (client?.send) {
+                client.send(data);
+            }
+        }
+    }
+
+    private broadcastTestEvent() {
+        if (this.clients.size === 0) return;
+
+        const data = JSON.stringify({
+            type: 'test-event',
+            timestamp: new Date().toISOString(),
+            message: 'Test broadcast from server',
+            clientCount: this.clients.size
+        });
+
+        console.log(`[AsyncAPI] Broadcasting test event to ${this.clients.size} client(s)`);
+
+        for (const client of this.clients) {
+            if (client?.send) {
+                client.send(data);
+            }
+        }
     }
 }
