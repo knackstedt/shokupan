@@ -14,6 +14,7 @@ import { RateLimitMiddleware } from '../../src/plugins/middleware/rate-limit';
 import { SecurityHeaders } from '../../src/plugins/middleware/security-headers';
 import { Session } from '../../src/plugins/middleware/session';
 import { Shokupan } from '../../src/shokupan';
+import { ShokupanWebsocketRouter } from '../../src/websocket';
 import { DecoratorTestController } from './controllers/decorator-controller';
 import { UserController } from './controllers/implicit-controller';
 import { ChunkedResponseRouter } from './routes/chunked-response';
@@ -105,7 +106,56 @@ app.get("simple", (ctx) => {
 });
 
 // ============================================================================
-// TEST WEBSOCKET ENDPOINT
+// WEBSOCKET EVENT HANDLERS
+// ============================================================================
+
+// WebSocket router with event handlers for AsyncAPI documentation
+const wsRouter = new ShokupanWebsocketRouter();
+
+// Echo event - responds with the same data received
+wsRouter.event("echo", async (ctx) => {
+    const data = await ctx.body();
+    ctx.emit("echo.response", data);
+});
+
+// Ping event - responds with pong
+wsRouter.event("ping", (ctx) => {
+    ctx.emit("pong", { timestamp: Date.now() });
+});
+
+// Chat message event
+wsRouter.event("chat.message", async (ctx) => {
+    const message = await ctx.body();
+    ctx.emit("chat.broadcast", {
+        message,
+        timestamp: Date.now(),
+        sender: "server"
+    });
+});
+
+// Broadcast subscription
+wsRouter.event("broadcast.subscribe", (ctx) => {
+    ctx.emit("broadcast.subscribed", { 
+        status: "subscribed",
+        timestamp: Date.now()
+    });
+});
+
+// Notification request
+wsRouter.event("notification.request", async (ctx) => {
+    const data = await ctx.body();
+    ctx.emit("notification.response", {
+        received: data,
+        processed: true,
+        timestamp: Date.now()
+    });
+});
+
+// Mount WebSocket router
+app.mount('/ws', wsRouter);
+
+// ============================================================================
+// TEST WEBSOCKET ENDPOINT (Raw handler for dashboard recording)
 // ============================================================================
 
 // Simple echo WebSocket for testing dashboard WS recording
@@ -359,7 +409,7 @@ await app.register(new AuthPlugin({
     },
     onSuccess: (user, ctx) => {
         // Automatically grant all permissions to the example user
-        user.permissions = ["dashboard:read", "api:read", "asyncapi:read", "scalar:read"];
+        user.permissions = ["dashboard:read", "api-explorer:read", "asyncapi:read", "scalar:read"];
         // Return nothing so AuthPlugin proceeds to issue the session cookie and redirect
     }
 }));
