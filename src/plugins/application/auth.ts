@@ -11,6 +11,7 @@ export interface AuthUser {
     name?: string;
     picture?: string;
     provider: string;
+    permissions?: string[];
     raw?: any;
     [key: string]: any;
 }

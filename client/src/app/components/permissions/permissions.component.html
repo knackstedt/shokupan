@@ -1,0 +1,225 @@
+<div class="permissions-container p-4">
+    <p-card>
+        <ng-template pTemplate="header">
+            <div class="flex justify-between items-center p-4">
+                <div>
+                    <h2 class="text-2xl font-bold m-0">Permission Management</h2>
+                    <p class="text-surface-500 mt-2 mb-0">View and manage roles and permissions</p>
+                </div>
+                <p-button
+                    icon="pi pi-refresh"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="secondary"
+                    (onClick)="loadData()"
+                    [loading]="loading()"
+                    pTooltip="Refresh"
+                />
+            </div>
+        </ng-template>
+
+        <p-tabs [(value)]="activeTab">
+            <p-tablist>
+                <p-tab value="0">My Permissions</p-tab>
+                <p-tab value="1">Roles</p-tab>
+                <p-tab value="2">Permission Matrix</p-tab>
+            </p-tablist>
+
+            <p-tabpanels>
+                <!-- User Permissions Tab -->
+                <p-tabpanel value="0">
+                <div class="space-y-4">
+                    @if (loading()) {
+                        <p-skeleton height="200px" />
+                    } @else if (user()) {
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- User Info -->
+                            <p-panel header="User Information">
+                                <div class="space-y-3">
+                                    <div class="flex items-center gap-3">
+                                        @if (user()?.picture) {
+                                            <img [src]="user()!.picture" alt="Avatar" class="w-12 h-12 rounded-full" />
+                                        }
+                                        <div>
+                                            <div class="font-semibold">{{ user()?.name || 'Unknown User' }}</div>
+                                            <div class="text-sm text-surface-500">{{ user()?.email }}</div>
+                                        </div>
+                                    </div>
+                                    <p-divider />
+                                    <div>
+                                        <div class="text-sm font-semibold mb-2">Assigned Roles</div>
+                                        <div class="flex flex-wrap gap-2">
+                                            @for (role of getUserRoleNames(); track role) {
+                                                <p-chip [label]="role" [styleClass]="'bg-' + getRoleColor(role) + '-100 text-' + getRoleColor(role) + '-700'" />
+                                            } @empty {
+                                                <span class="text-surface-500 text-sm">No roles assigned</span>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </p-panel>
+
+                            <!-- User Permissions -->
+                            <p-panel header="My Permissions">
+                                <div class="space-y-2">
+                                    @if (userPermissions()?.permissions && userPermissions()!.permissions.length > 0) {
+                                        <div class="max-h-64 overflow-y-auto">
+                                            @for (permission of userPermissions()!.permissions; track formatPermission(permission)) {
+                                                <p-tag
+                                                    [value]="formatPermission(permission)"
+                                                    [severity]="getPermissionSeverity(permission.resource, permission.action)"
+                                                    styleClass="mb-2 mr-2"
+                                                />
+                                            }
+                                        </div>
+                                    } @else {
+                                        <span class="text-surface-500 text-sm">No direct permissions assigned</span>
+                                    }
+                                </div>
+                            </p-panel>
+                        </div>
+                    } @else {
+                        <div class="text-center py-8 text-surface-500">
+                            <i class="pi pi-user text-4xl mb-3"></i>
+                            <p>Please log in to view your permissions</p>
+                        </div>
+                    }
+                </div>
+                </p-tabpanel>
+
+                <!-- Roles Tab -->
+                <p-tabpanel value="1">
+                <div class="space-y-4">
+                    <div class="flex gap-2">
+                        <span class="p-input-icon-left flex-1">
+                            <i class="pi pi-search"></i>
+                            <input
+                                pInputText
+                                type="text"
+                                placeholder="Search roles..."
+                                [(ngModel)]="searchTerm"
+                                class="w-full"
+                            />
+                        </span>
+                    </div>
+
+                    @if (loading()) {
+                        <p-skeleton height="400px" />
+                    } @else {
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            @for (role of filteredRoles(); track role.name) {
+                                <p-panel [header]="role.name" [toggleable]="true">
+                                    <ng-template pTemplate="icons">
+                                        @if (hasRole(role.name)) {
+                                            <p-badge value="Active" severity="success" />
+                                        }
+                                    </ng-template>
+
+                                    <div class="space-y-3">
+                                        @if (role.description) {
+                                            <p class="text-surface-600 text-sm">{{ role.description }}</p>
+                                        }
+
+                                        @if (role.inherits && role.inherits.length > 0) {
+                                            <div>
+                                                <div class="text-sm font-semibold mb-2">Inherits From:</div>
+                                                <div class="flex flex-wrap gap-2">
+                                                    @for (inherited of role.inherits; track inherited) {
+                                                        <p-chip [label]="inherited" icon="pi pi-arrow-up" styleClass="text-xs" />
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+
+                                        <div>
+                                            <div class="text-sm font-semibold mb-2">
+                                                Permissions ({{ getAllPermissionsForRole(role.name).length }})
+                                            </div>
+                                            <div class="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
+                                                @for (permission of getAllPermissionsForRole(role.name); track formatPermission(permission)) {
+                                                    <p-tag
+                                                        [value]="formatPermission(permission)"
+                                                        [severity]="getPermissionSeverity(permission.resource, permission.action)"
+                                                        styleClass="text-xs"
+                                                    />
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                </p-panel>
+                            } @empty {
+                                <div class="col-span-2 text-center py-8 text-surface-500">
+                                    <i class="pi pi-shield text-4xl mb-3"></i>
+                                    <p>No roles found</p>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+                </p-tabpanel>
+
+                <!-- Permission Matrix Tab -->
+                <p-tabpanel value="2">
+                @if (loading()) {
+                    <p-skeleton height="500px" />
+                } @else {
+                    <div class="overflow-x-auto">
+                        <p-table
+                            [value]="permissionMatrix().resources"
+                            [scrollable]="true"
+                            scrollHeight="500px"
+                            styleClass="text-sm"
+                        >
+                            <ng-template pTemplate="header">
+                                <tr>
+                                    <th class="sticky left-0 bg-surface-0 dark:bg-surface-900 z-10">Resource</th>
+                                    @for (role of permissionMatrix().roles; track role.name) {
+                                        <th class="text-center min-w-32">
+                                            <div class="flex flex-col items-center gap-1">
+                                                <span>{{ role.name }}</span>
+                                                @if (hasRole(role.name)) {
+                                                    <p-badge value="You" severity="success" styleClass="text-xs" />
+                                                }
+                                            </div>
+                                        </th>
+                                    }
+                                </tr>
+                            </ng-template>
+                            <ng-template pTemplate="body" let-resource>
+                                <tr>
+                                    <td class="sticky left-0 bg-surface-0 dark:bg-surface-900 font-semibold">
+                                        {{ resource }}
+                                    </td>
+                                    @for (role of permissionMatrix().roles; track role.name) {
+                                        <td class="text-center">
+                                            <div class="flex flex-col gap-1">
+                                                @for (action of permissionMatrix().actions; track action) {
+                                                    @if (hasRolePermission(role.name, resource, action)) {
+                                                        <p-tag
+                                                            [value]="action"
+                                                            [severity]="getPermissionSeverity(resource, action)"
+                                                            styleClass="text-xs"
+                                                        />
+                                                    }
+                                                }
+                                            </div>
+                                        </td>
+                                    }
+                                </tr>
+                            </ng-template>
+                            <ng-template pTemplate="emptymessage">
+                                <tr>
+                                    <td [attr.colspan]="permissionMatrix().roles.length + 1" class="text-center py-8">
+                                        <i class="pi pi-table text-4xl text-surface-400 mb-3"></i>
+                                        <p class="text-surface-500">No permissions configured</p>
+                                    </td>
+                                </tr>
+                            </ng-template>
+                        </p-table>
+                    </div>
+                }
+                </p-tabpanel>
+            </p-tabpanels>
+        </p-tabs>
+    </p-card>
+</div>
