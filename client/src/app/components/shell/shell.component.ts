@@ -12,9 +12,10 @@ import { PermissionService } from '../../services/permission.service';
 import { ApiExplorerComponent } from '../api-explorer/api-explorer.component';
 import { AsyncApiComponent } from '../asyncapi/asyncapi.component';
 import { DashboardComponent } from '../dashboard/dashboard.component';
+import { PermissionsComponent } from '../permissions/permissions.component';
 import { ScalarComponent } from '../scalar/scalar.component';
 
-export type TabId = 'dashboard' | 'api-explorer' | 'asyncapi' | 'scalar';
+export type TabId = 'dashboard' | 'api-explorer' | 'asyncapi' | 'scalar' | 'permissions';
 
 interface NavTab {
   id: TabId;
@@ -32,6 +33,7 @@ interface NavTab {
     ApiExplorerComponent,
     AsyncApiComponent,
     ScalarComponent,
+    PermissionsComponent,
   ],
   templateUrl: './shell.component.html',
   styleUrl: './shell.component.scss',
@@ -45,6 +47,7 @@ export class ShellComponent implements OnInit {
     { id: 'api-explorer', label: 'REST API', icon: '🔌', permission: 'api-explorer' },
     { id: 'asyncapi', label: 'WebSocket API', icon: '⚡', permission: 'asyncapi' },
     { id: 'scalar', label: 'Reference', icon: '📖', permission: 'scalar' },
+    { id: 'permissions', label: 'Permissions', icon: '🔐', permission: 'permissions' },
   ];
 
   readonly visibleTabs = computed(() => {
