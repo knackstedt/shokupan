@@ -108,8 +108,6 @@ export class EChartComponent implements AfterViewInit, OnDestroy {
 
     ngOnDestroy() {
         EChartComponent._selfInstances.splice(EChartComponent._selfInstances.indexOf(this), 1);
-        if (this.chart) {
-            this.chart.dispose();
-        }
+        this.chart?.dispose();
     }
 }

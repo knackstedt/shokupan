@@ -1,3 +1,7 @@
+:root {
+    --p-content-background: #0000;
+}
+
 // ─── PrimeNG overrides ───────────────────────────────────────────────────────
 .p-button.p-button-primary {
     background: var(--primary);
@@ -91,5 +95,27 @@
         .p-multiselect-empty-message {
             color: var(--text-muted) !important;
         }
+    }
+}
+
+
+.p-tablist,
+.p-tabpanels {
+    background: none;
+}
+
+.p-tabpanels {
+    flex: 1;
+    overflow: hidden;
+    padding: 0;
+}
+
+p-tabpanel {
+    overflow: hidden;
+    display: flex;
+    height: 100%;
+
+    &[hidden] {
+        display: none;
     }
 }

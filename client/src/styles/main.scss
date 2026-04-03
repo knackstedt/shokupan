@@ -79,3 +79,8 @@ body {
 }
 
 // ─── HTTP method badges (shared) ─────────────────────────────────────────────
+
+ng-scrollbar {
+    flex: 1;
+    overflow: hidden;
+}
