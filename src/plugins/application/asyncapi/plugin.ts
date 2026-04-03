@@ -7,9 +7,9 @@ import renderToString from 'preact-render-to-string';
 import { ShokupanRouter } from '../../../router';
 import type { Shokupan } from '../../../shokupan';
 import { deepMerge } from '../../../util/deep-merge';
+import { getEditorLinkPattern } from '../../../util/ide';
 import { $isMounted } from '../../../util/symbol';
 import type { DeepPartial, ShokupanPlugin, ShokupanPluginOptions } from '../../../util/types';
-import { getEditorLinkPattern } from '../../../util/ide';
 import { AsyncApiApp, buildNavTree } from './components.tsx';
 import { generateAsyncApi } from './generator';
 
@@ -134,11 +134,8 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
         });
 
         this.get('/json', async ctx => {
-            let spec = ctx.app?.asyncApiSpec;
-            if (!spec) {
-                // Fallback generation
-                spec = await generateAsyncApi(ctx.app!);
-            }
+            // Always regenerate to ensure fresh AST analysis
+            const spec = await generateAsyncApi(ctx.app!);
 
             if (this.pluginOptions.spec) {
                 deepMerge(spec, this.pluginOptions.spec);

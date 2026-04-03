@@ -58,6 +58,16 @@ export class ASTAnalyzerWorker extends EventEmitter {
     }
 
     /**
+     * Force re-analysis by clearing cached results.
+     */
+    public invalidateCache(): void {
+        this.state = 'idle';
+        this.result = null;
+        this.error = null;
+        this.analysisPromise = null;
+    }
+
+    /**
      * Check if analysis is currently running.
      */
     public isAnalyzing(): boolean {
