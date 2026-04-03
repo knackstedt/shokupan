@@ -66,6 +66,10 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
 
                 const analyzer = getGlobalAnalyzer(process.cwd(), entrypoint, timeout);
 
+                // Force fresh analysis by invalidating cache
+                analyzer.invalidateCache();
+                await analyzer.analyze();
+
                 // Check current state
                 const state = analyzer.getState();
 

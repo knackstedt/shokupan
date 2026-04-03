@@ -776,6 +776,8 @@ export class OpenAPIAnalyzer {
         emits?: { event: string; payload?: any; location?: { startLine: number; endLine: number; }; }[];
         highlights?: { startLine: number; endLine: number; type: 'emit' | 'return-success' | 'return-warning'; }[];
     } {
+        console.log('[AST] analyzeHandler called for method:', method, 'isArrowFunction:', ts.isArrowFunction(handler), 'isFunctionExpression:', ts.isFunctionExpression(handler), 'file:', sourceFile.fileName);
+        
         // Get TypeChecker for type resolution
         const typeChecker = this.program?.getTypeChecker();
         const requestTypes: RouteInfo['requestTypes'] = {};
@@ -882,9 +884,12 @@ export class OpenAPIAnalyzer {
         if (ts.isArrowFunction(handler) || ts.isFunctionExpression(handler) || ts.isMethodDeclaration(handler) || handler.kind === 175) {
             // TS method has .body which is FunctionBody (Block) or undefined
             body = (handler as any).body;
+            console.log('[AST] Handler has body:', !!body, 'isBlock:', ts.isBlock(body));
 
             // Visit the handler body to find ctx usage
             const visit = (node: ts.Node) => {
+                console.log('[AST] Visiting node kind:', node.kind, ts.SyntaxKind[node.kind]);
+                
                 // Track variable declarations
                 if (ts.isVariableDeclaration(node)) {
                     if (node.initializer) {
@@ -1167,8 +1172,11 @@ export class OpenAPIAnalyzer {
                         if (ts.isPropertyAccessExpression(expr.expression)) {
                             const objText = expr.expression.expression.getText(sourceFile);
                             const propText = expr.expression.name.getText(sourceFile);
+                            
+                            console.log('[AST] Found property access:', objText, propText, 'in', sourceFile.fileName);
 
                             if (((objText === 'ctx' || objText.endsWith('.ctx')) || (objText === 'this' || objText.endsWith('.this'))) && propText === 'emit') {
+                                console.log('[AST] FOUND EMIT CALL in', sourceFile.fileName);
                                 if (expr.arguments.length >= 1) {
                                     const eventNameArg = expr.arguments[0];
                                     if (ts.isStringLiteral(eventNameArg)) {
