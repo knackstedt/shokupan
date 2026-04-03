@@ -21,7 +21,7 @@
                         <p-skeleton height="200px" />
                     </div>
                 } @else if (user()) {
-                    <div>
+                    <div style="display: flex; flex-direction: column; gap: 1rem">
                         <!-- User Info -->
                         <p-panel header="User Information" [toggleable]="false">
                             <div>
@@ -55,44 +55,72 @@
                         <!-- User Permissions -->
                         <p-panel header="My Permissions" [toggleable]="false">
                             <div>
-                                @if (userPermissions()?.permissions && userPermissions()!.permissions.length > 0) {
-                                    <div class="permissions-grid">
-                                        @for (permission of userPermissions()!.permissions; track formatPermission(permission)) {
-                                            <div class="permission-item">
-                                                <p-tag
-                                                    [value]="formatPermission(permission)"
-                                                    [severity]="getPermissionSeverity(permission.resource, permission.action)"
-                                                />
-                                            </div>
-                                        }
-                                    </div>
-                                } @else {
-                                    <div>
-                                        <i class="pi pi-lock"></i>
-                                        <p>No direct permissions assigned</p>
-                                        <p>Your permissions are inherited from your roles</p>
-                                    </div>
-                                }
+                                <!-- Direct Permissions -->
+                                <div>
+                                    <h4>Direct Permissions</h4>
+                                    @if (userPermissions()?.permissions && userPermissions()!.permissions.length > 0) {
+                                        <div class="permissions-grid">
+                                            @for (permission of userPermissions()!.permissions; track formatPermission(permission)) {
+                                                <div class="permission-item">
+                                                    <p-tag
+                                                        [value]="formatPermission(permission)"
+                                                        [severity]="getPermissionSeverity(permission.resource, permission.action)"
+                                                    />
+                                                </div>
+                                            }
+                                        </div>
+                                    } @else {
+                                        <div>
+                                            <i class="pi pi-lock"></i>
+                                            <p>No direct permissions assigned</p>
+                                        </div>
+                                    }
+                                </div>
+
+                                <!-- Role-based Permissions -->
+                                <div>
+                                    <h4>From Roles</h4>
+                                    @if (getUserEffectivePermissions().length > 0) {
+                                        <div class="permissions-grid">
+                                            @for (permission of getUserEffectivePermissions(); track formatPermission(permission)) {
+                                                <div class="permission-item">
+                                                    <p-tag
+                                                        [value]="formatPermission(permission)"
+                                                        [severity]="getPermissionSeverity(permission.resource, permission.action)"
+                                                        [pTooltip]="'Roles: ' + getUserRoleNames().join(', ')"
+                                                    />
+                                                </div>
+                                            }
+                                        </div>
+                                    } @else {
+                                        <div>
+                                            <i class="pi pi-lock"></i>
+                                            <p>No permissions from roles</p>
+                                        </div>
+                                    }
+                                </div>
                             </div>
                         </p-panel>
 
                         <!-- Permission Summary -->
-                        @if (userPermissions()?.permissions && userPermissions()!.permissions.length > 0) {
+                        @if (userPermissions()?.roles && userPermissions()!.roles.length > 0) {
                             <p-panel header="Permission Summary" [toggleable]="false">
-                                <div class="summary-grid">
-                                    <div>
-                                        <div>{{ userPermissions()!.permissions.length }}</div>
-                                        <div>Total Permissions</div>
-                                    </div>
-                                    <div>
-                                        <div>{{ getUserRoleNames().length }}</div>
-                                        <div>Assigned Roles</div>
-                                    </div>
-                                    <div>
-                                        <div>{{ getUniqueResources() }}</div>
-                                        <div>Resources</div>
-                                    </div>
-                                </div>
+                                <p-table [value]="getPermissionSummaryData()" [rows]="3" styleClass="p-datatable-sm">
+                                    <ng-template pTemplate="header">
+                                        <tr>
+                                            <th>Metric</th>
+                                            <th class="text-right">Value</th>
+                                        </tr>
+                                    </ng-template>
+                                    <ng-template pTemplate="body" let-row>
+                                        <tr>
+                                            <td>{{ row.label }}</td>
+                                            <td class="text-right">
+                                                <p-tag [value]="row.value" [severity]="row.severity" />
+                                            </td>
+                                        </tr>
+                                    </ng-template>
+                                </p-table>
                             </p-panel>
                         }
                     </div>
@@ -219,6 +247,8 @@
                                                     <p-tag
                                                         [value]="action"
                                                         [severity]="getPermissionSeverity(resource, action)"
+                                                        [pTooltip]="role.name + ' has ' + resource + ':' + action + ' permission'"
+                                                        tooltipPosition="top"
                                                     />
                                                 }
                                             }

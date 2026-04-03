@@ -154,6 +154,25 @@ export class PermissionsComponent implements OnInit {
         return this.permissionService.getRolePermissions(roleName);
     }
 
+    getUserEffectivePermissions(): Permission[] {
+        const roleNames = this.getUserRoleNames();
+        const allPermissions: Permission[] = [];
+        const seen = new Set<string>();
+
+        roleNames.forEach(roleName => {
+            const perms = this.getAllPermissionsForRole(roleName);
+            perms.forEach(perm => {
+                const key = `${perm.resource}:${perm.action}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    allPermissions.push(perm);
+                }
+            });
+        });
+
+        return allPermissions;
+    }
+
     getUserRoleNames(): string[] {
         return this.userPermissions()?.roles || [];
     }
@@ -163,8 +182,29 @@ export class PermissionsComponent implements OnInit {
     }
 
     getUniqueResources(): number {
-        if (!this.userPermissions()?.permissions) return 0;
-        const resources = new Set(this.userPermissions()!.permissions.map(p => p.resource));
+        const permissions = this.getUserEffectivePermissions();
+        if (!permissions.length) return 0;
+        const resources = new Set(permissions.map(p => p.resource));
         return resources.size;
+    }
+
+    getPermissionSummaryData(): { label: string; value: string; severity: string }[] {
+        return [
+            {
+                label: 'Total Permissions',
+                value: String(this.getUserEffectivePermissions().length),
+                severity: 'info'
+            },
+            {
+                label: 'Assigned Roles',
+                value: String(this.getUserRoleNames().length),
+                severity: 'success'
+            },
+            {
+                label: 'Resources',
+                value: String(this.getUniqueResources()),
+                severity: 'warning'
+            }
+        ];
     }
 }
