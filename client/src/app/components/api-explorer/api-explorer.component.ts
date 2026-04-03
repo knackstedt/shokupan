@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Component, effect, ElementRef, inject, OnInit, SecurityContext, signal, ViewChild } from '@angular/core';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
 import { MonacoEditorComponent } from '@dotglitch/ngx-common/monaco-editor';
 import { AngularSplitModule } from 'angular-split';
 import { NgScrollbarModule } from 'ngx-scrollbar';
@@ -10,6 +10,7 @@ import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { Tab, TabList, TabPanel, TabPanels, Tabs } from 'primeng/tabs';
 import { ToastModule } from 'primeng/toast';
+import { SchemaViewerComponent } from '../schema-viewer/schema-viewer.component';
 
 interface Route {
     method: string;
@@ -44,6 +45,7 @@ interface GroupNode {
         ButtonModule,
         ToastModule,
         AngularSplitModule,
+        SchemaViewerComponent,
     ],
     templateUrl: './api-explorer.component.html',
     styleUrl: './api-explorer.component.scss',
@@ -534,87 +536,6 @@ export class ApiExplorerComponent implements OnInit {
         return `vscode://file${file}:${line}`;
     }
 
-    renderResponseSchema(schema: any, depth: number = 0): SafeHtml {
-        const html = this.renderSchemaToString(schema, depth);
-        return this.sanitizer.bypassSecurityTrustHtml(html);
-    }
-
-    private renderSchemaToString(schema: any, depth: number = 0): string {
-        if (!schema) return '';
-
-        const indent = depth * 16;
-        const type = schema.type || 'any';
-        const required = schema.required || [];
-
-        // Handle oneOf
-        if (schema.oneOf) {
-            return `
-        <div style="margin-left: ${indent}px;">
-          <div style="font-weight: 500; color: var(--text-primary); margin-bottom: 8px;">
-            <span style="color: var(--text-secondary); font-size: 0.85rem;">One of:</span>
-          </div>
-          ${schema.oneOf.map((subSchema: any, idx: number) => `
-            <div style="border-left: 3px solid #4caf50; padding-left: 12px; margin-bottom: 12px;">
-              <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px;">Option ${idx + 1}:</div>
-              ${this.renderSchemaToString(subSchema, 0)}
-            </div>
-          `).join('')}
-        </div>
-      `;
-        }
-
-        if (type === 'object' && schema.properties) {
-            const props = Object.entries(schema.properties).map(([key, prop]: [string, any]) => {
-                const isRequired = required.includes(key);
-                const propType = prop.type || 'any';
-                const hasNested = (prop.type === 'object' && prop.properties) || (prop.type === 'array' && prop.items);
-
-                const badgeHtml = !isRequired
-                ? '<span style="margin-left: auto; font-size: 0.75rem; color: #9e9e9e; font-style: italic;">optional</span>'
-                : '';
-
-                return `
-          <div style="margin-left: ${indent}px; margin-bottom: 8px;">
-            <div style="display: flex; align-items: center; gap: 8px; padding: 4px 0;">
-              <code style="font-weight: 500; color: var(--text-primary);">${this.escapeHtml(key)}</code>
-              <span style="color: var(--text-secondary); font-size: 0.85rem;">${this.escapeHtml(propType)}</span>
-              ${badgeHtml}
-            </div>
-            ${prop.description ? `<div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: -4px; margin-bottom: 4px;">${this.escapeHtml(prop.description)}</div>` : ''}
-            ${hasNested ? this.renderSchemaToString(propType === 'array' ? prop.items : prop, depth + 1) : ''}
-          </div>
-        `;
-            }).join('');
-            return props;
-        } else if (type === 'array' && schema.items) {
-            return `
-        <div style="margin-left: ${indent}px; margin-top: 4px;">
-          <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px;">
-            [array items]
-          </div>
-          ${this.renderSchemaToString(schema.items, depth + 1)}
-        </div>
-      `;
-        }
-
-        return `
-      <div style="margin-left: ${indent}px; padding: 4px 0;">
-        <span style="color: var(--text-secondary); font-family: monospace;">${this.escapeHtml(type)}</span>
-        ${schema.format ? `<span style="color: var(--text-secondary); font-size: 0.85rem; margin-left: 6px;">(${this.escapeHtml(schema.format)})</span>` : ''}
-        ${schema.description ? `<div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px;">${this.escapeHtml(schema.description)}</div>` : ''}
-      </div>
-    `;
-    }
-
-    private escapeHtml(text: string): string {
-        if (!text) return '';
-        return String(text)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-    }
 
     private loadCSS(href: string): void {
         const link = document.createElement('link');

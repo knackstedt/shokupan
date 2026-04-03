@@ -1,4 +1,23 @@
 <div class="asyncapi-explorer">
+  @if (loading()) {
+    <div class="loading-overlay">
+      <div class="loading-spinner">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10" opacity="0.25"></circle>
+          <path d="M12 2 A10 10 0 0 1 22 12" stroke-linecap="round">
+            <animateTransform
+              attributeName="transform"
+              type="rotate"
+              from="0 12 12"
+              to="360 12 12"
+              dur="1s"
+              repeatCount="indefinite"/>
+          </path>
+        </svg>
+        <p>Loading AsyncAPI specification...</p>
+      </div>
+    </div>
+  }
   <as-split direction="horizontal" [gutterSize]="8">
     <!-- Sidebar -->
     <as-split-area [size]="20" [minSize]="15" [maxSize]="40">
@@ -31,17 +50,19 @@
             class="event-tab"
             [class.active]="activeTab() === 'recv'"
             (click)="setActiveTab('recv')"
+            title="RECV events: Messages received by the server from clients (client publishes → server receives)"
           >
             <span class="badge badge-RECV">RECV</span>
-            <span>Incoming</span>
+            <span class="tab-label">Incoming</span>
           </button>
           <button
             class="event-tab"
             [class.active]="activeTab() === 'send'"
             (click)="setActiveTab('send')"
+            title="SEND events: Messages sent by the server to clients (server emits → client subscribes)"
           >
             <span class="badge badge-SEND">SEND</span>
-            <span>Outgoing</span>
+            <span class="tab-label">Outgoing</span>
           </button>
         </div>
 
@@ -49,7 +70,7 @@
           @if (activeTab() === 'recv') {
             <!-- RECV Events (Incoming) -->
             @if (hasChannels()) {
-              @for (topLevelEntry of getSortedEntries(navTree()); track topLevelEntry[0]) {
+              @for (topLevelEntry of getSortedEntries(getRecvNavTree()); track topLevelEntry[0]) {
                 <div>
                   <!-- Top-level group label -->
                   <div class="group-label">{{ topLevelEntry[0] }}</div>
@@ -74,9 +95,6 @@
                               </span>
                               <span style="margin-right: 6px; color: #fbbf24;">⚠️</span>
                               <span class="tree-label">{{ item.label }}</span>
-                              @if (data.type === 'publish' && getPayloadType(data.op); as payloadType) {
-                                <span class="payload-type" [title]="'Payload type: ' + payloadType">{{ payloadType }}</span>
-                              }
                             </div>
                           } @else {
                             <!-- Normal leaf -->
@@ -100,9 +118,6 @@
                                 </span>
                               }
                               <span class="tree-label">{{ item.label }}</span>
-                              @if (data.type === 'publish' && getPayloadType(data.op); as payloadType) {
-                                <span class="payload-type" [title]="'Payload type: ' + payloadType">{{ payloadType }}</span>
-                              }
                             </div>
                           }
                         }
@@ -134,23 +149,61 @@
             }
           } @else {
             <!-- SEND Events (Outgoing) -->
-            @if (getSendEvents().length > 0) {
-              @for (sendEvent of getSendEvents(); track sendEvent.name) {
-                <div class="send-event-item">
-                  <div class="send-event-header" (click)="selectChannel(sendEvent.name, sendEvent.op, 'subscribe')">
-                    <span class="badge badge-SEND">SEND</span>
-                    <span class="tree-label">{{ sendEvent.name }}</span>
-                    @if (getPayloadType(sendEvent.op); as payloadType) {
-                      <span class="payload-type" [title]="'Payload type: ' + payloadType">{{ payloadType }}</span>
-                    }
-                  </div>
-                  @if (sendEvent.triggeringEvents.length > 0) {
-                    <div class="triggering-events">
-                      <span class="trigger-label">Triggered by:</span>
-                      @for (triggerEvent of sendEvent.triggeringEvents; track triggerEvent) {
-                        <button class="trigger-link" (click)="selectChannel(triggerEvent, spec().channels[triggerEvent]?.publish, 'publish')">
-                          {{ triggerEvent }}
-                        </button>
+            @if (hasChannels()) {
+              @for (topLevelEntry of getSortedEntries(getSendNavTree()); track topLevelEntry[0]) {
+                <div>
+                  <!-- Top-level group label -->
+                  <div class="group-label">{{ topLevelEntry[0] }}</div>
+
+                  <!-- Recursively-flattened items within this group -->
+                  @if (hasChildren(topLevelEntry[1])) {
+                    <div class="tree-node" style="margin-left: 0">
+                      @for (item of getFlatItems(topLevelEntry[1]); track item.label + item.node.data?.name) {
+                        @if (item.isLeaf) {
+                          @if (item.node.data; as data) {
+                            @if (isWarning(item.node)) {
+                              <!-- Warning leaf -->
+                              <div
+                                class="tree-item"
+                                [style.paddingLeft.px]="item.depth * 12"
+                                [attr.data-event]="data.name"
+                                [class.active]="selectedChannel()?.name === data.name"
+                                (click)="selectChannel(data.name, data.op, data.type)"
+                              >
+                                <span class="badge" [class]="'badge-' + formatChannelType(data.type)">
+                                  {{ formatChannelType(data.type) }}
+                                </span>
+                                <span style="margin-right: 6px; color: #fbbf24;">⚠️</span>
+                                <span class="tree-label">{{ data.name }}</span>
+                              </div>
+                            } @else {
+                              <!-- Normal leaf -->
+                              <div
+                                class="tree-item"
+                                [style.paddingLeft.px]="item.depth * 12"
+                                [attr.data-event]="data.name"
+                                [class.active]="selectedChannel()?.name === data.name"
+                                [class.plugin]="isPlugin(item.node)"
+                                (click)="selectChannel(data.name, data.op, data.type)"
+                              >
+                                <span class="badge" [class]="'badge-' + formatChannelType(data.type)">
+                                  {{ formatChannelType(data.type) }}
+                                </span>
+                                @if (isPlugin(item.node)) {
+                                  <span class="plugin-badge" title="Built-in Plugin">
+                                    <img src="assets/favicon.svg" width="16" height="16" />
+                                  </span>
+                                }
+                                <span class="tree-label">{{ data.name }}</span>
+                              </div>
+                            }
+                          }
+                        } @else {
+                          <!-- Non-leaf intermediate node (path segment) -->
+                          <div class="tree-item" [style.paddingLeft.px]="item.depth * 12" style="color: var(--text-muted); cursor: default;">
+                            <span class="tree-label">{{ item.label }}</span>
+                          </div>
+                        }
                       }
                     </div>
                   }
@@ -203,7 +256,9 @@
                 <div class="section">
                   <h3>Payload Schema</h3>
                   @if (channel.op.message?.payload) {
-                    <pre class="schema-code">{{ channel.op.message.payload | json }}</pre>
+                    <div class="schema-viewer-container">
+                      <skp-schema-viewer [schema]="channel.op.message.payload"></skp-schema-viewer>
+                    </div>
                   } @else {
                     <div class="info-message">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline-block; vertical-align: middle; margin-right: 0.5rem;">

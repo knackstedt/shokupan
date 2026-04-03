@@ -4,6 +4,7 @@ import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AngularSplitModule } from 'angular-split';
 import { NgScrollbarModule } from 'ngx-scrollbar';
+import { SchemaViewerComponent } from '../schema-viewer/schema-viewer.component';
 
 interface SourceInfo {
   file: string;
@@ -43,13 +44,14 @@ export interface FlatLeaf {
 @Component({
   selector: 'skp-asyncapi',
   standalone: true,
-  imports: [CommonModule, FormsModule, NgScrollbarModule, AngularSplitModule],
+  imports: [CommonModule, FormsModule, NgScrollbarModule, AngularSplitModule, SchemaViewerComponent],
   templateUrl: './asyncapi.component.html',
   styleUrl: './asyncapi.component.scss',
 })
 export class AsyncApiComponent implements OnInit, OnDestroy {
   private http = inject(HttpClient);
 
+  readonly loading = signal<boolean>(true);
   readonly spec = signal<any>(null);
   readonly navTree = signal<NavTreeNode>({ children: {} });
   readonly selectedChannel = signal<ChannelItem | null>(null);
@@ -71,6 +73,7 @@ export class AsyncApiComponent implements OnInit, OnDestroy {
   }
 
   private loadSpec(): void {
+    this.loading.set(true);
     this.http.get<any>('/asyncapi/json').subscribe({
       next: (spec) => {
         // Pull out the server-computed IDE link pattern before storing the spec
@@ -86,9 +89,11 @@ export class AsyncApiComponent implements OnInit, OnDestroy {
         if (!this.wsConnected()) {
           setTimeout(() => this.connectWebSocket(), 100);
         }
+        this.loading.set(false);
       },
       error: (err) => {
         console.error('Failed to load AsyncAPI spec:', err);
+        this.loading.set(false);
       },
     });
   }
@@ -230,6 +235,18 @@ export class AsyncApiComponent implements OnInit, OnDestroy {
     this.activeTab.set(tab);
   }
 
+  getRecvNavTree(): NavTreeNode {
+    const spec = this.spec();
+    if (!spec) return { children: {} };
+    return this.buildNavTree(spec, 'publish');
+  }
+
+  getSendNavTree(): NavTreeNode {
+    const spec = this.spec();
+    if (!spec) return { children: {} };
+    return this.buildNavTree(spec, 'subscribe');
+  }
+
   getSendEvents(): Array<{ name: string; op: any; triggeringEvents: string[] }> {
     const spec = this.spec();
     if (!spec?.channels) return [];
@@ -272,7 +289,7 @@ export class AsyncApiComponent implements OnInit, OnDestroy {
 
   // ── Nav tree helpers ────────────────────────────────────────────────────
 
-  private buildNavTree(spec: any): NavTreeNode {
+  private buildNavTree(spec: any, filterType?: 'publish' | 'subscribe'): NavTreeNode {
     if (!spec || !spec.channels) return { children: {} };
 
     const root: NavTreeNode = { children: {} };
@@ -282,6 +299,9 @@ export class AsyncApiComponent implements OnInit, OnDestroy {
       const ch = spec.channels[name];
       const op = ch.publish || ch.subscribe;
       const type = ch.publish ? 'publish' : 'subscribe';
+
+      // Filter by type if specified (for RECV tab, only show publish events)
+      if (filterType && type !== filterType) return;
 
       if (groupByRouter) {
         // Group by router/controller (tag)
