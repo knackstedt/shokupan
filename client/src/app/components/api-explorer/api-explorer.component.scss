@@ -423,21 +423,15 @@
             }
 
             .response-schema {
-                background: var(--bg-primary);
-                border: 1px solid var(--card-border);
-                border-radius: 6px;
-                padding: 1rem;
                 margin-top: 0.5rem;
 
                 .schema-content {
+                    background: var(--bg-primary);
+                    border: 1px solid var(--card-border);
+                    border-radius: 6px;
+                    padding: 1rem;
                     font-size: 0.875rem;
                     line-height: 1.6;
-
-                    code {
-                        font-family: var(--skp-font-mono);
-                        background: transparent;
-                        padding: 0;
-                    }
                 }
             }
         }

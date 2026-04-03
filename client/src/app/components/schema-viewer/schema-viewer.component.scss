@@ -1,0 +1,43 @@
+.schema-type {
+    font-family: var(--skp-font-mono);
+    font-size: 0.85rem;
+    font-weight: 500;
+
+    &.schema-type-string {
+        color: #22c55e; // green
+    }
+
+    &.schema-type-number {
+        color: #3b82f6; // blue
+    }
+
+    &.schema-type-integer {
+        color: #3b82f6; // blue
+    }
+
+    &.schema-type-boolean {
+        color: #a855f7; // purple
+    }
+
+    &.schema-type-object {
+        color: #f59e0b; // amber
+    }
+
+    &.schema-type-array {
+        color: #ec4899; // pink
+    }
+
+    &.schema-type-any {
+        color: #9e9e9e; // gray
+    }
+
+    &.schema-type-null {
+        color: #9e9e9e; // gray
+    }
+}
+
+code {
+    font-family: var(--skp-font-mono);
+    background: transparent;
+    padding: 0;
+}

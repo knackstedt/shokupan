@@ -1,0 +1,48 @@
+@if (isOneOf) {
+  <div [style.margin-left.px]="indent">
+    <div style="font-weight: 500; color: var(--text-primary); margin-bottom: 8px;">
+      <span style="color: var(--text-secondary); font-size: 0.85rem;">One of:</span>
+    </div>
+    @for (subSchema of oneOfSchemas; track $index) {
+      <div style="border-left: 3px solid #4caf50; padding-left: 12px; margin-bottom: 12px;">
+        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px;">Option {{ $index + 1 }}:</div>
+        <skp-schema-viewer [schema]="subSchema" [depth]="0"></skp-schema-viewer>
+      </div>
+    }
+  </div>
+} @else if (isObject) {
+  @for (prop of properties; track prop[0]) {
+    <div [style.margin-left.px]="indent" style="margin-bottom: 8px;">
+      <div style="display: flex; align-items: center; gap: 8px; padding: 4px 0;">
+        <code style="font-weight: 500; color: var(--text-primary);">{{ prop[0] }}</code>
+        <span class="schema-type" [class]="'schema-type-' + getPropertyType(prop[1])">{{ getPropertyType(prop[1]) }}</span>
+        @if (!isRequired(prop[0])) {
+          <span style="margin-left: auto; font-size: 0.75rem; color: #9e9e9e; font-style: italic;">optional</span>
+        }
+      </div>
+      @if (prop[1].description) {
+        <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: -4px; margin-bottom: 4px;">{{ prop[1].description }}</div>
+      }
+      @if (hasNested(prop[1])) {
+        <skp-schema-viewer [schema]="getNestedSchema(prop[1])" [depth]="depth + 1"></skp-schema-viewer>
+      }
+    </div>
+  }
+} @else if (isArray) {
+  <div [style.margin-left.px]="indent" style="margin-top: 4px;">
+    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px;">
+      [array items]
+    </div>
+    <skp-schema-viewer [schema]="arrayItems" [depth]="depth + 1"></skp-schema-viewer>
+  </div>
+} @else {
+  <div [style.margin-left.px]="indent" style="padding: 4px 0;">
+    <span class="schema-type" [class]="'schema-type-' + type">{{ type }}</span>
+    @if (format) {
+      <span style="color: var(--text-secondary); font-size: 0.85rem; margin-left: 6px;">({{ format }})</span>
+    }
+    @if (description) {
+      <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px;">{{ description }}</div>
+    }
+  </div>
+}

@@ -173,7 +173,9 @@
                                                                 @if (route.op.responses[code].content['application/json']?.schema) {
                                                                     <div class="response-schema">
                                                                         <h4 style="font-size: 0.875rem; margin: 0.75rem 0 0.5rem; color: var(--text-secondary); font-weight: 600;">Response Body Schema</h4>
-                                                                        <div class="schema-content" [innerHTML]="renderResponseSchema(route.op.responses[code].content['application/json'].schema)"></div>
+                                                                        <div class="schema-content">
+                                                                            <skp-schema-viewer [schema]="route.op.responses[code].content['application/json'].schema"></skp-schema-viewer>
+                                                                        </div>
                                                                     </div>
                                                                 }
                                                             }
