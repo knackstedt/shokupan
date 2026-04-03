@@ -5,14 +5,54 @@
       <aside class="sidebar">
         <div class="sidebar-header">
           <h2>AsyncAPI Events</h2>
+          <button class="grouping-toggle" (click)="toggleGrouping()" [title]="groupByRouter() ? 'Group by event name' : 'Group by router'">
+            @if (groupByRouter()) {
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
+            } @else {
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="8" y1="6" x2="21" y2="6"></line>
+                <line x1="8" y1="12" x2="21" y2="12"></line>
+                <line x1="8" y1="18" x2="21" y2="18"></line>
+                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+              </svg>
+            }
+          </button>
+        </div>
+
+        <div class="event-tabs">
+          <button
+            class="event-tab"
+            [class.active]="activeTab() === 'recv'"
+            (click)="setActiveTab('recv')"
+          >
+            <span class="badge badge-RECV">RECV</span>
+            <span>Incoming</span>
+          </button>
+          <button
+            class="event-tab"
+            [class.active]="activeTab() === 'send'"
+            (click)="setActiveTab('send')"
+          >
+            <span class="badge badge-SEND">SEND</span>
+            <span>Outgoing</span>
+          </button>
         </div>
 
         <ng-scrollbar class="sidebar-scroll" orientation="vertical">
-          @if (hasChannels()) {
-            @for (topLevelEntry of getSortedEntries(navTree()); track topLevelEntry[0]) {
-              <div>
-                <!-- Top-level group label -->
-                <div class="group-label">{{ topLevelEntry[0] }}</div>
+          @if (activeTab() === 'recv') {
+            <!-- RECV Events (Incoming) -->
+            @if (hasChannels()) {
+              @for (topLevelEntry of getSortedEntries(navTree()); track topLevelEntry[0]) {
+                <div>
+                  <!-- Top-level group label -->
+                  <div class="group-label">{{ topLevelEntry[0] }}</div>
 
                 <!-- Recursively-flattened items within this group -->
                 @if (hasChildren(topLevelEntry[1])) {
@@ -26,11 +66,17 @@
                               class="tree-item"
                               [style.paddingLeft.px]="item.depth * 12"
                               [attr.data-event]="data.name"
-                              style="color: #fbbf24"
+                              [class.active]="selectedChannel()?.name === data.name"
                               (click)="selectChannel(data.name, data.op, data.type)"
                             >
-                              <span style="margin-right: 6px;">⚠️</span>
+                              <span class="badge" [class]="'badge-' + formatChannelType(data.type)">
+                                {{ formatChannelType(data.type) }}
+                              </span>
+                              <span style="margin-right: 6px; color: #fbbf24;">⚠️</span>
                               <span class="tree-label">{{ item.label }}</span>
+                              @if (data.type === 'publish' && getPayloadType(data.op); as payloadType) {
+                                <span class="payload-type" [title]="'Payload type: ' + payloadType">{{ payloadType }}</span>
+                              }
                             </div>
                           } @else {
                             <!-- Normal leaf -->
@@ -54,17 +100,8 @@
                                 </span>
                               }
                               <span class="tree-label">{{ item.label }}</span>
-                              @if (getFirstSourceInfo(data.op); as si) {
-                                <a
-                                  [href]="generateEditorLink(si.file, si.line)"
-                                  class="source-link"
-                                  (click)="$event.stopPropagation()"
-                                  [title]="si.file + ':' + si.line"
-                                >
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block">
-                                    <polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline>
-                                  </svg>
-                                </a>
+                              @if (data.type === 'publish' && getPayloadType(data.op); as payloadType) {
+                                <span class="payload-type" [title]="'Payload type: ' + payloadType">{{ payloadType }}</span>
                               }
                             </div>
                           }
@@ -80,20 +117,60 @@
                 }
               </div>
             }
+            } @else {
+              <div class="empty-state" style="padding: 2rem; text-align: center;">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto 1rem; opacity: 0.5;">
+                  <path d="M12 20h9"></path>
+                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                </svg>
+                <h3 style="margin: 0 0 0.5rem; font-size: 1.1rem; font-weight: 600;">No WebSocket Events Found</h3>
+                <p style="margin: 0; color: var(--text-muted); font-size: 0.9rem; line-height: 1.5;">
+                  Add event handlers to your WebSocket router to see them here.
+                </p>
+                <p style="margin: 1rem 0 0; color: var(--text-muted); font-size: 0.85rem;">
+                  Example: <code style="background: rgba(0,0,0,0.1); padding: 0.2rem 0.4rem; border-radius: 3px;">wsRouter.event("eventName", handler)</code>
+                </p>
+              </div>
+            }
           } @else {
-            <div class="empty-state" style="padding: 2rem; text-align: center;">
-              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto 1rem; opacity: 0.5;">
-                <path d="M12 20h9"></path>
-                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-              </svg>
-              <h3 style="margin: 0 0 0.5rem; font-size: 1.1rem; font-weight: 600;">No WebSocket Events Found</h3>
-              <p style="margin: 0; color: var(--text-muted); font-size: 0.9rem; line-height: 1.5;">
-                Add event handlers to your WebSocket router to see them here.
-              </p>
-              <p style="margin: 1rem 0 0; color: var(--text-muted); font-size: 0.85rem;">
-                Example: <code style="background: rgba(0,0,0,0.1); padding: 0.2rem 0.4rem; border-radius: 3px;">wsRouter.event("eventName", handler)</code>
-              </p>
-            </div>
+            <!-- SEND Events (Outgoing) -->
+            @if (getSendEvents().length > 0) {
+              @for (sendEvent of getSendEvents(); track sendEvent.name) {
+                <div class="send-event-item">
+                  <div class="send-event-header" (click)="selectChannel(sendEvent.name, sendEvent.op, 'subscribe')">
+                    <span class="badge badge-SEND">SEND</span>
+                    <span class="tree-label">{{ sendEvent.name }}</span>
+                    @if (getPayloadType(sendEvent.op); as payloadType) {
+                      <span class="payload-type" [title]="'Payload type: ' + payloadType">{{ payloadType }}</span>
+                    }
+                  </div>
+                  @if (sendEvent.triggeringEvents.length > 0) {
+                    <div class="triggering-events">
+                      <span class="trigger-label">Triggered by:</span>
+                      @for (triggerEvent of sendEvent.triggeringEvents; track triggerEvent) {
+                        <button class="trigger-link" (click)="selectChannel(triggerEvent, spec().channels[triggerEvent]?.publish, 'publish')">
+                          {{ triggerEvent }}
+                        </button>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            } @else {
+              <div class="empty-state" style="padding: 2rem; text-align: center;">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto 1rem; opacity: 0.5;">
+                  <path d="M12 2v20"></path>
+                  <path d="m5 9 7 7 7-7"></path>
+                </svg>
+                <h3 style="margin: 0 0 0.5rem; font-size: 1.1rem; font-weight: 600;">No Outgoing Events</h3>
+                <p style="margin: 0; color: var(--text-muted); font-size: 0.9rem; line-height: 1.5;">
+                  Server emit events will appear here when detected by AST analysis.
+                </p>
+                <p style="margin: 1rem 0 0; color: var(--text-muted); font-size: 0.85rem;">
+                  Example: <code style="background: rgba(0,0,0,0.1); padding: 0.2rem 0.4rem; border-radius: 3px;">ctx.emit("eventName", payload)</code>
+                </p>
+              </div>
+            }
           }
         </ng-scrollbar>
       </aside>
@@ -123,19 +200,28 @@
                   <div class="route-desc">{{ channel.op.description }}</div>
                 }
 
-                @if (channel.op.message?.payload) {
-                  <div class="section">
-                    <h3>Payload Schema</h3>
+                <div class="section">
+                  <h3>Payload Schema</h3>
+                  @if (channel.op.message?.payload) {
                     <pre class="schema-code">{{ channel.op.message.payload | json }}</pre>
-                  </div>
-                }
+                  } @else {
+                    <div class="info-message">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline-block; vertical-align: middle; margin-right: 0.5rem;">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                      </svg>
+                      <span>No payload schema available. The event handler does not specify or use a typed payload.</span>
+                    </div>
+                  }
+                </div>
 
                 @if (channel.sourceInfo) {
                   <div class="section">
                     <h3>Source Information</h3>
                     <div class="source-info">
                       <a [href]="generateEditorLink(channel.sourceInfo.file, channel.sourceInfo.line)" class="source-link-inline">
-                        {{ channel.sourceInfo.file }}:{{ channel.sourceInfo.line }}
+                        {{ shortenFilePath(channel.sourceInfo.file) }}:{{ channel.sourceInfo.line }}
                       </a>
                     </div>
                   </div>
@@ -148,7 +234,7 @@
                     @for (si of channel.op['x-source-info']; track si.file + ':' + si.line) {
                       <div class="source-info">
                         <a [href]="generateEditorLink(si.file, si.line)" class="source-link-inline">
-                          {{ si.file }}:{{ si.line }}
+                          {{ shortenFilePath(si.file) }}:{{ si.line }}
                         </a>
                       </div>
                     }
