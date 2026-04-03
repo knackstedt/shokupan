@@ -7,6 +7,7 @@ import { AsyncApiPlugin } from '../../src/plugins/application/asyncapi/plugin';
 import { AuthPlugin } from '../../src/plugins/application/auth';
 import { Dashboard } from '../../src/plugins/application/dashboard/plugin';
 import { MCPServerPlugin } from '../../src/plugins/application/mcp-server/plugin';
+import { PermissionPlugin } from '../../src/plugins/application/permissions';
 import { ScalarPlugin } from '../../src/plugins/application/scalar';
 import { WebAppPlugin } from '../../src/plugins/application/web-app/plugin';
 import { Compression } from '../../src/plugins/middleware/compression';
@@ -386,9 +387,149 @@ await app.register(new MCPServerPlugin({
     rootDir: './examples/full'
 }));
 
-await app.register(new AuthPlugin({
+// ============================================================================
+// PERMISSION SYSTEM
+// ============================================================================
+
+const permissionPlugin = new PermissionPlugin({
+    roles: [
+        {
+            name: 'admin',
+            description: 'Full system access',
+            permissions: [
+                { resource: '*', action: '*' }
+            ]
+        },
+        {
+            name: 'developer',
+            description: 'Developer with API and debugging access',
+            permissions: [
+                // Dashboard access
+                { resource: 'dashboard', action: 'view' },
+                { resource: 'dashboard', action: 'read' },
+                { resource: 'networktools', action: 'view' },
+                { resource: 'networktools', action: 'execute' },
+                
+                // API Explorer
+                { resource: 'api-explorer', action: 'view' },
+                { resource: 'api-explorer', action: 'read' },
+                { resource: 'restapi', action: 'view' },
+                { resource: 'restapi', action: 'execute' },
+                
+                // WebSocket API
+                { resource: 'asyncapi', action: 'view' },
+                { resource: 'asyncapi', action: 'read' },
+                { resource: 'wsapi', action: 'view' },
+                { resource: 'wsapi', action: 'send' },
+                { resource: 'wsapi', action: 'recv' },
+                
+                // API Documentation
+                { resource: 'scalar', action: 'view' },
+                { resource: 'scalar', action: 'read' },
+                
+                // Permissions viewer
+                { resource: 'permissions', action: 'view' },
+                { resource: 'permissions', action: 'read' }
+            ]
+        },
+        {
+            name: 'viewer',
+            description: 'Read-only access to documentation',
+            permissions: [
+                // Dashboard - view only
+                { resource: 'dashboard', action: 'view' },
+                { resource: 'dashboard', action: 'read' },
+                
+                // API Explorer - view only
+                { resource: 'api-explorer', action: 'view' },
+                { resource: 'api-explorer', action: 'read' },
+                { resource: 'restapi', action: 'view' },
+                
+                // WebSocket API - view only
+                { resource: 'asyncapi', action: 'view' },
+                { resource: 'asyncapi', action: 'read' },
+                { resource: 'wsapi', action: 'view' },
+                
+                // API Documentation
+                { resource: 'scalar', action: 'view' },
+                { resource: 'scalar', action: 'read' },
+                
+                // Permissions viewer
+                { resource: 'permissions', action: 'view' },
+                { resource: 'permissions', action: 'read' }
+            ]
+        },
+        {
+            name: 'tester',
+            description: 'API testing access without debugging tools',
+            permissions: [
+                // API Explorer with execute
+                { resource: 'api-explorer', action: 'view' },
+                { resource: 'api-explorer', action: 'read' },
+                { resource: 'restapi', action: 'view' },
+                { resource: 'restapi', action: 'execute' },
+                
+                // WebSocket API with send/recv
+                { resource: 'asyncapi', action: 'view' },
+                { resource: 'asyncapi', action: 'read' },
+                { resource: 'wsapi', action: 'view' },
+                { resource: 'wsapi', action: 'send' },
+                { resource: 'wsapi', action: 'recv' },
+                
+                // API Documentation
+                { resource: 'scalar', action: 'view' },
+                { resource: 'scalar', action: 'read' }
+            ]
+        },
+        {
+            name: 'guest',
+            description: 'Limited documentation access',
+            permissions: [
+                // Only Scalar documentation
+                { resource: 'scalar', action: 'view' },
+                { resource: 'scalar', action: 'read' }
+            ]
+        }
+    ],
+    getUserPermissions: async (user, ctx) => {
+        // Parse string permissions to Permission objects
+        if (user.permissions && Array.isArray(user.permissions)) {
+            return user.permissions.map((p: any) => {
+                if (typeof p === 'string') {
+                    const [resource, action] = p.split(':');
+                    return { resource, action };
+                }
+                return p;
+            });
+        }
+        return [];
+    },
+    getUserRoles: async (user, ctx) => {
+        return user.roles || [];
+    },
+    onUnauthorized: async (ctx, check) => {
+        return ctx.json({
+            error: 'Forbidden',
+            message: `Access denied: You need '${check.resource}:${check.action}' permission`,
+            requiredPermission: `${check.resource}:${check.action}`,
+            hint: 'Contact your administrator to request access'
+        }, 403);
+    },
+    enableWildcards: true,
+    caseSensitive: false
+});
+
+await app.register(permissionPlugin);
+
+const authPlugin = new AuthPlugin({
     jwtSecret: process.env['SESSION_SECRET'] || 'dev-secret-change-in-production',
     successRedirect: '/_app/',
+    cookieOptions: {
+        httpOnly: true,
+        secure: process.env['NODE_ENV'] === 'production',
+        sameSite: 'Lax',
+        path: '/'
+    },
     providers: {
         github: {
             clientId: process.env['GITHUB_CLIENT_ID'] || 'dummy-client-id',
@@ -408,11 +549,17 @@ await app.register(new AuthPlugin({
         }
     },
     onSuccess: (user, ctx) => {
-        // Automatically grant all permissions to the example user
-        user.permissions = ["dashboard:read", "api-explorer:read", "asyncapi:read", "scalar:read"];
-        // Return nothing so AuthPlugin proceeds to issue the session cookie and redirect
+        // For the full example, grant admin role to all authenticated users
+        user.roles = ['admin'];
+        
+        console.log(`[Auth] User ${user.email} assigned roles: ${user.roles.join(', ')}`);
     }
-}));
+});
+
+// Apply auth middleware globally to populate ctx.user from JWT cookie
+app.use(authPlugin.getMiddleware());
+
+await app.register(authPlugin);
 
 // ============================================================================
 // OPENAPI DOCUMENTATION
