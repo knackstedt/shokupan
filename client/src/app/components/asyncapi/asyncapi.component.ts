@@ -58,6 +58,8 @@ export class AsyncApiComponent implements OnInit, OnDestroy {
   readonly serverUrl = signal<string>(location.host);
   readonly wsProtocol = signal<string>(location.protocol === 'https:' ? 'wss' : 'ws');
   readonly targetEvent = signal<string>('--');
+  readonly groupByRouter = signal<boolean>(true);
+  readonly activeTab = signal<'recv' | 'send'>('recv');
 
   /** IDE link pattern from the server, e.g. "vscode://file/{{absolute}}:{{line}}:{{column}}" */
   private ideLinkPattern = 'vscode://file/{{absolute}}:{{line}}:{{column}}';
@@ -102,8 +104,7 @@ export class AsyncApiComponent implements OnInit, OnDestroy {
   getFirstSourceInfo(op: any): SourceInfo | undefined {
     const si = op?.['x-source-info'];
     if (!si) return undefined;
-    if (Array.isArray(si)) return si[0] as SourceInfo | undefined;
-    return si as SourceInfo;
+    return Array.isArray(si) ? si[0] as SourceInfo | undefined : si as SourceInfo;
   }
 
   selectChannel(channelName: string, op: any, type: 'publish' | 'subscribe'): void {
@@ -183,6 +184,28 @@ export class AsyncApiComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Shortens a file path by removing workspace root and common prefixes.
+   */
+  shortenFilePath(file: string): string {
+    if (!file) return '';
+
+    // Remove common workspace prefixes
+    let shortened = file
+      .replace(/^.*\/node_modules\//, 'node_modules/')
+      .replace(/^.*\/src\//, 'src/')
+      .replace(/^.*\/examples\//, 'examples/')
+      .replace(/^.*\/shokupan\//, '');
+
+    // If still too long, show last 2-3 path segments
+    const parts = shortened.split('/');
+    if (parts.length > 3) {
+      shortened = '.../' + parts.slice(-3).join('/');
+    }
+
+    return shortened;
+  }
+
+  /**
    * Generates an IDE link using the pattern provided by the server.
    * Substitutes {{absolute}} and {{line}} (and optionally {{column}}).
    */
@@ -194,8 +217,57 @@ export class AsyncApiComponent implements OnInit, OnDestroy {
       .replace('{{column}}', String(column));
   }
 
+  toggleGrouping(): void {
+    this.groupByRouter.update(v => !v);
+    const spec = this.spec();
+    if (spec) {
+      const navTree = this.buildNavTree(spec);
+      this.navTree.set(navTree);
+    }
+  }
+
+  setActiveTab(tab: 'recv' | 'send'): void {
+    this.activeTab.set(tab);
+  }
+
+  getSendEvents(): Array<{ name: string; op: any; triggeringEvents: string[] }> {
+    const spec = this.spec();
+    if (!spec?.channels) return [];
+
+    const sendEvents: Array<{ name: string; op: any; triggeringEvents: string[] }> = [];
+    const emitMap = new Map<string, string[]>(); // Maps emit event -> source events
+
+    // First pass: build map of which RECV events emit which SEND events
+    Object.keys(spec.channels).forEach(channelName => {
+      const ch = spec.channels[channelName];
+      if (ch.publish) {
+        // This is a RECV event, check what it emits
+        const astMatch = ch.publish['x-shokupan-source'];
+        // In the future, we'll parse emits from AST data
+        // For now, we'll use the subscribe channels directly
+      }
+    });
+
+    // Second pass: collect all SEND events
+    Object.keys(spec.channels).forEach(channelName => {
+      const ch = spec.channels[channelName];
+      if (ch.subscribe) {
+        sendEvents.push({
+          name: channelName,
+          op: ch.subscribe,
+          triggeringEvents: emitMap.get(channelName) || []
+        });
+      }
+    });
+
+    return sendEvents;
+  }
+
   formatChannelType(type: 'publish' | 'subscribe'): string {
-    return type === 'publish' ? 'SEND' : 'RECV';
+    // In AsyncAPI from server perspective:
+    // publish = client publishes to server = server RECEIVES
+    // subscribe = client subscribes from server = server SENDS
+    return type === 'publish' ? 'RECV' : 'SEND';
   }
 
   // ── Nav tree helpers ────────────────────────────────────────────────────
@@ -204,30 +276,51 @@ export class AsyncApiComponent implements OnInit, OnDestroy {
     if (!spec || !spec.channels) return { children: {} };
 
     const root: NavTreeNode = { children: {} };
+    const groupByRouter = this.groupByRouter();
 
     Object.keys(spec.channels).forEach(name => {
       const ch = spec.channels[name];
       const op = ch.publish || ch.subscribe;
       const type = ch.publish ? 'publish' : 'subscribe';
 
-      // Get Tag (Controller Name)
-      const tag = (op.tags && op.tags.length > 0) ? op.tags[0].name : 'General';
+      if (groupByRouter) {
+        // Group by router/controller (tag)
+        const tag = (op.tags && op.tags.length > 0) ? op.tags[0].name : 'General';
 
-      // Ensure Tag Group Exists
-      if (!root.children[tag]) root.children[tag] = { children: {} };
+        // Ensure Tag Group Exists
+        if (!root.children[tag]) root.children[tag] = { children: {} };
 
-      const parts = name.split(/[\.\/]/);
-      let current = root.children[tag];
+        const parts = name.split(/[\.\/]/);
+        let current = root.children[tag];
 
-      parts.forEach((part, i) => {
-        if (!current.children[part]) current.children[part] = { children: {} };
-        current = current.children[part];
+        parts.forEach((part, i) => {
+          if (!current.children[part]) current.children[part] = { children: {} };
+          current = current.children[part];
 
-        if (i === parts.length - 1) {
-          current.isLeaf = true;
-          current.data = { name, op, type };
-        }
-      });
+          if (i === parts.length - 1) {
+            current.isLeaf = true;
+            current.data = { name, op, type };
+          }
+        });
+      } else {
+        // Group by event name only (flat structure under type)
+        const typeGroup = type === 'publish' ? 'Client → Server (RECV)' : 'Server → Client (SEND)';
+
+        if (!root.children[typeGroup]) root.children[typeGroup] = { children: {} };
+
+        const parts = name.split(/[\.\/]/);
+        let current = root.children[typeGroup];
+
+        parts.forEach((part, i) => {
+          if (!current.children[part]) current.children[part] = { children: {} };
+          current = current.children[part];
+
+          if (i === parts.length - 1) {
+            current.isLeaf = true;
+            current.data = { name, op, type };
+          }
+        });
+      }
     });
 
     return root;
@@ -293,6 +386,32 @@ export class AsyncApiComponent implements OnInit, OnDestroy {
   hasChannels(): boolean {
     const spec = this.spec();
     return spec && spec.channels && Object.keys(spec.channels).length > 0;
+  }
+
+  /**
+   * Get payload type description from AST data
+   */
+  getPayloadType(op: any): string {
+    const payload = op?.message?.payload;
+    if (!payload) return 'any';
+
+    if (payload.type) {
+      if (payload.type === 'object' && payload.properties) {
+        const props = Object.keys(payload.properties).slice(0, 3).join(', ');
+        const more = Object.keys(payload.properties).length > 3 ? ', ...' : '';
+        return `{ ${props}${more} }`;
+      }
+      if (payload.type === 'array' && payload.items) {
+        return `${payload.items.type || 'any'}[]`;
+      }
+      return payload.type;
+    }
+
+    if (payload.$ref) {
+      return payload.$ref.split('/').pop() || 'object';
+    }
+
+    return 'object';
   }
 
   private addLog(data: string, direction: 'send' | 'recv' | 'system'): void {
