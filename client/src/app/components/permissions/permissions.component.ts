@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { NgScrollbarModule } from 'ngx-scrollbar';
 import { AuthService } from '../../services/auth.service';
 import { Permission, PermissionService, Role } from '../../services/permission.service';
 
@@ -24,6 +25,7 @@ import { TooltipModule } from 'primeng/tooltip';
     imports: [
         CommonModule,
         FormsModule,
+        NgScrollbarModule,
         CardModule,
         TableModule,
         TagModule,
@@ -158,5 +160,11 @@ export class PermissionsComponent implements OnInit {
 
     hasRole(roleName: string): boolean {
         return this.getUserRoleNames().includes(roleName);
+    }
+
+    getUniqueResources(): number {
+        if (!this.userPermissions()?.permissions) return 0;
+        const resources = new Set(this.userPermissions()!.permissions.map(p => p.resource));
+        return resources.size;
     }
 }

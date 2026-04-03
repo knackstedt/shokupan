@@ -810,18 +810,8 @@ pre.try-body {
 }
 
 :host ::ng-deep {
-    .p-tablist,
-    .p-tabpanels {
-        background: none;
-    }
-
-    .p-tabpanels {
-        flex: 1;
-        overflow: hidden;
-        padding: 0;
-    }
-
     ng-scroll-content {
         padding: 1rem;
     }
 }
+

@@ -1,74 +1,51 @@
-.permissions-container {
-    min-height: 100vh;
-    background: var(--surface-ground);
+:host {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
 
-    :host ::ng-deep {
-        .p-card {
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
 
-        .p-tabview-nav {
-            background: transparent;
-        }
+p-tabs {
+    flex: 1;
+    overflow: hidden;
+}
 
-        .p-panel {
-            .p-panel-header {
-                background: var(--surface-50);
-                border-color: var(--surface-200);
-            }
-
-            .p-panel-content {
-                padding: 1rem;
-            }
-        }
-
-        .p-tag {
-            font-size: 0.75rem;
-            padding: 0.25rem 0.5rem;
-        }
-
-        .p-chip {
-            font-size: 0.875rem;
-        }
-
-        .p-table {
-            .p-datatable-thead > tr > th {
-                background: var(--surface-100);
-                font-weight: 600;
-                padding: 0.75rem;
-            }
-
-            .p-datatable-tbody > tr > td {
-                padding: 0.5rem;
-            }
-
-            .sticky {
-                position: sticky;
-                box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
-            }
-        }
+:host ::ng-deep {
+    ng-scroll-content {
+        padding: 1rem;
     }
 }
 
-.dark {
-    .permissions-container {
-        :host ::ng-deep {
-            .p-panel {
-                .p-panel-header {
-                    background: var(--surface-800);
-                    border-color: var(--surface-700);
-                }
-            }
+.roles-search {
+    display: flex;
+    flex-direction: column;
+}
 
-            .p-table {
-                .p-datatable-thead > tr > th {
-                    background: var(--surface-800);
-                }
+.search-input {
+    width: 100%;
+    padding: 0.5rem;
+}
 
-                .sticky {
-                    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.3);
-                }
-            }
-        }
-    }
+.roles-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.permissions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.permission-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.permission-actions {
+    display: flex;
+    gap: 0.5rem;
 }
