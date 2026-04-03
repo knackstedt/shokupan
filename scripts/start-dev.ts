@@ -172,8 +172,8 @@ function addToBuffer(tabIndex, line) {
 
 function showPrettyStartupLog() {
     if (angularStarted && apiStarted) {
-        const apiUrl = `http://localhost:${apiPort}`;
-        const appUrl = `http://localhost:${apiPort}/_app/`;
+        const apiUrl = `https://localhost:${apiPort}`;
+        const appUrl = `https://localhost:${apiPort}/_app/`;
         
         const apiLink = `\x1b]8;;${apiUrl}\x1b\\${apiUrl}\x1b]8;;\x1b\\`;
         const appLink = `\x1b]8;;${appUrl}\x1b\\${appUrl}\x1b]8;;\x1b\\`;
