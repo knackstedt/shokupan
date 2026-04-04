@@ -14,7 +14,7 @@ import type { ApplicationInstance } from './analyzer.impl';
 export class OpenAPIAnalyzer {
     private analyzerImpl: any;
 
-    constructor(private rootDir: string, private entrypoint?: string, private logger?: Logger) { }
+    constructor(private rootDir: string, private logger: Logger, private entrypoint?: string) { }
 
     /**
      * Main analysis entry point.
@@ -23,7 +23,7 @@ export class OpenAPIAnalyzer {
     public async analyze(): Promise<{ applications: ApplicationInstance[]; }> {
         // Dynamic import to avoid loading 'typescript' peer dependency if not needed (e.g. at runtime)
         const { OpenAPIAnalyzer: AnalyzerImpl } = await import('./analyzer.impl');
-        this.analyzerImpl = new AnalyzerImpl(this.rootDir, this.entrypoint, this.logger);
+        this.analyzerImpl = new AnalyzerImpl(this.rootDir, this.logger, this.entrypoint);
         return this.analyzerImpl.analyze();
     }
 
