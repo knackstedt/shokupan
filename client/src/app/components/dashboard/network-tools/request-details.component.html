@@ -205,8 +205,15 @@
                         <h3>Query Parameters</h3>
                         <div class="kv-grid params-grid">
                             @for (p of queryParams(); track $index) {
-                            <div class="key param-key">{{ p[0] }}</div>
-                            <div class="val" [class]="queryParamClass(p[1])">{{ p[1] }}</div>
+                                <div class="key param-key">{{ p[0] }}</div>
+                                <div class="val" [class]="queryParamClass(p[1])">{{ p[1] }}</div>
+                                <button class="copy-btn" (click)="copyToClipboard(p[1])" title="Copy value">
+                                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                                        <path
+                                            d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z" />
+                                        <path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h-1v1H2V6h1V5H2z" />
+                                    </svg>
+                                </button>
                             }
                         </div>
                     </section>
