@@ -1,12 +1,14 @@
 import { describe, expect, test } from 'bun:test';
 import path from 'node:path';
+import { createLogger } from '../../../util/logger';
 import { OpenAPIAnalyzer } from '../openapi/analyzer';
 
 const __dirname = new URL('.', import.meta.url).pathname;
+const logger = createLogger();
 
 
 async function getSpec(directory: string) {
-    const analyzer = new OpenAPIAnalyzer(directory);
+    const analyzer = new OpenAPIAnalyzer(directory, logger);
     await analyzer.analyze();
     return analyzer.generateOpenAPISpec();
 }

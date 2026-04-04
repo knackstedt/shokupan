@@ -251,7 +251,7 @@ export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin 
                     try {
                         const entrypoint = process.argv[1];
                         (parent as any).logger?.info('ScalarPlugin', `Running eager static analysis on entrypoint: ${entrypoint}`);
-                        const analyzer = new OpenAPIAnalyzer(process.cwd(), entrypoint, (parent as any).logger);
+                        const analyzer = new OpenAPIAnalyzer(process.cwd(), parent.logger, entrypoint);
                         let staticSpec = await analyzer.analyze();
 
                         if (!this.pluginOptions.baseDocument) this.pluginOptions.baseDocument = {};

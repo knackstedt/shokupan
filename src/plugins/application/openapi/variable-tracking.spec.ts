@@ -1,12 +1,15 @@
 import { describe, expect, it } from "bun:test";
 import path from "path";
+import { createLogger } from "../../../util/logger";
 import { OpenAPIAnalyzer } from "../openapi/analyzer.impl";
+
+const logger = createLogger();
 
 describe("Middleware Variable Tracking", () => {
     it("should detect status codes from variables in RateLimitMiddleware", async () => {
         // Analyze the examples/api_paths directory which uses RateLimitMiddleware
         const testDir = path.join(process.cwd(), 'examples', 'api_paths');
-        const analyzer = new OpenAPIAnalyzer(testDir);
+        const analyzer = new OpenAPIAnalyzer(testDir, logger);
 
         const { applications } = await analyzer.analyze();
 

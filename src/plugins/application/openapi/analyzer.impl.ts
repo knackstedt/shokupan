@@ -111,7 +111,7 @@ export class OpenAPIAnalyzer {
     // Track imports per file: filePath -> { importedName -> { modulePath, exportName } }
     private imports: Map<string, Map<string, { modulePath: string; exportName?: string; }>> = new Map();
 
-    constructor(private rootDir: string, entrypoint?: string, private logger?: Logger) {
+    constructor(private rootDir: string, private logger: Logger, entrypoint?: string) {
         if (entrypoint) {
             this.entrypoint = path.resolve(entrypoint);
         }
@@ -776,7 +776,7 @@ export class OpenAPIAnalyzer {
         emits?: { event: string; payload?: any; location?: { startLine: number; endLine: number; }; }[];
         highlights?: { startLine: number; endLine: number; type: 'emit' | 'return-success' | 'return-warning'; }[];
     } {
-        console.log('[AST] analyzeHandler called for method:', method, 'isArrowFunction:', ts.isArrowFunction(handler), 'isFunctionExpression:', ts.isFunctionExpression(handler), 'file:', sourceFile.fileName);
+        this.logger.debug('AST', 'analyzeHandler called', { method, isArrowFunction: ts.isArrowFunction(handler), isFunctionExpression: ts.isFunctionExpression(handler), file: sourceFile.fileName });
         
         // Get TypeChecker for type resolution
         const typeChecker = this.program?.getTypeChecker();
@@ -884,11 +884,11 @@ export class OpenAPIAnalyzer {
         if (ts.isArrowFunction(handler) || ts.isFunctionExpression(handler) || ts.isMethodDeclaration(handler) || handler.kind === 175) {
             // TS method has .body which is FunctionBody (Block) or undefined
             body = (handler as any).body;
-            console.log('[AST] Handler has body:', !!body, 'isBlock:', ts.isBlock(body));
+            this.logger.debug('AST', "Handler has observed", { hasBody: !!body, isBlock: ts.isBlock(body) });
 
             // Visit the handler body to find ctx usage
             const visit = (node: ts.Node) => {
-                console.log('[AST] Visiting node kind:', node.kind, ts.SyntaxKind[node.kind]);
+                this.logger.debug('AST', "Visiting node kind", { kind: node.kind, syntaxKind: ts.SyntaxKind[node.kind] });
                 
                 // Track variable declarations
                 if (ts.isVariableDeclaration(node)) {
@@ -1173,10 +1173,10 @@ export class OpenAPIAnalyzer {
                             const objText = expr.expression.expression.getText(sourceFile);
                             const propText = expr.expression.name.getText(sourceFile);
                             
-                            console.log('[AST] Found property access:', objText, propText, 'in', sourceFile.fileName);
+                            this.logger.debug('AST', 'Found property access', { objText, propText, file: sourceFile.fileName });
 
                             if (((objText === 'ctx' || objText.endsWith('.ctx')) || (objText === 'this' || objText.endsWith('.this'))) && propText === 'emit') {
-                                console.log('[AST] FOUND EMIT CALL in', sourceFile.fileName);
+                                this.logger.debug('AST', 'FOUND EMIT CALL', { file: sourceFile.fileName });
                                 if (expr.arguments.length >= 1) {
                                     const eventNameArg = expr.arguments[0];
                                     if (ts.isStringLiteral(eventNameArg)) {
@@ -2351,7 +2351,7 @@ export class OpenAPIAnalyzer {
 /**
  * Analyze a directory and generate OpenAPI spec
  */
-export async function analyzeDirectory(directory: string): Promise<any> {
-    const analyzer = new OpenAPIAnalyzer(directory);
+export async function analyzeDirectory(directory: string, logger: Logger): Promise<any> {
+    const analyzer = new OpenAPIAnalyzer(directory, logger);
     return await analyzer.analyze();
 }
