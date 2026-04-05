@@ -2,7 +2,7 @@
 // Constants
 export const FRAMEWORKS = ["shokupan", "shokupan-npm", "fastify", "express", "koa", "hapi", "nest", "hono", "elysia"];
 export const RUNTIMES = ["bun", "node", "deno"];
-export const BUN_ONLY_FRAMEWORKS = ["elysia"]; // Frameworks that only work on Bun
+export const BUN_ONLY_FRAMEWORKS = ["shokupan", "elysia"]; // Frameworks that only work on Bun
 export const BUN_REUSE_PORT_FRAMEWORKS = ["shokupan", "elysia", "hono"]; // Frameworks supporting Bun's reusePort (Bun.serve)
 
 // Framework/scenario exclusions - scenarios that frameworks don't support

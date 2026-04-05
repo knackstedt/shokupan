@@ -11,12 +11,15 @@ async function main() {
 
     try {
         console.log(`Worker loading ${caseFile}`);
+        console.log(`PORT env: ${process.env.PORT}`);
         // Dynamic import works in bun and node (modern)
         // For CJS node, this returns a promise with the module.
         const mod = await import(caseFile);
+        console.log(`Module imported, keys: ${Object.keys(mod)}`);
         const startFn = mod.start || mod.default?.start;
 
         if (startFn) {
+            console.log(`Calling startFn with port ${port}...`);
             const stop = await startFn(port);
             console.log(`Server started on port ${port}`);
 

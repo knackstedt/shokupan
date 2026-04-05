@@ -6,6 +6,10 @@ import { COMPRESSIBLE_JSON, LARGE_JSON, SMALL_JSON, md5, serializeRequest } from
 export async function startAdvanced(port: number, scenario: string) {
     const app = new Shokupan({
         port,
+        hostname: "127.0.0.1",
+        enableOpenApiGen: false,
+        enableAsyncApiGen: false,
+        development: false,
         logger: {
             verbose: false,
             info: () => { },
