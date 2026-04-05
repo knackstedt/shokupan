@@ -731,7 +731,8 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
             return tracer.startActiveSpan(`${req.method} ${new URL(req.url).pathname}`, attrs, ctx, span => {
                 const ctxStore = new RequestContextStore();
                 ctxStore.span = span;
-                ctxStore.request = req;
+                // Don't store the Request object - it prevents GC and causes memory leaks
+                // ctxStore.request = req;
 
                 return asyncContext.run(ctxStore, () => this.handleRequest(req, server).finally(() => span.end()));
             });
@@ -741,7 +742,8 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         if (this.applicationConfig.enableAsyncLocalStorage) {
             const requestId = this.applicationConfig.idGenerator?.() ?? nanoid();
             const ctxStore = new RequestContextStore();
-            ctxStore.request = req;
+            // Don't store the Request object - it prevents GC and causes memory leaks
+            // ctxStore.request = req;
             ctxStore['requestId'] = requestId;
             ctxStore['app'] = this;
             return asyncContext.run(ctxStore, () => this.handleRequest(req, server, requestId));
@@ -755,8 +757,8 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
         // But ShokupanContext expects ShokupanRequest.
         const request = req as unknown as ShokupanRequest<T>;
 
-        const controller = new AbortController();
-        const ctx = new ShokupanContext<T>(request, server, undefined, this, controller.signal, this.applicationConfig.enableMiddlewareTracking, requestId);
+        const controller = this.applicationConfig.enableAbortController ? new AbortController() : undefined;
+        const ctx = new ShokupanContext<T>(request, server, undefined, this, controller?.signal, this.applicationConfig.enableMiddlewareTracking, requestId);
 
         const handle = async () => {
 
@@ -1022,7 +1024,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
 
             const timeoutPromise = new Promise<never>((_, reject) => {
                 timeoutId = setTimeout(async () => {
-                    controller.abort(); // Signal cancellation to handlers
+                    controller?.abort(); // Signal cancellation to handlers
                     await this.runHooks('onRequestTimeout', ctx);
                     reject(new Error("Request Timeout"));
                 }, timeoutMs);

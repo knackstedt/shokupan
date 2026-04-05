@@ -627,6 +627,13 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
     defaultResponseTransformer?: string;
 
     /**
+     * Whether to enable AbortController for request cancellation.
+     * When enabled, each request gets an AbortController that can be used to cancel the request.
+     * This adds overhead (~5-10% performance impact) but enables request timeout cancellation.
+     * @default false
+     */
+    enableAbortController?: boolean;
+    /**
      * Whether to enable middleware and handler tracking.
      * When enabled, `ctx.handlerStack` will be populated with the handlers the request has passed through.
      * Also, `ctx.state` will be a Proxy that tracks changes made by each handler.
