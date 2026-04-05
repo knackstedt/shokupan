@@ -131,7 +131,7 @@ export class ShokupanContext<
     public state: State;
     public handlerStack: HandlerStackItem[] = [];
 
-    public readonly response: ShokupanResponse;
+    private _response?: ShokupanResponse;
     public [$debug]?: DebugCollector;
     public [$finalResponse]?: Response;
     public [$rawBody]?: string | ArrayBuffer | Uint8Array; // Raw body for compression optimization
@@ -141,6 +141,14 @@ export class ShokupanContext<
      */
     get logger() {
         return this.app?.logger;
+    }
+
+    /**
+     * Response object (lazy-initialized)
+     */
+    get response(): ShokupanResponse {
+        if (!this._response) this._response = new ShokupanResponse();
+        return this._response;
     }
 
     // Body caching to avoid double parsing
@@ -242,7 +250,6 @@ export class ShokupanContext<
                 }
             });
         }
-        this.response = new ShokupanResponse();
     }
 
     get url(): URL {
