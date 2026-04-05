@@ -6,6 +6,7 @@ import getPort, { portNumbers } from "get-port";
 import ora from "ora";
 import path from "path";
 import {
+    BUN_ONLY_FRAMEWORKS,
     BUN_REUSE_PORT_FRAMEWORKS,
     FRAMEWORK_EXCLUSIONS,
     MemorySample,
@@ -41,8 +42,15 @@ export async function compileForNode(targetFrameworks: string[]) {
     const externals = Object.keys(pkg.dependencies || {}).concat(Object.keys(pkg.devDependencies || {}));
     const externalFlags = externals.flatMap(e => ["--external", e]);
 
+    // Filter out Bun-only frameworks from Node.js compilation
+    const nodeFrameworks = targetFrameworks.filter(f => !BUN_ONLY_FRAMEWORKS.includes(f));
+    if (nodeFrameworks.length === 0) {
+        console.log("No frameworks to compile for Node.js (all are Bun-only)");
+        return;
+    }
+
     // Compile each case individually to ensure proper output
-    for (const framework of targetFrameworks) {
+    for (const framework of nodeFrameworks) {
         const entrypoint = path.join(CASES_DIR, `${framework}.ts`);
         const outfile = path.join(DIST_DIR, `${framework}.cjs`);
 
@@ -231,8 +239,8 @@ async function runBenchmarkWithProcessCount(
 
         const proc = spawn(cmd, {
             env,
-            stdout: "pipe",
-            stderr: "pipe",
+            stdout: runtime === "bun" ? "inherit" : "pipe",
+            stderr: runtime === "bun" ? "inherit" : "pipe",
             onExit(proc, exitCode, signalCode, error) {
                 const isExpectedSignal = signalCode === 15 || signalCode === 2;
                 if (exitCode !== 0 && !isExpectedSignal) {
@@ -263,7 +271,10 @@ async function runBenchmarkWithProcessCount(
             } catch (e) { }
         };
 
-        pipeStream(proc.stderr, process.stderr);
+        // Only pipe stderr for non-Bun runtimes since Bun uses inherit
+        if (runtime !== "bun") {
+            pipeStream(proc.stderr, process.stderr);
+        }
         procs.push(proc);
         allOutputLines.push(outputLines);
     }

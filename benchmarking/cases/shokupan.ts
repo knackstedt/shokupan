@@ -4,6 +4,10 @@ import { MEDIUM_JSON } from "../data";
 export async function start(port: number) {
     const app = new Shokupan({
         port,
+        hostname: "127.0.0.1",
+        enableOpenApiGen: false,
+        enableAsyncApiGen: false,
+        development: false,
         logger: {
             verbose: false,
             info: () => { },

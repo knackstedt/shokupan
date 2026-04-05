@@ -55,8 +55,14 @@ async function compileForNode(targetFrameworks: string[]) {
     const externals = Object.keys(pkg.dependencies || {}).concat(Object.keys(pkg.devDependencies || {}));
     const externalFlags = externals.flatMap(e => ["--external", e]);
 
-    // Compile cases
-    const entrypoints = targetFrameworks.map(f => path.join(CASES_DIR, `${f}.ts`));
+    // Compile cases - filter out Bun-only frameworks
+    const nodeFrameworks = targetFrameworks.filter(f => !BUN_ONLY_FRAMEWORKS.includes(f));
+    if (nodeFrameworks.length === 0) {
+        console.log("No frameworks to compile for Node.js (all are Bun-only)");
+        return;
+    }
+    
+    const entrypoints = nodeFrameworks.map(f => path.join(CASES_DIR, `${f}.ts`));
     const casesProc = spawn(["bun", "build",
         ...entrypoints,
         "--outdir", DIST_DIR,
@@ -121,8 +127,8 @@ async function runBenchmark(framework: string, runtime: string) {
 
     const proc = spawn(cmd, {
         env,
-        stdout: "pipe",
-        stderr: "pipe",
+        stdout: runtime === "bun" ? "inherit" : "pipe",
+        stderr: runtime === "bun" ? "inherit" : "pipe",
         onExit(proc, exitCode, signalCode, error) {
             const isExpectedSignal = signalCode === 15 || signalCode === 2;
             if (exitCode !== 0 && !isExpectedSignal) {
@@ -150,8 +156,11 @@ async function runBenchmark(framework: string, runtime: string) {
     };
 
     const outputLines: string[] = [];
-    pipeStream(proc.stdout, process.stdout);
-    pipeStream(proc.stderr, process.stderr);
+    // Only pipe for non-Bun runtimes since Bun uses inherit
+    if (runtime !== "bun") {
+        pipeStream(proc.stdout, process.stdout);
+        pipeStream(proc.stderr, process.stderr);
+    }
 
     await new Promise(r => setTimeout(r, 1500));
 
