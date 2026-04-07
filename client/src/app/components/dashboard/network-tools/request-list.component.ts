@@ -25,6 +25,10 @@ export class RequestListComponent {
     onContextMenu = output<any>();
 
     filterText = signal('');
+    directionFilter = signal<'all' | 'inbound' | 'outbound'>('all');
+    excludePluginRequests = signal(false);
+    excludeStaticAssets = signal(false);
+    excludeProxiedRequests = signal(false);
 
     // Column configuration
     cols = [
@@ -117,11 +121,18 @@ export class RequestListComponent {
     }
 
     /**
-     * Get width for a specific column
+     * Get width for a specific column - memoized for performance
      */
-    getColWidth(field: string): number {
-        return this.colWidths()[field] ?? this.DEFAULT_WIDTHS[field] ?? 100;
-    }
+    private colWidthCache = new Map<string, number>();
+    getColWidth = (field: string): number => {
+        const widths = this.colWidths();
+        const cacheKey = `${field}-${widths[field]}`;
+        if (!this.colWidthCache.has(cacheKey)) {
+            this.colWidthCache.clear(); // Clear cache when widths change
+            this.colWidthCache.set(cacheKey, widths[field] ?? this.DEFAULT_WIDTHS[field] ?? 100);
+        }
+        return this.colWidthCache.get(cacheKey)!;
+    };
 
     /**
      * Load column settings from localStorage
@@ -222,17 +233,66 @@ export class RequestListComponent {
         this.colContextMenu().show(event);
     }
 
+    // Constants for filtering - defined once to avoid recreation
+    private readonly PLUGIN_PATHS = ['/dashboard', '/scalar', '/openapi', '/asyncapi', '/_app', '/@vite', '/__vite'];
+    private readonly STATIC_EXTENSIONS = ['.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.woff', '.woff2', '.ttf', '.eot', '.map', '.webp', '.avif'];
+
     // Waterfall range
 
     filteredRequests = computed(() => {
         const query = this.filterText().toLowerCase();
         const reqs = this.requests();
+        const direction = this.directionFilter();
+        const excludePlugins = this.excludePluginRequests();
+        const excludeStatic = this.excludeStaticAssets();
+        const excludeProxied = this.excludeProxiedRequests();
+
+        // Early return if no filters active
+        if (!query && direction === 'all' && !excludePlugins && !excludeStatic && !excludeProxied) {
+            return reqs;
+        }
 
         return reqs.filter(r => {
-            return !query ||
-                r.url.toLowerCase().includes(query) ||
-                r.method.toLowerCase().includes(query) ||
-                (r.status && String(r.status).includes(query));
+            // Filter by direction first (cheapest check)
+            if (direction !== 'all' && r.direction !== direction) return false;
+
+            // Filter out proxied/outbound requests if enabled
+            if (excludeProxied && r.direction === 'outbound') return false;
+
+            // Filter out plugin requests if enabled (includes Vite and _app)
+            if (excludePlugins) {
+                const path = r.path || '';
+                const url = r.url;
+                for (let i = 0; i < this.PLUGIN_PATHS.length; i++) {
+                    if (path.startsWith(this.PLUGIN_PATHS[i]) || url.includes(this.PLUGIN_PATHS[i])) {
+                        return false;
+                    }
+                }
+            }
+
+            // Filter out static assets if enabled
+            if (excludeStatic) {
+                const urlLower = r.url.toLowerCase();
+                const pathLower = r.path?.toLowerCase() || '';
+                for (let i = 0; i < this.STATIC_EXTENSIONS.length; i++) {
+                    if (urlLower.endsWith(this.STATIC_EXTENSIONS[i]) || pathLower.endsWith(this.STATIC_EXTENSIONS[i])) {
+                        return false;
+                    }
+                }
+            }
+
+            // Filter by search query last (most expensive)
+            if (query) {
+                const urlLower = r.url.toLowerCase();
+                const methodLower = r.method.toLowerCase();
+                const statusStr = r.status ? String(r.status) : '';
+
+                if (!urlLower.includes(query) && !methodLower.includes(query) && !statusStr.includes(query)) {
+                    return false;
+                }
+            }
+
+            return true;
         });
     });
 
@@ -307,73 +367,115 @@ export class RequestListComponent {
         };
     });
 
-    isColVisible(field: string): boolean {
-        return this.selectedCols().includes(field);
-    }
+    // Memoize column visibility checks
+    private colVisibilityCache = new Map<string, boolean>();
+    isColVisible = (field: string): boolean => {
+        const cols = this.selectedCols();
+        const cacheKey = cols.join(',');
+        if (this.colVisibilityCache.size === 0 || !this.colVisibilityCache.has(field)) {
+            this.colVisibilityCache.clear();
+            cols.forEach(col => this.colVisibilityCache.set(col, true));
+        }
+        return this.colVisibilityCache.has(field);
+    };
 
-    getName(url: string) {
-        try {
-            const u = new URL(url, 'http://localhost');
-            const parts = u.pathname.split('/');
-            return parts[parts.length - 1] || u.hostname || url;
-        } catch { return url; }
-    }
+    // Memoize getName to avoid repeated URL parsing
+    private nameCache = new Map<string, string>();
+    getName = (url: string): string => {
+        if (!this.nameCache.has(url)) {
+            try {
+                const u = new URL(url, 'http://localhost');
+                const parts = u.pathname.split('/');
+                this.nameCache.set(url, parts[parts.length - 1] || u.hostname || url);
+            } catch {
+                this.nameCache.set(url, url);
+            }
+        }
+        return this.nameCache.get(url)!;
+    };
 
-    getWaterfallStyle(req: NetworkRequest) {
+    // Memoize waterfall styles
+    private waterfallCache = new Map<string, any>();
+    private lastTimeRange: { min: number; max: number } = { min: 0, max: 0 };
+
+    getWaterfallStyle = (req: NetworkRequest): any => {
         const { min, max } = this.timeRange();
-        const range = Math.max(1, max - min);
-        const startPct = ((req.timestamp - min) / range) * 100;
-        const widthPct = Math.max(0.5, (req.duration / range) * 100);
 
-        const color = req.duration > 1000 ? '#ef4444' : req.duration > 500 ? '#f59e0b' : '#3b82f6';
+        // Clear cache if time range changed
+        if (min !== this.lastTimeRange.min || max !== this.lastTimeRange.max) {
+            this.waterfallCache.clear();
+            this.lastTimeRange = { min, max };
+        }
 
-        return {
-            'left': `min(${startPct}%, calc(100% - 2px))`,
-            'width': `${widthPct}%`,
-            'background-color': color
-        };
-    }
+        const cacheKey = `${req.id}-${req.timestamp}-${req.duration}`;
+        if (!this.waterfallCache.has(cacheKey)) {
+            const range = Math.max(1, max - min);
+            const startPct = ((req.timestamp - min) / range) * 100;
+            const widthPct = Math.max(0.5, (req.duration / range) * 100);
+            const color = req.duration > 1000 ? '#ef4444' : req.duration > 500 ? '#f59e0b' : '#3b82f6';
 
-    getWSWaterfallData(req: NetworkRequest) {
+            this.waterfallCache.set(cacheKey, {
+                'left': `min(${startPct}%, calc(100% - 2px))`,
+                'width': `${widthPct}%`,
+                'background-color': color
+            });
+        }
+        return this.waterfallCache.get(cacheKey);
+    };
+
+    // Memoize WebSocket waterfall data
+    private wsWaterfallCache = new Map<string, any>();
+
+    getWSWaterfallData = (req: NetworkRequest): any => {
         const { min, max } = this.timeRange();
+
+        // Clear cache if time range changed
+        if (min !== this.lastTimeRange.min || max !== this.lastTimeRange.max) {
+            this.wsWaterfallCache.clear();
+        }
+
         const messages = req.wsMessages || [];
-        const range = Math.max(1, max - min);
+        const cacheKey = `${req.id}-${messages.length}-${min}-${max}`;
 
-        const openEvent = messages.find(m => m.type === 'open');
-        const closeEvent = messages.find(m => m.type === 'close');
+        if (!this.wsWaterfallCache.has(cacheKey)) {
+            const range = Math.max(1, max - min);
+            const openEvent = messages.find(m => m.type === 'open');
+            const closeEvent = messages.find(m => m.type === 'close');
 
-        let wsStart = req.timestamp;
-        let wsEnd = req.timestamp + (req.duration || 0);
-        let isOpen = !closeEvent;
+            let wsStart = req.timestamp;
+            let wsEnd = req.timestamp + (req.duration || 0);
+            let isOpen = !closeEvent;
 
-        if (openEvent) wsStart = openEvent.timestamp;
-        if (isOpen) wsEnd = Math.max(wsEnd, max);
+            if (openEvent) wsStart = openEvent.timestamp;
+            if (isOpen) wsEnd = Math.max(wsEnd, max);
 
-        const wsStartPct = Math.max(0, ((wsStart - min) / range) * 100);
-        const wsEndPct = Math.min(100, ((wsEnd - min) / range) * 100);
+            const wsStartPct = Math.max(0, ((wsStart - min) / range) * 100);
+            const wsEndPct = Math.min(100, ((wsEnd - min) / range) * 100);
 
-        return {
-            lineStyle: {
-                'left': `${wsStartPct}%`,
-                'width': `${Math.max(0.5, wsEndPct - wsStartPct)}%`
-            },
-            startMarkerStyle: { 'left': `${wsStartPct}%` },
-            endMarkerStyle: { 'left': `${wsEndPct}%` },
-            isOpen,
-            pixels: messages.filter(m => m.type === 'message').map(msg => {
-                const msgPct = ((msg.timestamp - min) / range) * 100;
-                const isOut = msg.dir === 'out';
-                return {
-                    style: {
-                        'left': `${msgPct}%`,
-                        'background-color': isOut ? '#10b981' : '#3b82f6',
-                        [isOut ? 'bottom' : 'top']: 'calc(50% + 2px)'
-                    },
-                    title: `${isOut ? 'Send' : 'Recv'}: ${formatBytes(msg.size)}`
-                };
-            })
-        };
-    }
+            this.wsWaterfallCache.set(cacheKey, {
+                lineStyle: {
+                    'left': `${wsStartPct}%`,
+                    'width': `${Math.max(0.5, wsEndPct - wsStartPct)}%`
+                },
+                startMarkerStyle: { 'left': `${wsStartPct}%` },
+                endMarkerStyle: { 'left': `${wsEndPct}%` },
+                isOpen,
+                pixels: messages.filter(m => m.type === 'message').map(msg => {
+                    const msgPct = ((msg.timestamp - min) / range) * 100;
+                    const isOut = msg.dir === 'out';
+                    return {
+                        style: {
+                            'left': `${msgPct}%`,
+                            'background-color': isOut ? '#10b981' : '#3b82f6',
+                            [isOut ? 'bottom' : 'top']: 'calc(50% + 2px)'
+                        },
+                        title: `${isOut ? 'Send' : 'Recv'}: ${formatBytes(msg.size)}`
+                    };
+                })
+            });
+        }
+        return this.wsWaterfallCache.get(cacheKey);
+    };
 
     onRowSelect(args: [UIEvent, any]) {
         const [uiEvent, row] = args;
@@ -405,46 +507,54 @@ export class RequestListComponent {
         }
     };
 
-    extractCaller(callStack: string): string {
+    // Memoize extractCaller to avoid repeated regex operations
+    private callerCache = new Map<string, string>();
+    extractCaller = (callStack: string): string => {
         if (!callStack) return '';
 
-        // Extract the first line from the call stack
-        const line = callStack.split('\n')[0];
-        const file = line.match(/\/([^\/]+\.[tj]sx?):\d+:\d+/);
-        return file ? file[1] : '';
-    }
+        if (!this.callerCache.has(callStack)) {
+            const line = callStack.split('\n')[0];
+            const file = line.match(/\/([^\/]+\.[tj]sx?):\d+:\d+/);
+            this.callerCache.set(callStack, file ? file[1] : '');
+        }
+        return this.callerCache.get(callStack)!;
+    };
 
     /**
      * Extracts the full file path, line, and column from a call stack line.
      * Returns null if no valid file path is found.
+     * Memoized for performance.
      */
-    extractCallerInfo(callStack: string): { displayText: string; fullPath: string; line: number; column: number } | null {
+    private callerInfoCache = new Map<string, { displayText: string; fullPath: string; line: number; column: number } | null>();
+    extractCallerInfo = (callStack: string): { displayText: string; fullPath: string; line: number; column: number } | null => {
         if (!callStack) {
             return null;
-        };
-
-        const line = callStack.split('\n')[0]?.trim();
-
-        // Match file paths with line and column numbers: /path/file.ts:123:45
-        const match = line.match(/\s*at\s+(?<function>\S+?)?\s+\(?(?<filePath>.+?):(?<line>\d+):(?<column>\d+)\)?/);
-        if (match) {
-            const { filePath, line: lineStr, column: colStr } = match.groups as { filePath: string; line: string; column: string };
-
-            // Extract just the filename for display
-            const parts = filePath.split('/');
-            const shortPath = parts.slice(-1)[0];
-
-            return {
-                displayText: shortPath || filePath,
-                fullPath: filePath,
-                line: parseInt(lineStr, 10) || 1,
-                column: parseInt(colStr, 10) || 1
-            };
         }
 
-        console.log('No valid caller info found in call stack:', callStack);
-        return null;
-    }
+        if (!this.callerInfoCache.has(callStack)) {
+            const line = callStack.split('\n')[0]?.trim();
+
+            // Match file paths with line and column numbers: /path/file.ts:123:45
+            const match = line.match(/\s*at\s+(?<function>\S+?)?\s+\(?(?<filePath>.+?):(?<line>\d+):(?<column>\d+)\)?/);
+            if (match) {
+                const { filePath, line: lineStr, column: colStr } = match.groups as { filePath: string; line: string; column: string };
+
+                // Extract just the filename for display
+                const parts = filePath.split('/');
+                const shortPath = parts.slice(-1)[0];
+
+                this.callerInfoCache.set(callStack, {
+                    displayText: shortPath || filePath,
+                    fullPath: filePath,
+                    line: parseInt(lineStr, 10) || 1,
+                    column: parseInt(colStr, 10) || 1
+                });
+            } else {
+                this.callerInfoCache.set(callStack, null);
+            }
+        }
+        return this.callerInfoCache.get(callStack)!;
+    };
 
     /**
      * Generates an IDE link (vscode://file) for opening the file at a specific line.

@@ -40,19 +40,34 @@ export class RequestDetailsComponent {
 
     readonly activeTab = signal<string | number>('headers');
 
+    /** Compute which tabs are available based on request data */
+    readonly availableTabs = computed(() => {
+        const req = this.request();
+        const tabs = ['headers'];
+        if (this.queryParams().length > 0) tabs.push('params');
+        if (!this.isWs()) {
+            tabs.push('payload', 'response');
+        }
+        tabs.push('cookies', 'timings');
+        if (req.callStack) tabs.push('caller');
+        if (this.isWs()) tabs.push('timeline');
+        return tabs;
+    });
+
     readonly decodedBody = signal<string | null>(null);
     readonly isDecoding = signal(false);
 
     readonly loadedRequestBody = signal<any>(null);
     readonly loadedResponseBody = signal<any>(null);
     readonly isLoadingPayload = signal(false);
+    readonly isLoadingMetadata = signal(false);
 
     constructor() {
         this.destroyRef.onDestroy(() => {
             this.worker?.terminate();
         });
 
-        // Effect for request change: reset states
+        // Effect for request change: reset states and validate tab
         effect(() => {
             const _ = this.request();
             this.decodedBody.set(null);
@@ -64,6 +79,13 @@ export class RequestDetailsComponent {
             if (this.worker) {
                 this.worker.terminate();
                 this.worker = null;
+            }
+
+            // Validate active tab - switch to headers if current tab is not available
+            const currentTab = this.activeTab();
+            const available = this.availableTabs();
+            if (!available.includes(currentTab as string)) {
+                this.activeTab.set('headers');
             }
         });
 
@@ -88,6 +110,19 @@ export class RequestDetailsComponent {
             }
         });
     }
+
+    /** Methods that typically have request bodies */
+    private readonly methodsWithBody = ['POST', 'PUT', 'PATCH', 'DELETE'];
+
+    /** Check if payload tab should be shown based on HTTP method or hasRequestBody flag */
+    readonly shouldShowPayloadTab = computed(() => {
+        const req = this.request();
+        // Show payload tab if: hasRequestBody is true, OR method typically has body
+        return req.hasRequestBody || this.methodsWithBody.includes(req.method);
+    });
+
+    readonly formattedRequestBody = signal<string | null>(null);
+    readonly formattedResponseBody = signal<string | null>(null);
 
     readonly hasCompression = computed(() => {
         const req = this.request();
@@ -427,6 +462,89 @@ export class RequestDetailsComponent {
 
     copyToClipboard(text: string) {
         navigator.clipboard.writeText(text);
+    }
+
+    /**
+     * Format JSON body content and update the formatted signal
+     */
+    formatJson(type: 'request' | 'response') {
+        const body = type === 'request'
+            ? (this.loadedRequestBody() || this.request().requestBody)
+            : (this.decodedBody() || this.loadedResponseBody() || this.request().responseBody || this.request().body);
+
+        if (!body) return;
+
+        const bodyStr = this.bodyString(body);
+
+        // Try to parse and format as JSON
+        try {
+            let parsed: any;
+
+            // If it's already an object, use it directly
+            if (typeof body === 'object' && !body.__binary) {
+                parsed = body;
+            } else if (typeof bodyStr === 'string') {
+                // Try to parse the string as JSON
+                parsed = JSON.parse(bodyStr);
+            } else {
+                return; // Can't format
+            }
+
+            const formatted = JSON.stringify(parsed, null, 2);
+
+            if (type === 'request') {
+                this.formattedRequestBody.set(formatted);
+            } else {
+                this.formattedResponseBody.set(formatted);
+            }
+        } catch {
+            // Not valid JSON, ignore
+        }
+    }
+
+    /**
+     * Get the display code for Monaco editor (formatted or raw)
+     */
+    getDisplayCode(type: 'request' | 'response'): string {
+        const formatted = type === 'request' ? this.formattedRequestBody() : this.formattedResponseBody();
+        if (formatted) return formatted;
+
+        const body = type === 'request'
+            ? (this.loadedRequestBody() || this.request().requestBody)
+            : (this.decodedBody() || this.loadedResponseBody() || this.request().responseBody || this.request().body);
+
+        return this.bodyString(body);
+    }
+
+    /**
+     * Check if the body is valid JSON that can be formatted
+     */
+    canFormatJson(type: 'request' | 'response'): boolean {
+        const body = type === 'request'
+            ? (this.loadedRequestBody() || this.request().requestBody)
+            : (this.decodedBody() || this.loadedResponseBody() || this.request().responseBody || this.request().body);
+
+        if (!body) return false;
+
+        // Already formatted
+        if ((type === 'request' && this.formattedRequestBody()) ||
+            (type === 'response' && this.formattedResponseBody())) {
+            return false;
+        }
+
+        const bodyStr = this.bodyString(body);
+
+        // Check if it's valid JSON
+        try {
+            if (typeof body === 'object' && !body.__binary) return true;
+            if (typeof bodyStr === 'string') {
+                JSON.parse(bodyStr);
+                return true;
+            }
+            return false;
+        } catch {
+            return false;
+        }
     }
 
     /**

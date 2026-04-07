@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, input, model, output, signal } from '@angular/core';
+import { Component, computed, input, model, output, signal, viewChild } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { AngularSplitModule } from 'angular-split';
 import { NgScrollbarModule } from 'ngx-scrollbar';
 import { MenuItem } from 'primeng/api';
@@ -14,6 +15,7 @@ import { RequestListComponent } from './request-list.component';
     standalone: true,
     imports: [
         CommonModule,
+        FormsModule,
         AngularSplitModule,
         NgScrollbarModule,
         RequestListComponent,
@@ -28,6 +30,9 @@ export class NetworkToolsComponent {
     requests = input<NetworkRequest[]>([]);
     selectedId = model<string | null>(null);
     onClear = output<void>();
+
+    // Get reference to request list to access its filter signals
+    requestList = viewChild.required<RequestListComponent>('requestList');
 
     readonly selectedRequest = computed(() => {
         const id = this.selectedId();
@@ -76,6 +81,42 @@ export class NetworkToolsComponent {
     clear() {
         this.onClear.emit();
         this.selectedId.set(null);
+    }
+
+    togglePluginFilter() {
+        const list = this.requestList();
+        list.excludePluginRequests.set(!list.excludePluginRequests());
+    }
+
+    toggleStaticFilter() {
+        const list = this.requestList();
+        list.excludeStaticAssets.set(!list.excludeStaticAssets());
+    }
+
+    toggleProxiedFilter() {
+        const list = this.requestList();
+        list.excludeProxiedRequests.set(!list.excludeProxiedRequests());
+    }
+
+    setDirectionFilter(direction: 'all' | 'inbound' | 'outbound') {
+        const list = this.requestList();
+        list.directionFilter.set(direction);
+    }
+
+    get directionFilter() {
+        return this.requestList()?.directionFilter() ?? 'all';
+    }
+
+    get excludePlugins() {
+        return this.requestList()?.excludePluginRequests() ?? false;
+    }
+
+    get excludeStatic() {
+        return this.requestList()?.excludeStaticAssets() ?? false;
+    }
+
+    get excludeProxied() {
+        return this.requestList()?.excludeProxiedRequests() ?? false;
     }
 
     private copyToClipboard(text: string) {

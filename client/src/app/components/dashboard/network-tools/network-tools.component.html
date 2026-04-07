@@ -7,14 +7,32 @@
             </svg>
         </button>
         <div class="divider"></div>
-        <!-- Filtering will be inside RequestListComponent for better encapsulation or here?
-             Let's put global filter in List component for now as it's standard DevTools behavior. -->
+        <div class="direction-filter">
+            <button class="direction-btn" [class.active]="directionFilter === 'all'" (click)="setDirectionFilter('all')">All</button>
+            <button class="direction-btn" [class.active]="directionFilter === 'inbound'" (click)="setDirectionFilter('inbound')">Inbound</button>
+            <button class="direction-btn" [class.active]="directionFilter === 'outbound'" (click)="setDirectionFilter('outbound')">Outbound</button>
+        </div>
+        <div class="divider"></div>
+        <div class="filter-group">
+            <label class="filter-checkbox">
+                <input type="checkbox" [ngModel]="excludePlugins" (ngModelChange)="togglePluginFilter()" />
+                <span>Excl. Plugins</span>
+            </label>
+            <label class="filter-checkbox">
+                <input type="checkbox" [ngModel]="excludeStatic" (ngModelChange)="toggleStaticFilter()" />
+                <span>Excl. Static</span>
+            </label>
+            <label class="filter-checkbox">
+                <input type="checkbox" [ngModel]="excludeProxied" (ngModelChange)="toggleProxiedFilter()" />
+                <span>Excl. Proxied</span>
+            </label>
+        </div>
     </div>
 
     <div class="content">
         <as-split direction="horizontal" [gutterSize]="4">
             <as-split-area [size]="selectedRequest() ? 40 : 100">
-                <skp-request-list [requests]="requests()" [(selectedId)]="selectedId" [contextMenu]="cm"
+                <skp-request-list #requestList [requests]="requests()" [(selectedId)]="selectedId" [contextMenu]="cm"
                     (onSelect)="selectRequest($any($event))"
                     (onContextMenu)="onRowContextMenu($any($event))"></skp-request-list>
             </as-split-area>
