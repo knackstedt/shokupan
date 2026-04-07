@@ -8,7 +8,10 @@ import { TooltipModule } from 'primeng/tooltip';
 import { HeaderTokensPipe } from './header-tokens.pipe';
 import { getHeaderUrl, getStatusCodeUrl, isHeaderDocumented } from './http-reference.data';
 import { NetworkRequest, formatBytes, formatDurationPretty, generateCurlCode, generateFetchCode, generateHAR } from './network-utils';
+import { UrlHighlightComponent } from './url-highlight.component';
 import { isSupportedEncoding } from './util/decompression';
+
+
 @Component({
     selector: 'skp-request-details',
     standalone: true,
@@ -24,7 +27,8 @@ import { isSupportedEncoding } from './util/decompression';
         KeyValuePipe,
         NgScrollbarModule,
         MonacoEditorComponent,
-        HeaderTokensPipe
+        HeaderTokensPipe,
+        UrlHighlightComponent
     ],
     templateUrl: './request-details.component.html',
     styleUrl: './request-details.component.scss',

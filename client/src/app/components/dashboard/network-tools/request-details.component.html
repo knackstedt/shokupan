@@ -16,7 +16,7 @@
         </button>
         <div class="request-summary">
             <span class="method" [class.method-ws]="isWs()">{{ isWs() ? 'WS' : request().method }}</span>
-            <span class="url" [title]="request().url">{{ request().url }}</span>
+            <span class="url" [title]="request().url"><skp-url-highlight [url]="request().url" /></span>
             <button class="btn-icon" (click)="copyToClipboard(request().url)" title="Copy URL">
                 <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z" />
@@ -55,12 +55,12 @@
         <p-tabpanels>
             <!-- ── Headers ──────────────────────────────────────────────── -->
             <p-tabpanel value="headers">
-                <ng-scrollbar class="tab-content">
+                <ng-scrollbar class="tab-content" orientation="vertical">
                     <section>
                         <h3>General</h3>
                         <div class="kv-grid">
                             <div class="key">Request URL:</div>
-                            <div class="val hl-url">{{ request().url }}</div>
+                            <div class="val hl-url"><skp-url-highlight [url]="request().url" /></div>
                             <button class="copy-btn" (click)="copyToClipboard(request().url)" title="Copy">
                                 <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
                                     <path
