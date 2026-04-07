@@ -171,6 +171,7 @@
             .val {
                 color: var(--text-primary);
                 word-break: break-all;
+                overflow: hidden;
 
                 // ── Syntax highlight classes ─────────────────────────────
                 &.hl-auth {
