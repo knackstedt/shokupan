@@ -30,11 +30,11 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies 1
-        run: bun install
+        run: bun ci
 
       - name: Install dependencies 2
         working-directory: ./docs
-        run: bun install
+        run: bun ci
 
       - name: Build documentation
         working-directory: ./docs

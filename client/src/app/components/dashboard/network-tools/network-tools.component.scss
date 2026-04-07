@@ -39,6 +39,63 @@
             height: 16px;
             background: var(--border-color);
         }
+
+        .direction-filter {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: var(--bg-primary);
+            border-radius: 4px;
+            padding: 2px;
+
+            .direction-btn {
+                background: transparent;
+                border: none;
+                color: var(--text-secondary);
+                cursor: pointer;
+                padding: 4px 12px;
+                font-size: 13px;
+                border-radius: 3px;
+                transition: all 0.15s ease;
+
+                &:hover {
+                    background: var(--bg-hover);
+                    color: var(--text-primary);
+                }
+
+                &.active {
+                    background: var(--palette-primary, #3b82f6);
+                    color: white;
+                }
+            }
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .filter-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            user-select: none;
+            font-size: 13px;
+            color: var(--text-primary);
+
+            input[type="checkbox"] {
+                cursor: pointer;
+                width: 16px;
+                height: 16px;
+                accent-color: var(--palette-primary, #3b82f6);
+            }
+
+            span {
+                font-size: 13px;
+            }
+        }
     }
 
     .content {

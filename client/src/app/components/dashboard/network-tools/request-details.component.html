@@ -1,4 +1,12 @@
 <div class="details-container">
+    @if (isLoadingMetadata()) {
+    <div class="loading-overlay">
+        <div class="loading-content">
+            <i class="pi pi-spin pi-spinner" style="font-size: 2rem; color: var(--primary)"></i>
+            <span>Loading request details...</span>
+        </div>
+    </div>
+    }
     <div class="details-header">
         <button class="btn-icon" (click)="onClose.emit()" title="Close details">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
@@ -9,6 +17,12 @@
         <div class="request-summary">
             <span class="method" [class.method-ws]="isWs()">{{ isWs() ? 'WS' : request().method }}</span>
             <span class="url" [title]="request().url">{{ request().url }}</span>
+            <button class="btn-icon" (click)="copyToClipboard(request().url)" title="Copy URL">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z" />
+                    <path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h-1v1H2V6h1V5H2z" />
+                </svg>
+            </button>
         </div>
         <div class="actions">
             <button pButton class="p-button-text p-button-sm" (click)="copyAsCurl()">cURL</button>
@@ -23,8 +37,10 @@
             @if (queryParams().length > 0) {
             <p-tab value="params">Params</p-tab>
             }
-            @if (!isWs()) {
+            @if (shouldShowPayloadTab()) {
             <p-tab value="payload">Payload</p-tab>
+            }
+            @if (!isWs()) {
             <p-tab value="response">Response</p-tab>
             }
             <p-tab value="cookies">Cookies</p-tab>
@@ -223,12 +239,17 @@
 
             <!-- ── Payload ──────────────────────────────────────────────── -->
             <p-tabpanel value="payload">
-                <ng-scrollbar class="tab-content">
-                    @if (request().requestBody) {
+                <ng-scrollbar class="tab-content" orientation="vertical">
+                    @if (request().hasRequestBody) {
                     <div class="editor-header">
                         <span>Request Payload</span>
-                        <button pButton class="p-button-text p-button-sm"
-                            (click)="copyToClipboard(bodyString(loadedRequestBody() || request().requestBody))">Copy</button>
+                        <div class="actions">
+                            @if (canFormatJson('request')) {
+                            <button pButton class="p-button-text p-button-sm" (click)="formatJson('request')">Format</button>
+                            }
+                            <button pButton class="p-button-text p-button-sm"
+                                (click)="copyToClipboard(getDisplayCode('request'))">Copy</button>
+                        </div>
                     </div>
                     <div class="monaco-wrapper">
                         @if (isLoadingPayload() && !loadedRequestBody()) {
@@ -236,11 +257,11 @@
                             <i class="pi pi-spin pi-spinner" style="font-size: 2rem; color: var(--primary)"></i>
                             <span>Loading request body...</span>
                         </div>
-                        } @else if (!bodyString(loadedRequestBody() || request().requestBody)) {
+                        } @else if (!getDisplayCode('request')) {
                         <div class="empty-msg">No request body content available</div>
                         }
 
-                        <ngx-monaco-editor [code]="bodyString(loadedRequestBody() || request().requestBody)"
+                        <ngx-monaco-editor [code]="getDisplayCode('request')"
                             [language]="bodyLanguage(loadedRequestBody() || request().requestBody, request().requestHeaders?.['content-type'] || request().requestHeaders?.['Content-Type'])"
                             [readOnly]="true" [lineNumbers]="'off'" [minimapEnabled]="false"
                             [scrollBeyondLastLine]="false" [automaticLayout]="true" theme="vs-dark"
@@ -255,8 +276,8 @@
 
             <!-- ── Response ─────────────────────────────────────────────── -->
             <p-tabpanel value="response">
-                <ng-scrollbar class="tab-content">
-                    @if (request().responseBody || request().body) {
+                <ng-scrollbar class="tab-content" orientation="vertical">
+                    @if (request().hasResponseBody || request().body) {
                     <div class="editor-header">
                         <div class="flex-1 flex gap-2 align-items-center">
                             <span>Response Body</span>
@@ -267,8 +288,11 @@
                             }
                         </div>
                         <div class="actions">
+                            @if (canFormatJson('response')) {
+                            <button pButton class="p-button-text p-button-sm" (click)="formatJson('response')">Format</button>
+                            }
                             <button pButton class="p-button-text p-button-sm"
-                                (click)="copyToClipboard(bodyString(decodedBody() || loadedResponseBody() || request().responseBody || request().body))">Copy</button>
+                                (click)="copyToClipboard(getDisplayCode('response'))">Copy</button>
                             <button pButton class="p-button-text p-button-sm"
                                 (click)="downloadResponse()">Download</button>
                         </div>
@@ -292,13 +316,12 @@
                             <i class="pi pi-exclamation-triangle" style="font-size: 2rem;"></i>
                             <pre>{{ bodyString(decodedBody() || loadedResponseBody()) }}</pre>
                         </div>
-                        } @else if (!bodyString(decodedBody() || loadedResponseBody() || request().responseBody ||
-                        request().body)) {
+                        } @else if (!getDisplayCode('response')) {
                         <div class="empty-msg">No body content available</div>
                         }
 
                         <ngx-monaco-editor
-                            [code]="bodyString(decodedBody() || loadedResponseBody() || request().responseBody || request().body)"
+                            [code]="getDisplayCode('response')"
                             [language]="bodyLanguage(decodedBody() || loadedResponseBody() || request().responseBody || request().body, request().contentType || request().responseHeaders?.['content-type'])"
                             [readOnly]="true" [lineNumbers]="'off'" [minimapEnabled]="false"
                             [scrollBeyondLastLine]="false" [automaticLayout]="true" theme="vs-dark"
@@ -307,7 +330,7 @@
 
                         <!-- Fallback in case Monaco fails to render -->
                         <div class="monaco-fallback">
-                            <pre>{{ bodyString(decodedBody() || loadedResponseBody() || request().responseBody || request().body) }}</pre>
+                            <pre>{{ getDisplayCode('response') }}</pre>
                         </div>
                     </div>
                     } @else {
