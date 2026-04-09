@@ -27,7 +27,7 @@
                             <div>
                                 <div>
                                     @if (user()?.picture) {
-                                        <img [src]="user()!.picture" alt="Avatar" />
+                                        <img [src]="user()!.picture" alt="Avatar" style="max-width: 128px; border-radius: 6px;" />
                                     } @else {
                                         <div>
                                             <i class="pi pi-user"></i>
