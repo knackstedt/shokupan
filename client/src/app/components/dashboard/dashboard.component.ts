@@ -4,7 +4,6 @@ import {
     inject,
     OnDestroy, OnInit, signal
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AppRegistryTreeComponent } from './app-registry-tree.component';
 import { AppGraphComponent } from './graph/app-graph.component';
 import { NetworkToolsComponent } from './network-tools/network-tools.component';
@@ -152,42 +151,34 @@ export class DashboardComponent implements OnInit, OnDestroy {
         });
     }
     fetchRequests(): void {
-        this.http.get<{ requests: any[]; }>('/dashboard/requests')
-            .pipe(takeUntilDestroyed())
-            .subscribe({
-                next: ({ requests }) => this.requests.set(requests.map((r: any) => ({ ...r, id: r.id || `${r.timestamp}-${r.method}-${r.url}` }))),
-                error: () => { },
-            });
-        this.http.get<{ metrics: Metrics; uptime: string; }>('/dashboard/metrics')
-            .pipe(takeUntilDestroyed())
-            .subscribe({
-                next: ({ metrics }) => this.metrics.set(metrics),
-                error: () => { },
-            });
+        this.http.get<{ requests: any[]; }>('/dashboard/requests').subscribe({
+            next: ({ requests }) => this.requests.set(requests.map((r: any) => ({ ...r, id: r.id || `${r.timestamp}-${r.method}-${r.url}` }))),
+            error: () => { },
+        });
+        this.http.get<{ metrics: Metrics; uptime: string; }>('/dashboard/metrics').subscribe({
+            next: ({ metrics }) => this.metrics.set(metrics),
+            error: () => { },
+        });
     }
 
     fetchRegistry(): void {
-        this.http.get<any>('/dashboard/registry')
-            .pipe(takeUntilDestroyed())
-            .subscribe({
-                next: (data: any) => this.appData.set(data.registry || data),
-                error: (err) => console.error("Failed to load registry", err)
-            });
+        this.http.get<any>('/dashboard/registry').subscribe({
+            next: (data: any) => this.appData.set(data.registry || data),
+            error: (err) => console.error("Failed to load registry", err)
+        });
     }
 
     purgeRequests(): void {
-        this.http.delete('/dashboard/requests')
-            .pipe(takeUntilDestroyed())
-            .subscribe({
-                next: () => {
-                    this.requests.set([]);
-                    this.metrics.set({
-                        totalRequests: 0, successfulRequests: 0, failedRequests: 0,
-                        activeRequests: 0, averageTotalTime_ms: 0, recentTimings: [], logs: [],
-                    });
-                },
-                error: () => { },
-            });
+        this.http.delete('/dashboard/requests').subscribe({
+            next: () => {
+                this.requests.set([]);
+                this.metrics.set({
+                    totalRequests: 0, successfulRequests: 0, failedRequests: 0,
+                    activeRequests: 0, averageTotalTime_ms: 0, recentTimings: [], logs: [],
+                });
+            },
+            error: () => { },
+        });
     }
 
 }
