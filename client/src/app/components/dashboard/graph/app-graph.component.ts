@@ -1,22 +1,20 @@
-import { CommonModule, isPlatformBrowser } from '@angular/common';
-import { ChangeDetectionStrategy, Component, CUSTOM_ELEMENTS_SCHEMA, Inject, Input, PLATFORM_ID, signal, ViewChild, ViewEncapsulation } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
+import { ChangeDetectionStrategy, Component, Inject, Input, PLATFORM_ID, signal, ViewEncapsulation } from '@angular/core';
 
-// ngx-vflow features
-import { createEdges, createNodes, Edge, Node, Vflow, VflowComponent } from 'ngx-vflow';
+import { XYFlowModule } from 'ngx-xyflow';
 import { TooltipModule } from 'primeng/tooltip';
 
 // elkjs logic
 import ELK from 'elkjs/lib/elk.bundled.js';
+import { ElkEdge } from './edge';
 
 @Component({
     selector: 'skp-app-graph',
     standalone: true,
     imports: [
-        CommonModule,
-        Vflow,
-        TooltipModule
+        TooltipModule,
+        XYFlowModule
     ],
-    schemas: [CUSTOM_ELEMENTS_SCHEMA],
     templateUrl: './app-graph.component.html',
     styleUrl: './app-graph.component.scss',
     encapsulation: ViewEncapsulation.None,
@@ -25,7 +23,6 @@ import ELK from 'elkjs/lib/elk.bundled.js';
 export class AppGraphComponent {
     private isBrowser: boolean;
 
-    @ViewChild(VflowComponent) vflowComponent!: VflowComponent;
 
     @Input() set rawData(value: any) {
         if (value && this.isBrowser) {
@@ -35,34 +32,16 @@ export class AppGraphComponent {
     @Input() metrics: any = {};
     @Input() requests: any[] = [];
 
-    nodes = signal<Node[]>([]);
-    edges = signal<Edge[]>([]);
+    readonly customEdges = { elk: ElkEdge }
+
+    nodes = signal<any[]>([]);
+    edges = signal<any[]>([]);
 
     readonly fitView = signal(false);
 
     constructor(@Inject(PLATFORM_ID) platformId: Object) {
         this.isBrowser = isPlatformBrowser(platformId);
     }
-
-    private customSmoothStep = (params: any) => {
-        const p1 = params.sourcePoint;
-        const p2 = params.targetPoint;
-        const radius = 30; // Increased radius for smoother curves
-
-        const midY = (p1.y + p2.y) / 2;
-        const diffX = Math.abs(p1.x - p2.x);
-        const dirX = p1.x < p2.x ? 1 : -1;
-
-        let path = '';
-        if (diffX < 2) {
-            path = `M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`;
-        } else {
-            const r = Math.min(radius, diffX / 2, Math.abs(p2.y - p1.y) / 2);
-            path = `M ${p1.x} ${p1.y} L ${p1.x} ${midY - r} Q ${p1.x} ${midY} ${p1.x + dirX * r} ${midY} L ${p2.x - dirX * r} ${midY} Q ${p2.x} ${midY} ${p2.x} ${midY + r} L ${p2.x} ${p2.y}`;
-        }
-
-        return { path };
-    };
 
     private async generateGraph(rootContext: any) {
         if (!this.isBrowser) return;
@@ -102,14 +81,17 @@ export class AppGraphComponent {
 
             // create a node (only if it's not a route)
             if (kind !== 'route' && kind !== 'middleware') {
-                const calculatedHeight = 52 + (endpoints.length ? 16 + (endpoints.length * 36) : 0);
+                // Header: 42px (padding + content + border)
+                // Endpoints list padding: 12px (6 top + 6 bottom)
+                // Each endpoint row: 28px (12px padding + 16px content)
+                const calculatedHeight = 42 + (endpoints.length ? 12 + (endpoints.length * 28) : 0);
                 newNodes.push({
                     id: ctxId,
-                    type: 'html-template',
+                    type: 'custom',
                     data: { kind, label, endpoints, nodeHeight: calculatedHeight },
                     point: { x: 0, y: 0 },
                     width: 380,
-                    height: calculatedHeight, // Base height + padding + (rows * rowHeight)
+                    height: calculatedHeight,
                 });
             }
 
@@ -120,13 +102,14 @@ export class AppGraphComponent {
 
                 mwArray.forEach((mw: any, idx: number) => {
                     const mwId = mw.id || `${ctxId}-mw-${idx}-${mw.name || 'unnamed'}`;
+                    // Middleware nodes are compact: just header (42px)
                     newNodes.push({
                         id: mwId,
-                        type: 'html-template',
-                        data: { kind: 'middleware', label: mw.name || 'Middleware', endpoints: [], nodeHeight: 44 },
+                        type: 'custom',
+                        data: { kind: 'middleware', label: mw.name || 'Middleware', endpoints: [], nodeHeight: 42 },
                         point: { x: 0, y: 0 },
-                        width: 380, // Matched with standard nodes to guarantee strict column alignment
-                        height: 44,
+                        width: 380,
+                        height: 42,
                     });
 
                     if (prevSourceId) {
@@ -134,10 +117,7 @@ export class AppGraphComponent {
                             id: `e-${prevSourceId}-${mwId}`,
                             source: prevSourceId,
                             target: mwId,
-                            sourceHandle: 'bottom',
-                            targetHandle: 'top',
-                            type: 'default',
-                            curve: this.customSmoothStep,
+                            type: 'elk',
                             edgeMarkers: { end: { type: 'arrowClosed' } }
                         });
                     }
@@ -149,10 +129,7 @@ export class AppGraphComponent {
                         id: `e-${prevSourceId}-${ctxId}`,
                         source: prevSourceId,
                         target: ctxId,
-                        sourceHandle: 'bottom',
-                        targetHandle: 'top',
-                        type: 'default',
-                        curve: this.customSmoothStep,
+                        type: 'elk',
                         edgeMarkers: { end: { type: 'arrowClosed' } }
                     });
                 }
@@ -166,10 +143,7 @@ export class AppGraphComponent {
                     id: `e-${incomingSourceId}-${ctxId}`,
                     source: incomingSourceId,
                     target: ctxId,
-                    sourceHandle: 'bottom',
-                    targetHandle: 'top',
-                    type: 'default',
-                    curve: this.customSmoothStep,
+                    type: 'elk',
                     edgeMarkers: { end: { type: 'arrowClosed' } }
                 });
             }
@@ -199,10 +173,11 @@ export class AppGraphComponent {
         }));
 
         const entryId = 'http-entry';
-        const entryCalculatedHeight = 52 + (entryEndpoints.length ? 16 + (entryEndpoints.length * 36) : 0);
+        // Header: 42px, endpoints padding: 12px, each row: 28px
+        const entryCalculatedHeight = 42 + (entryEndpoints.length ? 12 + (entryEndpoints.length * 28) : 0);
         newNodes.push({
             id: entryId,
-            type: 'html-template',
+            type: 'custom',
             data: { kind: 'entrypoint', label: 'HTTP Request', endpoints: entryEndpoints, nodeHeight: entryCalculatedHeight },
             point: { x: 0, y: 0 },
             width: 380,
@@ -211,21 +186,17 @@ export class AppGraphComponent {
 
         processContext(rootContext, entryId, 'router', true);
 
-        console.log("NODES:", newNodes.map((n: any) => n.id)); console.log("EDGES:", newEdges.map((e: any) => e.source + " -> " + e.target)); try {
+        try {
             const layouted = await this.applyElkLayout(newNodes, newEdges);
-            this.nodes.set(createNodes(layouted.nodes));
-            this.edges.set(createEdges(layouted.edges));
 
-            setTimeout(() => {
-                if (this.vflowComponent) {
-                    this.vflowComponent.fitView({ padding: 0.1, duration: 500 });
-                }
-            }, 250);
+            console.log({ layouted });
+            this.nodes.set(layouted.nodes);
+            this.edges.set(layouted.edges);
         } catch (e) {
             console.error("ELK structure failed:", e);
             // Fallback to unstructured dump
-            this.nodes.set(createNodes(newNodes));
-            this.edges.set(createEdges(newEdges));
+            this.nodes.set(newNodes);
+            this.edges.set(newEdges);
         }
     }
 
@@ -238,8 +209,8 @@ export class AppGraphComponent {
             id: "root",
             layoutOptions: {
                 'elk.algorithm': 'layered',
-                'elk.direction': 'DOWN',
-                'elk.spacing.nodeNode': '80', // strictly 80px between nodes
+                'elk.direction': 'RIGHT',
+                'elk.spacing.nodeNode': '40', // strictly 80px between nodes
                 'elk.layered.spacing.nodeNodeBetweenLayers': '90',
                 'elk.spacing.edgeNode': '40',
                 'elk.layered.spacing.edgeEdgeBetweenLayers': '40',
@@ -248,21 +219,24 @@ export class AppGraphComponent {
                 'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
                 'elk.layered.nodePlacement.bk.fixedAlignment': 'BALANCED'
             },
-            children: nodes.map(n => ({ id: n.id, width: n.width || 380, height: n.height || 40 })),
-            edges: edges.map(e => ({ id: e.id, sources: [e.source], targets: [e.target] }))
+            children: nodes.map(n => ({ ...n, width: n.width || 380, height: n.height || 40 })),
+            edges: edges.map(e => ({ ...e, sources: [e.source], targets: [e.target] }))
         };
 
-        const laidOut = await elk.layout(graph);
+        const laidOut = await elk.layout(graph) as any;
 
         return {
             nodes: nodes.map(n => {
                 const elkNode = laidOut.children?.find((c: any) => c.id === n.id);
                 if (elkNode) {
-                    return { ...n, point: { x: elkNode.x || 0, y: elkNode.y || 0 } };
+                    return { ...n, position: { x: elkNode.x || 0, y: elkNode.y || 0 } };
                 }
                 return n;
             }),
-            edges
+            edges: laidOut.edges.map((e: any) => ({
+                ...e,
+                data: { path: e.sections?.[0] }
+            }))
         };
     }
 
@@ -352,27 +326,42 @@ export class AppGraphComponent {
         const stats = this.getNodeStats(item);
         if (!stats) return '';
 
-        const row = (label: string, value: string | number, color?: string) =>
-            `<div class="tt-row"><span>${label}</span><span${color ? ` style="color:${color}"` : ''}>${value}</span></div>`;
+        const row = (label: string, value: string | number, valueClass?: string) =>
+            `<div class="tt-row"><span>${label}</span><span${valueClass ? ` class="${valueClass}"` : ''}>${value}</span></div>`;
 
-        const statusRows = Object.keys(stats.statusCodes).map(code =>
-            row(`HTTP ${code}`, stats.statusCodes[code])
-        ).join('');
+        const valueClassFor = (val: number, thresholds: { warn: number; danger: number }) => {
+            if (val >= thresholds.danger) return 'tt-value-danger';
+            if (val >= thresholds.warn) return 'tt-value-warning';
+            return 'tt-value-success';
+        };
+
+        const gridItem = (label: string, value: string) =>
+            `<div class="tt-grid-item"><span class="tt-label">${label}</span><span class="tt-value">${value}</span></div>`;
+
+        const statusBadges = Object.keys(stats.statusCodes).map(code => {
+            const statusNum = parseInt(code, 10);
+            const isError = statusNum >= 400;
+            const isSuccess = statusNum >= 200 && statusNum < 300;
+            const colorClass = isError ? 'tt-value-danger' : isSuccess ? 'tt-value-success' : 'tt-value-info';
+            return `<span class="tt-status-badge ${colorClass}">${code}: ${stats.statusCodes[code]}</span>`;
+        }).join('');
 
         return `<div class="tt-body">
-                <div class="tt-header">Metrics</div>
-                ${row('Requests', stats.requests)}
-                ${row('Traffic', stats.trafficPercent + '%')}
-                ${row('Failures', stats.failures, stats.failures > 0 ? '#ef4444' : undefined)}
-                <div class="tt-header" style="margin-top:8px">Response Times</div>
-                ${row('p1', stats.p1 + 'ms')}
-                ${row('p10', stats.p10 + 'ms')}
-                ${row('p25', stats.p25 + 'ms')}
-                ${row('p50', stats.p50 + 'ms')}
-                ${row('p75', stats.p75 + 'ms')}
-                ${row('p90', stats.p90 + 'ms')}
-                ${row('p99', stats.p99 + 'ms')}
-                ${statusRows ? `<div class="tt-divider"></div>${statusRows}` : ''}
+                <div class="tt-section">
+                    <div class="tt-header">Metrics</div>
+                    ${row('Requests', stats.requests, 'tt-value-info')}
+                    ${row('Traffic', stats.trafficPercent + '%', stats.trafficPercent > 50 ? 'tt-value-success' : undefined)}
+                    ${row('Failures', stats.failures, stats.failures > 0 ? 'tt-value-danger' : undefined)}
+                </div>
+                <div class="tt-section">
+                    <div class="tt-header">Response Times</div>
+                    <div class="tt-grid">
+                        ${gridItem('min', stats.p1 + 'ms')}
+                        ${gridItem('p50', stats.p50 + 'ms')}
+                        ${gridItem('p99', stats.p99 + 'ms')}
+                    </div>
+                </div>
+                ${statusBadges ? `<div class="tt-divider"></div><div class="tt-status-codes">${statusBadges}</div>` : ''}
             </div>`;
     }
 }

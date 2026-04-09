@@ -1,12 +1,29 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, OnDestroy, OnInit, inject, input, output, signal } from '@angular/core';
+import { Component, inject, input, OnDestroy, OnInit, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { EChartsOption } from 'echarts';
 import { NgScrollbarModule } from 'ngx-scrollbar';
 import { TabulatorModule } from 'ngx-tabulator-tables';
 import { EChartComponent } from '../echart/echarts.component';
-import { formatDurationPretty } from './network-tools/network-utils';
+import { formatDurationPretty, NetworkRequest } from './network-tools/network-utils';
+
+interface LogEntry {
+    timestamp: number;
+    level: 'info' | 'warn' | 'error' | 'debug';
+    message: string;
+    source?: string;
+}
+
+interface MetricsData {
+    totalRequests: number;
+    successfulRequests: number;
+    failedRequests: number;
+    activeRequests: number;
+    averageTotalTime_ms: number;
+    recentTimings: number[];
+    logs: LogEntry[];
+}
 
 @Component({
     selector: 'skp-dashboard-overview',
@@ -17,14 +34,14 @@ import { formatDurationPretty } from './network-tools/network-utils';
 })
 export class DashboardOverviewComponent implements OnInit, OnDestroy {
     private http = inject(HttpClient);
-    private interval: any;
+    private interval: ReturnType<typeof setInterval> | undefined;
 
     // Inputs from parent dashboard
-    readonly metrics = input<{ totalRequests: number; successfulRequests: number; failedRequests: number; activeRequests: number; averageTotalTime_ms: number; recentTimings: number[]; logs: any[]; }>({
+    readonly metrics = input<MetricsData>({
         totalRequests: 0, successfulRequests: 0, failedRequests: 0,
         activeRequests: 0, averageTotalTime_ms: 0, recentTimings: [], logs: [],
     });
-    readonly requests = input<any[]>([]);
+    readonly requests = input<NetworkRequest[]>([]);
     readonly wsConnected = input(false);
 
     readonly requestSelect = output<string>();
