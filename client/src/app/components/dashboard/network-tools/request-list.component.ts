@@ -136,6 +136,7 @@ export class RequestListComponent {
 
     /**
      * Load column settings from localStorage
+     * Falls back gracefully if localStorage is unavailable (private browsing, quota exceeded)
      */
     private loadColumnSettings(): { visible: string[]; widths: Record<string, number> } | null {
         // Return cached value if already loaded
@@ -145,15 +146,14 @@ export class RequestListComponent {
 
         try {
             const stored = localStorage.getItem(this.COLUMN_STORAGE_KEY);
-            console.log('[RequestList] Loading from localStorage:', stored);
             if (stored) {
                 const parsed = JSON.parse(stored);
-                console.log('[RequestList] Parsed settings:', parsed);
                 this._cachedSettings = parsed;
                 return parsed;
             }
         } catch (e) {
-            console.error('[RequestList] Error loading settings:', e);
+            // localStorage unavailable or quota exceeded - use defaults
+            this._cachedSettings = null;
         }
         this._cachedSettings = null;
         return null;
@@ -170,14 +170,11 @@ export class RequestListComponent {
                 this.cols.some(col => col.field === field)
             );
             if (validCols.length > 0) {
-                console.log('[RequestList] Loaded visible columns:', validCols);
                 return validCols;
             }
         }
         // Default visible columns
-        const defaults = ['status', 'method', 'name', 'path', 'caller', 'type', 'size', 'duration', 'waterfall'];
-        console.log('[RequestList] Using default visible columns:', defaults);
-        return defaults;
+        return ['status', 'method', 'name', 'path', 'caller', 'type', 'size', 'duration', 'waterfall'];
     }
 
     /**
@@ -185,13 +182,12 @@ export class RequestListComponent {
      */
     private loadColumnWidths(): Record<string, number> {
         const settings = this.loadColumnSettings();
-        const widths = { ...this.DEFAULT_WIDTHS, ...(settings?.widths || {}) };
-        console.log('[RequestList] Loaded column widths:', widths);
-        return widths;
+        return { ...this.DEFAULT_WIDTHS, ...(settings?.widths || {}) };
     }
 
     /**
      * Save column settings to localStorage
+     * Silently fails if localStorage is unavailable
      */
     private saveColumnSettings(visibleCols: string[], widths: Record<string, number>): void {
         try {
@@ -200,10 +196,9 @@ export class RequestListComponent {
                 widths: widths,
                 timestamp: Date.now()
             };
-            console.log('[RequestList] Saving to localStorage:', data);
             localStorage.setItem(this.COLUMN_STORAGE_KEY, JSON.stringify(data));
         } catch (e) {
-            console.error('[RequestList] Error saving settings:', e);
+            // localStorage unavailable - settings won't persist
         }
     }
 
@@ -480,7 +475,6 @@ export class RequestListComponent {
     onRowSelect(args: [UIEvent, any]) {
         const [uiEvent, row] = args;
         const rowData = row?.getData?.() || row;
-        console.log("RequestListComponent: row selected", rowData);
         this.selectedId.set(rowData?.id);
         this.onSelect.emit(rowData);
     }

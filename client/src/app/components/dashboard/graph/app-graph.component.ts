@@ -1,5 +1,6 @@
 import { isPlatformBrowser } from '@angular/common';
-import { ChangeDetectionStrategy, Component, Inject, Input, PLATFORM_ID, signal, ViewEncapsulation } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Inject, inject, Input, PLATFORM_ID, SecurityContext, signal, ViewEncapsulation } from '@angular/core';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 
 import { XYFlowModule } from 'ngx-xyflow';
 import { TooltipModule } from 'primeng/tooltip';
@@ -22,7 +23,7 @@ import { ElkEdge } from './edge';
 })
 export class AppGraphComponent {
     private isBrowser: boolean;
-
+    private sanitizer = inject(DomSanitizer);
 
     @Input() set rawData(value: any) {
         if (value && this.isBrowser) {
@@ -242,23 +243,25 @@ export class AppGraphComponent {
 
     /**
      * Highlights :params, * wildcards, .well-known segments in the path.
-     * Returns an HTML string safe for [innerHTML].
+     * Returns sanitized HTML safe for display.
      */
-    highlightPath(path: string | undefined): string {
+    highlightPath(path: string | undefined): SafeHtml {
         if (!path) return '';
-        return path.split('/').map((seg, i) => {
-            if (!seg) return i === 0 ? '' : '';      // empty (leading slash)
+        const html = path.split('/').map((seg, i) => {
+            if (!seg) return i === 0 ? '' : '';
+            const escaped = this.sanitizer.sanitize(SecurityContext.HTML, seg) || '';
             if (seg.startsWith(':')) {
-                return `<span class="path-param">${escHtml(seg)}</span>`;
+                return `<span class="path-param">${escaped}</span>`;
             }
             if (seg === '*' || seg === '**') {
-                return `<span class="path-wildcard">${escHtml(seg)}</span>`;
+                return `<span class="path-wildcard">${escaped}</span>`;
             }
             if (seg.startsWith('.')) {
-                return `<span class="path-dotfile">${escHtml(seg)}</span>`;
+                return `<span class="path-dotfile">${escaped}</span>`;
             }
-            return escHtml(seg);
+            return escaped;
         }).join('<span class="path-sep">/</span>');
+        return this.sanitizer.sanitize(SecurityContext.HTML, html) || '';
     }
 
     getNodeStats(item: any): any {
@@ -366,6 +369,3 @@ export class AppGraphComponent {
     }
 }
 
-function escHtml(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
