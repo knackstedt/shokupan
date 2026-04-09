@@ -1,6 +1,7 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Component, inject, input, OnDestroy, OnInit, output, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import type { EChartsOption } from 'echarts';
 import { NgScrollbarModule } from 'ngx-scrollbar';
@@ -34,6 +35,7 @@ interface MetricsData {
 })
 export class DashboardOverviewComponent implements OnInit, OnDestroy {
     private http = inject(HttpClient);
+    private destroyRef = takeUntilDestroyed();
     private interval: ReturnType<typeof setInterval> | undefined;
 
     // Inputs from parent dashboard
@@ -166,8 +168,10 @@ export class DashboardOverviewComponent implements OnInit, OnDestroy {
     }
 
     private fetchData() {
-        this.http.get<{ metrics: any[]; }>(`/dashboard/metrics/history?interval=${this.timeframe()}`).subscribe({
-            next: (res) => {
+        this.http.get<{ metrics: any[]; }>(`/dashboard/metrics/history?interval=${this.timeframe()}`)
+            .pipe(this.destroyRef)
+            .subscribe({
+            next: (res: any) => {
                 if (!res.metrics || !res.metrics.length) return;
                 this.processData(res.metrics);
             },

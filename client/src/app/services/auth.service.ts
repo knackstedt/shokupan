@@ -1,4 +1,7 @@
-import { Injectable, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Injectable, inject, signal } from '@angular/core';
+import { MessageService } from 'primeng/api';
+import { firstValueFrom } from 'rxjs';
 import { AuthUser, OAuthProvider } from '../types';
 
 /**
@@ -13,9 +16,13 @@ import { AuthUser, OAuthProvider } from '../types';
  */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+    private http = inject(HttpClient);
+    private messageService = inject(MessageService);
+
     /** Currently signed-in user, or null if not authenticated. */
     readonly user = signal<AuthUser | null>(null);
     readonly loading = signal(true);
+    readonly authError = signal<string | null>(null);
 
     constructor() {
         this.initUser();
@@ -27,15 +34,15 @@ export class AuthService {
      */
     async initUser(): Promise<void> {
         try {
-            const res = await fetch('/auth/me', { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json() as AuthUser;
-                this.user.set(data);
-            } else {
-                this.user.set(null);
-            }
-        } catch {
+            const data = await firstValueFrom(
+                this.http.get<AuthUser>('/auth/me', { withCredentials: true })
+            );
+            this.user.set(data);
+            this.authError.set(null);
+        } catch (error: any) {
             this.user.set(null);
+            const errorMsg = error?.error?.message || error?.message || 'Authentication failed';
+            this.authError.set(errorMsg);
         } finally {
             this.loading.set(false);
         }
@@ -55,9 +62,25 @@ export class AuthService {
      */
     async logout(): Promise<void> {
         try {
-            await fetch('/auth/logout', { method: 'POST', credentials: 'include' });
-        } catch { /* ignore */ }
+            await firstValueFrom(
+                this.http.post('/auth/logout', {}, { withCredentials: true })
+            );
+            this.messageService.add({
+                severity: 'success',
+                summary: 'Logged Out',
+                detail: 'You have been successfully logged out',
+                life: 3000
+            });
+        } catch (error: any) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Logout Warning',
+                detail: 'Logout request failed, but local session cleared',
+                life: 3000
+            });
+        }
         this.user.set(null);
+        this.authError.set(null);
     }
 
     get isAuthenticated(): boolean {

@@ -1,5 +1,6 @@
 import { NgTemplateOutlet, UpperCasePipe } from '@angular/common';
-import { Component, Input, OnChanges, SimpleChanges, signal } from '@angular/core';
+import { Component, inject, Input, OnChanges, SecurityContext, signal, SimpleChanges } from '@angular/core';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { NgScrollbarModule } from 'ngx-scrollbar';
 import { TooltipModule } from 'primeng/tooltip';
 
@@ -11,6 +12,8 @@ import { TooltipModule } from 'primeng/tooltip';
     styleUrl: './app-registry-tree.component.scss'
 })
 export class AppRegistryTreeComponent implements OnChanges {
+    private sanitizer = inject(DomSanitizer);
+
     @Input() set rawData(value: any) {
         if (value) {
             this.processData(value);
@@ -110,23 +113,25 @@ export class AppRegistryTreeComponent implements OnChanges {
 
     /**
      * Highlights :params, * wildcards, .well-known segments in the path.
-     * Returns an HTML string safe for [innerHTML].
+     * Returns sanitized HTML safe for [innerHTML].
      */
-    highlightPath(path: string | undefined): string {
+    highlightPath(path: string | undefined): SafeHtml {
         if (!path) return '';
-        return path.split('/').map((seg, i) => {
-            if (!seg) return i === 0 ? '' : '';      // empty (leading slash)
+        const html = path.split('/').map((seg, i) => {
+            if (!seg) return i === 0 ? '' : '';
+            const escaped = this.sanitizer.sanitize(SecurityContext.HTML, seg) || '';
             if (seg.startsWith(':')) {
-                return `<span class="path-param">${escHtml(seg)}</span>`;
+                return `<span class="path-param">${escaped}</span>`;
             }
             if (seg === '*' || seg === '**') {
-                return `<span class="path-wildcard">${escHtml(seg)}</span>`;
+                return `<span class="path-wildcard">${escaped}</span>`;
             }
             if (seg.startsWith('.')) {
-                return `<span class="path-dotfile">${escHtml(seg)}</span>`;
+                return `<span class="path-dotfile">${escaped}</span>`;
             }
-            return escHtml(seg);
+            return escaped;
         }).join('<span class="path-sep">/</span>');
+        return this.sanitizer.sanitize(SecurityContext.HTML, html) || '';
     }
 
     getNodeStats(item: any): any {
@@ -213,6 +218,3 @@ export class AppRegistryTreeComponent implements OnChanges {
     }
 }
 
-function escHtml(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}

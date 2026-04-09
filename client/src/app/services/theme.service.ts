@@ -1,5 +1,5 @@
-import { Injectable } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
+import { Injectable, OnDestroy } from '@angular/core';
+import { BehaviorSubject, Subscription } from 'rxjs';
 
 const store = globalThis.localStorage || {};
 const matchMedia = globalThis.matchMedia || (() => ({})) as any;
@@ -26,7 +26,7 @@ const getAutoTheme = () => {
 @Injectable({
     providedIn: 'root'
 })
-export class ThemeService {
+export class ThemeService implements OnDestroy {
 
     readonly themes = [
         { label: "Dark", id: 'dark' },
@@ -41,20 +41,26 @@ export class ThemeService {
      * For use with canvases and similar libraries.
      */
     theme = new BehaviorSubject<'dark' | 'light'>(initialDiscreteTheme);
+    private subscriptions: Subscription[] = [];
 
     constructor() {
-
-        this.theme.subscribe(t => {
-            document.body.parentElement?.classList.remove("theme-dark");
-            document.body.parentElement?.classList.remove("theme-light");
-            document.body.parentElement?.classList.add("theme-" + t);
-        });
+        this.subscriptions.push(
+            this.theme.subscribe(t => {
+                document.body.parentElement?.classList.remove("theme-dark");
+                document.body.parentElement?.classList.remove("theme-light");
+                document.body.parentElement?.classList.add("theme-" + t);
+            })
+        );
 
         // The system theme changed (either due to timed color themes or the user changing the mode)
         matchMedia('(prefers-color-scheme: dark)').addEventListener("change", ev => {
             if (store['fiq.theme'] == "auto")
                 this.theme.next(getAutoTheme());
         });
+    }
+
+    ngOnDestroy(): void {
+        this.subscriptions.forEach(sub => sub.unsubscribe());
     }
 
     public setTheme(t: AppTheme) {

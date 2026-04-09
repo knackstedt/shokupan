@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer } from '@angular/platform-browser';
 import { MonacoEditorComponent } from '@dotglitch/ngx-common/monaco-editor';
@@ -20,6 +21,7 @@ import { NetworkRequest, formatBytes } from './network-utils';
 })
 export class ReplayModalComponent {
     private http = inject(HttpClient);
+    private destroyRef = takeUntilDestroyed();
     private sanitizer = inject(DomSanitizer);
 
     request = input.required<NetworkRequest>();
@@ -108,13 +110,22 @@ export class ReplayModalComponent {
             headers,
             body,
             direction: this.request().direction
-        }).subscribe({
-            next: (res) => {
-                this.replayState.update(s => ({
-                    ...s,
-                    loading: false,
-                    response: res,
-                    activeTab: 2 // Switch to response tab
+        })
+            .pipe(this.destroyRef)
+            .subscribe({
+                next: (res) => {
+                    this.replayState.update(s => ({
+                        ...s,
+                        loading: false,
+                        response: res,
+                        activeTab: 2 // Switch to response tab
+                    }));
+                },
+                error: (err) => {
+                    this.replayState.update(s => ({ ...s, loading: false }));
+                    alert("Replay failed: " + (err.error?.error || err.message));
+                }
+            });
                 }));
             },
             error: (err) => {
