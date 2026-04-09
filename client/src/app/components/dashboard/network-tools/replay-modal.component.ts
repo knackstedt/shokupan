@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
@@ -126,13 +126,6 @@ export class ReplayModalComponent {
                     alert("Replay failed: " + (err.error?.error || err.message));
                 }
             });
-                }));
-            },
-            error: (err) => {
-                this.replayState.update(s => ({ ...s, loading: false }));
-                alert("Replay failed: " + (err.error?.error || err.message));
-            }
-        });
     }
 
     formatBytes(b: number) { return formatBytes(b); }
