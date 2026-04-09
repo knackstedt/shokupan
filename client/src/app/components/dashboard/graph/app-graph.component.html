@@ -1,0 +1,54 @@
+<div class="graph-wrapper">
+    @if (nodes().length > 0) {
+    <ngx-xyflow
+        [nodes]="nodes()"
+        [edges]="edges()"
+        [minZoom]="0.05"
+        [maxZoom]="2"
+        [defaultEdgeOptions]="{
+            focusable: false,
+            selectable: false,
+            interactionWidth: 0
+        }"
+        [edgeTypes]="customEdges"
+        [nodesDraggable]="false"
+        [onlyRenderVisibleElements]="true"
+        colorMode="dark"
+    >
+        <ngx-xyflow-controls/>
+        <ngx-xyflow-background color="#0000" [gap]="20" [size]="2" />
+        <ngx-xyflow-node nodeType="custom">
+            <ng-template let-data>
+                <div class="graph-node kind-{{data?.kind}}" [style.width.px]="380"
+                    [style.min-height.px]="data?.nodeHeight || 44">
+                    <div class="node-header">
+                        <span class="node-kind">{{ data?.kind }}</span>
+                        <span class="node-title"
+                            [pTooltip]="buildTooltipHtml({ data: data })" [escape]="false"
+                            tooltipPosition="bottom" tooltipStyleClass="skp-tt">{{ data?.label }}</span>
+                    </div>
+
+                    @if (data?.endpoints?.length) {
+                    <div class="endpoints-list">
+                        @for (ep of data?.endpoints; track $index) {
+                        <div class="endpoint-row" [pTooltip]="buildTooltipHtml({ data: { kind: 'route', label: ep.path, endpoints: [ep] } })" [escape]="false"
+                            tooltipPosition="bottom" tooltipStyleClass="skp-tt">
+                            <span class="badge-{{ ep.method }}">{{ ep.method }}</span>
+                            <span class="ep-path">{{ ep.path }}</span>
+                        </div>
+                        }
+                    </div>
+                    }
+                </div>
+            </ng-template>
+            <ngx-xyflow-handle type="target" position="top"></ngx-xyflow-handle>
+            <ngx-xyflow-handle type="source" position="bottom"></ngx-xyflow-handle>
+        </ngx-xyflow-node>
+    </ngx-xyflow>
+    } @else {
+    <div class="empty-state">
+        <span>🕸️</span>
+        <p>Building dependency graph...</p>
+    </div>
+    }
+</div>

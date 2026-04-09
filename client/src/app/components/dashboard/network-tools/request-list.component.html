@@ -24,10 +24,20 @@
             placeholder="Choose Columns"></p-multiSelect>
     </div>
 
-    <ngx-tabulator [dataSource]="filteredRequests()" class="network-table" [selectable]="1" [headerSort]="true"
-        [movableColumns]="true" [height]="'100%'" [rowFormatter]="rowFormatter" (rowClick)="onRowSelect($any($event))"
-        (cellClick)="debug('cell', $event)" (rowContext)="onRowContext($any($event))" (headerContext)="onHeaderContext($any($event))"
-        (columnResized)="onColumnResized($event[0].getField(), $event[0].getWidth())">
+    <ngx-tabulator
+        [dataSource]="filteredRequests()"
+        class="network-table"
+        [selectable]="1"
+        [headerSort]="true"
+        [movableColumns]="true"
+        [height]="'100%'"
+        [rowFormatter]="rowFormatter"
+        (rowClick)="onRowSelect($any($event))"
+        (cellClick)="debug('cell', $event)"
+        (rowContext)="onRowContext($any($event))"
+        (headerContext)="onHeaderContext($any($event))"
+        (columnResized)="onColumnResized($event[0].getField(), $event[0].getWidth())"
+    >
         <ngx-tabulator-column field="status" title="Status" [width]="getColWidth('status')" [headerSort]="true"
             (onCellClick)="debug('cell', $event)" [visible]="isColVisible('status')">
             <ng-template let-data>

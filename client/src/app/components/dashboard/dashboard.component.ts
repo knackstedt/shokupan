@@ -4,10 +4,37 @@ import {
     inject,
     OnDestroy, OnInit, signal
 } from '@angular/core';
-import { AppGraphComponent } from './app-graph.component';
 import { AppRegistryTreeComponent } from './app-registry-tree.component';
+import { AppGraphComponent } from './graph/app-graph.component';
 import { NetworkToolsComponent } from './network-tools/network-tools.component';
+import { NetworkRequest } from './network-tools/network-utils';
 import { DashboardOverviewComponent } from './overview.component';
+
+interface LogEntry {
+    timestamp: number;
+    level: 'info' | 'warn' | 'error' | 'debug';
+    message: string;
+    source?: string;
+}
+
+interface AppRegistry {
+    id?: string;
+    name?: string;
+    kind?: string;
+    path?: string;
+    middleware?: Array<{ id?: string; name?: string }>;
+    routes?: Array<{ id?: string; path: string; method?: string }>;
+    events?: unknown[];
+    controllers?: unknown[];
+    routers?: unknown[];
+    children?: {
+        middleware?: Array<{ id?: string; name?: string }>;
+        routes?: Array<{ id?: string; path: string; method?: string }>;
+        events?: unknown[];
+        controllers?: unknown[];
+        routers?: unknown[];
+    };
+}
 
 interface Metrics {
     totalRequests: number;
@@ -16,7 +43,7 @@ interface Metrics {
     activeRequests: number;
     averageTotalTime_ms: number;
     recentTimings: number[];
-    logs: any[];
+    logs: LogEntry[];
 }
 
 @Component({
@@ -36,13 +63,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
         totalRequests: 0, successfulRequests: 0, failedRequests: 0,
         activeRequests: 0, averageTotalTime_ms: 0, recentTimings: [], logs: [],
     });
-    readonly requests = signal<any[]>([]);
+    readonly requests = signal<NetworkRequest[]>([]);
     readonly selectedRequestId = signal<string | null>(null);
-    readonly appData = signal<any>(null);
+    readonly appData = signal<AppRegistry | null>(null);
     readonly wsConnected = signal(false);
 
     private ws: WebSocket | null = null;
-    private reconnectTimer: any;
+    private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 
     ngOnInit(): void {
         this.syncHashUrl();
@@ -55,7 +82,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     ngOnDestroy(): void {
         window.removeEventListener('hashchange', this.onHashChange);
         this.ws?.close();
-        clearTimeout(this.reconnectTimer);
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+        }
     }
 
     private onHashChange = () => {
@@ -83,7 +112,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
 
     setTab(tab: 'overview' | 'network' | 'application') {
-        console.log("Dashboard: setting tab to", tab);
         if (window.location.hash !== '#/dashboard/' + tab) {
             window.location.hash = '#/dashboard/' + tab;
         }
@@ -94,7 +122,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
 
     selectRequest(id: string | null) {
-        console.log("Dashboard: selectRequest called with ID", id);
         this.selectedRequestId.set(id);
         if (id) {
             this.setTab('network');

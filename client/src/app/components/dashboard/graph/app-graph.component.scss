@@ -1,0 +1,302 @@
+.graph-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    background: var(--bg-card);
+    overflow: hidden;
+    position: relative;
+}
+
+ngx-xyflow {
+    display: flex;
+    flex: 1;
+}
+
+:host ::ng-deep {
+    .react-flow__edge {
+        pointer-events: none;
+    }
+}
+
+.graph-node {
+    background: var(--bg-card, #1e2029);
+    border: 1px solid var(--card-border, #333);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    font-family: var(--skp-font, system-ui, sans-serif);
+}
+
+/* ── Node Kind Variants ──────────────────────────────────────────────── */
+.graph-node.kind-entrypoint {
+    border-color: #22c55e;
+    border-left: 4px solid #22c55e;
+}
+
+.graph-node.kind-router {
+    border-color: #3b82f6;
+    border-left: 4px solid #3b82f6;
+}
+
+.graph-node.kind-controller {
+    border-color: #8b5cf6;
+    border-left: 4px solid #8b5cf6;
+}
+
+.graph-node.kind-middleware {
+    border-color: #f59e0b;
+    border-left: 4px solid #f59e0b;
+}
+
+.graph-node.kind-event {
+    border-color: #ec4899;
+    border-left: 4px solid #ec4899;
+}
+
+/* ── Node Header ───────────────────────────────────────────────────── */
+.node-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid var(--card-border, #333);
+    cursor: default;
+}
+
+.node-kind {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary, #a8a8a8);
+    white-space: nowrap;
+}
+
+.node-title {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-primary, #e0e0e0);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Endpoints List ────────────────────────────────────────────────── */
+.endpoints-list {
+    padding: 6px 0;
+}
+
+.endpoint-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    transition: background 0.15s ease;
+}
+
+.endpoint-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.ep-path {
+    color: var(--text-secondary, #a8a8a8);
+    font-family: var(--skp-font-mono, monospace);
+    font-size: 0.75rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── HTTP Method Badges ────────────────────────────────────────────── */
+.badge-GET {
+    background: #22c55e;
+    color: #000;
+}
+
+.badge-POST {
+    background: #3b82f6;
+    color: #fff;
+}
+
+.badge-PUT {
+    background: #f59e0b;
+    color: #000;
+}
+
+.badge-PATCH {
+    background: #8b5cf6;
+    color: #fff;
+}
+
+.badge-DELETE {
+    background: #ef4444;
+    color: #fff;
+}
+
+.badge-USE {
+    background: #6b7280;
+    color: #fff;
+}
+
+[class^="badge-"] {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 3px;
+    min-width: 36px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* ── Path Highlighting ─────────────────────────────────────────────── */
+.path-param {
+    color: #f59e0b;
+    font-weight: 500;
+}
+
+.path-wildcard {
+    color: #ec4899;
+    font-weight: 500;
+}
+
+.path-dotfile {
+    color: #3b82f6;
+    font-weight: 500;
+}
+
+.path-sep {
+    color: var(--text-secondary, #666);
+    margin: 0 1px;
+}
+
+/* ── PrimeNG tooltip override (tooltipStyleClass="skp-tt") ───────────── */
+.p-tooltip.skp-tt .p-tooltip-text {
+    background: linear-gradient(145deg, #1a1d26 0%, #1e2029 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 10px !important;
+    padding: 14px 16px !important;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.3),
+        0 8px 24px rgba(0, 0, 0, 0.6),
+        0 0 30px rgba(0, 0, 0, 0.3) !important;
+    font-size: 0.78rem !important;
+    min-width: 240px;
+}
+
+.p-tooltip.skp-tt .p-tooltip-arrow {
+    display: none !important;
+}
+
+/* ── Tooltip content built by buildTooltipHtml() ─────────────────────── */
+.tt-body {
+    font-family: var(--skp-font-mono, ui-monospace, 'Cascadia Code', 'SF Mono', monospace);
+    font-size: 0.8rem;
+    color: var(--text-primary, #e8e8e8);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    .tt-header {
+        font-family: var(--skp-font, system-ui, sans-serif);
+        font-weight: 700;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: var(--primary, #FFB380);
+        padding-bottom: 6px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .tt-section {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .tt-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 3px 0;
+        line-height: 1.4;
+
+        span:first-child {
+            color: var(--text-secondary, #9ca3af);
+            font-size: 0.75rem;
+        }
+
+        span:last-child {
+            font-weight: 500;
+            color: #e8e8e8;
+        }
+    }
+
+    .tt-value-success { color: #4ade80 !important; }
+    .tt-value-warning { color: #fbbf24 !important; }
+    .tt-value-danger { color: #f87171 !important; }
+    .tt-value-info { color: #60a5fa !important; }
+
+    .tt-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 6px;
+        margin-top: 2px;
+    }
+
+    .tt-grid-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 6px 4px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 5px;
+        border: 1px solid rgba(255, 255, 255, 0.04);
+
+        .tt-label {
+            font-size: 0.65rem;
+            color: var(--text-secondary, #9ca3af);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .tt-value {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #e8e8e8;
+        }
+    }
+
+    .tt-divider {
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+        margin: 2px 0;
+    }
+
+    .tt-status-codes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 2px;
+    }
+
+    .tt-status-badge {
+        font-size: 0.7rem;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+}
