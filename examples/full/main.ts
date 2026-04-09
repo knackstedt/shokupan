@@ -215,7 +215,7 @@ app.use(SecurityHeaders({
         includeSubDomains: true
     },
     noSniff: true,
-    frameguard: { action: 'deny' },
+    frameguard: { action: 'sameorigin' },
     xssFilter: true,
     referrerPolicy: { policy: 'no-referrer' }
 }));
