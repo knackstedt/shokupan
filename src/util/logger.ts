@@ -249,6 +249,17 @@ export function createHTTPLogger(): Middleware {
         return Math.round(duration / 1000) + 's';
     };
 
+    const SENSITIVE_HEADERS = new Set(['authorization', 'cookie', 'set-cookie', 'x-api-key', 'x-auth-token', 'proxy-authorization']);
+
+    const sanitizeHeaders = (headers: Headers): Record<string, string> => {
+        const result: Record<string, string> = {};
+        headers.forEach((value, key) => {
+            const lowerKey = key.toLowerCase();
+            result[key] = SENSITIVE_HEADERS.has(lowerKey) ? '[REDACTED]' : value;
+        });
+        return result;
+    };
+
     if (process.env.NODE_ENV === 'production') {
         return async (ctx, next) => {
             const status = ctx.response.status ?? 200;
@@ -260,7 +271,7 @@ export function createHTTPLogger(): Middleware {
                 method: ctx.method,
                 url: ctx.url,
                 status: status,
-                headers: ctx.request.headers,
+                headers: sanitizeHeaders(ctx.request.headers),
                 length: ctx.response.get('content-length') ?? -1,
                 ip: ctx.request.ip,
                 ua: ctx.request.header('user-agent'),
