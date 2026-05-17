@@ -79,18 +79,27 @@
                                     "maximumError": "300kB"
                                 }
                             ],
-                            "outputHashing": "all"
+                            "outputHashing": "all",
+                            "sourceMap": {
+                                "scripts": true,
+                                "styles": false,
+                                "hidden": true
+                            }
                         },
                         "development": {
                             "optimization": false,
                             "extractLicenses": false,
-                            "sourceMap": true
+                            "sourceMap": true,
+                            // "baseHref": "/"
                         }
                     },
                     "defaultConfiguration": "production"
                 },
                 "serve": {
                     "builder": "@angular/build:dev-server",
+                    "options": {
+                        // "proxyConfig": "proxy.conf.json"
+                    },
                     "configurations": {
                         "production": {
                             "buildTarget": "shokupan-client:build:production"

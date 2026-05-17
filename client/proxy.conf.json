@@ -1,0 +1,33 @@
+{
+  "/scalar": {
+    "target": "https://localhost:4220",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/openapi": {
+    "target": "https://localhost:4220",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/asyncapi": {
+    "target": "https://localhost:4220",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/dashboard": {
+    "target": "https://localhost:4220",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/api": {
+    "target": "https://localhost:4220",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/auth": {
+    "target": "https://localhost:4220",
+    "secure": false,
+    "changeOrigin": true
+  }
+}
