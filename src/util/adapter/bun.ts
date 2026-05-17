@@ -53,6 +53,17 @@ export class BunAdapter implements ServerAdapter {
                     const self = app;
                     // HTTP Bridge - Check BEFORE custom handler
                     if (isJSONPayload && self.applicationConfig['enableHttpBridge'] && payload.type === 'HTTP') {
+                        // Security: HTTP Bridge allows arbitrary HTTP execution over WebSocket.
+                        // In production, require a shared secret in the payload headers.
+                        const bridgeSecret = process.env['SHOKUPAN_HTTP_BRIDGE_SECRET'];
+                        const isDev = self.applicationConfig.development;
+                        const authHeader = payload.headers?.['Authorization'] || payload.headers?.['authorization'];
+                        const providedSecret = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+                        if (!isDev && (!bridgeSecret || providedSecret !== bridgeSecret)) {
+                            ws.send(JSON.stringify({ type: 'ERROR', id: payload.id, error: 'HTTP Bridge authentication required' }));
+                            return;
+                        }
+
                         const { id, method, path, headers, body } = payload;
                         // Use 127.0.0.1 to avoid localhost lookup issues in some environments, though localhost is usually fine
                         const hostname = self.applicationConfig.hostname || 'localhost';
