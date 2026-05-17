@@ -1,4 +1,10 @@
-import renderToString from 'preact-render-to-string';
+let renderToString: any;
+async function getRenderToString() {
+    if (!renderToString) {
+        renderToString = (await import('preact-render-to-string')).default;
+    }
+    return renderToString;
+}
 import type { ShokupanContext } from '../../../../context';
 import { getReasonPhrase } from '../reason-phrases';
 
@@ -320,7 +326,7 @@ const StatusPage = ({ method, status, image, message, path, requestId, hideError
     </html>
 );
 
-export function renderStatusView(ctx: ShokupanContext, status: number, error: Error, options: { requestId?: string, hideErrorMessage?: boolean; } = {}) {
+export async function renderStatusView(ctx: ShokupanContext, status: number, error: Error, options: { requestId?: string, hideErrorMessage?: boolean; } = {}) {
     const props = {
         status,
         message: error.message || 'Error',
@@ -330,5 +336,5 @@ export function renderStatusView(ctx: ShokupanContext, status: number, error: Er
         hideErrorMessage: options.hideErrorMessage
     };
 
-    return '<!DOCTYPE html>\n' + renderToString(StatusPage(props));
+    return '<!DOCTYPE html>\n' + (await getRenderToString())(StatusPage(props));
 }

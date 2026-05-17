@@ -3,7 +3,13 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import renderToString from 'preact-render-to-string';
+let renderToString: any;
+async function getRenderToString() {
+    if (!renderToString) {
+        renderToString = (await import('preact-render-to-string')).default;
+    }
+    return renderToString;
+}
 import { ShokupanRouter } from '../../../router';
 import type { Shokupan } from '../../../shokupan';
 import { deepMerge } from '../../../util/deep-merge';
@@ -54,7 +60,7 @@ export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
     }
 
     constructor(private pluginOptions: DebugPluginOptions = {}) {
-        super({ renderer: renderToString });
+        super({ renderer: async (...args: any[]) => (await getRenderToString())(...args) });
         this.pluginOptions.path ??= '/debug';
         
         this.pluginOptions.apiExplorer ??= { enabled: true };
@@ -229,7 +235,7 @@ export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
                 const asyncSpec = (ctx.app as any).asyncApiSpec;
                 const base = `${this.pluginOptions.path}/explorer`;
                 const element = ApiExplorerApp({ spec: spec, base, asyncSpec });
-                const html = renderToString(element);
+                const html = (await getRenderToString())(element);
                 if (html.length === 0) throw new Error('DebugPlugin: rendered API Explorer page is blank.');
                 return ctx.html(html);
             });
