@@ -420,34 +420,50 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
             // Register ErrorView
             const hasErrorView = this.plugins.some((p: any) => p instanceof ErrorView);
             if (!hasErrorView) {
-                await this.register(new ErrorView({
-                    developmentErrorView: true
-                }));
-                this.logger.info("Shokupan", "Loaded ErrorView module");
+                try {
+                    await this.register(new ErrorView({
+                        developmentErrorView: true
+                    }));
+                    this.logger.info("Shokupan", "Loaded ErrorView module");
+                } catch (err: any) {
+                    this.logger.warn("Shokupan", "ErrorView plugin failed to load", { error: err.message });
+                }
             }
 
             // Register Dashboard
             const hasDashboard = this.plugins.some((p: any) => typeof p === 'object' && p.metadata?.pluginName === 'Dashboard');
             if (!hasDashboard) {
-                await this.register(DashboardPlugin({
-                    path: '/dashboard',
-                    trackStateMutations: true
-                }));
-                this.logger.info("Shokupan", "Loaded Dashboard module");
+                try {
+                    await this.register(DashboardPlugin({
+                        path: '/dashboard',
+                        trackStateMutations: true
+                    }));
+                    this.logger.info("Shokupan", "Loaded Dashboard module");
+                } catch (err: any) {
+                    this.logger.warn("Shokupan", "Dashboard plugin failed to load", { error: err.message });
+                }
             }
 
             // Register ApiExplorer
             const hasApiExplorer = this.plugins.some((p: any) => p === ApiExplorerPlugin || p instanceof ApiExplorerPlugin);
             if (!hasApiExplorer) {
-                await this.register(new ApiExplorerPlugin(), { path: '/dashboard/explorer' });
-                this.logger.info("Shokupan", "Loaded ApiExplorer module");
+                try {
+                    await this.register(new ApiExplorerPlugin(), { path: '/dashboard/explorer' });
+                    this.logger.info("Shokupan", "Loaded ApiExplorer module");
+                } catch (err: any) {
+                    this.logger.warn("Shokupan", "ApiExplorer plugin failed to load", { error: err.message });
+                }
             }
 
             // Register AsyncAPI UI
             const hasAsyncApi = this.plugins.some((p: any) => p === AsyncApiPlugin || p instanceof AsyncApiPlugin);
             if (!hasAsyncApi) {
-                await this.register(new AsyncApiPlugin(), { path: '/dashboard/ws-explorer' });
-                this.logger.info("Shokupan", "Loaded AsyncAPI module");
+                try {
+                    await this.register(new AsyncApiPlugin(), { path: '/dashboard/ws-explorer' });
+                    this.logger.info("Shokupan", "Loaded AsyncAPI module");
+                } catch (err: any) {
+                    this.logger.warn("Shokupan", "AsyncAPI plugin failed to load", { error: err.message });
+                }
             }
         }
 
