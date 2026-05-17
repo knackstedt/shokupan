@@ -1037,7 +1037,14 @@ export class Dashboard implements ShokupanPlugin {
                 })
             ];
 
-            await loadJsxComponent();
+            try {
+                await loadJsxComponent();
+            } catch (err: any) {
+                if (err.message?.includes('preact')) {
+                    return ctx.text('Dashboard requires preact. Install preact to enable the dashboard.', 503);
+                }
+                throw err;
+            }
             const html = (await getRenderToString())(DashboardApp({
                 metrics: this.metrics,
                 uptime,

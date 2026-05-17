@@ -148,7 +148,14 @@ export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin 
                 : await (this.root || this).generateApiSpec();
             const asyncSpec = (ctx.app as any).asyncApiSpec;
             const base = this.pluginOptions.path!;
-            await loadJsxComponent();
+            try {
+                await loadJsxComponent();
+            } catch (err: any) {
+                if (err.message?.includes('preact')) {
+                    return ctx.text('API Explorer requires preact. Install preact to enable.', 503);
+                }
+                throw err;
+            }
             const element = ApiExplorerApp({ spec: spec, base, asyncSpec });
             const html = renderToString(element);
             if (html.length === 0) throw new Error('ApiExplorerPlugin: rendered page is blank.');
