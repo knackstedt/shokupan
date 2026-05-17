@@ -170,6 +170,16 @@ describe("Security Fixes", () => {
             expect(result.error).toContain('dashboard path');
         });
 
+        test("blocks replay to 172.16.x.x private range", () => {
+            const result = Dashboard.validateReplayUrl('http://172.16.0.1/secret', '/admin');
+            expect(result.error).toContain('internal addresses');
+        });
+
+        test("allows replay to 172.32.x.x public range", () => {
+            const result = Dashboard.validateReplayUrl('http://172.32.1.1/api', '/admin');
+            expect(result.error).toBeUndefined();
+        });
+
         test("allows replay to external addresses", () => {
             const result = Dashboard.validateReplayUrl('https://api.example.com/users', '/admin');
             expect(result.error).toBeUndefined();
