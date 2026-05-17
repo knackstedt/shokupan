@@ -3,7 +3,7 @@ import addFormats from "ajv-formats";
 import type { Middleware } from "../../util/types";
 import { ValidationError } from "./validation";
 
-const ajv = new Ajv({ coerceTypes: true, allErrors: true });
+const ajv = new Ajv({ coerceTypes: false, allErrors: true });
 addFormats(ajv);
 
 type ValidatorCache = Map<string, {
