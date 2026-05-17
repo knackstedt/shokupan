@@ -1,4 +1,3 @@
-import { Eta } from 'eta';
 import { Stats } from 'fs';
 import { readdir, stat } from 'fs/promises';
 import { lookup } from 'mrmime';
@@ -6,7 +5,14 @@ import { join, resolve } from 'path';
 import type { ShokupanContext } from '../../context';
 import type { Middleware, StaticServeOptions } from '../../util/types';
 
-const eta = new Eta();
+let eta: any;
+async function getEta() {
+    if (!eta) {
+        const { Eta } = await import('eta');
+        eta = new Eta();
+    }
+    return eta;
+}
 
 interface FileData {
     abs: string;
@@ -162,7 +168,7 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
                 // Directory Listing Fallback
                 if (!file && stats?.isDirectory() && config.listDirectory) {
                     const files = await readdir(abs);
-                    const listing = eta.renderString(`
+                    const listing = (await getEta()).renderString(`
                                  <!DOCTYPE html>
                                  <html>
                                  <head>

@@ -4,7 +4,13 @@ import { nanoid } from 'nanoid';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import renderToString from 'preact-render-to-string';
+let renderToString: any;
+async function getRenderToString() {
+    if (!renderToString) {
+        renderToString = (await import('preact-render-to-string')).default;
+    }
+    return renderToString;
+}
 import type { DebugCollector } from "../../../context";
 import { ShokupanRouter } from "../../../router";
 import type { Shokupan } from '../../../shokupan';
@@ -170,7 +176,7 @@ export class Dashboard implements ShokupanPlugin {
 
     private [$appRoot]: Shokupan;
 
-    private router = new ShokupanRouter({ renderer: renderToString });
+    private router = new ShokupanRouter({ renderer: async (...args: any[]) => (await getRenderToString())(...args) });
     private metrics: RequestMetrics = {
         totalRequests: 0,
         successfulRequests: 0,
@@ -977,7 +983,7 @@ export class Dashboard implements ShokupanPlugin {
                 })
             ];
 
-            const html = renderToString(DashboardApp({
+            const html = (await getRenderToString())(DashboardApp({
                 metrics: this.metrics,
                 uptime,
                 rootPath: process.cwd(),

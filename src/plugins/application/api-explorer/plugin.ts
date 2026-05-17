@@ -1,7 +1,13 @@
 import { readFile } from 'fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import renderToString from 'preact-render-to-string';
+let renderToString: any;
+async function getRenderToString() {
+    if (!renderToString) {
+        renderToString = (await import('preact-render-to-string')).default;
+    }
+    return renderToString;
+}
 import { ShokupanRouter } from '../../../router';
 import type { Shokupan } from '../../../shokupan.ts';
 import { $isMounted } from '../../../util/symbol';
@@ -25,7 +31,7 @@ export interface ApiExplorerOptions {
 export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin {
 
     constructor(private readonly pluginOptions: ApiExplorerOptions = {}) {
-        super({ renderer: renderToString });
+        super({ renderer: async (...args: any[]) => (await getRenderToString())(...args) });
         pluginOptions.path ??= '/explorer';
 
         // Metadata

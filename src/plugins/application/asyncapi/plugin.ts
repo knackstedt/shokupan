@@ -3,7 +3,13 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import renderToString from 'preact-render-to-string';
+let renderToString: any;
+async function getRenderToString() {
+    if (!renderToString) {
+        renderToString = (await import('preact-render-to-string')).default;
+    }
+    return renderToString;
+}
 import { ShokupanRouter } from '../../../router';
 import type { Shokupan } from '../../../shokupan';
 import { deepMerge } from '../../../util/deep-merge';
@@ -37,7 +43,7 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
     }
 
     constructor(private pluginOptions: AsyncApiPluginOptions = {}) {
-        super({ renderer: renderToString });
+        super({ renderer: async (...args: any[]) => (await getRenderToString())(...args) });
         this.pluginOptions.path ??= '/asyncapi';
 
         // Metadata
