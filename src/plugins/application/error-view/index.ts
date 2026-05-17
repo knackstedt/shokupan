@@ -1,4 +1,5 @@
 import type { Shokupan } from '../../../shokupan';
+import { existsSync } from 'node:fs';
 import { asyncContext } from '../../../util/async-hooks';
 import { getErrorStatus } from '../../../util/http-error';
 import type { Middleware, ShokupanPlugin } from '../../../util/types';
@@ -150,7 +151,10 @@ export class ErrorView implements ShokupanPlugin {
         const { join } = await import('path');
         const assetDir = join(import.meta.dir, 'assets');
 
-        app.static('/_shokupan/error-view', assetDir);
+        if (existsSync(assetDir)) {
+
+            app.static('/_shokupan/error-view', assetDir);
+        }
 
         // Register middleware
         app.use(errorViewMiddleware);
