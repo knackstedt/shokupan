@@ -15,6 +15,7 @@ export * from "./plugins/application/asyncapi/plugin";
 export * from "./plugins/application/auth";
 export * from "./plugins/application/cluster";
 export * from "./plugins/application/dashboard/plugin";
+export * from "./plugins/application/debug/plugin";
 export * from "./plugins/application/error-view/index";
 export * from "./plugins/application/graceful-shutdown/plugin";
 export * from "./plugins/application/graphql-apollo";
@@ -23,6 +24,7 @@ export * from "./plugins/application/htmx";
 export * from "./plugins/application/idempotency/plugin";
 export * from "./plugins/application/mcp-server/plugin";
 export * from "./plugins/application/opentelemetry";
+export * from "./plugins/application/permissions";
 export * from "./plugins/application/scalar";
 export * from "./plugins/application/socket-io";
 

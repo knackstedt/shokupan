@@ -102,10 +102,14 @@ export class FetchInterceptor {
     private static originalFetch: typeof global.fetch | undefined;
     private static originalHttpRequest: typeof http.request | undefined;
     private static originalHttpsRequest: typeof https.request | undefined;
+    private static originalHttpGet: typeof http.get | undefined;
+    private static originalHttpsGet: typeof https.get | undefined;
 
     private originalFetch: typeof global.fetch;
     private originalHttpRequest: typeof http.request;
     private originalHttpsRequest: typeof https.request;
+    private originalHttpGet: typeof http.get;
+    private originalHttpsGet: typeof https.get;
     private callbacks: OutboundRequestCallback[] = [];
     private isPatched: boolean = false;
     private logger: Logger;
@@ -129,6 +133,8 @@ export class FetchInterceptor {
                 FetchInterceptor.originalFetch = global.fetch;
                 FetchInterceptor.originalHttpRequest = http.request;
                 FetchInterceptor.originalHttpsRequest = https.request;
+                FetchInterceptor.originalHttpGet = http.get;
+                FetchInterceptor.originalHttpsGet = https.get;
             }
         }
 

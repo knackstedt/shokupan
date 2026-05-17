@@ -1,6 +1,6 @@
 
+import { AuthPlugin } from '../../src/plugins/application/auth';
 import { Shokupan } from '../../src/shokupan';
-import { AuthPlugin } from '../plugins/auth';
 
 const app = new Shokupan({
     port: 3002
@@ -26,7 +26,7 @@ const auth = new AuthPlugin({
     }
 });
 
-app.use(auth.middleware());
+app.register(auth);
 app.mount("/", auth); // Mounts /auth/github/login etc. at root level
 
 app.get("/", (ctx) => {

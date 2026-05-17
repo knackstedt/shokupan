@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { ShokupanContext } from "./context";
 import { ShokupanRequest } from "./util/request";
-import { EmptyState, getStateProperty, hasStateProperty, requireStateProperty } from "./util/types";
+import { type EmptyState, getStateProperty, hasStateProperty, requireStateProperty } from "./util/types";
 
 describe("State Type Utilities", () => {
     describe("hasStateProperty", () => {

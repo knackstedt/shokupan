@@ -76,8 +76,7 @@ class DemoController {
 }
 
 const app = new Shokupan({
-    port: 3000,
-    controllersOnly: true // Optional: Enforce only Controllers
+    port: 3000
 });
 
 

@@ -369,27 +369,53 @@ export class Dashboard implements ShokupanPlugin {
             }
         }
 
-        // AsyncAPI
-        const asyncApiConf = checkConfig('asyncapi');
-        if (asyncApiConf.enabled) {
-            if (asyncApiConf.path) {
-                integrations['asyncapi'] = asyncApiConf.path;
-            } else {
-                const plugin = routers.find(r => r.constructor.name === 'AsyncApiPlugin');
-                if (plugin) {
-                    integrations['asyncapi'] = (plugin as any)[$mountPath];
+        // Check for unified DebugPlugin first
+        const debugPlugin = routers.find(r => r.constructor.name === 'DebugPlugin');
+        if (debugPlugin) {
+            const debugPath = (debugPlugin as any)[$mountPath];
+            
+            // AsyncAPI via DebugPlugin
+            const asyncApiConf = checkConfig('asyncapi');
+            if (asyncApiConf.enabled) {
+                if (asyncApiConf.path) {
+                    integrations['asyncapi'] = asyncApiConf.path;
+                } else {
+                    integrations['asyncapi'] = `${debugPath}/asyncapi`;
                 }
             }
-        }
 
-        const apiExplorerConf = checkConfig('apiExplorer');
-        if (apiExplorerConf.enabled) {
-            if (apiExplorerConf.path) {
-                integrations['apiExplorer'] = apiExplorerConf.path;
-            } else {
-                const plugin = routers.find(r => r.constructor.name === 'ApiExplorerPlugin');
-                if (plugin) {
-                    integrations['apiExplorer'] = (plugin as any)[$mountPath];
+            // API Explorer via DebugPlugin
+            const apiExplorerConf = checkConfig('apiExplorer');
+            if (apiExplorerConf.enabled) {
+                if (apiExplorerConf.path) {
+                    integrations['apiExplorer'] = apiExplorerConf.path;
+                } else {
+                    integrations['apiExplorer'] = `${debugPath}/explorer`;
+                }
+            }
+        } else {
+            // Fallback to legacy standalone plugins
+            const asyncApiConf = checkConfig('asyncapi');
+            if (asyncApiConf.enabled) {
+                if (asyncApiConf.path) {
+                    integrations['asyncapi'] = asyncApiConf.path;
+                } else {
+                    const plugin = routers.find(r => r.constructor.name === 'AsyncApiPlugin');
+                    if (plugin) {
+                        integrations['asyncapi'] = (plugin as any)[$mountPath];
+                    }
+                }
+            }
+
+            const apiExplorerConf = checkConfig('apiExplorer');
+            if (apiExplorerConf.enabled) {
+                if (apiExplorerConf.path) {
+                    integrations['apiExplorer'] = apiExplorerConf.path;
+                } else {
+                    const plugin = routers.find(r => r.constructor.name === 'ApiExplorerPlugin');
+                    if (plugin) {
+                        integrations['apiExplorer'] = (plugin as any)[$mountPath];
+                    }
                 }
             }
         }
