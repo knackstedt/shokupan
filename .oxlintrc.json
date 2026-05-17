@@ -1,0 +1,10 @@
+{
+    "rules": {
+        "no-console": "error"
+    },
+    "ignorePatterns": [
+        "src/cli/**/*",
+        "src/test/**/*",
+        "src/**/*.spec.ts"
+    ]
+}

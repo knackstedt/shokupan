@@ -9,6 +9,12 @@ export * from "./util/symbol";
 export * from "./util/types";
 export * from "./websocket";
 
+// Adapters
+export * from "./util/adapter";
+
+// Resilience
+export * from "./plugins/resilience";
+
 // Plugins
 // Application Plugins
 export * from "./plugins/application/api-explorer/plugin";
@@ -28,6 +34,7 @@ export * from "./plugins/application/opentelemetry";
 export * from "./plugins/application/permissions";
 export * from "./plugins/application/scalar";
 export * from "./plugins/application/socket-io";
+export * from "./plugins/application/web-app/plugin";
 
 // Middleware Plugins
 export * from "./plugins/middleware/compression";

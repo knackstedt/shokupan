@@ -26,12 +26,12 @@ export function getCallerInfo(skipFrames = 1): { file: string; line: number; } {
             if (l.includes('node_modules')) continue;
             if (l.includes('bun:main')) continue;
             if (l.includes('bun:wrap')) continue;
-            // TODO: The following checks are highly fragile and will not work when packaged.
-            if (l.includes('src/decorators/util/stack.ts')) continue; // Ignore self
-            if (l.includes('src/router.ts')) continue; // Ignore router internals
-            if (l.includes('src/decorators/http.ts')) continue; // Ignore decorators
-            if (l.includes('src/shokupan.ts')) continue; // Ignore framework internals
-            if (l.includes('src/plugins/application/openapi/openapi.ts')) continue; // Ignore openapi internals
+            // Ignore framework internals by basename (works when packaged too)
+            if (/[\/\\]stack\.(ts|js|mjs|cts|cjs)/.test(l)) continue; // Ignore self
+            if (/[\/\\]router\.(ts|js|mjs|cts|cjs)/.test(l)) continue; // Ignore router internals
+            if (/[\/\\]http\.(ts|js|mjs|cts|cjs)/.test(l)) continue; // Ignore decorators
+            if (/[\/\\]shokupan\.(ts|js|mjs|cts|cjs)/.test(l)) continue; // Ignore framework internals
+            if (/[\/\\]openapi\.(ts|js|mjs|cts|cjs)/.test(l)) continue; // Ignore openapi internals
 
             found++;
             if (found >= skipFrames) {

@@ -9,26 +9,7 @@ export class NodeAdapter implements ServerAdapter {
     private server?: any;
 
     async listen(port: number, app: Shokupan, tls?: { key: string; cert: string; }): Promise<Server<any>> {
-        const factory = app.applicationConfig.serverFactory;
-
         let nodeServer: http.Server | https.Server;
-
-        if (factory) {
-            // If a custom factory is provided, use it (it returns a promise of a server like object)
-            // But we need to standardize this.
-            // For now, support existing factory pattern if needed, or assume it's just handled here.
-            // Actually, the old code called `factory({ ... })`.
-            // We can defer to it.
-            const serveOptions = {
-                port: port,
-                hostname: app.applicationConfig.hostname,
-                development: app.applicationConfig.development,
-                fetch: app.fetch.bind(app),
-                reusePort: app.applicationConfig.reusePort,
-            };
-            this.server = await factory(serveOptions);
-            return this.server;
-        }
 
         // Standard Node.js implementation
         const handler = async (req: http.IncomingMessage, res: http.ServerResponse) => {
