@@ -24,6 +24,10 @@ export default defineConfig({
                 {
                     src: 'src/plugins/application/api-explorer/static/*',
                     dest: 'plugins/application/api-explorer/static'
+                },
+                {
+                    src: 'src/plugins/application/error-view/assets/*',
+                    dest: 'plugins/application/error-view/assets'
                 }
             ]
         })

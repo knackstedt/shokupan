@@ -1,0 +1,8 @@
+- Always use TypeScript, never plain JavaScript
+- Use bun, not npm
+- Validate every Client UI change with the playwright MCP server. Prompt me to sign-in if needed
+- Prefer reusing code over duplicating it
+- Write tests for new features
+- Always update the documentation and readme when changing or updating a feature
+- Never use for..of loops
+- Always ask for permission before ever using unsafe HTML rendering

@@ -1,0 +1,44 @@
+C. Performance/Profiler
+Concept: Flamegraphs for request handling. (Requires V8 hooks/debugger?)
+Implementation: We can visualize the middleware stack as a flamegraph. Integrating deeply with V8's CPU profiler is possible but complex; however, a "Logical Flamegraph" of your middleware/handlers is very doable and often more useful.
+
+Implement a schema validator for request payloads in the Network tab and the API Explorer tab. (stretch, this is arbitrary otherwise)
+
+Update the Application graph and use heatmap colors in conjunction with the tooltips to show the hot-paths. (requests, errors, latency, etc.)
+
+Create permission matrix view -- showing request methods+paths and roles required for each path
+
+
+Update the network tool:
+
+Websocket requests should show the total data transferred and the the time should be the time to connect. There should be a new column for websocket requests that shows the total duration the 
+websocket has been open for.
+
+Update the timings that we record: (Blocked)
+    Queued (waiting for open connection)
+    DNS Lookup
+    Connect
+    Sending
+    Waiting
+    Receiving
+
+    add security tab (outbound requests only?)
+    show connection TLS level and cipher,
+    show certificate info
+
+
+Update status code columns
+
+For redirects where we capture both the redirect and the final response, show 300 -> 200 as green, 300 -> 300 as yellow, 300 -> 400 as red, etc.
+
+
+
+
+
+Add support for generating a dependency/code graph of the following:
+https://app.zoom.us/wc/94733183221/join?ref_from=launch&pwd=UbM4WQrDaOgDWCijHN1jhcCKzLWWbB.1&_x_zm_rtaid=vxVE4IeRSUyaaRuGbm7DWQ.1774974431238.b63a5af8f57f372b5b6b4171d52727ae&_x_zm_rhtaid=122&fromPWA=1
++ Show which dependencies are used by which routes/endpoints
++ Show which routes/endpoints use which dependencies
++ Show which services/guards/middleware use which dependencies
+
+Generate a DAG
