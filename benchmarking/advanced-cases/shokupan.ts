@@ -19,7 +19,9 @@ export async function startAdvanced(port: number, scenario: string) {
             fatal: () => { }
         } as any,
         enableAsyncLocalStorage: scenario === "fully-loaded",
-        reusePort: !!process.env.REUSE_PORT
+        reusePort: !!process.env.REUSE_PORT,
+        // Disable automatic body pre-parsing for large payload scenarios to avoid overhead
+        disableBodyParsing: scenario === "large-payload-request" || scenario === "fully-loaded"
     });
 
     switch (scenario) {
@@ -102,7 +104,7 @@ export async function startAdvanced(port: number, scenario: string) {
             // Simple validator middleware (simulating Zod)
             const validatorMiddleware: Middleware = async (ctx, next: NextFn) => {
                 if (ctx.request.method === "POST") {
-                    const body = await ctx.body().catch(() => null) as any;
+                    const body = await ctx.body() as any;
                     if (!body || typeof body.data !== 'string') {
                         return ctx.json({ error: "Invalid body" }, 400);
                     }
