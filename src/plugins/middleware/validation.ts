@@ -4,6 +4,8 @@ let validateOrReject: any;
 import { ShokupanContext } from "../../context";
 import type { Middleware } from "../../util/types";
 
+const $cachedBody = Symbol.for("Shokupan.ctx.cachedBody");
+
 export interface ValidationConfig {
     body?: any;
     query?: any;
@@ -245,7 +247,7 @@ export function validate(config: ValidationConfig): Middleware {
             validBody = await validators.body(b);
 
             // Update context's cached body with validated/transformed version
-            (ctx as any)._cachedBody = validBody;
+            (ctx as any)[$cachedBody] = validBody;
 
             // Monkey-patch req.json() to return the validated body
             // This ensures handlers can call ctx.req.json() and get the validated data
@@ -255,8 +257,6 @@ export function validate(config: ValidationConfig): Middleware {
                 writable: true,
                 configurable: true
             });
-
-            (ctx as any).body = validBody; // Legacy/Convenience
         }
 
         // Call afterValidate Hook
