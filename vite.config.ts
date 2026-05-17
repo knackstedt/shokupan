@@ -45,6 +45,6 @@ export default defineConfig({
         },
         sourcemap: true,
         minify: false,
-        target: 'node18',
+        target: 'esnext',
     }
 });

@@ -34,7 +34,7 @@ const defaults: ShokupanConfig = {
     hostname: "localhost",
     development: process.env.NODE_ENV !== "production",
     enableAsyncLocalStorage: false,
-    enableHttpBridge: false,
+    enableHTTPBridge: false,
     enableOpenApiGen: true,
     enableAsyncAstScanning: true,
     blockOnOpenApiGen: false,
@@ -220,7 +220,7 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
         }
 
         this.dbPromise = Promise.resolve();
-        if (this.applicationConfig.adapter !== 'wintercg' && (this.applicationConfig.datastore || this.applicationConfig.surreal)) {
+        if (this.applicationConfig.adapter !== 'wintercg' && this.applicationConfig.datastore) {
             this.dbPromise = this.initDatastore().catch(err => {
                 // Log but don't crash if optional datastore init fails
                 this.logger?.debug('Shokupan', "Failed to initialize default datastore", { error: err });
@@ -304,19 +304,14 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
                 }
                 case 'surrealdb': {
                     const { SurrealAdapter } = await import('./util/adapter/datastore/surreal');
-                    // Forward legacy config if present
-                    const legacyConfig = this.applicationConfig.surreal || {};
-                    const effectiveOptions = { ...legacyConfig, ...options };
-                    this.datastore = new SurrealAdapter(effectiveOptions);
+                    this.datastore = new SurrealAdapter(options);
                     break;
                 }
                 default: {
                     // Determine default behavior if adapter not specified
                     // Old default: SurrealDB
                     const { SurrealAdapter } = await import('./util/adapter/datastore/surreal');
-                    // Support legacy config
-                    const legacy = this.applicationConfig.surreal;
-                    this.datastore = new SurrealAdapter(options || legacy || {});
+                    this.datastore = new SurrealAdapter(options || {});
                 }
             }
 

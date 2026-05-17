@@ -33,7 +33,7 @@
         "build": "vite build",
         "bench": "cd benchmarking && bun runner.ts",
         "bench:advanced": "cd benchmarking && bun advanced-runner.ts",
-        "retag": "git push origin :refs/tags/v$(node -p \"require('./package.json').version\") 2>/dev/null || true && git tag -d v$(node -p \"require('./package.json').version\") 2>/dev/null || true && git tag v$(node -p \"require('./package.json').version\") && git push origin v$(node -p \"require('./package.json').version\") --force"
+        "retag": "VERSION=$(jq -r '.version' package.json) && git push origin :refs/tags/v${VERSION} 2>/dev/null || true && git tag -d v${VERSION} 2>/dev/null || true && git tag v${VERSION} && git push origin v${VERSION} --force"
     },
     "bin": {
         "shokupan": "dist/cli.js",
