@@ -1448,7 +1448,7 @@ export class Dashboard implements ShokupanPlugin {
                     // Record failure in failed_request table for aggregate tracking
                     try {
                         const id = `failed_${ctx.requestId}`;
-                        await this.db.upsert('failed_request', id, {
+                        await this.db?.upsert('failed_request', id, {
                             id,
                             method: ctx.method,
                             url: ctx.url.toString(),
