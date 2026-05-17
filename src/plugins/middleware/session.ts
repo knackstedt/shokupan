@@ -308,6 +308,13 @@ declare module "../../context" {
  */
 export function Session(options: SessionOptions): Middleware {
     const store = options.store || new MemoryStore();
+    if (store instanceof MemoryStore && process.env.NODE_ENV === 'production') {
+        console.warn(
+            '[Session] MemoryStore is not suitable for production environments. ' +
+            'Sessions will be lost on restart and will not scale across instances. ' +
+            'Please configure a persistent store (e.g. Redis, PostgreSQL, MongoDB).'
+        );
+    }
     const name = options.name || 'connect.sid';
     const secrets = Array.isArray(options.secret) ? options.secret : [options.secret];
 
