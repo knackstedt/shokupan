@@ -1008,6 +1008,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         // Copy metadata
         (wrapped as any).originalHandler = (handler as any).originalHandler || handler;
         (wrapped as any).metadata = (handler as any).metadata;
+        (wrapped as any)._route = (handler as any)._route;
 
         // Cache it
         this.wrappedHandlers.set(handler, wrapped);
@@ -1022,28 +1023,30 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * @param path Request path
      * @returns Route handler and parameters if found, otherwise null
      */
-    public find(method: string, path: string): { handler: ShokupanHandler<T>; params: Record<string, string>; } | null {
+    public find(method: string, path: string): { handler: ShokupanHandler<T>; params: Record<string, string>; route?: any } | null {
         // console.log(`[Router] find ${method} ${path} (routes: ${this.routes.length}, children: ${this[$childRouters].length})`);
 
 
         // 1. Check local routes
         let result = this.trie.search(method, path);
         if (result) {
+            const route = (result.handler as any)._route;
             // Wrap with router middleware if present (except for root application, which handles it globally)
             if (!(this as any)[$isApplication]) {
                 result.handler = this.wrapHandlerWithMiddleware(result.handler);
             }
-            return result;
+            return { ...result, route };
         }
 
         // Fallback: If HEAD not found, try GET
         if (method === "HEAD") {
             result = this.trie.search("GET", path);
             if (result) {
+                const route = (result.handler as any)._route;
                 if (!(this as any)[$isApplication]) {
                     result.handler = this.wrapHandlerWithMiddleware(result.handler);
                 }
-                return result;
+                return { ...result, route };
             }
         }
 
@@ -1230,7 +1233,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         }
 
         // Store for OpenAPI (still use list)
-        this[$routes].push({
+        const route = {
             method,
             path,
             regex: regex ?? new RegExp(''),
@@ -1247,8 +1250,13 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
                 line
             },
             controller,
-            middleware: middleware || []
-        });
+            middleware: middleware || [],
+            fileAccessCheck: this.config?.fileAccessCheck
+        };
+        this[$routes].push(route);
+
+        // Attach route reference to handler for retrieval in find()
+        (bakedHandler as any)._route = route;
 
         // Insert into Trie
         this.trie.insert(method, path, bakedHandler);
@@ -1429,7 +1437,7 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
         // Mark handler with a flag to prevent auto-upgrade
         (handler as any).__isSocketRoute = true;
 
-        this[$routes].push({
+        const route: ShokupanRoute = {
             method: "GET",
             path,
             regex,
@@ -1445,7 +1453,11 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
             controller: undefined,
             middleware: [],
             isSocket: true  // Add flag to route metadata
-        });
+        };
+        this[$routes].push(route);
+
+        // Attach route reference to handler for retrieval in find()
+        (handler as any)._route = route;
 
         // Insert into Trie with socket marker
         this.trie.insert("GET", path, handler);

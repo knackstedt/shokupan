@@ -801,6 +801,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                     if (match) {
                         ctx[$routeMatched] = true;
                         ctx.params = match.params;
+                        ctx.matchedRoute = match.route;
 
                         // Ensure body is parsed before handler executes
                         if (bodyParsing) await bodyParsing;
@@ -1128,6 +1129,7 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
                 };
                 // Preserve metadata if any
                 (handler as any).originalHandler = (originalHandler as any).originalHandler || originalHandler;
+                (handler as any)._route = (originalHandler as any)._route;
             }
 
             trie.insert(route.method, fullPath, handler);
@@ -1151,11 +1153,18 @@ export class Shokupan<T = any> extends ShokupanRouter<T> {
     public override find(method: string, path: string) {
         if (this.rootTrie) {
             const result = this.rootTrie.search(method, path);
-            if (result) return result;
+            if (result) {
+                const route = (result.handler as any)._route;
+                return { ...result, route };
+            }
 
             // Fallback HEAD -> GET
             if (method === "HEAD") {
-                return this.rootTrie.search("GET", path);
+                const headResult = this.rootTrie.search("GET", path);
+                if (headResult) {
+                    const route = (headResult.handler as any)._route;
+                    return { ...headResult, route };
+                }
             }
             return null;
         }

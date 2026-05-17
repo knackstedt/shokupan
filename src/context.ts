@@ -1,6 +1,7 @@
 import type { BodyInit, Server, ServerWebSocket } from 'bun';
 import { nanoid } from 'nanoid';
 import { readFile } from 'node:fs/promises';
+import { resolve, sep } from 'node:path';
 import { inspect } from 'node:util';
 import type { Socket, Server as SocketServer } from 'socket.io';
 import type { Shokupan } from './shokupan';
@@ -11,7 +12,7 @@ import { parseQuery } from './util/query-string';
 import type { ShokupanRequest } from './util/request';
 import { ShokupanResponse } from './util/response';
 import { $bodyParsed, $bodyParseError, $bodyType, $cachedBody, $cachedCookies, $cachedHost, $cachedHostname, $cachedOrigin, $cachedProtocol, $cachedQuery, $debug, $finalResponse, $io, $onWsMessage, $rawBody, $requestId, $routeMatched, $socket, $url, $ws, $wsMessages } from './util/symbol';
-import type { CookieOptions, HeadersInit, JSXRenderer, SSEMessage, SSEStreamErrorHandler, SSEStreamHelper, StreamErrorHandler, StreamHelper, TextStreamErrorHandler, TextStreamHelper } from './util/types';
+import type { CookieOptions, HeadersInit, JSXRenderer, ShokupanRoute, SSEMessage, SSEStreamErrorHandler, SSEStreamHelper, StreamErrorHandler, StreamHelper, TextStreamErrorHandler, TextStreamHelper } from './util/types';
 
 /**
  * Inline WebSocket handlers for ctx.upgrade()
@@ -43,7 +44,14 @@ function isValidCookieDomain(domain: string, currentHost: string): boolean {
     return false;
 }
 
-
+/**
+ * Security: Validate if a file path is within an allowed parent directory
+ */
+function isSubPath(parent: string, child: string): boolean {
+    const p = resolve(parent);
+    const c = resolve(child);
+    return c === p || c.startsWith(p + sep);
+}
 
 export interface HandlerStackItem {
     name: string;
@@ -159,7 +167,7 @@ export class ShokupanContext<
     private [$bodyParseError]?: Error;
 
     public [$routeMatched]: boolean = false;
-
+    public matchedRoute?: ShokupanRoute;
 
     // Cached URL properties to avoid repeated parsing
     private [$cachedHostname]?: string;
@@ -999,6 +1007,33 @@ export class ShokupanContext<
         }
         // status is optional in file responseOptions, so only update if defined, otherwise keep existing
         if (status) this.response.status = status;
+
+        // Security: block null-byte injection and directory traversal
+        if (path.includes('\0') || path.includes('..')) {
+            throw new Error('Invalid file path');
+        }
+        const resolved = resolve(path);
+
+        // Enforce allowedStaticFilePaths boundary if configured
+        const allowedPaths = this.app.applicationConfig.allowedStaticFilePaths;
+        if (allowedPaths && allowedPaths.length > 0) {
+            const isAllowed = allowedPaths.some(allowed => isSubPath(allowed, resolved));
+            if (!isAllowed) {
+                throw new Error('Invalid file path');
+            }
+        }
+
+        // App-level file access check
+        const appFileCheck = this.app.applicationConfig.fileAccessCheck;
+        if (appFileCheck && !appFileCheck(this, path)) {
+            throw new Error('Invalid file path');
+        }
+
+        // Route-level file access check
+        const routeFileCheck = this.matchedRoute?.fileAccessCheck;
+        if (routeFileCheck && !routeFileCheck(this, path)) {
+            throw new Error('Invalid file path');
+        }
 
         if (typeof Bun !== "undefined") {
             this[$finalResponse] = new Response(Bun.file(path, fileOptions), { status, headers: finalHeaders });
