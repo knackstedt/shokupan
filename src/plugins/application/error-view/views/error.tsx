@@ -1,4 +1,10 @@
-import renderToString from 'preact-render-to-string';
+let renderToString: any;
+async function getRenderToString() {
+    if (!renderToString) {
+        renderToString = (await import('preact-render-to-string')).default;
+    }
+    return renderToString;
+}
 import type { ShokupanContext } from '../../../../context';
 import { escapeHtml } from '../../../../util/html';
 import { generateEditorLink } from '../../../../util/ide';
@@ -498,5 +504,5 @@ export async function renderErrorView(ctx: ShokupanContext, error: any, options:
         hideStacktrace: options.hideStacktrace
     });
 
-    return '<!DOCTYPE html>\n' + renderToString(element);
+    return '<!DOCTYPE html>\n' + (await getRenderToString())(element);
 }
