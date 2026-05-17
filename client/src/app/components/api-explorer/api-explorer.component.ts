@@ -10,6 +10,7 @@ import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { Tab, TabList, TabPanel, TabPanels, Tabs } from 'primeng/tabs';
 import { ToastModule } from 'primeng/toast';
+import { firstValueFrom } from 'rxjs';
 import { SchemaViewerComponent } from '../schema-viewer/schema-viewer.component';
 
 interface Route {
@@ -259,12 +260,12 @@ export class ApiExplorerComponent implements OnInit {
             const method = this.requestMethod().toLowerCase();
             const body = this.requestBody() ? JSON.parse(this.requestBody()) : undefined;
 
-            const response = await this.http.request(method, url, {
+            const response = await firstValueFrom(this.http.request(method, url, {
                 headers,
                 body,
                 observe: 'response',
                 responseType: 'text'
-            }).toPromise();
+            }));
 
             const duration = Date.now() - startTime;
 

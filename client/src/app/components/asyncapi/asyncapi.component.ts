@@ -4,6 +4,7 @@ import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AngularSplitModule } from 'angular-split';
 import { NgScrollbarModule } from 'ngx-scrollbar';
+import { ConfigService } from '../../services/config.service';
 import { SchemaViewerComponent } from '../schema-viewer/schema-viewer.component';
 
 interface SourceInfo {
@@ -41,6 +42,7 @@ export interface FlatLeaf {
   type: 'publish' | 'subscribe';
 }
 
+
 @Component({
   selector: 'skp-asyncapi',
   standalone: true,
@@ -50,6 +52,7 @@ export interface FlatLeaf {
 })
 export class AsyncApiComponent implements OnInit, OnDestroy {
   private http = inject(HttpClient);
+  private config = inject(ConfigService);
 
   readonly loading = signal<boolean>(true);
   readonly spec = signal<any>(null);
@@ -74,7 +77,8 @@ export class AsyncApiComponent implements OnInit, OnDestroy {
 
   private loadSpec(): void {
     this.loading.set(true);
-    this.http.get<any>('/asyncapi/json').subscribe({
+    const apiPath = this.config.config().asyncApi;
+    this.http.get<any>(`${apiPath}/json`).subscribe({
       next: (spec) => {
         // Pull out the server-computed IDE link pattern before storing the spec
         if (spec?.['x-ide-link-pattern']) {
@@ -137,7 +141,8 @@ export class AsyncApiComponent implements OnInit, OnDestroy {
 
     // Strip any existing protocol prefix
     url = url.replace(/^(wss?:\/\/)?/, '');
-    const wsUrl = `${protocol}://${url}/asyncapi/ws`;
+    const apiPath = this.config.config().asyncApi;
+    const wsUrl = `${protocol}://${url}${apiPath}/ws`;
 
     try {
       this.ws = new WebSocket(wsUrl);
