@@ -31,7 +31,13 @@ jobs:
         run: bun run build
         
       - name: Publish to NPM
-        run: npm publish --provenance
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [[ "$VERSION" == *-* ]]; then
+            npm publish --provenance --tag next
+          else
+            npm publish --provenance
+          fi
 
   create-release:
     needs: publish-npm
@@ -40,10 +46,20 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      
+
+      - name: Check if prerelease
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [[ "$VERSION" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
