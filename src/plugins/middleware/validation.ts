@@ -38,6 +38,31 @@ function isTypeBox(schema: any): boolean {
     return typeof schema?.Check === 'function' && typeof schema?.Errors === 'function';
 }
 
+function isRawTypeBox(schema: any): boolean {
+    return schema && typeof schema === 'object' && !!schema[Symbol.for('TypeBox.Kind')];
+}
+
+let TypeCompiler: any;
+
+async function getTypeCompiler() {
+    if (!TypeCompiler) {
+        TypeCompiler = (await import('@sinclair/typebox/compiler')).TypeCompiler;
+    }
+    return TypeCompiler;
+}
+
+const compiledTypeBoxCache = new WeakMap<any, any>();
+
+async function compileTypeBox(schema: any) {
+    let compiled = compiledTypeBoxCache.get(schema);
+    if (!compiled) {
+        const TC = await getTypeCompiler();
+        compiled = TC.Compile(schema);
+        compiledTypeBoxCache.set(schema, compiled);
+    }
+    return compiled;
+}
+
 function validateTypeBox(schema: any, data: any) {
     if (!schema.Check(data)) {
         throw new ValidationError([...schema.Errors(data)]);
@@ -156,6 +181,16 @@ function getValidator(schema: any): (data: any) => Promise<any> | any {
     if (isTypeBox(schema)) {
         return (data) => validateTypeBox(schema, data);
     }
+    if (isRawTypeBox(schema)) {
+        // Return a function that lazily compiles and validates on first use
+        let compiled: any;
+        return async (data: any) => {
+            if (!compiled) {
+                compiled = await compileTypeBox(schema);
+            }
+            return validateTypeBox(compiled, data);
+        };
+    }
     if (isAjv(schema)) {
         return (data) => validateAjv(schema, data);
     }
@@ -248,6 +283,10 @@ export function validate(config: ValidationConfig): Middleware {
 
             // Update context's cached body with validated/transformed version
             (ctx as any)[$cachedBody] = validBody;
+
+            // Monkey-patch ctx.body() to return the validated body synchronously
+            // This ensures handlers can call ctx.body() without await after validation
+            (ctx as any).body = () => validBody;
 
             // Monkey-patch req.json() to return the validated body
             // This ensures handlers can call ctx.req.json() and get the validated data

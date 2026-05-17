@@ -1736,6 +1736,10 @@ function unknownError(ctx: any): any {
     return ctx.json({ error: "Unknown Error" }, 500);
 }
 
+export function DashboardPlugin(config?: DashboardConfig) {
+    return new Dashboard(config);
+}
+
 export default function DebugDashboard(config?: DashboardConfig) {
     return new Dashboard(config);
 }
