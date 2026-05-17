@@ -1,3 +1,8 @@
+---
+title: Nested WebSocket Routers
+description: How to use nested WebSocket routers in Shokupan.
+---
+
 # Nested WebSocket Routers
 
 ## Overview
