@@ -3,6 +3,13 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ShokupanRouter } from '../../../router';
+import type { Shokupan } from '../../../shokupan';
+import { deepMerge } from '../../../util/deep-merge';
+import { getEditorLinkPattern } from '../../../util/ide';
+import { $isMounted } from '../../../util/symbol';
+import type { DeepPartial, ShokupanPlugin, ShokupanPluginOptions } from '../../../util/types';
+import { generateAsyncApi } from '../asyncapi/generator';
 let renderToString: any;
 async function getRenderToString() {
     if (!renderToString) {
@@ -10,15 +17,21 @@ async function getRenderToString() {
     }
     return renderToString;
 }
-import { ShokupanRouter } from '../../../router';
-import type { Shokupan } from '../../../shokupan';
-import { deepMerge } from '../../../util/deep-merge';
-import { getEditorLinkPattern } from '../../../util/ide';
-import { $isMounted } from '../../../util/symbol';
-import type { DeepPartial, ShokupanPlugin, ShokupanPluginOptions } from '../../../util/types';
-import { ApiExplorerApp } from '../api-explorer/components.tsx';
-import { AsyncApiApp, buildNavTree } from '../asyncapi/components.tsx';
-import { generateAsyncApi } from '../asyncapi/generator';
+
+// Lazy-load JSX components to avoid requiring preact for consumers that don't use DebugPlugin
+let ApiExplorerApp: typeof import('../api-explorer/components.tsx').ApiExplorerApp;
+let AsyncApiApp: typeof import('../asyncapi/components.tsx').AsyncApiApp;
+let buildNavTree: typeof import('../asyncapi/components.tsx').buildNavTree;
+
+async function loadJsxComponents() {
+    if (!ApiExplorerApp || !AsyncApiApp || !buildNavTree) {
+        const apiExplorer = await import('../api-explorer/components.tsx');
+        const asyncApi = await import('../asyncapi/components.tsx');
+        ApiExplorerApp = apiExplorer.ApiExplorerApp;
+        AsyncApiApp = asyncApi.AsyncApiApp;
+        buildNavTree = asyncApi.buildNavTree;
+    }
+}
 
 export interface DebugPluginEndpointConfig {
     enabled?: boolean;
@@ -234,6 +247,7 @@ export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
                     : await (this.root || this).generateApiSpec();
                 const asyncSpec = (ctx.app as any).asyncApiSpec;
                 const base = `${this.pluginOptions.path}/explorer`;
+                await loadJsxComponents();
                 const element = ApiExplorerApp({ spec: spec, base, asyncSpec });
                 const html = (await getRenderToString())(element);
                 if (html.length === 0) throw new Error('DebugPlugin: rendered API Explorer page is blank.');
@@ -264,6 +278,7 @@ export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
 
                 const disableSourceView = this.pluginOptions.asyncApi?.disableSourceView;
 
+                await loadJsxComponents();
                 const navTree = buildNavTree(spec);
 
                 return ctx.jsx(AsyncApiApp({ spec, serverUrl, base, disableSourceView, navTree }));

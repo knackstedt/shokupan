@@ -3,6 +3,13 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ShokupanRouter } from '../../../router';
+import type { Shokupan } from '../../../shokupan';
+import { deepMerge } from '../../../util/deep-merge';
+import { getEditorLinkPattern } from '../../../util/ide';
+import { $isMounted } from '../../../util/symbol';
+import type { DeepPartial, ShokupanPlugin, ShokupanPluginOptions } from '../../../util/types';
+import { generateAsyncApi } from './generator';
 let renderToString: any;
 async function getRenderToString() {
     if (!renderToString) {
@@ -10,14 +17,17 @@ async function getRenderToString() {
     }
     return renderToString;
 }
-import { ShokupanRouter } from '../../../router';
-import type { Shokupan } from '../../../shokupan';
-import { deepMerge } from '../../../util/deep-merge';
-import { getEditorLinkPattern } from '../../../util/ide';
-import { $isMounted } from '../../../util/symbol';
-import type { DeepPartial, ShokupanPlugin, ShokupanPluginOptions } from '../../../util/types';
-import { AsyncApiApp, buildNavTree } from './components.tsx';
-import { generateAsyncApi } from './generator';
+
+// Lazy-load JSX components to avoid requiring preact for consumers that don't use AsyncApiPlugin
+let AsyncApiApp: typeof import('./components.tsx').AsyncApiApp;
+let buildNavTree: typeof import('./components.tsx').buildNavTree;
+async function loadJsxComponents() {
+    if (!AsyncApiApp || !buildNavTree) {
+        const mod = await import('./components.tsx');
+        AsyncApiApp = mod.AsyncApiApp;
+        buildNavTree = mod.buildNavTree;
+    }
+}
 
 export interface AsyncApiPluginOptions {
     path?: string;
@@ -172,6 +182,7 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
             const disableSourceView = this.pluginOptions.disableSourceView;
 
             // Build navigation tree from spec
+            await loadJsxComponents();
             const navTree = buildNavTree(spec);
 
             return ctx.jsx(AsyncApiApp({ spec, serverUrl, base, disableSourceView, navTree }));

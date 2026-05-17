@@ -1,6 +1,10 @@
 import { readFile } from 'fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ShokupanRouter } from '../../../router';
+import type { Shokupan } from '../../../shokupan.ts';
+import { $isMounted } from '../../../util/symbol';
+import type { ShokupanPlugin, ShokupanPluginOptions } from '../../../util/types.ts';
 let renderToString: any;
 async function getRenderToString() {
     if (!renderToString) {
@@ -8,11 +12,15 @@ async function getRenderToString() {
     }
     return renderToString;
 }
-import { ShokupanRouter } from '../../../router';
-import type { Shokupan } from '../../../shokupan.ts';
-import { $isMounted } from '../../../util/symbol';
-import type { ShokupanPlugin, ShokupanPluginOptions } from '../../../util/types.ts';
-import { ApiExplorerApp } from './components.tsx';
+
+// Lazy-load JSX component to avoid requiring preact for consumers that don't use ApiExplorerPlugin
+let ApiExplorerApp: typeof import('./components.tsx').ApiExplorerApp;
+async function loadJsxComponent() {
+    if (!ApiExplorerApp) {
+        const mod = await import('./components.tsx');
+        ApiExplorerApp = mod.ApiExplorerApp;
+    }
+}
 
 export interface ApiExplorerOptions {
     baseDocument?: any;
@@ -140,6 +148,7 @@ export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin 
                 : await (this.root || this).generateApiSpec();
             const asyncSpec = (ctx.app as any).asyncApiSpec;
             const base = this.pluginOptions.path!;
+            await loadJsxComponent();
             const element = ApiExplorerApp({ spec: spec, base, asyncSpec });
             const html = renderToString(element);
             if (html.length === 0) throw new Error('ApiExplorerPlugin: rendered page is blank.');
