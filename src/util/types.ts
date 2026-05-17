@@ -392,6 +392,11 @@ export type ShokupanRouteConfig = DeepPartial<{
      * The CPU usage percentage threshold (0-100) at which to start rejecting requests.
      */
     autoBackpressureLevel: number;
+    /**
+     * Custom file access check for routes that use ctx.file().
+     * Return true to allow access to the file, false to deny.
+     */
+    fileAccessCheck?: (ctx: ShokupanContext, path: string) => boolean;
 }>;
 
 export type ShokupanRoute = {
@@ -473,6 +478,11 @@ export type ShokupanRoute = {
      * Whether this route is a WebSocket route
      */
     isSocket?: boolean;
+    /**
+     * Custom file access check for routes that use ctx.file().
+     * Return true to allow access to the file, false to deny.
+     */
+    fileAccessCheck?: (ctx: ShokupanContext, path: string) => boolean;
 };
 
 export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> = Partial<{
@@ -737,6 +747,16 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      * The file system adapter to use for `ctx.file`.
      */
     fileSystem?: FileSystemAdapter;
+    /**
+     * Allowed paths for ctx.file(). If provided, files must be within one of these paths.
+     * If null/undefined, any file can be loaded (subject to existing traversal checks).
+     */
+    allowedStaticFilePaths?: string[];
+    /**
+     * Custom file access check function. If provided, called for every ctx.file() invocation.
+     * Return true to allow, false to deny.
+     */
+    fileAccessCheck?: (ctx: ShokupanContext, path: string) => boolean;
 
     /**
      * Lifecycle hooks.
@@ -920,4 +940,10 @@ export interface StaticServeOptions<T extends Record<string, any>> {
      * @default true
      */
     useCache?: boolean;
+    /**
+     * Maximum total size in bytes for the in-memory cache.
+     * Once exceeded, no further files are cached.
+     * @default 52428800 (50 MB)
+     */
+    maxCacheSize?: number;
 };
