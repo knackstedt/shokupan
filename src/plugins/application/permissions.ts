@@ -64,7 +64,7 @@ export class PermissionPlugin extends ShokupanRouter<any> implements ShokupanPlu
         }
     }
 
-    async onInit(app: Shokupan, options: ShokupanPluginOptions) {
+    async onInit(app: Shokupan, options?: ShokupanPluginOptions) {
         this.init();
 
         if (!(this as any)[$isMounted]) {

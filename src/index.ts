@@ -7,6 +7,7 @@ export * from "./util/request";
 export * from "./util/response";
 export * from "./util/symbol";
 export * from "./util/types";
+export * from "./websocket";
 
 // Plugins
 // Application Plugins
