@@ -1,12 +1,14 @@
-import type { Shokupan } from '../../../shokupan';
 import { existsSync } from 'node:fs';
+import type { Shokupan } from '../../../shokupan';
 import { asyncContext } from '../../../util/async-hooks';
 import { getErrorStatus } from '../../../util/http-error';
 import type { Middleware, ShokupanPlugin } from '../../../util/types';
 import { applyMonkeyPatch } from './monkeypatch';
 import { getReasonPhrase } from './reason-phrases';
-import { renderErrorView } from './views/error';
-import { renderStatusView } from './views/status';
+
+// Lazy-load JSX views to avoid requiring preact for consumers that don't use ErrorView
+let renderErrorView: typeof import('./views/error').renderErrorView;
+let renderStatusView: typeof import('./views/status').renderStatusView;
 
 export interface ErrorViewConfig {
     /**
@@ -46,6 +48,14 @@ export class ErrorView implements ShokupanPlugin {
     constructor(private config: ErrorViewConfig = {}) { }
 
     async onInit(app: Shokupan) {
+        // Lazy-load JSX views
+        if (!renderErrorView || !renderStatusView) {
+            const errorModule = await import('./views/error');
+            const statusModule = await import('./views/status');
+            renderErrorView = errorModule.renderErrorView;
+            renderStatusView = statusModule.renderStatusView;
+        }
+
         // Apply global patches
         applyMonkeyPatch();
 

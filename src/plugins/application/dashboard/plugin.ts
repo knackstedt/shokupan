@@ -4,6 +4,14 @@ import { nanoid } from 'nanoid';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { DebugCollector } from "../../../context";
+import { ShokupanRouter } from "../../../router";
+import type { Shokupan } from '../../../shokupan';
+import { getEditorLinkPattern } from '../../../util/ide';
+import { $appRoot, $childRouters, $debug, $mountPath, $onWsMessage, $wsMessages } from "../../../util/symbol";
+import type { ShokupanHooks, ShokupanPlugin } from "../../../util/types";
+import { FetchInterceptor, type OutboundRequestLog } from './fetch-interceptor';
+import { MetricsCollector } from './metrics-collector';
 let renderToString: any;
 async function getRenderToString() {
     if (!renderToString) {
@@ -11,15 +19,15 @@ async function getRenderToString() {
     }
     return renderToString;
 }
-import type { DebugCollector } from "../../../context";
-import { ShokupanRouter } from "../../../router";
-import type { Shokupan } from '../../../shokupan';
-import { getEditorLinkPattern } from '../../../util/ide';
-import { $appRoot, $childRouters, $debug, $mountPath, $onWsMessage, $wsMessages } from "../../../util/symbol";
-import type { ShokupanHooks, ShokupanPlugin } from "../../../util/types";
-import { DashboardApp } from './components';
-import { FetchInterceptor, type OutboundRequestLog } from './fetch-interceptor';
-import { MetricsCollector } from './metrics-collector';
+
+// Lazy-load JSX component to avoid requiring preact for consumers that don't use Dashboard
+let DashboardApp: typeof import('./components').DashboardApp;
+async function loadJsxComponent() {
+    if (!DashboardApp) {
+        const mod = await import('./components');
+        DashboardApp = mod.DashboardApp;
+    }
+}
 
 /**
  * Match a hostname/IP against a glob pattern.
@@ -1029,6 +1037,7 @@ export class Dashboard implements ShokupanPlugin {
                 })
             ];
 
+            await loadJsxComponent();
             const html = (await getRenderToString())(DashboardApp({
                 metrics: this.metrics,
                 uptime,
