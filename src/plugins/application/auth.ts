@@ -141,7 +141,7 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
             : authConfig.jwtSecret;
     }
 
-    async onInit(app: Shokupan, options: ShokupanPluginOptions) {
+    async onInit(app: Shokupan, options?: ShokupanPluginOptions) {
         // Load dependencies asynchronously
         this.arctic = await import("arctic");
         this.jose = await import("jose");
