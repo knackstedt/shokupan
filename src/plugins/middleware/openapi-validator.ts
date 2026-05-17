@@ -1,17 +1,28 @@
-import Ajv from "ajv";
-import addFormats from "ajv-formats";
+// Lazy-load Ajv to avoid requiring it for consumers that don't use OpenAPI validation
+let Ajv: typeof import("ajv").default;
+let addFormats: typeof import("ajv-formats").default;
+let ajv: any;
+async function getAjv() {
+    if (!ajv) {
+        const ajvModule = await import("ajv");
+        const formatsModule = await import("ajv-formats");
+        Ajv = ajvModule.default;
+        addFormats = formatsModule.default;
+        ajv = new Ajv({ coerceTypes: false, allErrors: true });
+        addFormats(ajv);
+    }
+    return ajv;
+}
+
 import type { Middleware } from "../../util/types";
 import { ValidationError } from "./validation";
 
-const ajv = new Ajv({ coerceTypes: false, allErrors: true });
-addFormats(ajv);
-
 type ValidatorCache = Map<string, {
     [method: string]: {
-        body?: import("ajv").ValidateFunction;
-        query?: import("ajv").ValidateFunction;
-        params?: import("ajv").ValidateFunction;
-        headers?: import("ajv").ValidateFunction;
+        body?: any;
+        query?: any;
+        params?: any;
+        headers?: any;
     };
 }>;
 
@@ -32,7 +43,7 @@ export function openApiValidator(): Middleware {
 
         let cache = compiledValidators.get(app);
         if (!cache) {
-            cache = compileValidators(app.openApiSpec);
+            cache = await compileValidators(app.openApiSpec);
             compiledValidators.set(app, cache);
         }
 
@@ -125,9 +136,10 @@ export function openApiValidator(): Middleware {
     };
 }
 
-export function compileValidators(spec: any): { paths: Map<string, { regex: RegExp, paramNames: string[]; }>, validators: ValidatorCache; } {
+export async function compileValidators(spec: any): Promise<{ paths: Map<string, { regex: RegExp, paramNames: string[]; }>, validators: ValidatorCache; }> {
     const validators: ValidatorCache = new Map();
     const paths = new Map<string, { regex: RegExp, paramNames: string[]; }>();
+    const ajv = await getAjv();
 
     const pathEntries = Object.entries(spec.paths || {});
     for (let i = 0; i < pathEntries.length; i++) {
@@ -157,7 +169,7 @@ export function compileValidators(spec: any): { paths: Map<string, { regex: RegE
 
             // 1. Compile Request Body
             if (oper.requestBody?.content?.['application/json']?.schema) {
-                opValidators.body = ajv.compile(oper.requestBody.content['application/json'].schema);
+                opValidators.body = ajv!.compile(oper.requestBody.content['application/json'].schema);
             }
 
             // 2. Compile Parameters (Query, Path, Header)
@@ -185,7 +197,7 @@ export function compileValidators(spec: any): { paths: Map<string, { regex: RegE
             }
 
             if (Object.keys(queryProps).length > 0) {
-                opValidators.query = ajv.compile({
+                opValidators.query = ajv!.compile({
                     type: 'object',
                     properties: queryProps,
                     required: queryRequired.length > 0 ? queryRequired : undefined
@@ -193,7 +205,7 @@ export function compileValidators(spec: any): { paths: Map<string, { regex: RegE
             }
 
             if (Object.keys(pathProps).length > 0) {
-                opValidators.params = ajv.compile({
+                opValidators.params = ajv!.compile({
                     type: 'object',
                     properties: pathProps,
                     required: pathRequired.length > 0 ? pathRequired : undefined
@@ -201,7 +213,7 @@ export function compileValidators(spec: any): { paths: Map<string, { regex: RegE
             }
 
             if (Object.keys(headerProps).length > 0) {
-                opValidators.headers = ajv.compile({
+                opValidators.headers = ajv!.compile({
                     type: 'object',
                     properties: headerProps,
                     required: headerRequired.length > 0 ? headerRequired : undefined
@@ -221,8 +233,8 @@ export function compileValidators(spec: any): { paths: Map<string, { regex: RegE
  * Pre-compiles validators for the application using the provided spec.
  * Should be called when the spec is available.
  */
-export function precompileValidators(app: any, spec: any) {
-    const cache = compileValidators(spec);
+export async function precompileValidators(app: any, spec: any) {
+    const cache = await compileValidators(spec);
     compiledValidators.set(app, cache);
 }
 
@@ -235,6 +247,6 @@ export function precompileValidators(app: any, spec: any) {
 export function enableOpenApiValidation(app: import("../../shokupan").Shokupan) {
     app.use(openApiValidator());
     app.onSpecAvailable((spec) => {
-        precompileValidators(app, spec);
+        return precompileValidators(app, spec);
     });
 }
