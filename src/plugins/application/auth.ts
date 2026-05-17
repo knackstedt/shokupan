@@ -51,6 +51,10 @@ export interface ProviderConfig {
      */
     keyId?: string;
     /**
+     * Private key PEM string (Apple Sign In)
+     */
+    privateKey?: string;
+    /**
      * Auth URL (Generic OAuth2)
      */
     authUrl?: string;
@@ -167,12 +171,11 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
             case 'microsoft':
                 return new MicrosoftEntraId(p.tenantId!, p.clientId, p.clientSecret, p.redirectUri);
             case 'apple':
-                // TODO: There is a type issue, requires testing.
                 return new Apple(
                     p.clientId,
                     p.teamId!,
                     p.keyId!,
-                    p.clientSecret as any,
+                    p.privateKey!,
                     p.redirectUri
                 );
             case 'auth0':
@@ -299,8 +302,6 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
                 const code = url.searchParams.get("code");
                 const state = url.searchParams.get("state");
 
-                console.log("== OAuth Callback Hit ==", { providerName, code, state });
-
                 const cookieHeader = ctx.req.headers.get("Cookie");
                 const storedState = cookieHeader?.match(/oauth_state=([^;]+)/)?.[1];
                 const storedVerifier = cookieHeader?.match(/oauth_verifier=([^;]+)/)?.[1];
@@ -358,7 +359,6 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
                     return ctx.json({ token: jwt, user });
 
                 } catch (e: any) {
-                    console.error("Auth Exception:", e);
                     let extradata = "";
                     try { if (e && e.response) extradata = " | Body: " + await e.response.text(); } catch { }
                     // Log detailed error server-side only; return generic message to client

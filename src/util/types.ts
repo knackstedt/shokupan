@@ -1,6 +1,4 @@
 import type { OpenAPI } from '@scalar/openapi-types';
-import type { Server } from 'bun';
-import type { Server as NodeServer } from 'node:http';
 import type { ShokupanContext } from '../context';
 import type { ServerAdapter } from './adapter';
 import type { FileSystemAdapter } from './adapter/filesystem';
@@ -346,10 +344,6 @@ export enum RouteParamType {
     REQUEST = "REQUEST",
     CONTEXT = "CONTEXT",
     SERVICE = "SERVICE"
-}
-
-export interface ServerFactory {
-    (options: any): Server<any> | Promise<Server<any>> | NodeServer | Promise<NodeServer>;
 }
 
 /**
@@ -748,17 +742,9 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
     renderer: JSXRenderer;
 
     /**
-     * Factory function to create the server instance.
-     * Defaults to Bun.serve.
-     * @deprecated Use `adapter` instead.
-     */
-    serverFactory: ServerFactory;
-
-    /**
      * The server adapter to use.
-     * overrides `serverFactory`.
      */
-    adapter?: 'bun' | 'node' | 'wintercg' | 'h3' | ServerAdapter;
+    adapter?: 'bun' | 'node' | 'wintercg' | ServerAdapter;
 
     /**
      * The file system adapter to use for `ctx.file`.
@@ -785,11 +771,6 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      * @default true
      */
     validateStatusCodes: boolean;
-
-    /**
-     * @deprecated Use `datastore` config instead.
-     */
-    surreal?: any;
 
     datastore?: {
         adapter: 'surreal' | 'sqlite' | 'level';
@@ -847,12 +828,6 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      * @default false
      */
     defaultSecurityHeaders?: boolean | any;
-
-    /**
-     * Any other config options are allowed, but will be ignored. 
-     * @deprecated
-     */
-    [key: string]: any;
 
     /**
      * IDE configuration for file links.

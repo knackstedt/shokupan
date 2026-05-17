@@ -277,26 +277,14 @@ export class MCPServerPlugin implements ShokupanPlugin {
             async (uri) => {
                 // Parse URI manually for now (simplified)
                 // uri: mcp://api/routes/GET/users/source
-                const parts = uri.replace("mcp://", "").split('/');
-                // parts: [api, routes, GET, users, source]
-                // This simple split fails for paths with slashes.
-                // We need regex or simpler matching.
-
-                // Assuming format: mcp://api/routes/<METHOD>/<PATH>/source
+                // Format: mcp://api/routes/<METHOD>/<PATH>/source
                 // PATH can contain slashes.
-                // We'll rely on regex matching later or assume simple case for now to fix compile.
-
-                // TODO: Better path matching for resources
-                const method = parts[2];
-                // Try to reconstruct path?
-                // This is brittle.
-
-                // Let's use analyzer to find route?
-                // The issue is extracting args from URI.
-                // Protocol handler supports exact match.
-                // Glob matching requires iterating handlers.
-                // My simple McpProtocol fallback needs work if we want true params.
-                // For now, assuming exact match or client sends exact URI.
+                const match = uri.match(/^mcp:\/\/api\/routes\/([^/]+)\/(.+)\/source$/);
+                if (!match) {
+                    throw new Error("Invalid MCP resource URI format");
+                }
+                const method = match[1];
+                const routePath = match[2];
 
                 throw new Error("Dynamic resource reading not fully implemented in lightweight version yet.");
             }
