@@ -149,10 +149,6 @@ export class FetchInterceptor {
      * Statically restore the original network methods.
      * Useful for cleaning up in tests.
      */
-    /**
-     * Statically restore the original network methods.
-     * Useful for cleaning up in tests.
-     */
     public static restore() {
         if (FetchInterceptor.originalFetch) {
             global.fetch = FetchInterceptor.originalFetch;
@@ -162,6 +158,12 @@ export class FetchInterceptor {
         } else if (typeof Bun !== 'undefined' && (Bun as any).fetch) {
             // Fallback: Restore Bun.fetch if in Bun environment (cleans up zombie patches)
             global.fetch = (Bun as any).fetch;
+        }
+
+        // Clear patched flag so future interceptors can capture the original
+        if ((global.fetch as any)?.__isPatched) {
+            delete (global.fetch as any).__isPatched;
+            delete (global.fetch as any).__originalFetch;
         }
 
         if (FetchInterceptor.originalHttpRequest) {

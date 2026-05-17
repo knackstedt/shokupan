@@ -362,7 +362,7 @@ export class Dashboard implements ShokupanPlugin {
             if (scalarConf.path) {
                 integrations['scalar'] = scalarConf.path;
             } else {
-                const plugin = routers.find(r => r.constructor.name === 'ScalarPlugin');
+                const plugin = routers.find(r => r.metadata?.pluginName === 'Scalar');
                 if (plugin) {
                     integrations['scalar'] = (plugin as any)[$mountPath];
                 }
@@ -370,10 +370,10 @@ export class Dashboard implements ShokupanPlugin {
         }
 
         // Check for unified DebugPlugin first
-        const debugPlugin = routers.find(r => r.constructor.name === 'DebugPlugin');
+        const debugPlugin = routers.find(r => r.metadata?.pluginName === 'Debug');
         if (debugPlugin) {
             const debugPath = (debugPlugin as any)[$mountPath];
-            
+
             // AsyncAPI via DebugPlugin
             const asyncApiConf = checkConfig('asyncapi');
             if (asyncApiConf.enabled) {
@@ -400,7 +400,7 @@ export class Dashboard implements ShokupanPlugin {
                 if (asyncApiConf.path) {
                     integrations['asyncapi'] = asyncApiConf.path;
                 } else {
-                    const plugin = routers.find(r => r.constructor.name === 'AsyncApiPlugin');
+                    const plugin = routers.find(r => r.metadata?.pluginName === 'AsyncAPI');
                     if (plugin) {
                         integrations['asyncapi'] = (plugin as any)[$mountPath];
                     }
@@ -412,7 +412,7 @@ export class Dashboard implements ShokupanPlugin {
                 if (apiExplorerConf.path) {
                     integrations['apiExplorer'] = apiExplorerConf.path;
                 } else {
-                    const plugin = routers.find(r => r.constructor.name === 'ApiExplorerPlugin');
+                    const plugin = routers.find(r => r.metadata?.pluginName === 'ApiExplorer');
                     if (plugin) {
                         integrations['apiExplorer'] = (plugin as any)[$mountPath];
                     }
@@ -816,7 +816,7 @@ export class Dashboard implements ShokupanPlugin {
             this.router.post("/replay", async (ctx) => {
                 try {
                     const body = await ctx.body();
-                    console.log('Dashboard', 'Replay request received', { body });
+                    this[$appRoot]?.logger?.debug('Dashboard', 'Replay request received', { body });
 
                     // Logic to replay request:
                     // If direction is outbound, we fetch from the server.
@@ -828,6 +828,12 @@ export class Dashboard implements ShokupanPlugin {
                         // Replay outbound request
                         const start = performance.now();
                         try {
+                            // SSRF protection: validate URL before fetching
+                            const validation = Dashboard.validateReplayUrl(body.url, this.mountPath);
+                            if (validation.error) {
+                                return ctx.json({ error: validation.error }, 400);
+                            }
+
                             const res = await fetch(body.url, {
                                 method: body.method,
                                 headers: body.headers,
@@ -1618,6 +1624,30 @@ export class Dashboard implements ShokupanPlugin {
         }
 
         return '[Binary or Unreadable Body]';
+    }
+
+    /**
+     * Validates a URL for the replay endpoint to prevent SSRF attacks.
+     * Returns an object with an `error` property if the URL is unsafe.
+     */
+    public static validateReplayUrl(url: string, mountPath: string): { error?: string } {
+        try {
+            const urlObj = new URL(url);
+            const blockedProtocols = ['file:', 'ftp:', 'gopher:', 'data:', 'javascript:', 'vbscript:'];
+            if (blockedProtocols.includes(urlObj.protocol)) {
+                return { error: 'Invalid protocol' };
+            }
+            const hostname = urlObj.hostname;
+            if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('10.') || hostname.startsWith('192.168.') || hostname.startsWith('172.')) {
+                return { error: 'Cannot replay to internal addresses' };
+            }
+            if (urlObj.pathname.startsWith(mountPath)) {
+                return { error: 'Cannot replay to dashboard path' };
+            }
+            return {};
+        } catch {
+            return { error: 'Invalid URL' };
+        }
     }
 }
 function unknownError(ctx: any): any {
