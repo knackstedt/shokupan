@@ -111,7 +111,7 @@ export class OpenAPIAnalyzer {
     // Track imports per file: filePath -> { importedName -> { modulePath, exportName } }
     private imports: Map<string, Map<string, { modulePath: string; exportName?: string; }>> = new Map();
 
-    constructor(private rootDir: string, private logger: Logger, entrypoint?: string) {
+    constructor(private rootDir: string, private logger?: Logger, entrypoint?: string) {
         if (entrypoint) {
             this.entrypoint = path.resolve(entrypoint);
         }
