@@ -64,8 +64,8 @@ export class WebAppPlugin implements ShokupanPlugin {
 
     private detectPaths() {
         const routers = (this.app as any)?.[$childRouters] || [];
-        
-        const debugPlugin = routers.find((r: any) => r.constructor.name === 'DebugPlugin');
+
+        const debugPlugin = routers.find((r: any) => r.metadata?.pluginName === 'Debug');
         if (debugPlugin) {
             const debugPath = (debugPlugin as any)[$mountPath];
             return {
@@ -74,8 +74,8 @@ export class WebAppPlugin implements ShokupanPlugin {
             };
         }
 
-        const asyncApiPlugin = routers.find((r: any) => r.constructor.name === 'AsyncApiPlugin');
-        const apiExplorerPlugin = routers.find((r: any) => r.constructor.name === 'ApiExplorerPlugin');
+        const asyncApiPlugin = routers.find((r: any) => r.metadata?.pluginName === 'AsyncAPI');
+        const apiExplorerPlugin = routers.find((r: any) => r.metadata?.pluginName === 'ApiExplorer');
 
         return {
             asyncApi: asyncApiPlugin ? (asyncApiPlugin as any)[$mountPath] : '/asyncapi',

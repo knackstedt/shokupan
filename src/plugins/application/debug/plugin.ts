@@ -43,6 +43,7 @@ export interface DebugPluginOptions {
 export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
     private clients = new Set<ServerWebSocket<any>>();
     private testBroadcastInterval: any = null;
+    private appLogger: any = null;
 
     private static getBasePath() {
         const dir = dirname(fileURLToPath(import.meta.url));
@@ -70,6 +71,8 @@ export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
     }
 
     async onInit(app: Shokupan, options?: ShokupanPluginOptions) {
+        this.appLogger = app.logger;
+
         if (!(this as any)[$isMounted]) {
             const path = this.pluginOptions.path || options?.path || '/debug';
             app.mount(path, this);
@@ -91,28 +94,24 @@ export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
                 app.logger?.info('DebugPlugin', `Found ${astFileName}, using static spec instead of generating.`);
             }
 
-            if (app.applicationConfig.enableAsyncApiGen !== true && !existsSync(specPath)) {
-                app.logger?.warn('DebugPlugin', 'enableAsyncApiGen is disabled. AsyncAPI will not generate spec.');
-            }
-
             const useAsyncScanning = app.applicationConfig?.enableAsyncAstScanning ?? true;
             app.logger?.info('DebugPlugin', `Async scanning enabled: ${useAsyncScanning}`);
-            
+
             if (useAsyncScanning) {
                 try {
                     const { getGlobalAnalyzer } = await import('../../../util/ast-analyzer-worker');
                     const analyzer = getGlobalAnalyzer();
                     const state = analyzer.getState();
-                    
+
                     app.logger?.info('DebugPlugin', `AST analyzer state: ${state}`);
-                    
+
                     analyzer.on('completed', (result) => {
                         app.logger?.info('DebugPlugin', 'AST analysis completed event fired, broadcasting spec update');
                         this.broadcastSpecUpdate();
                     });
-                    
+
                     app.logger?.info('DebugPlugin', 'Registered listener for AST analyzer completed event');
-                    
+
                     if (state === 'completed') {
                         app.logger?.info('DebugPlugin', 'AST analysis already completed, broadcasting immediately');
                         this.broadcastSpecUpdate();
@@ -124,18 +123,51 @@ export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
         }
     }
 
+    public onShutdown() {
+        if (this.testBroadcastInterval) {
+            clearInterval(this.testBroadcastInterval);
+            this.testBroadcastInterval = null;
+        }
+        for (const client of this.clients) {
+            try { client.close(); } catch { }
+        }
+        this.clients.clear();
+    }
+
     private checkPermission(ctx: any, config?: DebugPluginEndpointConfig): boolean {
         if (!config?.permissions) return true;
-        
+
         const user = (ctx as any).user;
         if (!user) return false;
 
-        return true;
+        const required = config.permissions;
+        const userPerms = user.permissions;
+        if (!Array.isArray(userPerms)) return false;
+
+        for (const p of userPerms) {
+            if (typeof p === 'string') {
+                const [resource, action] = p.split(':');
+                if (this.matchesPermission(resource, action, required.resource, required.action)) {
+                    return true;
+                }
+            } else if (p && typeof p === 'object') {
+                if (this.matchesPermission(p.resource, p.action, required.resource, required.action)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private matchesPermission(userResource: string, userAction: string, reqResource: string, reqAction: string): boolean {
+        const resMatch = userResource === '*' || userResource === reqResource;
+        const actMatch = userAction === '*' || userAction === reqAction;
+        return resMatch && actMatch;
     }
 
     private init() {
+        const basePath = DebugPlugin.getBasePath();
         const serveFile = async (ctx: any, file: string, type: string, subdir: string) => {
-            const basePath = dirname(dirname(fileURLToPath(import.meta.url)));
             const content = await readFile(join(basePath, subdir, 'static', file), 'utf-8');
             ctx.set('Content-Type', type);
             return ctx.send(content);
@@ -262,7 +294,7 @@ export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
                 const cwd = process.cwd();
                 const resolvedPath = resolve(cwd, file);
 
-                if (!resolvedPath.startsWith(cwd)) {
+                if (!resolvedPath.startsWith(cwd + '/') && resolvedPath !== cwd) {
                     return ctx.text('Forbidden: File must be within project root', 403);
                 }
 
@@ -282,24 +314,24 @@ export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
                 return ctx.upgrade({
                     open: (ctx, ws) => {
                         this.clients.add(ws);
-                        console.log(`[DebugPlugin] AsyncAPI client connected. Total clients: ${this.clients.size}`);
-                        
+                        this.appLogger?.info(`[DebugPlugin] AsyncAPI client connected. Total clients: ${this.clients.size}`);
+
                         if (!this.testBroadcastInterval) {
-                            console.log('[DebugPlugin] Starting test broadcast interval');
+                            this.appLogger?.info('[DebugPlugin] Starting test broadcast interval');
                             this.testBroadcastInterval = setInterval(() => {
                                 this.broadcastTestEvent();
                             }, 5000);
                         }
                     },
                     message: (ctx, ws, message) => {
-                        console.log('[DebugPlugin] Received message from client:', message);
+                        this.appLogger?.info('[DebugPlugin] Received message from client:', message);
                     },
                     close: (ctx, ws) => {
                         this.clients.delete(ws);
-                        console.log(`[DebugPlugin] AsyncAPI client disconnected. Total clients: ${this.clients.size}`);
-                        
+                        this.appLogger?.info(`[DebugPlugin] AsyncAPI client disconnected. Total clients: ${this.clients.size}`);
+
                         if (this.clients.size === 0 && this.testBroadcastInterval) {
-                            console.log('[DebugPlugin] Stopping test broadcast interval');
+                            this.appLogger?.info('[DebugPlugin] Stopping test broadcast interval');
                             clearInterval(this.testBroadcastInterval);
                             this.testBroadcastInterval = null;
                         }
@@ -334,7 +366,7 @@ export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
             clientCount: this.clients.size
         });
 
-        console.log(`[DebugPlugin] Broadcasting test event to ${this.clients.size} client(s)`);
+        this.appLogger?.info(`[DebugPlugin] Broadcasting test event to ${this.clients.size} client(s)`);
 
         for (const client of this.clients) {
             if (client?.send) {

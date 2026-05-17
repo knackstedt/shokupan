@@ -1,4 +1,4 @@
-
+import { randomUUID } from "crypto";
 import { ShokupanRouter } from "../../../router";
 import type { Shokupan } from '../../../shokupan';
 import type { McpSession } from "../../../util/mcp-protocol";
@@ -109,7 +109,7 @@ export class MCPServerPlugin implements ShokupanPlugin {
     private setupRoutes() {
         // SSE Endpoint (GET)
         this.router.get('', (ctx) => {
-            const sessionId = crypto.randomUUID();
+            const sessionId = randomUUID();
             const session = this.router.mcpProtocol.createSession(sessionId);
             this.sessions.set(sessionId, session);
 
