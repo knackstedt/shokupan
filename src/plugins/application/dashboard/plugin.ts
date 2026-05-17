@@ -15,6 +15,39 @@ import { DashboardApp } from './components';
 import { FetchInterceptor, type OutboundRequestLog } from './fetch-interceptor';
 import { MetricsCollector } from './metrics-collector';
 
+/**
+ * Match a hostname/IP against a glob pattern.
+ * Supports `*` as a wildcard for an entire segment (IPv4 octet or IPv6 group).
+ * Examples: '1.1.1.1', '10.0.0.*', '192.168.1.*', 'fe80::*', '*.example.com'
+ */
+function matchHostGlob(pattern: string, hostname: string): boolean {
+    // Normalize to lowercase for case-insensitive matching
+    const pat = pattern.toLowerCase();
+    const host = hostname.toLowerCase();
+
+    // Split by delimiters (dot for IPv4/domain, colon for IPv6)
+    const patDelim = pat.includes(':') ? ':' : '.';
+    const hostDelim = host.includes(':') ? ':' : '.';
+
+    // If delimiters differ, only exact match is possible
+    if (patDelim !== hostDelim) {
+        return pat === host;
+    }
+
+    const patParts = pat.split(patDelim);
+    const hostParts = host.split(hostDelim);
+
+    if (patParts.length !== hostParts.length) {
+        return false;
+    }
+
+    for (let i = 0; i < patParts.length; i++) {
+        if (patParts[i] === '*') continue;
+        if (patParts[i] !== hostParts[i]) return false;
+    }
+    return true;
+}
+
 interface RequestMetrics {
     totalRequests: number;
     successfulRequests: number;
@@ -125,6 +158,13 @@ export interface DashboardConfig {
      * @default true (if enableMiddlewareTracking is enabled)
      */
     trackStateMutations?: boolean;
+    /**
+     * Allowed hosts/IPs for the replay endpoint.
+     * Can be an array of glob patterns (e.g. '1.1.1.1', '10.0.0.*', '192.168.1.*')
+     * or a custom function that receives the hostname and returns true if allowed.
+     * If not provided, private/internal addresses remain blocked by default.
+     */
+    allowedReplayHosts?: string[] | ((hostname: string) => boolean);
 }
 
 class Collector implements DebugCollector {
@@ -829,7 +869,7 @@ export class Dashboard implements ShokupanPlugin {
                         const start = performance.now();
                         try {
                             // SSRF protection: validate URL before fetching
-                            const validation = Dashboard.validateReplayUrl(body.url, this.mountPath);
+                            const validation = Dashboard.validateReplayUrl(body.url, this.mountPath, this.dashboardConfig.allowedReplayHosts);
                             if (validation.error) {
                                 return ctx.json({ error: validation.error }, 400);
                             }
@@ -1630,7 +1670,7 @@ export class Dashboard implements ShokupanPlugin {
      * Validates a URL for the replay endpoint to prevent SSRF attacks.
      * Returns an object with an `error` property if the URL is unsafe.
      */
-    public static validateReplayUrl(url: string, mountPath: string): { error?: string } {
+    public static validateReplayUrl(url: string, mountPath: string, allowedReplayHosts?: string[] | ((hostname: string) => boolean)): { error?: string } {
         try {
             const urlObj = new URL(url);
             const blockedProtocols = ['file:', 'ftp:', 'gopher:', 'data:', 'javascript:', 'vbscript:'];
@@ -1638,9 +1678,29 @@ export class Dashboard implements ShokupanPlugin {
                 return { error: 'Invalid protocol' };
             }
             const hostname = urlObj.hostname;
-            if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('10.') || hostname.startsWith('192.168.') || hostname.startsWith('172.')) {
-                return { error: 'Cannot replay to internal addresses' };
+
+            // Check custom allowlist first
+            if (allowedReplayHosts) {
+                if (typeof allowedReplayHosts === 'function') {
+                    if (!allowedReplayHosts(hostname)) {
+                        return { error: 'Hostname not allowed' };
+                    }
+                } else {
+                    const isAllowed = allowedReplayHosts.some(pattern => matchHostGlob(pattern, hostname));
+                    if (!isAllowed) {
+                        return { error: 'Hostname not allowed' };
+                    }
+                }
+            } else {
+                // Default private IP blocking
+                const isPrivateIP = hostname === 'localhost' || hostname === '127.0.0.1' ||
+                    hostname.startsWith('10.') || hostname.startsWith('192.168.') ||
+                    /^172\.(1[6-9]|2\d|3[01])\./.test(hostname);
+                if (isPrivateIP) {
+                    return { error: 'Cannot replay to internal addresses' };
+                }
             }
+
             if (urlObj.pathname.startsWith(mountPath)) {
                 return { error: 'Cannot replay to dashboard path' };
             }
