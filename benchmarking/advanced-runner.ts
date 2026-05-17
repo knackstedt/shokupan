@@ -31,6 +31,8 @@ async function main() {
     const hasScenarioArg = scenarioIndex !== -1;
     const hasAllFlag = args.includes("--all");
     const isReportOnly = args.includes("--report-only");
+    const noWarmup = args.includes("--no-warmup");
+    const shuffleRuns = args.includes("--shuffle-runs") ? 3 : 1;
 
     if (isReportOnly) {
         console.log("Generating report from existing history...");
@@ -49,6 +51,12 @@ async function main() {
         spawn([openCmd, reportPath]);
         return;
     }
+
+    // Parse shuffle runs argument
+    const shuffleRunsIndex = args.indexOf("--shuffle-runs");
+    const numShuffleRuns = shuffleRunsIndex !== -1 
+        ? parseInt(args[shuffleRunsIndex + 1]) || 3 
+        : 1;
 
     let targetFrameworks: string[];
     let targetScenarios: string[];
@@ -164,51 +172,142 @@ async function main() {
     await compileForNode(targetFrameworks);
     spinner.text = "Compilation complete";
 
-    const fullResults: AllResults = {};
-    const benchStartTime = Date.now();
-
+    // Build test matrix
+    const testMatrix: Array<{ framework: string; runtime: string; scenario: string }> = [];
     for (const framework of targetFrameworks) {
-        fullResults[framework] = {};
-
         for (const runtime of RUNTIMES) {
-            fullResults[framework][runtime] = {};
-
             // Skip Bun-only frameworks on Node.js
             if (runtime === "node" && BUN_ONLY_FRAMEWORKS.includes(framework)) {
-                console.log(`\nSkipping ${framework} on ${runtime} for all scenarios (Bun-only framework)`);
-                for (const scenario of targetScenarios) {
-                    fullResults[framework][runtime][scenario] = {
-                        error: "Skipped - Bun-only framework"
-                    } as any;
-                }
                 continue;
             }
-
             for (const scenario of targetScenarios) {
-                try {
-                    spinner.text = `${framework} on ${runtime} - ${SCENARIOS[scenario].name}`;
+                testMatrix.push({ framework, runtime, scenario });
+            }
+        }
+    }
 
-                    console.log(`\n\x1b[30m${"=".repeat(60)}\x1b[0m`);
-                    console.log(`\x1b[0mFramework: \x1b[36m${framework}\x1b[0m | \x1b[0mRuntime: \x1b[36m${runtime === "bun" ? "\x1b[33mbun\x1b[0m" : "\x1b[32mnode\x1b[0m"}\x1b[0m | \x1b[0mScenario: \x1b[36m${scenario}\x1b[0m`);
-                    console.log(`\x1b[30m${"=".repeat(60)}\x1b[0m`);
+    // System warmup phase: Run a throwaway benchmark to warm up the system
+    if (!noWarmup && testMatrix.length > 0) {
+        spinner.text = "System warmup phase...";
+        const warmupTest = testMatrix[0];
+        try {
+            // Run a short warmup test (not recorded)
+            await runBenchmark(warmupTest.framework, warmupTest.runtime, warmupTest.scenario);
+        } catch (e) {
+            // Ignore warmup errors
+        }
+        // Allow system to settle after warmup
+        await new Promise(r => setTimeout(r, 2000));
+    }
 
-                    const testStartTime = Date.now();
-                    const res = await runBenchmark(framework, runtime, scenario);
-                    const testDuration = (Date.now() - testStartTime) / 1000;
+    const fullResults: AllResults = {};
+    const allRunResults: Array<{ shuffleIndex: number; results: AllResults }> = [];
+    const benchStartTime = Date.now();
 
-                    fullResults[framework][runtime][scenario] = res as any;
+    for (let runIndex = 0; runIndex < numShuffleRuns; runIndex++) {
+        // Shuffle the test matrix using Fisher-Yates algorithm for fair distribution
+        const shuffledMatrix = [...testMatrix];
+        for (let i = shuffledMatrix.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffledMatrix[i], shuffledMatrix[j]] = [shuffledMatrix[j], shuffledMatrix[i]];
+        }
 
-                    // Log test completion time
-                    if (res && res.error) {
-                        console.log(`\x1b[90m  ${res.error.startsWith('Skipped') ? 'Skipped' : 'Failed'} (${testDuration.toFixed(2)}s)\x1b[0m`);
+        if (numShuffleRuns > 1) {
+            console.log(`\n\x1b[33m🎲 Shuffle Run ${runIndex + 1}/${numShuffleRuns}\x1b[0m`);
+        }
+
+        const runResults: AllResults = {};
+
+        for (const test of shuffledMatrix) {
+            const { framework, runtime, scenario } = test;
+
+            // Initialize result structures if needed
+            if (!runResults[framework]) runResults[framework] = {};
+            if (!runResults[framework][runtime]) runResults[framework][runtime] = {};
+
+            try {
+                spinner.text = `${framework} on ${runtime} - ${SCENARIOS[scenario].name}`;
+
+                console.log(`\n\x1b[30m${"=".repeat(60)}\x1b[0m`);
+                console.log(`\x1b[0mFramework: \x1b[36m${framework}\x1b[0m | \x1b[0mRuntime: \x1b[36m${runtime === "bun" ? "\x1b[33mbun\x1b[0m" : "\x1b[32mnode\x1b[0m"}\x1b[0m | \x1b[0mScenario: \x1b[36m${scenario}\x1b[0m`);
+                console.log(`\x1b[30m${"=".repeat(60)}\x1b[0m`);
+
+                const testStartTime = Date.now();
+                const res = await runBenchmark(framework, runtime, scenario);
+                const testDuration = (Date.now() - testStartTime) / 1000;
+
+                runResults[framework][runtime][scenario] = res as any;
+
+                // Log test completion time
+                if (res && res.error) {
+                    console.log(`\x1b[90m  ${res.error.startsWith('Skipped') ? 'Skipped' : 'Failed'} (${testDuration.toFixed(2)}s)\x1b[0m`);
+                } else {
+                    console.log(`\x1b[32m  ✓ Completed in ${testDuration.toFixed(2)}s\x1b[0m`);
+                }
+            } catch (e: any) {
+                console.error(`Failed ${framework}/${runtime}/${scenario}:`, e.message);
+                runResults[framework][runtime][scenario] = {
+                    error: e.message || "Failed to run"
+                } as any;
+            }
+        }
+
+        allRunResults.push({ shuffleIndex: runIndex, results: runResults });
+    }
+
+    // Aggregate results across all shuffle runs
+    // For each framework/runtime/scenario, average the results
+    for (const framework of targetFrameworks) {
+        fullResults[framework] = {};
+        for (const runtime of RUNTIMES) {
+            fullResults[framework][runtime] = {};
+            for (const scenario of targetScenarios) {
+                const allScenarioResults = allRunResults
+                    .map(r => r.results[framework]?.[runtime]?.[scenario])
+                    .filter(r => r && !r.error);
+
+                if (allScenarioResults.length === 0) {
+                    // Check if it's a Bun-only skip
+                    if (runtime === "node" && BUN_ONLY_FRAMEWORKS.includes(framework)) {
+                        fullResults[framework][runtime][scenario] = {
+                            error: "Skipped - Bun-only framework"
+                        } as any;
                     } else {
-                        console.log(`\x1b[32m  ✓ Completed in ${testDuration.toFixed(2)}s\x1b[0m`);
+                        fullResults[framework][runtime][scenario] = {
+                            error: "Failed to run"
+                        } as any;
                     }
-                } catch (e: any) {
-                    console.error(`Failed ${framework}/${runtime}/${scenario}:`, e.message);
-                    fullResults[framework][runtime][scenario] = {
-                        error: e.message || "Failed to run"
-                    } as any;
+                } else if (allScenarioResults.length === 1) {
+                    fullResults[framework][runtime][scenario] = allScenarioResults[0];
+                } else {
+                    // Average numeric metrics across runs
+                    const aggregated: any = {};
+                    const endpoints = Object.keys(allScenarioResults[0]).filter(k => k !== 'duration' && k !== 'error');
+                    
+                    for (const endpoint of endpoints) {
+                        const endpointResults = allScenarioResults.map(r => r[endpoint]).filter(Boolean);
+                        if (endpointResults.length === 0) continue;
+
+                        aggregated[endpoint] = {
+                            requests: endpointResults.reduce((sum, r) => sum + (r.requests || 0), 0) / endpointResults.length,
+                            latency: endpointResults.reduce((sum, r) => sum + (r.latency || 0), 0) / endpointResults.length,
+                            throughput: endpointResults.reduce((sum, r) => sum + (r.throughput || 0), 0) / endpointResults.length,
+                        };
+
+                        // Average percentiles if present
+                        if (endpointResults[0].percentiles) {
+                            const percentileKeys = Object.keys(endpointResults[0].percentiles);
+                            aggregated[endpoint].percentiles = {};
+                            for (const p of percentileKeys) {
+                                aggregated[endpoint].percentiles[p] = endpointResults.reduce((sum, r) => sum + (r.percentiles?.[p] || 0), 0) / endpointResults.length;
+                            }
+                        }
+                    }
+                    
+                    aggregated.duration = allScenarioResults.reduce((sum, r) => sum + ((r as any).duration || 0), 0) / allScenarioResults.length;
+                    aggregated.aggregatedRuns = allScenarioResults.length;
+                    
+                    fullResults[framework][runtime][scenario] = aggregated;
                 }
             }
         }

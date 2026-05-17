@@ -431,7 +431,8 @@ async function runBenchmarkWithProcessCount(
         for (const proc of procs) {
             proc.kill();
         }
-        await new Promise(r => setTimeout(r, 500));
+        // Wait longer for process cleanup and TCP socket cleanup (prevents port/TIME_WAIT issues)
+        await new Promise(r => setTimeout(r, 2000));
     }
 
     return {
