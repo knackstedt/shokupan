@@ -50,10 +50,18 @@ export class ErrorView implements ShokupanPlugin {
     async onInit(app: Shokupan) {
         // Lazy-load JSX views
         if (!renderErrorView || !renderStatusView) {
-            const errorModule = await import('./views/error');
-            const statusModule = await import('./views/status');
-            renderErrorView = errorModule.renderErrorView;
-            renderStatusView = statusModule.renderStatusView;
+            try {
+                const errorModule = await import('./views/error');
+                const statusModule = await import('./views/status');
+                renderErrorView = errorModule.renderErrorView;
+                renderStatusView = statusModule.renderStatusView;
+            } catch (err: any) {
+                if (err.message?.includes('preact')) {
+                    app.logger?.warn('ErrorView', 'preact not found, skipping JSX error views. Install preact to enable detailed error views.');
+                    return;
+                }
+                throw err;
+            }
         }
 
         // Apply global patches

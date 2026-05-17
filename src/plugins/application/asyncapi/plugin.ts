@@ -182,7 +182,14 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
             const disableSourceView = this.pluginOptions.disableSourceView;
 
             // Build navigation tree from spec
-            await loadJsxComponents();
+            try {
+                await loadJsxComponents();
+            } catch (err: any) {
+                if (err.message?.includes('preact')) {
+                    return ctx.text('AsyncAPI Explorer requires preact. Install preact to enable.', 503);
+                }
+                throw err;
+            }
             const navTree = buildNavTree(spec);
 
             return ctx.jsx(AsyncApiApp({ spec, serverUrl, base, disableSourceView, navTree }));

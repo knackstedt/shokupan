@@ -247,7 +247,14 @@ export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
                     : await (this.root || this).generateApiSpec();
                 const asyncSpec = (ctx.app as any).asyncApiSpec;
                 const base = `${this.pluginOptions.path}/explorer`;
-                await loadJsxComponents();
+                try {
+                    await loadJsxComponents();
+                } catch (err: any) {
+                    if (err.message?.includes('preact')) {
+                        return ctx.text('Debug plugin requires preact. Install preact to enable.', 503);
+                    }
+                    throw err;
+                }
                 const element = ApiExplorerApp({ spec: spec, base, asyncSpec });
                 const html = (await getRenderToString())(element);
                 if (html.length === 0) throw new Error('DebugPlugin: rendered API Explorer page is blank.');
@@ -278,7 +285,14 @@ export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
 
                 const disableSourceView = this.pluginOptions.asyncApi?.disableSourceView;
 
-                await loadJsxComponents();
+                try {
+                    await loadJsxComponents();
+                } catch (err: any) {
+                    if (err.message?.includes('preact')) {
+                        return ctx.text('Debug plugin requires preact. Install preact to enable.', 503);
+                    }
+                    throw err;
+                }
                 const navTree = buildNavTree(spec);
 
                 return ctx.jsx(AsyncApiApp({ spec, serverUrl, base, disableSourceView, navTree }));
