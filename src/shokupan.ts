@@ -479,7 +479,11 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
                     const { dump } = await import('js-yaml');
                     const yaml = dump(this.openApiSpec);
                     return ctx.send(yaml, { status: 200, headers: { 'content-type': 'application/yaml' } });
-                } catch (e) {
+                } catch (e: any) {
+                    if (e.code === 'ERR_MODULE_NOT_FOUND' || e.message?.includes("Cannot find package 'js-yaml'")) {
+                        this.logger?.error('Shokupan', "OpenAPI YAML generation failed: js-yaml is not installed. Run `bun add js-yaml` to enable YAML output.", { error: e });
+                        return ctx.text("OpenAPI YAML generation failed: js-yaml is not installed. Run `bun add js-yaml` to enable YAML output.", 500);
+                    }
                     this.logger?.error('Shokupan', "Failed to generate OpenAPI YAML", { error: e });
                     return ctx.text("Internal Server Error", 500);
                 }
