@@ -174,8 +174,26 @@ export function Spec(spec: MethodAPISpec | GuardAPISpec | AsyncAPISpec) {
 
 /**
  * Decorator: Applies a rate limit to a class or method.
+ * Also works as middleware when passed to app.use().
  */
 export function RateLimit(options: RateLimitOptions) {
-    return Use(RateLimitMiddleware(options));
+    const middleware = RateLimitMiddleware(options);
+    const decorator = Use(middleware);
+
+    // Create a hybrid that works as both decorator and middleware
+    const hybrid = (...args: any[]) => {
+        // If called with (ctx, next), it's middleware usage
+        if (args.length === 2 && typeof args[1] === 'function') {
+            return middleware(args[0], args[1]);
+        }
+        // Otherwise, it's decorator usage
+        return decorator(...args);
+    };
+
+    // Copy middleware metadata for tracking
+    hybrid.isBuiltin = middleware.isBuiltin;
+    hybrid.pluginName = middleware.pluginName;
+
+    return hybrid;
 }
 
