@@ -12,7 +12,7 @@ import { parseQuery } from './util/query-string';
 import type { ShokupanRequest } from './util/request';
 import { ShokupanResponse } from './util/response';
 import { $bodyParsed, $bodyParseError, $bodyType, $cachedBody, $cachedCookies, $cachedHost, $cachedHostname, $cachedOrigin, $cachedProtocol, $cachedQuery, $debug, $finalResponse, $io, $onWsMessage, $rawBody, $requestId, $routeMatched, $socket, $url, $ws, $wsMessages } from './util/symbol';
-import type { CookieOptions, HeadersInit, JSXRenderer, ShokupanRoute, SSEMessage, SSEStreamErrorHandler, SSEStreamHelper, StreamErrorHandler, StreamHelper, TextStreamErrorHandler, TextStreamHelper } from './util/types';
+import type { CookieOptions, GlobalShokupanState, HeadersInit, JSXRenderer, ShokupanRoute, SSEMessage, SSEStreamErrorHandler, SSEStreamHelper, StreamErrorHandler, StreamHelper, TextStreamErrorHandler, TextStreamHelper } from './util/types';
 
 /**
  * Inline WebSocket handlers for ctx.upgrade()
@@ -132,7 +132,7 @@ export interface DebugCollector {
  * ```
  */
 export class ShokupanContext<
-    State extends Record<string, any> = Record<string, any>,
+    State extends Record<string, any> = GlobalShokupanState,
     Params extends Record<string, string> = Record<string, string>
 > {
     public params: Params = {} as Params; // Router assigns this, but default to empty object
