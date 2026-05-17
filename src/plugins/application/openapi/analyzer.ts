@@ -14,7 +14,7 @@ import type { ApplicationInstance } from './analyzer.impl';
 export class OpenAPIAnalyzer {
     private analyzerImpl: any;
 
-    constructor(private rootDir: string, private logger: Logger, private entrypoint?: string) { }
+    constructor(private rootDir: string, private logger?: Logger, private entrypoint?: string) { }
 
     /**
      * Main analysis entry point.
