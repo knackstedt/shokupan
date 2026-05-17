@@ -119,7 +119,6 @@ export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin 
                             ws = new WebSocket(wsUrl);
                             
                             ws.onopen = () => {
-                                console.log('[Scalar] Connected to lifecycle monitor');
                                 if (reconnectTimer) {
                                     clearTimeout(reconnectTimer);
                                     reconnectTimer = undefined;
@@ -131,7 +130,6 @@ export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin 
                                     const data = JSON.parse(event.data);
                                     if (data.type === 'hello') {
                                         if (data.bootId !== bootId) {
-                                            console.log('[Scalar] Server restarted (timestamp change), reloading...');
                                             window.location.reload();
                                         }
                                     }
@@ -139,7 +137,6 @@ export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin 
                             };
                             
                             ws.onclose = () => {
-                                console.log('[Scalar] Lifecycle connection lost');
                                 ws = undefined;
                                 scheduleReconnect();
                             };
