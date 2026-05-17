@@ -88,7 +88,7 @@ export const ShokupanApplicationTree = {};
  * app.mount('/api', apiRouter);
  * ```
  */
-export class ShokupanRouter<T extends Record<string, any> = Record<string, any>> {
+export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState> {
     // Internal marker to identify Router vs. Application
     private [$isApplication]: boolean = false;
     private [$isMounted]: boolean = false;
@@ -157,9 +157,9 @@ export class ShokupanRouter<T extends Record<string, any> = Record<string, any>>
      * Registers middleware for this router.
      * Middleware will run for all routes matched by this router.
      */
-    public use(middleware: Middleware) {
+    public use(middleware: ShokupanHandler<T> | Middleware) {
         // Basic middleware registration
-        this.middleware.push(middleware);
+        this.middleware.push(middleware as Middleware);
         return this;
     }
 

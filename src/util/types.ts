@@ -352,12 +352,29 @@ export interface ServerFactory {
     (options: any): Server<any> | Promise<Server<any>> | NodeServer | Promise<NodeServer>;
 }
 
+/**
+ * Global state interface for module augmentation.
+ * Users can declare their app's global state shape once:
+ *
+ * @example
+ * ```ts
+ * declare module "shokupan" {
+ *   interface GlobalShokupanState {
+ *     user: { id: string; name: string };
+ *   }
+ * }
+ * ```
+ */
+export interface GlobalShokupanState {
+    [key: string]: any;
+}
+
 export interface ErrorHandler<T = any> {
-    (err: T, ctx: ShokupanContext): Response | Promise<Response>;
+    (err: T, ctx: ShokupanContext<any>): Response | Promise<Response>;
 }
 
 export type NextFn = () => Promise<any>;
-export type Middleware = ((ctx: ShokupanContext<unknown>, next: NextFn) => Promise<any> | any) & {
+export type Middleware = ((ctx: ShokupanContext<any>, next: NextFn) => Promise<any> | any) & {
     isBuiltin?: boolean;
     pluginName?: string;
     metadata?: RouteMetadata;
