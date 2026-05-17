@@ -10,12 +10,12 @@ import type { Middleware, NextFn } from './util/types';
  */
 export const compose = (middleware: Middleware[]) => {
     if (!middleware.length) {
-        return (context: ShokupanContext<unknown>, next?: NextFn) => {
+        return (context: ShokupanContext<any>, next?: NextFn) => {
             return next ? next() : Promise.resolve();
         };
     }
 
-    return function dispatch(context: ShokupanContext<unknown>, next?: NextFn): Promise<any> {
+    return function dispatch(context: ShokupanContext<any>, next?: NextFn): Promise<any> {
         let index = -1;
 
         async function runner(i: number): Promise<any> {

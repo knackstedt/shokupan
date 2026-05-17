@@ -110,7 +110,7 @@ const defaults: ShokupanConfig = {
  * });
  * ```
  */
-export class Shokupan<T = any> extends ShokupanRouter<T> {
+export class Shokupan<T extends Record<string, any> = GlobalShokupanState> extends ShokupanRouter<T> {
     readonly applicationConfig: ShokupanConfig = {};
     public openApiSpec?: any;
     public asyncApiSpec?: any;
