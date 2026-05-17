@@ -1,5 +1,6 @@
 import { join, resolve } from 'node:path';
 import type { Shokupan } from '../../../shokupan';
+import { $childRouters, $mountPath } from '../../../util/symbol';
 import type { ShokupanPlugin } from '../../../util/types';
 import { Proxy } from '../../middleware/proxy';
 
@@ -32,6 +33,7 @@ export class WebAppPlugin implements ShokupanPlugin {
     private mountPath: string;
     private distDir: string;
     private devPort: string | undefined;
+    private app: Shokupan | null = null;
 
     constructor(private opts: WebAppPluginOptions = {}) {
         this.mountPath = opts.path ?? '/_app';
@@ -45,13 +47,40 @@ export class WebAppPlugin implements ShokupanPlugin {
         if ((this as any)[$isMounted]) return;
         (this as any)[$isMounted] = true;
 
+        this.app = app;
         if (options?.path) this.mountPath = options.path;
+
+        app.get(`${this.mountPath}/config.json`, (ctx) => {
+            const config = this.detectPaths();
+            return ctx.json(config);
+        });
 
         if (this.devPort) {
             this.initDev(app);
         } else {
             this.initProd(app);
         }
+    }
+
+    private detectPaths() {
+        const routers = (this.app as any)?.[$childRouters] || [];
+        
+        const debugPlugin = routers.find((r: any) => r.constructor.name === 'DebugPlugin');
+        if (debugPlugin) {
+            const debugPath = (debugPlugin as any)[$mountPath];
+            return {
+                asyncApi: `${debugPath}/asyncapi`,
+                apiExplorer: `${debugPath}/explorer`
+            };
+        }
+
+        const asyncApiPlugin = routers.find((r: any) => r.constructor.name === 'AsyncApiPlugin');
+        const apiExplorerPlugin = routers.find((r: any) => r.constructor.name === 'ApiExplorerPlugin');
+
+        return {
+            asyncApi: asyncApiPlugin ? (asyncApiPlugin as any)[$mountPath] : '/asyncapi',
+            apiExplorer: apiExplorerPlugin ? (apiExplorerPlugin as any)[$mountPath] : '/explorer'
+        };
     }
 
     /** Dev mode: proxy all requests to the Angular dev server */

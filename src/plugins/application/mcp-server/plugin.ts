@@ -49,7 +49,7 @@ export class MCPServerPlugin implements ShokupanPlugin {
         this[$appRoot] = app;
 
         // Initialize Analyzer
-        this.analyzer = new OpenAPIAnalyzer(this.options.rootDir);
+        this.analyzer = new OpenAPIAnalyzer(this.options.rootDir, app.logger);
 
         // Register Tools
         if (this.options.allowIntrospection) {
