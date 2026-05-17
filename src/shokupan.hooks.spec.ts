@@ -68,8 +68,8 @@ describe("Event Hooks", () => {
             name: z.string()
         });
 
-        app.post("/validate", validate({ body: schema }), (ctx) => {
-            return ctx.json(ctx.body);
+        app.post("/validate", validate({ body: schema }), async (ctx) => {
+            return ctx.json(await ctx.body());
         });
 
         const res = await app.fetch(new Request("http://localhost/validate", {
