@@ -2,6 +2,7 @@
 import { ShokupanContext } from "../../context";
 import { ShokupanRouter } from "../../router";
 import type { Shokupan } from "../../shokupan";
+import { UnauthorizedError } from "../../util/http-error";
 import { $isMounted } from "../../util/symbol";
 import type { ShokupanPlugin, ShokupanPluginOptions } from "../../util/types";
 
@@ -141,7 +142,7 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
             : authConfig.jwtSecret;
     }
 
-    async onInit(app: Shokupan, options: ShokupanPluginOptions) {
+    async onInit(app: Shokupan, options?: ShokupanPluginOptions) {
         // Load dependencies asynchronously
         this.arctic = await import("arctic");
         this.jose = await import("jose");
@@ -187,7 +188,16 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
 
     private async createSession(user: AuthUser, ctx: ShokupanContext) {
         const alg = this.authConfig.jwtAlgorithm || 'HS256';
-        const jwt = await new this.jose.SignJWT({ ...user })
+        // Security: do not spread raw provider data into the JWT payload
+        const safeUser = {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            picture: user.picture,
+            provider: user.provider,
+            permissions: user.permissions
+        };
+        const jwt = await new this.jose.SignJWT(safeUser)
             .setProtectedHeader({ alg })
             .setIssuedAt()
             .setExpirationTime(this.authConfig.jwtExpiration || '24h')
@@ -197,7 +207,8 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
         const opts = this.authConfig.cookieOptions || {};
         let cookie = `auth_token=${jwt}; Path=${opts.path || '/'}; HttpOnly`;
         if (opts.secure) cookie += '; Secure';
-        if (opts.sameSite) cookie += `; SameSite=${opts.sameSite}`;
+        const sameSite = opts.sameSite ?? 'Lax';
+        if (sameSite) cookie += `; SameSite=${sameSite}`;
         if (opts.maxAge) cookie += `; Max-Age=${opts.maxAge}`;
 
         ctx.set('Set-Cookie', cookie);
@@ -350,9 +361,9 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
                     console.error("Auth Exception:", e);
                     let extradata = "";
                     try { if (e && e.response) extradata = " | Body: " + await e.response.text(); } catch { }
-                    // Temporary debug: Return the actual error message to the client
-                    ctx.app?.logger?.error('Auth', 'Authentication failed', e);
-                    return ctx.text(`Authentication failed.\nError: ${e?.message ?? String(e)}${extradata}\n\nStack:\n${e?.stack}`, 500);
+                    // Log detailed error server-side only; return generic message to client
+                    ctx.app?.logger?.error('Auth', 'Authentication failed', { error: e?.message ?? String(e), stack: e?.stack, extra: extradata });
+                    return ctx.text('Authentication failed. Please try again.', 500);
                 }
             });
         }
@@ -491,8 +502,8 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
                     const { payload } = await this.jose.jwtVerify(token, this.secret);
                     (ctx as any).user = payload;
                 } catch {
-                    // Invalid token, just proceed without user or throw?
-                    // Usually proceed, let guard handle it if required
+                    // Invalid or expired token — reject the request
+                    throw new UnauthorizedError('Invalid or expired token');
                 }
             }
             return next();
