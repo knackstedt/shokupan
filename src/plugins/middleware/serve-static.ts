@@ -12,6 +12,7 @@ interface FileData {
     abs: string;
     stats: Stats;
     headers: Record<string, any>;
+    hits: number;
 }
 
 export function serveStatic<T extends Record<string, any>>(config: StaticServeOptions<T>, prefix: string) {
@@ -22,7 +23,9 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
     // Refactor R4: useCache:true (or unspecified) means the in-memory cache IS active.
     // The old code had the condition inverted — !config.useCache triggered the cache walk.
     const cacheEnabled = config.useCache !== false;
+    const maxCacheSize = config.maxCacheSize ?? 50 * 1024 * 1024; // Default 50MB
     const FILES: Record<string, FileData> = {};
+    let cacheTotalSize = 0;
 
     // P3: Expose a ready() Promise so callers can optionally await full cache population.
     let _resolveReady!: () => void;
@@ -45,32 +48,36 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
         return headers;
     }
 
-    // Optimization: Pre-load files into memory when cache is enabled
-    if (cacheEnabled) {
-        async function walk(dir: string) {
-            const entries = await readdir(dir, { withFileTypes: true });
-            for (const entry of entries) {
-                const res = resolve(dir, entry.name);
-                if (entry.isDirectory()) {
-                    await walk(res);
-                } else {
-                    const stats = await stat(res) as Stats;
-                    const headers = toHeaders(entry.name, stats, isEtag);
-                    const rel = res.slice(rootPath.length).replace(/\\/g, '/');
-                    FILES[rel] = { abs: res, stats, headers };
-                }
+    // Helper: Add a file to the LFU cache, evicting least-hit entries if needed
+    function tryCache(rel: string, file: FileData) {
+        const fileSize = file.stats.size;
+        if (fileSize > maxCacheSize) return;
+
+        // Already cached — hits were incremented on lookup
+        if (FILES[rel]) return;
+
+        // Evict least-hit (then largest) files until there's room
+        if (cacheTotalSize + fileSize > maxCacheSize) {
+            const entries = Object.entries(FILES);
+            entries.sort((a, b) => {
+                if (a[1].hits !== b[1].hits) return a[1].hits - b[1].hits;
+                return b[1].stats.size - a[1].stats.size;
+            });
+            for (const [key, data] of entries) {
+                if (cacheTotalSize + fileSize <= maxCacheSize) break;
+                cacheTotalSize -= data.stats.size;
+                delete FILES[key];
             }
         }
-        walk(rootPath)
-            .then(_resolveReady)
-            .catch(err => {
-                if (process.env.NODE_ENV !== 'test') console.error('[serveStatic] Cache population error:', err);
-                _resolveReady();
-            });
-    } else {
-        // No cache — resolve immediately so ready() doesn't block
-        _resolveReady();
+
+        if (cacheTotalSize + fileSize <= maxCacheSize) {
+            file.hits = 1;
+            FILES[rel] = file;
+            cacheTotalSize += fileSize;
+        }
     }
+
+    _resolveReady();
 
     const serveStaticMiddleware: Middleware = async (ctx: ShokupanContext<any>) => {
         let reqPath = ctx.params?.['*'] ?? ctx.path.slice(normalizedPrefix.length);
@@ -106,6 +113,9 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
                     if (!file) file = FILES[join(reqPath, 'index' + (ext.startsWith('.') ? ext : '.' + ext)).replace(/\\/g, '/')];
                     if (file) break;
                 }
+            }
+            if (file) {
+                file.hits++;
             }
         }
 
@@ -155,8 +165,13 @@ export function serveStatic<T extends Record<string, any>>(config: StaticServeOp
                     file = {
                         abs: resolve(abs),
                         stats: stats as Stats,
-                        headers: toHeaders(abs, stats as Stats, isEtag)
+                        headers: toHeaders(abs, stats as Stats, isEtag),
+                        hits: 0
                     };
+                    if (cacheEnabled) {
+                        const rel = file.abs.slice(rootPath.length).replace(/\\/g, '/');
+                        tryCache(rel, file);
+                    }
                 }
 
                 // Directory Listing Fallback
