@@ -49,6 +49,26 @@ app.listen();
 
 That's it! In development mode, your server is automatically running securely at `https://localhost:3000` 🎉
 
+### Vite Integration
+
+Shokupan integrates seamlessly with [Vite](https://vitejs.dev/) for fullstack development. One command starts both your backend and frontend with hot reload:
+
+```typescript
+import { Shokupan, VitePlugin } from 'shokupan';
+const app = new Shokupan({ development: true });
+
+app.get('/api/hello', (ctx) => ({ message: 'Hello from Shokupan!' }));
+await app.register(new VitePlugin());
+await app.listen(3000);
+```
+
+Then run:
+```bash
+shokupan dev
+```
+
+Your API runs on `https://localhost:3000`, and Vite's dev server handles all frontend assets and HMR automatically. In production, the plugin serves your built Vite output with SPA fallback support.
+
 ### Development Mode
 
 By default, when `NODE_ENV` is not `production` (or `development: true` in config), Shokupan automatically enhances your developer experience:
@@ -105,6 +125,7 @@ Shokupan has a rich ecosystem of plugins.
 | **[Proxy](https://shokupan.dev/plugins/proxy)** | Create reverse proxies. |
 | **[OpenAPI Validator](https://shokupan.dev/plugins/openapi-validation)** | Validate requests against OpenAPI specs. |
 | **[Idempotency](https://shokupan.dev/plugins/idempotency)** | Ensure safe retries for non-idempotent operations. |
+| **[Vite](https://shokupan.dev/plugins/vite)** | Seamless integration with Vite for fullstack development. |
 
 ## 🚀 Advanced Features
 
