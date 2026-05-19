@@ -1,0 +1,17 @@
+{
+    "name": "shokupan-sample-auth-validation",
+    "version": "1.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "bun --watch main.ts",
+        "start": "bun main.ts",
+        "test": "bun test"
+    },
+    "dependencies": {
+        "shokupan": "link:../..",
+        "zod": "^4.3.5"
+    },
+    "devDependencies": {
+        "@types/bun": "latest"
+    }
+}

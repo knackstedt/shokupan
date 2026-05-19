@@ -1,0 +1,16 @@
+{
+    "name": "shokupan-sample-basic-rest-api",
+    "version": "1.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "bun --watch main.ts",
+        "start": "bun main.ts",
+        "test": "bun test"
+    },
+    "dependencies": {
+        "shokupan": "link:../.."
+    },
+    "devDependencies": {
+        "@types/bun": "latest"
+    }
+}
