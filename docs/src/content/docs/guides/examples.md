@@ -118,6 +118,112 @@ bun run dev
 - `admin` / `admin123` (admin role)
 - `alice` / `alice123` (user role)
 
+---
+
+### 6. File Upload
+
+Multipart form upload handling with file streaming and download.
+
+```bash
+cd samples/06-file-upload
+bun run dev
+```
+
+**Features:**
+- Multipart form data upload
+- File listing and download
+- File streaming for large files
+
+**Endpoints:**
+- `POST /upload` — Upload files
+- `GET /files` — List uploaded files
+- `GET /files/:name` — Download a file
+- `GET /stream/:name` — Stream a file
+
+---
+
+### 7. GraphQL API
+
+GraphQL server using the GraphQL Yoga plugin.
+
+```bash
+cd samples/07-graphql-api
+bun run dev
+```
+
+**Features:**
+- GraphQL schema with queries and mutations
+- GraphQL Yoga plugin integration
+- In-memory data store
+
+**Endpoints:**
+- `POST /graphql` — GraphQL endpoint
+
+---
+
+### 8. Server-Sent Events
+
+Real-time event streaming with SSE.
+
+```bash
+cd samples/08-server-sent-events
+bun run dev
+```
+
+**Features:**
+- SSE stream with `ctx.streamSSE()`
+- Automatic event ID tracking
+- JSON event history endpoint
+
+**Endpoints:**
+- `GET /events` — SSE stream
+- `GET /events/history` — Recent events
+- `POST /events` — Create manual event
+
+---
+
+### 9. HTMX Fullstack
+
+Server-rendered interactive app with HTMX partial updates.
+
+```bash
+cd samples/09-htmx-fullstack
+bun run dev
+```
+
+**Features:**
+- Server-side HTML rendering
+- HTMX attributes for interactivity
+- Todo CRUD without client-side JavaScript
+
+**Endpoints:**
+- `GET /` — Full HTML page
+- `GET /todos/partial` — Todo list partial
+- `POST /todos` — Create todo
+- `POST /todos/:id/toggle` — Toggle completion
+- `DELETE /todos/:id` — Delete todo
+
+---
+
+### 10. Microservices
+
+Multiple services with internal sub-requests via `internalRequest()`.
+
+```bash
+cd samples/10-microservices
+bun run dev
+```
+
+**Features:**
+- Multiple Shokupan services
+- Internal HTTP sub-requests
+- Gateway aggregation pattern
+
+**Services:**
+- User Service — `http://localhost:3010`
+- Order Service — `http://localhost:3011`
+- Gateway — `http://localhost:3012`
+
 ## Running Tests
 
 Each sample includes tests that verify it compiles and the core imports work:

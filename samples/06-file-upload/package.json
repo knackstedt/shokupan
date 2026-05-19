@@ -1,0 +1,16 @@
+{
+    "name": "sample-06-file-upload",
+    "version": "1.0.0",
+    "description": "Sample: File Upload with multipart streaming",
+    "type": "module",
+    "scripts": {
+        "dev": "bun main.ts",
+        "test": "bun test"
+    },
+    "dependencies": {
+        "shokupan": "link:../.."
+    },
+    "devDependencies": {
+        "@types/bun": "latest"
+    }
+}
