@@ -1,0 +1,16 @@
+{
+    "name": "sample-08-server-sent-events",
+    "version": "1.0.0",
+    "description": "Sample: Server-Sent Events streaming",
+    "type": "module",
+    "scripts": {
+        "dev": "bun main.ts",
+        "test": "bun test"
+    },
+    "dependencies": {
+        "shokupan": "link:../.."
+    },
+    "devDependencies": {
+        "@types/bun": "latest"
+    }
+}

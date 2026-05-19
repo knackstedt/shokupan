@@ -1,0 +1,16 @@
+{
+    "name": "sample-09-htmx-fullstack",
+    "version": "1.0.0",
+    "description": "Sample: HTMX fullstack application",
+    "type": "module",
+    "scripts": {
+        "dev": "bun main.ts",
+        "test": "bun test"
+    },
+    "dependencies": {
+        "shokupan": "link:../.."
+    },
+    "devDependencies": {
+        "@types/bun": "latest"
+    }
+}

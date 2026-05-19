@@ -1,0 +1,16 @@
+{
+    "name": "sample-10-microservices",
+    "version": "1.0.0",
+    "description": "Sample: Microservices with HTTP bridge",
+    "type": "module",
+    "scripts": {
+        "dev": "bun main.ts",
+        "test": "bun test"
+    },
+    "dependencies": {
+        "shokupan": "link:../.."
+    },
+    "devDependencies": {
+        "@types/bun": "latest"
+    }
+}
