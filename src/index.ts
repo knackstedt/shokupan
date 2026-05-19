@@ -34,6 +34,7 @@ export * from "./plugins/application/opentelemetry";
 export * from "./plugins/application/permissions";
 export * from "./plugins/application/scalar";
 export * from "./plugins/application/socket-io";
+export * from "./plugins/application/vite/plugin";
 export * from "./plugins/application/web-app/plugin";
 
 // Middleware Plugins
