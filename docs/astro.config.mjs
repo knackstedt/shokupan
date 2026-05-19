@@ -120,6 +120,7 @@ export default defineConfig({
                         { label: 'Socket.IO', link: '/plugins/socket-io/' },
                         { label: 'Sessions', link: '/plugins/sessions/' },
                         { label: 'Validation', link: '/plugins/validation/' },
+                        { label: 'Vite', link: '/plugins/vite/' },
                     ],
                 },
                 {

@@ -444,6 +444,58 @@ async function generate(legacyAnalyzeMode = false) {
     }
 }
 
+async function dev() {
+    const args = process.argv.slice(2);
+
+    const getArgValue = (flag: string) => {
+        const index = args.indexOf(flag);
+        if (index !== -1 && args.length > index + 1) {
+            return args[index + 1];
+        }
+        return null;
+    };
+
+    let entry = getArgValue('--entry');
+    const port = getArgValue('--port');
+    const hostname = getArgValue('--hostname');
+
+    if (!entry) {
+        const candidates = ['src/main.ts', 'src/index.ts', 'main.ts', 'index.ts', 'app.ts'];
+        for (let i = 0; i < candidates.length; i++) {
+            if (fs.existsSync(candidates[i])) {
+                entry = candidates[i];
+                break;
+            }
+        }
+    }
+
+    if (!entry) {
+        console.error('No entry file found. Specify one with --entry <file>');
+        process.exit(1);
+    }
+
+    const env: Record<string, string> = { ...process.env as Record<string, string> };
+    if (port) env['PORT'] = port;
+    if (hostname) env['HOSTNAME'] = hostname;
+    if (!env['NODE_ENV']) env['NODE_ENV'] = 'development';
+
+    // Filter out CLI-specific flags so the entry script doesn't receive them
+    const forwardedArgs = args.slice(1).filter((a) => {
+        return a !== '--entry' && a !== '--port' && a !== '--hostname'
+            && !a.startsWith('--entry=') && !a.startsWith('--port=') && !a.startsWith('--hostname=');
+    });
+
+    // @ts-ignore - Bun.spawn is available in the Bun runtime
+    const proc = Bun.spawn(['bun', '--watch', entry, ...forwardedArgs], {
+        stdio: ['inherit', 'inherit', 'inherit'],
+        env
+    });
+
+    // @ts-ignore
+    const exitCode = await proc.exited;
+    process.exit(exitCode);
+}
+
 async function main() {
     const args = process.argv.slice(2);
     const command = args[0];
@@ -452,6 +504,8 @@ async function main() {
         await analyze();
     } else if (command === 'generate') {
         await generate(false);
+    } else if (command === 'dev') {
+        await dev();
     } else if (command === 'scaffold' || !command) {
         // Default to scaffold for backwards compatibility
         await scaffold();
@@ -462,11 +516,13 @@ async function main() {
         console.log('  scaffold (default) - Scaffold controllers, middleware, or plugins');
         console.log('  generate           - Generate compliant OpenAPI, HTTP API, and AsyncAPI specs');
         console.log('  analyze <dir>      - Content analysis (Legacy/OpenAPI only)');
+        console.log('  dev                - Start development server with hot reload');
         console.log('');
         console.log('Usage:');
         console.log('  shokupan scaffold');
         console.log('  shokupan generate [--dir <dir>] [--openapi <path>] [--http-api <path>] [--asyncapi <path>] [--ast [<path>]]');
         console.log('  shokupan analyze <directory> [--output openapi.json]');
+        console.log('  shokupan dev [--entry <file>] [--port <port>] [--hostname <host>]');
         process.exit(0);
     }
 }
