@@ -98,6 +98,25 @@ apiRouter.get('/posts', (ctx) => ({ posts: [] }));
 app.mount('/api', apiRouter);
 ```
 
+## Path-Based Middleware
+
+Apply middleware only to routes under a specific path prefix (Express-style):
+
+```typescript
+// Runs only for routes starting with /admin
+app.use('/admin', async (ctx, next) => {
+    if (!ctx.state.user?.isAdmin) {
+        return ctx.json({ error: 'Forbidden' }, 403);
+    }
+    await next();
+});
+
+// Runs only for routes starting with /api
+app.use('/api', RateLimit({ windowMs: 60 * 1000, max: 100 }));
+```
+
+This is equivalent to mounting a router with middleware, but more concise for simple cases.
+
 ## Controller Middleware
 
 Use the `@Use` decorator for controllers:
