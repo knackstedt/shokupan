@@ -1,0 +1,17 @@
+{
+    "name": "shokupan-sample-fullstack-vite",
+    "version": "1.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "bun --watch main.ts",
+        "start": "bun main.ts",
+        "test": "bun test"
+    },
+    "dependencies": {
+        "shokupan": "link:../.."
+    },
+    "devDependencies": {
+        "@types/bun": "latest",
+        "vite": "^7.3.1"
+    }
+}
