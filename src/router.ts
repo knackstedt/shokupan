@@ -156,10 +156,50 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
     /**
      * Registers middleware for this router.
      * Middleware will run for all routes matched by this router.
+     *
+     * Supports Express-style path-based middleware:
+     * `use('/admin', middleware)` runs only for routes under `/admin`.
      */
-    public use(middleware: ShokupanHandler<T> | Middleware) {
-        // Basic middleware registration
-        this.middleware.push(middleware as Middleware);
+    public use(middleware: ShokupanHandler<T> | Middleware): this;
+    public use(path: string, middleware: ShokupanHandler<T> | Middleware): this;
+    public use(
+        arg1: string | ShokupanHandler<T> | Middleware,
+        arg2?: ShokupanHandler<T> | Middleware
+    ) {
+        let path: string | undefined;
+        let middleware: ShokupanHandler<T> | Middleware;
+
+        if (typeof arg1 === 'string') {
+            path = arg1;
+            middleware = arg2 as ShokupanHandler<T> | Middleware;
+        } else {
+            middleware = arg1;
+        }
+
+        if (typeof middleware !== 'function') {
+            throw new TypeError(
+                `[Shokupan] app.use() expects a function as middleware, received ${typeof middleware}. ` +
+                `Did you mean to pass a path string as the first argument? Use use('/path', middleware) for path-based middleware.`
+            );
+        }
+
+        if (path) {
+            // Wrap middleware to only run for matching paths
+            const wrapped = async (ctx: ShokupanContext<any>, next: () => Promise<any>) => {
+                if (ctx.path?.startsWith(path)) {
+                    return (middleware as Middleware)(ctx, next);
+                }
+                return next();
+            };
+            // Preserve metadata if present
+            (wrapped as any).metadata = (middleware as any).metadata;
+            (wrapped as any).isBuiltin = (middleware as any).isBuiltin;
+            (wrapped as any).pluginName = (middleware as any).pluginName;
+            this.middleware.push(wrapped as Middleware);
+        } else {
+            this.middleware.push(middleware as Middleware);
+        }
+
         return this;
     }
 

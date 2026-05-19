@@ -327,8 +327,32 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
 
     /**
      * Adds middleware to the application.
+     *
+     * Supports Express-style path-based middleware:
+     * `use('/admin', middleware)` runs only for routes under `/admin`.
      */
-    public override use(middleware: Middleware) {
+    public override use(middleware: Middleware): this;
+    public override use(path: string, middleware: Middleware): this;
+    public override use(
+        arg1: string | Middleware,
+        arg2?: Middleware
+    ) {
+        let path: string | undefined;
+        let middleware: Middleware;
+
+        if (typeof arg1 === 'string') {
+            path = arg1;
+            middleware = arg2 as Middleware;
+        } else {
+            middleware = arg1;
+        }
+
+        if (typeof middleware !== 'function') {
+            throw new TypeError(
+                `[Shokupan] app.use() expects a function as middleware, received ${typeof middleware}. ` +
+                `Did you mean to pass a path string as the first argument? Use use('/path', middleware) for path-based middleware.`
+            );
+        }
 
         // --- Middleware Tracking Logic ---
         const { file, line } = getCallerInfo();
@@ -343,9 +367,13 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
 
         if (this.applicationConfig.enableMiddlewareTracking) {
             (wrapped as any).order = this.middleware.length;
-            this.middleware.push(wrapped);
+        }
+
+        // Delegate to router's use with path support
+        if (path) {
+            super.use(path, this.applicationConfig.enableMiddlewareTracking ? wrapped : middleware);
         } else {
-            this.middleware.push(middleware);
+            this.middleware.push(this.applicationConfig.enableMiddlewareTracking ? wrapped : middleware);
         }
 
         return this;

@@ -6,6 +6,13 @@ export class MiddlewareTracker {
         handler: Middleware | ShokupanHandler<any>,
         context: { file: string, line: number, name?: string, isBuiltin?: boolean, pluginName?: string; }
     ): any {
+        if (typeof handler !== 'function') {
+            throw new TypeError(
+                `[Shokupan] MiddlewareTracker.wrap expected a function, received ${typeof handler}. ` +
+                `Ensure you are passing a valid middleware function to app.use().`
+            );
+        }
+
         const { file, line, name, isBuiltin, pluginName } = context;
         const handlerName = name || handler.name || 'anonymous';
 
