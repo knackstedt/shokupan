@@ -87,7 +87,8 @@
         "reflect-metadata": "^0.2.0",
         "secure-json-parse": "^4.0.0",
         "socket.io": "^4.8.3",
-        "surrealdb": "^2.0.0"
+        "surrealdb": "^2.0.0",
+        "vite": "^6.0.0 || ^7.0.0 || ^8.0.0"
     },
     "peerDependenciesMeta": {
         "arctic": {
@@ -143,6 +144,9 @@
         },
         "sqlite3": {
             "optional": true
+        },
+        "vite": {
+            "optional": true
         }
     },
     "devDependencies": {
@@ -182,6 +186,7 @@
         "js-yaml": "^4.1.1",
         "memory-level": "^3.1.0",
         "parse-json": "^8.3.0",
+        "playwright": "^1.60.0",
         "preact": "^10.28.2",
         "preact-render-to-string": "^6.6.5",
         "react": "18.2.0",
