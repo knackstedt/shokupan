@@ -143,6 +143,8 @@ export default defineConfig({
                         { label: 'Debugging', link: '/guides/debugging/' },
                         { label: 'CLI Tools', link: '/guides/cli/' },
                         { label: 'Deployment', link: '/guides/deployment/' },
+                        { label: 'Error Handling', link: '/guides/error-handling/' },
+                        { label: 'Example Applications', link: '/guides/examples/' },
                         { label: 'Global Type Augmentation', link: '/guides/global-type-augmentation/' },
                         { label: 'JSON Parser Configuration', link: '/guides/json-parser-configuration/' },
                         { label: 'Multipart Streaming', link: '/guides/multipart-streaming/' },
