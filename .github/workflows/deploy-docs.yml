@@ -1,13 +1,12 @@
 name: Documentation
 
 on:
-  # Runs on pushes to main branch
   push:
     branches: [dev]
     paths:
       - 'docs/**'
       - '.github/workflows/deploy-docs.yml'
-  
+
 concurrency:
   group: "pages"
   cancel-in-progress: false
@@ -29,19 +28,25 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Install dependencies 1
-        run: bun ci
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-docs-${{ hashFiles('bun.lock', 'docs/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-docs-
 
-      - name: Install dependencies 2
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Documentation Dependencies
         working-directory: ./docs
-        run: bun ci
+        run: bun install --frozen-lockfile
 
-      - name: Build documentation
+      - name: Build Documentation
         working-directory: ./docs
         run: bun run build
 
-
-      - name: Upload artifact
+      - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./docs/dist
