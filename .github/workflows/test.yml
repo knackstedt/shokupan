@@ -2,10 +2,26 @@ name: Test
 
 on:
   push:
-    branches:
-      - '*'
+    branches: [main, dev]
     paths:
-      - src
+      - 'src/**'
+      - 'package.json'
+      - 'tsconfig.json'
+      - 'bun.lock'
+      - '.github/workflows/test.yml'
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'tsconfig.json'
+      - 'bun.lock'
+      - '.github/workflows/test.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -13,31 +29,49 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
       - name: Install Dependencies
-        run: bun ci
-      
-      - name: Install Peer Dependencies
-        run: |
-          bun add ajv@^8.0.0 \
-            ajv-formats@^3.0.0 \
-            arctic@^3 \
-            class-transformer@^0.5.0 \
-            class-validator@^0.14.0 \
-            eta@^4.0.0 \
-            jose@^6.0.0 \
-            parse-json@^8.0.0 \
-            reflect-metadata@^0.2.0 \
-            secure-json-parse@^4.0.0 \
-            @scalar/api-reference@^1.0.0 \
-            @surrealdb/node@^2.4.0 \
-            surrealdb@^2.0.0-alpha.14
-        
+        run: bun install --frozen-lockfile
+
       - name: Build
         run: bun run build
-        
+
       - name: Run Tests
         run: bun test
+
+  test-client:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-client-${{ hashFiles('client/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-client-
+
+      - name: Install Client Dependencies
+        working-directory: ./client
+        run: bun install --frozen-lockfile
+
+      - name: Run Client Tests
+        working-directory: ./client
+        run: bun run test:ci
