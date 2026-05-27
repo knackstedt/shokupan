@@ -8,7 +8,7 @@ head:
     content: ":root { --sl-content-width: 100% !important; }"
 ---
 
-Shokupan is built with performance as a top priority. This page contains comprehensive benchmark results comparing Shokupan against other popular Node.js web frameworks across **Bun**, **Node.js**, and **Deno** runtimes.
+Shokupan is built with performance as a top priority. This page contains comprehensive benchmark results comparing Shokupan against other popular web frameworks on the **Bun** runtime.
 
 ## Overview
 

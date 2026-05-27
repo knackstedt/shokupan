@@ -20,7 +20,6 @@ export interface ClusterOptions {
 
     /**
      * Enable sticky sessions (useful for Socket.io).
-     * Currently only supported in Node.js runtime.
      * @default false
      */
     sticky?: boolean;
@@ -28,8 +27,8 @@ export interface ClusterOptions {
 
 /**
  * Cluster Plugin
- * 
- * Automatically manages clustering for Node.js and Bun.
+ *
+ * Automatically manages clustering for Bun.
  */
 export class ClusterPlugin implements ShokupanPlugin {
     constructor(private options: ClusterOptions = {}) { }
