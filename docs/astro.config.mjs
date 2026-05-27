@@ -109,7 +109,6 @@ export default defineConfig({
                         { label: 'GraphQL', link: '/plugins/graphql/' },
                         { label: 'Idempotency', link: '/plugins/idempotency/' },
                         { label: 'MCP Server', link: '/plugins/mcp-server/' },
-                        { label: 'NodeJS/Deno', link: '/plugins/http-server/' },
                         { label: 'OpenAPI Validation', link: '/plugins/openapi-validation/' },
                         { label: 'Permissions', link: '/plugins/permissions/' },
                         { label: 'Proxy', link: '/plugins/proxy/' },

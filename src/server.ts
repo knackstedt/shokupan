@@ -47,10 +47,6 @@ export class ShokupanServer {
             adapter = new BunAdapter();
         } else if (adapterName === 'node') {
             adapter = new NodeAdapter();
-        } else if (adapterName === 'h3') {
-            throw new Error(
-                '[Shokupan] H3Adapter is no longer supported. HTTP/3 support is coming in a future release.'
-            );
         } else if (adapterName === 'wintercg') {
             throw new Error("WinterCG adapter does not support listen(). Use fetch directly.");
         } else {
