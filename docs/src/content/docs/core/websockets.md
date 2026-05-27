@@ -17,7 +17,7 @@ Shokupan provides **first-class WebSocket support** with three flexible approach
 - **Event-Based**: Structured event routing with `@Event()` decorators or `.event()` methods
 - **Binary Support**: No strict payload format - supports JSON, protobuf, msgpack, and any binary format
 - **HTTP Bridge**: Optional HTTP-over-WebSocket for unified API access
-- **Socket.IO Compatible**: Easy integration with Socket.IO for Node.js environments
+- **Socket.IO Compatible**: Easy integration with Socket.IO
 
 ---
 
@@ -910,7 +910,7 @@ router.onMessage((ctx, ws, message) => {
 
 ## Socket.IO Integration
 
-For Node.js environments or when you need Socket.IO compatibility, Shokupan provides seamless integration.
+When you need Socket.IO compatibility, Shokupan provides seamless integration.
 
 ### Installation
 
@@ -920,7 +920,7 @@ bun add socket.io
 npm install socket.io
 ```
 
-### Setup with Node.js
+### Setup
 
 ```typescript
 import { Shokupan, attachSocketIOBridge } from "shokupan";

@@ -645,7 +645,6 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
      * Stops the application server.
      * 
      * This method gracefully shuts down the server and stops any running monitors.
-     * Works transparently in both Bun and Node.js runtimes.
      * 
      * @returns A promise that resolves when the server has been stopped.
      * 

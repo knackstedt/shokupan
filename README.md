@@ -6,7 +6,7 @@
 Shokupan is designed to make building APIs delightful again. With zero-config defaults, instant startup times, and full type safety out of the box, you can focus on building your product, not configuring your framework.
 
 > [!CAUTION]
-> Shokupan is still in alpha and is not guaranteed to be stable. Please use with caution. We will be adding more features and APIs in the future. Please file an issue if you find any bugs or have suggestions for improvement.
+> Shokupan is still in beta and is not guaranteed to be stable. Please use with caution. We will be adding more features and APIs in the future. Please file an issue if you find any bugs or have suggestions for improvement.
 
 📚 **[Full documentation available at https://shokupan.dev](https://shokupan.dev)**
 
@@ -19,8 +19,8 @@ Shokupan is designed to make building APIs delightful again. With zero-config de
 - 📝 **Auto OpenAPI** - Generate [OpenAPI](https://www.openapis.org/) specs automatically from routes.
 - 🔌 **Rich Plugin System** - CORS, Sessions, Auth, Validation, Rate Limiting, and more.
 - 🌐 **Flexible Routing** - Express-style routes or decorator-based controllers.
-- 🔀 **Express Compatible** - Works with [Express](https://expressjs.com/) middleware patterns.
-- 📊 **Built-in Telemetry** - [OpenTelemetry](https://opentelemetry.io/) instrumentation out of the box.
+- 🔀 **Express Compatible** - Adapter for [Express](https://expressjs.com/) middleware (partial `req`/`res` mock).
+- 📊 **OpenTelemetry Plugin** - [OpenTelemetry](https://opentelemetry.io/) instrumentation available via plugin.
 - 🔐 **OAuth2 Support** - GitHub, Google, Microsoft, Apple, Auth0, Okta.
 - ✅ **Multi-validator Support** - Zod, Ajv, TypeBox, Valibot.
 - 📚 **OpenAPI Docs** - Beautiful OpenAPI documentation with [Scalar](https://scalar.dev/).
@@ -31,7 +31,7 @@ Shokupan is designed to make building APIs delightful again. With zero-config de
 
 ## 🚀 Quick Start
 
-> Bun and TypeScript are recommended for Shokupan, though it also supports Node.js and standard JavaScript.
+> Bun and TypeScript are required for Shokupan.
 
 ```typescript
 import { Shokupan, ScalarPlugin } from 'shokupan';
@@ -40,11 +40,11 @@ const app = new Shokupan();
 app.get('/', (ctx) => ({ message: 'Hello, World!' }));
 app.get('/hello', (ctx) => "world");
 
-app.mount('/scalar', new ScalarPlugin({
+await app.register(new ScalarPlugin({
     enableStaticAnalysis: true
 }));
 
-app.listen();
+await app.listen();
 ```
 
 That's it! In development mode, your server is automatically running securely at `https://localhost:3000` 🎉
@@ -119,7 +119,6 @@ Shokupan has a rich ecosystem of plugins.
 | **[AsyncAPI](https://shokupan.dev/plugins/asyncapi)** | Generate and view documentation for WebSocket APIs. |
 | **[Cluster](https://shokupan.dev/plugins/cluster)** | Utilize multiple CPU cores for better performance. |
 | **[GraphQL](https://shokupan.dev/plugins/graphql)** | Support for Apollo Server and GraphQL Yoga. |
-| **[HTTP Server](https://shokupan.dev/plugins/http-server)** | Use standard Node.js HTTP/HTTPS servers. |
 | **[MCP Server](https://shokupan.dev/plugins/mcp-server)** | Expose your API as tools to LLMs. |
 | **[Socket.IO](https://shokupan.dev/plugins/socket-io)** | Easy integration with Socket.IO. |
 | **[Proxy](https://shokupan.dev/plugins/proxy)** | Create reverse proxies. |
