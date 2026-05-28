@@ -26,8 +26,14 @@ jobs:
             exit 1
           fi
 
+  tests:
+    needs: verify-main
+    uses: ./.github/workflows/test.yml
+    permissions:
+      contents: read
+
   publish-npm:
-    needs: [verify-main]
+    needs: [verify-main, tests]
     runs-on: ubuntu-latest
     permissions:
       contents: read
