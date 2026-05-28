@@ -1,63 +1,75 @@
-import { TestBed, fakeAsync } from '@angular/core/testing';
+import { provideHttpClient, withFetch } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
+import { MessageService } from 'primeng/api';
 import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
     let service: AuthService;
-    let fetchSpy: jasmine.Spy;
+    let httpMock: HttpTestingController;
 
     beforeEach(() => {
-        TestBed.configureTestingModule({ providers: [AuthService] });
-
-        // Mock global fetch before the service constructs (initUser is called in constructor)
-        fetchSpy = spyOn(globalThis, 'fetch');
+        TestBed.configureTestingModule({
+            providers: [
+                provideHttpClient(withFetch()),
+                provideHttpClientTesting(),
+                AuthService,
+                { provide: MessageService, useValue: { add: jasmine.createSpy('add') } }
+            ]
+        });
+        httpMock = TestBed.inject(HttpTestingController);
     });
 
-    it('sets user to null when /auth/me returns 401', fakeAsync(async () => {
-        fetchSpy.and.resolveTo(new Response('{"error":"Unauthenticated"}', { status: 401 }));
+    afterEach(() => {
+        httpMock.verify();
+    });
+
+    it('sets user to null when /auth/me returns 401', async () => {
         service = TestBed.inject(AuthService);
-        await service.initUser();
+        const req = httpMock.expectOne('/auth/me');
+        req.flush({ error: 'Unauthenticated' }, { status: 401, statusText: 'Unauthorized' });
+        await Promise.resolve();
         expect(service.user()).toBeNull();
         expect(service.loading()).toBeFalse();
-    }));
-
-    it('sets user when /auth/me returns 200', fakeAsync(async () => {
-        const mockUser = { id: '1', provider: 'github', name: 'Alice', permissions: ['dashboard:read'] };
-        fetchSpy.and.resolveTo(new Response(JSON.stringify(mockUser), { status: 200 }));
-        service = TestBed.inject(AuthService);
-        await service.initUser();
-        expect(service.user()).toEqual(mockUser as any);
-        expect(service.isAuthenticated).toBeTrue();
-    }));
-
-    it('sets user to null when fetch throws', fakeAsync(async () => {
-        fetchSpy.and.rejectWith(new Error('Network Error'));
-        service = TestBed.inject(AuthService);
-        await service.initUser();
-        expect(service.user()).toBeNull();
-    }));
-
-    it('login() redirects to OAuth endpoint', () => {
-        fetchSpy.and.resolveTo(new Response('{}', { status: 200 }));
-        service = TestBed.inject(AuthService);
-        const locationSpy = spyOnProperty(globalThis, 'location', 'get').and.returnValue({
-            href: ''
-        } as Location);
-        let destination = '';
-        Object.defineProperty(location, 'href', { set: (v: string) => { destination = v; }, configurable: true });
-        service.login('github');
-        expect(destination).toContain('/auth/github/login');
     });
 
-    it('logout() calls /auth/logout and clears user', fakeAsync(async () => {
-        // First init user
-        fetchSpy.and.resolveTo(new Response(JSON.stringify({ id: '1', provider: 'github' }), { status: 200 }));
+    it('sets user when /auth/me returns 200', async () => {
+        const mockUser = { id: '1', provider: 'github', name: 'Alice', permissions: ['dashboard:read'] };
         service = TestBed.inject(AuthService);
-        await service.initUser();
+        const req = httpMock.expectOne('/auth/me');
+        req.flush(mockUser);
+        await Promise.resolve();
+        expect(service.user()).toEqual(mockUser as any);
+        expect(service.isAuthenticated).toBeTrue();
+    });
+
+    it('sets user to null when request errors', async () => {
+        service = TestBed.inject(AuthService);
+        const req = httpMock.expectOne('/auth/me');
+        req.error(new ProgressEvent('Network Error'));
+        await Promise.resolve();
+        expect(service.user()).toBeNull();
+    });
+
+    it('login() redirects to OAuth endpoint', () => {
+        service = TestBed.inject(AuthService);
+        httpMock.expectOne('/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
+
+        const hrefSpy = spyOnProperty(window.location, 'href', 'set');
+        service.login('github');
+        expect(hrefSpy).toHaveBeenCalledWith('/auth/github/login');
+    });
+
+    it('logout() calls /auth/logout and clears user', async () => {
+        service = TestBed.inject(AuthService);
+        httpMock.expectOne('/auth/me').flush({ id: '1', provider: 'github' });
+        await Promise.resolve();
         expect(service.user()).toBeTruthy();
 
-        // Now logout
-        fetchSpy.and.resolveTo(new Response('{"ok":true}', { status: 200 }));
-        await service.logout();
+        const logoutPromise = service.logout();
+        const req = httpMock.expectOne('/auth/logout');
+        req.flush({ ok: true });
+        await logoutPromise;
         expect(service.user()).toBeNull();
-    }));
+    });
 });

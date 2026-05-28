@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { GeometryPdfComponent } from './geometry-pdf.component';
+import { PDFRendererComponent } from './pdf-renderer.component';
 
-describe('GeometryPdfComponent', () => {
-  let component: GeometryPdfComponent;
-  let fixture: ComponentFixture<GeometryPdfComponent>;
+describe('PDFRendererComponent', () => {
+  let component: PDFRendererComponent;
+  let fixture: ComponentFixture<PDFRendererComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [GeometryPdfComponent]
+      imports: [PDFRendererComponent]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(GeometryPdfComponent);
+    fixture = TestBed.createComponent(PDFRendererComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
