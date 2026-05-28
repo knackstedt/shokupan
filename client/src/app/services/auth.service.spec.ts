@@ -55,10 +55,17 @@ describe('AuthService', () => {
         service = TestBed.inject(AuthService);
         httpMock.expectOne('/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
 
-        const locationMock = { href: '' };
-        spyOnProperty(window, 'location', 'get').and.returnValue(locationMock as Location);
+        const originalLocation = window.location;
+        Object.defineProperty(window, 'location', {
+            writable: true,
+            value: { href: '' }
+        });
         service.login('github');
-        expect(locationMock.href).toBe('/auth/github/login');
+        expect(window.location.href).toBe('/auth/github/login');
+        Object.defineProperty(window, 'location', {
+            writable: true,
+            value: originalLocation
+        });
     });
 
     it('logout() calls /auth/logout and clears user', async () => {
