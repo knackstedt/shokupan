@@ -2,21 +2,9 @@ name: Test
 
 on:
   push:
-    branches: [main, dev]
-    paths:
-      - 'src/**'
-      - 'package.json'
-      - 'tsconfig.json'
-      - 'bun.lock'
-      - '.github/workflows/test.yml'
+    tags-ignore:
+      - 'v*'
   pull_request:
-    branches: [main, dev]
-    paths:
-      - 'src/**'
-      - 'package.json'
-      - 'tsconfig.json'
-      - 'bun.lock'
-      - '.github/workflows/test.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
