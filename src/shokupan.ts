@@ -26,7 +26,7 @@ import { ShokupanRequest } from './util/request';
 import { type ResponseTransformer, ResponseTransformerRegistry } from './util/response-transformer';
 import { $appRoot, $childRouters, $dispatch, $finalResponse, $isApplication, $mountPath, $routeMatched, $routes } from './util/symbol';
 import { RouterTrie } from './util/trie';
-import type { ErrorHandler, Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig, ShokupanPlugin } from './util/types';
+import type { ErrorHandler, GlobalShokupanState, Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig, ShokupanHooks, ShokupanPlugin, ShokupanRoute } from './util/types';
 
 
 const defaults: ShokupanConfig = {
@@ -132,6 +132,7 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
     private specAvailableHooks: ((spec: any) => void | Promise<void>)[] = [];
 
     private pluginInitPromises: Promise<void>[] = [];
+    private securityHeadersPromise?: Promise<void>;
 
 
     public get db(): DatastoreAdapter | undefined {
@@ -164,8 +165,8 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
 
         // Register hooks if provided in config
         if (hooks) {
-            for (const [name, fn] of Object.entries(hooks)) {
-                this.hook(name as any, fn);
+            for (const [name, fn] of Object.entries(hooks) as [keyof ShokupanHooks<T>, any][]) {
+                this.hook(name, fn);
             }
         }
 
@@ -213,10 +214,12 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
             name: 'ShokupanApplication'
         };
 
-        // Security: Apply default security headers
+        // Security: Apply default security headers (deferred via dynamic import)
         if (this.applicationConfig.defaultSecurityHeaders) {
-            const { SecurityHeaders } = require("./plugins/middleware/security-headers");
-            this.use(SecurityHeaders(this.applicationConfig.defaultSecurityHeaders === true ? {} : this.applicationConfig.defaultSecurityHeaders));
+            this.securityHeadersPromise = (async () => {
+                const { SecurityHeaders } = await import("./plugins/middleware/security-headers");
+                this.use(SecurityHeaders(this.applicationConfig.defaultSecurityHeaders === true ? {} : this.applicationConfig.defaultSecurityHeaders));
+            })();
         }
 
         this.dbPromise = Promise.resolve();
@@ -242,7 +245,7 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
                     // Check if this promise belongs to this app's context
                     if (ctx && ctx.store && ctx.store.app === this) {
                         const { requestId } = ctx.store;
-                        this.logger.error('Shokupan', "Unhandled Rejection in Shokupan Request", {
+                        this.logger?.error('Shokupan', "Unhandled Rejection in Shokupan Request", {
                             error: reason,
                             requestId,
                             creationStack: ctx.stack
@@ -361,12 +364,12 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
             file,
             line,
             name: middleware.name || 'middleware',
-            isBuiltin: (middleware as any).isBuiltin,
-            pluginName: (middleware as any).pluginName
+            isBuiltin: middleware.isBuiltin,
+            pluginName: middleware.pluginName
         });
 
         if (this.applicationConfig.enableMiddlewareTracking) {
-            (wrapped as any).order = this.middleware.length;
+            wrapped.order = this.middleware.length;
         }
 
         // Delegate to router's use with path support
@@ -389,7 +392,7 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
         this.plugins.push(plugin);
         try {
             const promise = plugin.onInit(this, options);
-            this.pluginInitPromises.push(promise as any);
+            this.pluginInitPromises.push(Promise.resolve(promise));
             await promise;
         }
         catch (err) {
@@ -437,7 +440,7 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
             // Always ensure middleware tracking is on in dev unless explicitly disabled
             if (this.applicationConfig.enableMiddlewareTracking !== false) {
                 this.applicationConfig.enableMiddlewareTracking = true;
-                this.logger.info("Shokupan", "Enabled middleware tracking");
+                this.logger?.info("Shokupan", "Enabled middleware tracking");
             }
 
             // Register ErrorView
@@ -447,9 +450,9 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
                     await this.register(new ErrorView({
                         developmentErrorView: true
                     }));
-                    this.logger.info("Shokupan", "Loaded ErrorView module");
+                    this.logger?.info("Shokupan", "Loaded ErrorView module");
                 } catch (err: any) {
-                    this.logger.warn("Shokupan", "ErrorView plugin failed to load", { error: err.message });
+                    this.logger?.warn("Shokupan", "ErrorView plugin failed to load", { error: err.message });
                 }
             }
 
@@ -461,9 +464,9 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
                         path: '/dashboard',
                         trackStateMutations: true
                     }));
-                    this.logger.info("Shokupan", "Loaded Dashboard module");
+                    this.logger?.info("Shokupan", "Loaded Dashboard module");
                 } catch (err: any) {
-                    this.logger.warn("Shokupan", "Dashboard plugin failed to load", { error: err.message });
+                    this.logger?.warn("Shokupan", "Dashboard plugin failed to load", { error: err.message });
                 }
             }
 
@@ -472,9 +475,9 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
             if (!hasApiExplorer) {
                 try {
                     await this.register(new ApiExplorerPlugin(), { path: '/dashboard/explorer' });
-                    this.logger.info("Shokupan", "Loaded ApiExplorer module");
+                    this.logger?.info("Shokupan", "Loaded ApiExplorer module");
                 } catch (err: any) {
-                    this.logger.warn("Shokupan", "ApiExplorer plugin failed to load", { error: err.message });
+                    this.logger?.warn("Shokupan", "ApiExplorer plugin failed to load", { error: err.message });
                 }
             }
 
@@ -483,9 +486,9 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
             if (!hasAsyncApi) {
                 try {
                     await this.register(new AsyncApiPlugin(), { path: '/dashboard/ws-explorer' });
-                    this.logger.info("Shokupan", "Loaded AsyncAPI module");
+                    this.logger?.info("Shokupan", "Loaded AsyncAPI module");
                 } catch (err: any) {
-                    this.logger.warn("Shokupan", "AsyncAPI plugin failed to load", { error: err.message });
+                    this.logger?.warn("Shokupan", "AsyncAPI plugin failed to load", { error: err.message });
                 }
             }
         }
@@ -635,7 +638,7 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
         const url = `${protocol}://${this.applicationConfig.hostname}:${this.applicationConfig.port}`;
         const hyperlinkedUrl = `\x1b]8;;${url}\x07${url}\x1b]8;;\x07`;
 
-        this.logger.info('Shokupan', `Server running on ${hyperlinkedUrl}`);
+        this.logger?.info('Shokupan', `Server running on ${hyperlinkedUrl}`);
         callback?.();
         return this.server;
     }
@@ -680,7 +683,7 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
     }
 
     public [$dispatch](req: ShokupanRequest<T>) {
-        return this.fetch(req as unknown as Request);
+        return this.fetch(req);
     }
 
     /**
@@ -710,31 +713,31 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
 
         // Create Request to pass to fetch
         const reqBody = options.body && typeof options.body === "object" ? JSON.stringify(options.body) : options.body;
-        const reqHeaders = new Headers(options.headers as any);
+        const reqHeaders = options.headers ? new Headers(options.headers) : new Headers();
         if (typeof options.body === "object" && !reqHeaders.has("content-type")) {
             reqHeaders.set("content-type", "application/json");
         }
 
-        const req = new ShokupanRequest({
+        const req = new ShokupanRequest<T>({
             method: (options.method || "GET") as Method,
             url,
             headers: reqHeaders,
             body: reqBody
-        }) as unknown as ShokupanRequest<T>;
+        });
 
-        const res = await this.fetch(req as unknown as Request);
+        const res = await this.fetch(req);
 
         // Convert Response to ProcessResult
-        const status = res.status;
+        const status = res!.status;
         const headers: Record<string, string> = {};
-        res.headers.forEach((v, k) => headers[k] = v);
+        res!.headers.forEach((v, k) => headers[k] = v);
 
         let data: any;
         if (headers['content-type']?.includes('application/json')) {
-            data = await res.json();
+            data = await res!.json();
         }
         else {
-            data = await res.text();
+            data = await res!.text();
         }
 
         return {
@@ -752,8 +755,12 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
      * @param server - The server instance.
      * @returns The response to send.
      */
-    public async fetch(req: Request, server?: Server<any>): Promise<Response> {
-
+    public async fetch(req: Request | ShokupanRequest<any>, server?: Server<any>): Promise<Response | undefined> {
+        // Await lazy-loaded security headers middleware before first request
+        if (this.securityHeadersPromise) {
+            await this.securityHeadersPromise;
+            this.securityHeadersPromise = undefined;
+        }
 
         if (this.applicationConfig.enableTracing) {
             // Dynamic import to avoid hard dependency
@@ -770,7 +777,7 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
 
             const parent = store?.span;
             const ctx = parent ? trace.setSpan(context.active(), parent) : undefined;
-            return tracer.startActiveSpan(`${req.method} ${new URL(req.url).pathname}`, attrs, ctx, span => {
+            return tracer.startActiveSpan(`${req.method} ${new URL(req.url).pathname}`, attrs, ctx || context.active(), span => {
                 const ctxStore = new RequestContextStore();
                 ctxStore.span = span;
                 // Don't store the Request object - it prevents GC and causes memory leaks
@@ -794,10 +801,8 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
         return this.handleRequest(req, server);
     }
 
-    private async handleRequest(req: Request, server?: Server<any>, requestId?: string): Promise<Response> {
-        // Cast to ShokupanRequest if needed, though at runtime it's just a Request
-        // But ShokupanContext expects ShokupanRequest.
-        const request = req as unknown as ShokupanRequest<T>;
+    private async handleRequest(req: Request | ShokupanRequest<T>, server?: Server<any>, requestId?: string): Promise<Response | undefined> {
+        const request = req as ShokupanRequest<T>;
 
         const controller = this.applicationConfig.enableAbortController ? new AbortController() : undefined;
         const ctx = new ShokupanContext<T>(request, server, undefined, this, controller?.signal, this.applicationConfig.enableMiddlewareTracking, requestId);
@@ -851,7 +856,7 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
                         // --- Manual Tracking for Route Handler ---
                         if (this.applicationConfig.enableMiddlewareTracking) {
                             const handler = match.handler;
-                            const meta = (handler as any).metadata;
+                            const meta = (handler as Middleware).metadata;
 
                             if (meta) {
                                 const trackingStartTime = performance.now();
@@ -942,16 +947,16 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
                     // Exception: If middleware manually changed the status from default 200,
                     // respect that (e.g., auth middleware set 401)
                     if (ctx.response.status !== HTTP_STATUS.OK) {
-                        return ctx.send(null, { status: ctx.response.status, headers: ctx.response.headers });
+                        return ctx.send(undefined, { status: ctx.response.status, headers: ctx.response.headers });
                     }
 
                     throw new NotFoundError();
                 });
 
-                let response: Response | Promise<Response>;
+                let response: Response | undefined;
 
                 if (ctx.isUpgraded) {
-                    response = undefined as unknown as Response;
+                    response = undefined;
                 }
                 else if (result instanceof Response) {
                     response = result;
@@ -976,7 +981,7 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
                                 this.logger?.debug("Shokupan", "Error in onResponseEnd hook (ws):", { error: e });
                             });
                         }
-                        return undefined as unknown as Response;
+                        return undefined;
                     }
                     else if (ctx[$routeMatched]) {
                         // A route WAS matched but returned nothing.
@@ -986,17 +991,17 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
                             status = HTTP_STATUS.NO_CONTENT;
                         }
                         // We send an empty response with the determined status
-                        response = ctx.send(null, { status, headers: ctx.response.headers });
+                        response = ctx.send(undefined, { status, headers: ctx.response.headers });
                     } else {
                         // Should have been thrown inside the middleware chain
                         throw new NotFoundError();
                     }
                 }
                 else if (typeof result === "object") {
-                    response = ctx.json(result);
+                    response = await ctx.json(result);
                 }
                 else {
-                    response = ctx.text(String(result));
+                    response = await ctx.text(String(result));
                 }
 
                 // Request End Hook - Processing finished, response ready
@@ -1119,7 +1124,7 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
         // because it is already executed globally in handleRequest.
         // If router is a child, we MUST add its middleware.
         let effectiveStack = middlewareStack;
-        if (router !== this as any) {
+        if (router !== this) {
             effectiveStack = [...middlewareStack, ...router.middleware];
         }
 
@@ -1170,8 +1175,8 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
                     return fn(ctx, () => originalHandler(ctx));
                 };
                 // Preserve metadata if any
-                (handler as any).originalHandler = (originalHandler as any).originalHandler || originalHandler;
-                (handler as any)._route = (originalHandler as any)._route;
+                handler.originalHandler = originalHandler.originalHandler || originalHandler;
+                (handler as { _route?: ShokupanRoute })._route = (originalHandler as { _route?: ShokupanRoute })._route;
             }
 
             trie.insert(route.method, fullPath, handler);
@@ -1196,7 +1201,7 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
         if (this.rootTrie) {
             const result = this.rootTrie.search(method, path);
             if (result) {
-                const route = (result.handler as any)._route;
+                const route = (result.handler as { _route?: ShokupanRoute })._route;
                 return { ...result, route };
             }
 
@@ -1204,7 +1209,7 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
             if (method === "HEAD") {
                 const headResult = this.rootTrie.search("GET", path);
                 if (headResult) {
-                    const route = (headResult.handler as any)._route;
+                    const route = (headResult.handler as { _route?: ShokupanRoute })._route;
                     return { ...headResult, route };
                 }
             }

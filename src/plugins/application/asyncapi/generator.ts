@@ -143,7 +143,7 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
             options.warnings.push({
                 type: 'ast-analysis-failed',
                 message: 'AST Analysis failed or skipped',
-                detail: e.message
+                detail: (e as any).message
             });
         }
     }

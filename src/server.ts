@@ -66,7 +66,7 @@ export class ShokupanServer {
         }
 
         // Start Server
-        this.server = await adapter.listen(finalPort, this.app, tlsOptions);
+        this.server = await adapter.listen(finalPort, this.app, tlsOptions!);
 
         // Update config port if 0 was used
         if (finalPort === 0 && this.server?.port) {

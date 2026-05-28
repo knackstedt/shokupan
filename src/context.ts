@@ -17,7 +17,7 @@ import type { CookieOptions, GlobalShokupanState, HeadersInit, JSXRenderer, Shok
 /**
  * Inline WebSocket handlers for ctx.upgrade()
  */
-export interface InlineWebSocketHandlers<T = any> {
+export interface InlineWebSocketHandlers<T extends Record<string, any> = any> {
     open?: (ctx: ShokupanContext<T>, ws: ServerWebSocket<any>) => void | Promise<void>;
     message?: (ctx: ShokupanContext<T>, ws: ServerWebSocket<any>, message: string | Buffer) => void | Promise<void>;
     close?: (ctx: ShokupanContext<T>, ws: ServerWebSocket<any>, code?: number, reason?: string) => void | Promise<void>;
@@ -167,6 +167,8 @@ export class ShokupanContext<
     private [$bodyParseError]?: Error;
 
     public [$routeMatched]: boolean = false;
+    public [$wsMessages]?: any[];
+    public [$onWsMessage]?: (msg: any) => void;
     public matchedRoute?: ShokupanRoute;
 
     // Cached URL properties to avoid repeated parsing
@@ -194,7 +196,7 @@ export class ShokupanContext<
     public getDisconnectCallbacks() {
         return this.disconnectCallbacks;
     }
-    private [$ws]?: ServerWebSocket;
+    public [$ws]?: ServerWebSocket<any>;
     private [$socket]?: Socket;
     private [$io]?: SocketServer;
 
@@ -225,7 +227,7 @@ export class ShokupanContext<
             state: this.state,
             params: this.params,
             response: this[$finalResponse]?.body,
-            responseHeaders: new Map(this[$finalResponse]?.headers as any),
+            responseHeaders: this[$finalResponse] ? new Map(this[$finalResponse].headers) : new Map(),
             handlerStack: this.handlerStack.map(h => h.name === "anonymous" ? (h.file + ":" + h.line) : h.name)
         }, { depth: null, colors: true, numericSeparator: true, customInspect: true });
 
@@ -236,13 +238,13 @@ export class ShokupanContext<
         public readonly request: ShokupanRequest<any>,
         public readonly server?: Server<any>,
         state?: State,
-        public readonly app?: Shokupan,
+        public readonly app?: Shokupan<any>,
         public readonly signal?: AbortSignal, // Optional as it might not be provided in tests or simple creates
         enableMiddlewareTracking: boolean = false,
         requestId?: string
     ) {
         this.state = state || {} as State;
-        this[$requestId] = requestId;
+        this[$requestId] = requestId ?? '';
 
         if (enableMiddlewareTracking) {
             const self = this;
@@ -341,7 +343,7 @@ export class ShokupanContext<
     /**
      * Client IP address
      */
-    get ip() { return this.server?.requestIP(this.request as unknown as Request); }
+    get ip() { return this.server?.requestIP(this.request as Request); }
 
     /**
      * Request hostname (e.g. "localhost")
@@ -463,7 +465,7 @@ export class ShokupanContext<
                 // Function options not supported by Bun upgrade
                 return false;
             }
-            else if (options && typeof (options as any).open === 'function') {
+            else if (options && typeof (options as InlineWebSocketHandlers<State>).open === 'function') {
                 // It's InlineWebSocketHandlers
                 const handlers = options as InlineWebSocketHandlers<State>;
 
@@ -472,15 +474,15 @@ export class ShokupanContext<
                 // This fixes the signature mismatch between router (ctx, ws) and adapter/bun (ws)
 
                 // Initialize tracking array if enabled
-                if (this.app.applicationConfig.enableWebSocketTracking) {
-                    (this as any)[$wsMessages] = [];
+                if (this.app?.applicationConfig.enableWebSocketTracking) {
+                    this[$wsMessages] = [];
                 }
 
                 // Construct wrapped handlers
                 const WrappedHandler = {
                     open: (ws: ServerWebSocket<any>) => {
                         // Tracking Logic (if enabled)
-                        if (this.app.applicationConfig.enableWebSocketTracking) {
+                        if (this.app?.applicationConfig.enableWebSocketTracking) {
                             const track = (type: 'open' | 'close' | 'message', dir: 'in' | 'out' | 'system', data?: any, size?: number) => {
                                 const msg = {
                                     type,
@@ -489,9 +491,9 @@ export class ShokupanContext<
                                     size: size || 0,
                                     timestamp: Date.now()
                                 };
-                                (this as any)[$wsMessages].push(msg);
-                                if ((this as any)[$onWsMessage]) {
-                                    (this as any)[$onWsMessage](msg);
+                                this[$wsMessages]!.push(msg);
+                                if (this[$onWsMessage]) {
+                                    this[$onWsMessage](msg);
                                 }
                             };
 
@@ -501,14 +503,14 @@ export class ShokupanContext<
                             // Proxy send methods to capture outgoing messages + data
                             const originalSend = ws.send.bind(ws);
                             ws.send = (data, compress) => {
-                                const size = typeof data === 'string' ? data.length : (data as any)?.byteLength || 0;
+                                const size = typeof data === 'string' ? data.length : (data instanceof ArrayBuffer ? data.byteLength : 0);
                                 track('message', 'out', typeof data === 'string' ? data : '[binary]', size);
                                 return originalSend(data, compress);
                             };
 
                             const originalPublish = ws.publish.bind(ws);
                             ws.publish = (topic, data, compress) => {
-                                const size = typeof data === 'string' ? data.length : (data as any)?.byteLength || 0;
+                                const size = typeof data === 'string' ? data.length : (data instanceof ArrayBuffer ? data.byteLength : 0);
                                 track('message', 'out', typeof data === 'string' ? data : '[binary]', size);
                                 return originalPublish(topic, data, compress);
                             };
@@ -517,8 +519,8 @@ export class ShokupanContext<
                         if (handlers.open) handlers.open(this, ws);
                     },
                     message: (ws: ServerWebSocket<any>, message: string | Buffer) => {
-                        if (this.app.applicationConfig.enableWebSocketTracking) {
-                            const size = typeof message === 'string' ? message.length : (message as any)?.byteLength || 0;
+                        if (this.app?.applicationConfig.enableWebSocketTracking) {
+                            const size = typeof message === 'string' ? message.length : (message as ArrayBuffer | Buffer).byteLength || 0;
                             const msg = {
                                 type: 'message',
                                 dir: 'in',
@@ -526,14 +528,14 @@ export class ShokupanContext<
                                 size,
                                 timestamp: Date.now()
                             };
-                            (this as any)[$wsMessages].push(msg);
-                            if ((this as any)[$onWsMessage]) (this as any)[$onWsMessage](msg);
+                            this[$wsMessages]!.push(msg);
+                            if (this[$onWsMessage]) this[$onWsMessage](msg);
                         }
 
                         if (handlers.message) handlers.message(this, ws, message);
                     },
                     close: (ws: ServerWebSocket<any>, code: number, message: string) => {
-                        if (this.app.applicationConfig.enableWebSocketTracking) {
+                        if (this.app?.applicationConfig.enableWebSocketTracking) {
                             const msg = {
                                 type: 'close',
                                 dir: 'system',
@@ -541,8 +543,8 @@ export class ShokupanContext<
                                 size: 0,
                                 timestamp: Date.now()
                             };
-                            (this as any)[$wsMessages].push(msg);
-                            if ((this as any)[$onWsMessage]) (this as any)[$onWsMessage](msg);
+                            this[$wsMessages]!.push(msg);
+                            if (this[$onWsMessage]) this[$onWsMessage](msg);
                         }
 
                         if (handlers.close) handlers.close(this, ws, code, message);
@@ -551,7 +553,7 @@ export class ShokupanContext<
                         // Handler interface does not support drain yet, but adapter calls it
                     },
                     error: (ws: ServerWebSocket<any>, error: Error) => {
-                        if (this.app.applicationConfig.enableWebSocketTracking) {
+                        if (this.app?.applicationConfig.enableWebSocketTracking) {
                             const msg = {
                                 type: 'error',
                                 dir: 'system',
@@ -559,8 +561,8 @@ export class ShokupanContext<
                                 size: 0,
                                 timestamp: Date.now()
                             };
-                            (this as any)[$wsMessages].push(msg);
-                            if ((this as any)[$onWsMessage]) (this as any)[$onWsMessage](msg);
+                            this[$wsMessages]!.push(msg);
+                            if (this[$onWsMessage]) this[$onWsMessage](msg);
                         }
 
                         if (handlers.error) handlers.error(this, ws, error);
@@ -570,7 +572,7 @@ export class ShokupanContext<
                 // Inject wrappedHandlers into data.handler for BunAdapter
                 wsOptions = {
                     data: {
-                        ...((options as any).data || {}),
+                        ...((options as { data?: any }).data || {}),
                         ctx: this,
                         createdAt: Date.now(),
                         ...this.state,
@@ -582,7 +584,7 @@ export class ShokupanContext<
         }
 
         // Standard upgrade with data/headers
-        const success = this.server.upgrade(this.req as any, wsOptions ?? options);
+        const success = this.server.upgrade(this.req as Request, (wsOptions ?? options) as any);
         if (success) {
             this.isUpgraded = true;
         }
@@ -660,7 +662,7 @@ export class ShokupanContext<
                 const keys = Object.keys(headers);
                 for (let i = 0; i < keys.length; i++) {
                     const key = keys[i];
-                    const val = (headers as any)[key];
+                    const val = (headers as Record<string, string>)[key];
                     h.set(key, val);
                 }
             }
@@ -683,7 +685,7 @@ export class ShokupanContext<
         const config = this.app?.applicationConfig || {};
         const { type, body } = await BodyParser.parse(this.request, config);
 
-        this[$bodyType] = type as any;
+        this[$bodyType] = type as 'json' | 'text' | 'formData' | 'arrayBuffer' | 'blob';
         this[$cachedBody] = body;
         this[$bodyParsed] = true;
 
@@ -734,7 +736,7 @@ export class ShokupanContext<
         }
 
         // Skip if automatic parsing is explicitly disabled
-        if (this.app?.applicationConfig?.['disableBodyParsing'] === true) {
+        if (this.app?.applicationConfig?.disableBodyParsing === true) {
             return;
         }
 
@@ -744,7 +746,7 @@ export class ShokupanContext<
         const contentLength = parseInt(this.request.headers.get("content-length") || "0", 10);
         if (contentLength > maxBodySize) {
             this[$bodyParseError] = new Error("Payload Too Large");
-            (this[$bodyParseError] as any).status = 413;
+            Object.assign(this[$bodyParseError]!, { status: 413 });
             // We can't easily return 413 here since this is async void, error stored for access
             return;
         }
@@ -825,11 +827,11 @@ export class ShokupanContext<
      * @returns Response
      */
     send(body?: BodyInit, options?: ResponseInit) {
-        const headers = this.mergeHeaders(options?.headers as any);
+        const headers = this.mergeHeaders(options?.headers as HeadersInit);
         const status = options?.status ?? this.response.status ?? 200;
 
         // Validate redirect status code
-        if (this.app.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(status)) {
+        if (this.app?.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(status)) {
             throw new Error(`Invalid HTTP status code: ${status}`);
         }
 
@@ -838,7 +840,6 @@ export class ShokupanContext<
             this[$rawBody] = body;
         }
 
-        // :as any because there are multiple bodyinit providers. What the hell.
         return this[$finalResponse] ??= new Response(body as any, { status, headers });
     }
 
@@ -899,7 +900,7 @@ export class ShokupanContext<
         const finalStatus = status ?? this.response.status ?? 200;
 
         // Validate redirect status code
-        if (this.app.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(finalStatus)) {
+        if (this.app?.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(finalStatus)) {
             throw new Error(`Invalid HTTP status code: ${finalStatus}`);
         }
         this.response.status = finalStatus;
@@ -930,7 +931,7 @@ export class ShokupanContext<
         const finalStatus = status ?? this.response.status ?? 200;
 
         // Validate redirect status code
-        if (this.app.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(finalStatus)) {
+        if (this.app?.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(finalStatus)) {
             throw new Error(`Invalid HTTP status code: ${finalStatus}`);
         }
         this.response.status = finalStatus;
@@ -950,7 +951,7 @@ export class ShokupanContext<
      */
     async redirect(url: string | Promise<string>, status = 302) {
         // Validate redirect status code
-        if (this.app.applicationConfig.validateStatusCodes && !VALID_REDIRECT_STATUSES.has(status)) {
+        if (this.app?.applicationConfig?.validateStatusCodes && !VALID_REDIRECT_STATUSES.has(status)) {
             throw new Error(`Invalid redirect status code: ${status}`);
         }
         this.response.status = status;
@@ -984,7 +985,7 @@ export class ShokupanContext<
     async status(statusCode: number | Promise<number>) {
         const status = statusCode instanceof Promise ? await statusCode : statusCode;
         // Validate redirect status code
-        if (this.app.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(status)) {
+        if (this.app?.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(status)) {
             throw new Error(`Invalid HTTP status code: ${status}`);
         }
         this.response.status = status;
@@ -998,11 +999,11 @@ export class ShokupanContext<
      * Respond with a file
      */
     public async file(path: string, fileOptions?: BlobPropertyBag, responseOptions?: ResponseInit) {
-        const finalHeaders = this.mergeHeaders(responseOptions?.headers as any);
+        const finalHeaders = this.mergeHeaders(responseOptions?.headers as HeadersInit);
         const status = responseOptions?.status ?? this.response.status;
 
         // Validate redirect status code
-        if (this.app.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(status)) {
+        if (this.app?.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(status)) {
             throw new Error(`Invalid HTTP status code: ${status}`);
         }
         // status is optional in file responseOptions, so only update if defined, otherwise keep existing
@@ -1015,7 +1016,7 @@ export class ShokupanContext<
         const resolved = resolve(path);
 
         // Enforce allowedStaticFilePaths boundary if configured
-        const allowedPaths = this.app.applicationConfig.allowedStaticFilePaths;
+        const allowedPaths = this.app?.applicationConfig.allowedStaticFilePaths;
         if (allowedPaths && allowedPaths.length > 0) {
             const isAllowed = allowedPaths.some(allowed => isSubPath(allowed, resolved));
             if (!isAllowed) {
@@ -1024,7 +1025,7 @@ export class ShokupanContext<
         }
 
         // App-level file access check
-        const appFileCheck = this.app.applicationConfig.fileAccessCheck;
+        const appFileCheck = this.app?.applicationConfig.fileAccessCheck;
         if (appFileCheck && !appFileCheck(this, path)) {
             throw new Error('Invalid file path');
         }
@@ -1063,7 +1064,7 @@ export class ShokupanContext<
         status ??= 200;
 
         // Validate redirect status code
-        if (this.app.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(status)) {
+        if (this.app?.applicationConfig.validateStatusCodes && !VALID_HTTP_STATUSES.has(status)) {
             throw new Error(`Invalid HTTP status code: ${status}`);
         }
         if (!this.renderer) {
@@ -1080,7 +1081,7 @@ export class ShokupanContext<
      * @param options Response options (status, headers)
      */
     public pipe(stream: ReadableStream, options?: ResponseInit): Response {
-        const headers = this.mergeHeaders(options?.headers as any);
+        const headers = this.mergeHeaders(options?.headers as HeadersInit);
         const status = options?.status ?? this.response.status ?? 200;
 
         if (this.app?.applicationConfig?.validateStatusCodes && !VALID_HTTP_STATUSES.has(status)) {
@@ -1134,17 +1135,17 @@ export class ShokupanContext<
                         
                         // Store chunk timings in context for dashboard to capture
                         if (chunkTimings.length > 0) {
-                            (ctx as any)._chunkTimings = chunkTimings;
+                            (ctx as { _chunkTimings?: any })._chunkTimings = chunkTimings;
                         }
                     } catch (err) {
                         if (onError) {
                             try {
                                 await onError(err as Error, helper);
                             } catch (handlerErr) {
-                                ctx.app.logger?.error('Context', 'Stream error handler', handlerErr);
+                                ctx.app?.logger?.error('Context', 'Stream error handler', handlerErr as Error);
                             }
                         } else {
-                            ctx.app.logger?.error('Context', 'Stream error', err);
+                            ctx.app?.logger?.error('Context', 'Stream error', err as Error);
                         }
                         if (!aborted.value) {
                             controller.close();
@@ -1161,7 +1162,7 @@ export class ShokupanContext<
                     try {
                         cb();
                     } catch (err) {
-                        ctx.app.logger?.error('Context', 'Stream abort callback', err);
+                        ctx.app?.logger?.error('Context', 'Stream abort callback', err as Error);
                     }
                 });
             }

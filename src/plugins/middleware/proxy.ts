@@ -190,7 +190,7 @@ function handleWSOpen(ws: ServerWebSocket, ctx: ShokupanContext, options: ProxyO
 
     const headers: Record<string, string> = {};
     // Copy headers from client request
-    ctx.request.headers.forEach((v, k) => {
+    ctx.request.headers.forEach((v: any, k: any) => {
         if (!['upgrade', 'connection', 'sec-websocket-key', 'sec-websocket-version', 'sec-websocket-extensions'].includes(k.toLowerCase())) {
             headers[k] = v;
         }
@@ -202,7 +202,7 @@ function handleWSOpen(ws: ServerWebSocket, ctx: ShokupanContext, options: ProxyO
     }
 
     const protocolHeader = headers['sec-websocket-protocol'] || ctx.request.headers.get('sec-websocket-protocol');
-    const protocols = protocolHeader ? protocolHeader.split(',').map(p => p.trim()) : undefined;
+    const protocols = protocolHeader ? protocolHeader.split(',').map((p: any) => p.trim()) : undefined;
 
     // @ts-ignore - Bun's native WebSocket supports options mapping as the 3rd argument.
     const upstream = new WebSocket(url.toString(), protocols, { headers });

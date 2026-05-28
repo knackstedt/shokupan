@@ -151,7 +151,7 @@ export class VitePlugin implements ShokupanPlugin {
                 }
 
                 // Parse accept header into individual media types (strip q-values)
-                const mediaTypes = accept.split(',').map(s => s.trim().split(';')[0].trim().toLowerCase());
+                const mediaTypes = accept.split(',').map((s: string) => s.trim().split(';')[0].trim().toLowerCase());
 
                 // Avoid proxying API requests to Vite - only skip if JSON/XML is explicitly
                 // requested as the primary type. Allow mixed browsers (text/html + */*) through.

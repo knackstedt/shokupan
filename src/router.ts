@@ -22,7 +22,7 @@ import { MiddlewareTracker } from './util/middleware-tracker';
 import { ShokupanRequest } from './util/request';
 import { $appRoot, $childControllers, $childRouters, $controllerHooks, $debug, $dispatch, $isApplication, $isMounted, $isRouter, $isWebSocketRouter, $mountPath, $onWsMessage, $parent, $routeSpec, $routes, $ws, $wsMessages } from './util/symbol';
 import { RouterTrie } from './util/trie';
-import { type GuardAPISpec, type HeadersInit, type JSXRenderer, type Method, type MethodAPISpec, type Middleware, type OpenAPIOptions, type ProcessResult, type RequestOptions, type RouteMetadata, type RouteParams, type ShokupanController, type ShokupanHandler, type ShokupanHooks, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions } from './util/types';
+import { type GlobalShokupanState, type GuardAPISpec, type HeadersInit, type JSXRenderer, type Method, type MethodAPISpec, type Middleware, type OpenAPIOptions, type ProcessResult, type RequestOptions, type RouteMetadata, type RouteParams, type ShokupanController, type ShokupanHandler, type ShokupanHooks, type ShokupanRoute, type ShokupanRouteConfig, type StaticServeOptions } from './util/types';
 
 
 export const RouterRegistry = new Map<string, ShokupanRouter<any>>();
@@ -93,7 +93,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
     private [$isApplication]: boolean = false;
     private [$isMounted]: boolean = false;
     private [$isRouter]: true = true;
-    private [$appRoot]: Shokupan;
+    private [$appRoot]!: Shokupan<any>;
     public [$mountPath]: string = "/"; // Public via Symbol for OpenAPI generator
 
     private [$parent]: ShokupanRouter<T> | null = null;
@@ -192,9 +192,9 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
                 return next();
             };
             // Preserve metadata if present
-            (wrapped as any).metadata = (middleware as any).metadata;
-            (wrapped as any).isBuiltin = (middleware as any).isBuiltin;
-            (wrapped as any).pluginName = (middleware as any).pluginName;
+            wrapped.metadata = middleware.metadata;
+            wrapped.isBuiltin = middleware.isBuiltin;
+            wrapped.pluginName = middleware.pluginName;
             this.middleware.push(wrapped as Middleware);
         } else {
             this.middleware.push(middleware as Middleware);
@@ -206,12 +206,12 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
 
     // Registry Accessor
     public get registry(): {
-        metadata: RouteMetadata,
-        middleware: { name: string, metadata: RouteMetadata, order: number, _fn: Middleware; }[],
-        routes: { type: 'route', path: string, method: Method, metadata: RouteMetadata, handlerName: string, tags: string[], order: number, _fn: ShokupanHandler<T>; }[],
-        routers: { type: 'router', path: string, metadata: RouteMetadata, children: { routes: any[]; }; }[],
-        controllers: { type: 'controller', path: string, name: string, metadata: RouteMetadata; children: { routes: any[]; }; }[];
-        events: { type: 'event', name: string, handlerName: string, metadata: RouteMetadata; _fn: ShokupanHandler<T>; }[];
+        metadata: RouteMetadata | undefined,
+        middleware: { name: string, metadata: RouteMetadata | undefined, order: number | undefined, _fn: Middleware; }[],
+        routes: { type: 'route', path: string, method: Method, metadata: RouteMetadata | undefined, handlerName: string, tags: string[] | undefined, order: number | undefined, _fn: ShokupanHandler<T>; }[],
+        routers: { type: 'router', path: string, metadata: RouteMetadata | undefined, children: { routes: any[]; }; }[],
+        controllers: { type: 'controller', path: string, name: string, metadata: RouteMetadata | undefined; children: { routes: any[]; }; }[];
+        events: { type: 'event', name: string, handlerName: string, metadata: RouteMetadata | undefined; _fn: ShokupanHandler<T>; }[];
     } {
         // Separation logic: Group routes by controller instance
         const controllerRoutesMap = new Map<any, any[]>();
@@ -262,9 +262,9 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
             const routes = controllerRoutesMap.get(c) || [];
             return {
                 type: 'controller' as 'controller',
-                path: (c as any)[$mountPath] || '/',
+                path: c[$mountPath] || '/',
                 name: c.constructor.name,
-                metadata: (c as any).metadata,
+                metadata: c.metadata,
                 children: { routes }
             };
         });
@@ -277,7 +277,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
                     type: 'event',
                     name,
                     handlerName: h.name,
-                    metadata: (h as any).source ? { file: (h as any).source.file, line: (h as any).source.line } : undefined,
+                    metadata: (h as { source?: { file: string; line: number } }).source ? { file: (h as { source?: { file: string; line: number } }).source!.file, line: (h as { source?: { file: string; line: number } }).source!.line } : undefined,
                     _fn: h
                 });
             });
@@ -348,7 +348,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
         this.mcpProtocol.addTool({
             name,
             inputSchema: schema,
-            handler: handler as any
+            handler: handler as (...args: any[]) => any
         });
         return this;
     }
@@ -360,7 +360,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
         this.mcpProtocol.addPrompt({
             name,
             arguments: args,
-            handler: handler as any
+            handler: handler as (...args: any[]) => any
         });
         return this;
     }
@@ -371,7 +371,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
     public resource(uri: string, options: { name?: string; description?: string; mimeType?: string; }, handler: Function) {
         this.mcpProtocol.addResource({
             uri,
-            handler: handler as any,
+            handler: handler as (...args: any[]) => any,
             ...options
         });
         return this;
@@ -422,7 +422,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
      */
     public mount(prefix: string, controller: ShokupanController | ShokupanController<T> | ShokupanRouter | ShokupanRouter<T> | Record<string, any>) {
         // Check if it's a WebSocket router
-        if (controller && typeof controller === 'object' && (controller as any)[$isWebSocketRouter]) {
+        if (controller && typeof controller === 'object' && (controller as Record<symbol, boolean>)[$isWebSocketRouter]) {
             this.mountWebSocketRouter(prefix, controller);
             return this;
         }
@@ -459,7 +459,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
         if (!wsRouter[$mountPath]) {
             wsRouter[$mountPath] = prefix;
         }
-        (this as any)[$childRouters].push(wsRouter);
+        this[$childRouters].push(wsRouter);
 
         // Use getAllHandlers() and getAllEvents() to include nested routers
         const handlers = wsRouter.getAllHandlers ? wsRouter.getAllHandlers() : wsRouter.getHandlers();
@@ -490,7 +490,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
                     // --- WebSocket Message Tracking ---
                     // Initialize storage
                     // Initialize storage
-                    if (!(ctx as any)[$wsMessages]) (ctx as any)[$wsMessages] = [];
+                    if (!ctx[$wsMessages]) ctx[$wsMessages] = [];
 
                     // Wrap send to capture outbound messages
                     const originalSend = ws.send.bind(ws);
@@ -503,8 +503,8 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
                             data: data,
                             size: size
                         };
-                        (ctx as any)[$wsMessages].push(msg);
-                        if ((ctx as any)[$onWsMessage]) (ctx as any)[$onWsMessage](msg);
+                        ctx[$wsMessages]!.push(msg);
+                        if (ctx[$onWsMessage]) ctx[$onWsMessage](msg);
                         return originalSend(data, compress);
                     };
 
@@ -515,8 +515,8 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
                         timestamp: Date.now(),
                         size: 0
                     };
-                    (ctx as any)[$wsMessages].push(openMsg);
-                    if ((ctx as any)[$onWsMessage]) (ctx as any)[$onWsMessage](openMsg);
+                    ctx[$wsMessages].push(openMsg);
+                    if (ctx[$onWsMessage]) ctx[$onWsMessage](openMsg);
                     // ----------------------------------
                 },
                 message: async (ctx, ws, message: string | ArrayBuffer | Buffer) => {
@@ -534,9 +534,9 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
                         data: message,
                         size: size
                     };
-                    if ((ctx as any)[$wsMessages]) {
-                        (ctx as any)[$wsMessages].push(msg);
-                        if ((ctx as any)[$onWsMessage]) (ctx as any)[$onWsMessage](msg);
+                    if (ctx[$wsMessages]) {
+                        ctx[$wsMessages].push(msg);
+                        if (ctx[$onWsMessage]) ctx[$onWsMessage](msg);
                     }
                     // ----------------------------------
 
@@ -580,9 +580,9 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
                         code,
                         reason
                     };
-                    if ((ctx as any)[$wsMessages]) {
-                        (ctx as any)[$wsMessages].push(closeMsg);
-                        if ((ctx as any)[$onWsMessage]) (ctx as any)[$onWsMessage](closeMsg);
+                    if (ctx[$wsMessages]) {
+                        ctx[$wsMessages].push(closeMsg);
+                        if (ctx[$onWsMessage]) ctx[$onWsMessage](closeMsg);
                     }
                     // ----------------------------------
                 }
@@ -639,7 +639,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
 
                     // --- WebSocket Message Tracking ---
                     // Initialize storage
-                    if (!(ctx as any)[$wsMessages]) (ctx as any)[$wsMessages] = [];
+                    if (!ctx[$wsMessages]) ctx[$wsMessages] = [];
 
                     // Wrap send to capture outbound messages
                     const originalSend = ws.send.bind(ws);
@@ -652,8 +652,8 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
                             data: data,
                             size: size
                         };
-                        (ctx as any)[$wsMessages].push(msg);
-                        if ((ctx as any)[$onWsMessage]) (ctx as any)[$onWsMessage](msg);
+                        ctx[$wsMessages]!.push(msg);
+                        if (ctx[$onWsMessage]) ctx[$onWsMessage](msg);
                         return originalSend(data, compress);
                     };
 
@@ -664,8 +664,8 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
                         timestamp: Date.now(),
                         size: 0
                     };
-                    (ctx as any)[$wsMessages].push(openMsg);
-                    if ((ctx as any)[$onWsMessage]) (ctx as any)[$onWsMessage](openMsg);
+                    ctx[$wsMessages].push(openMsg);
+                    if (ctx[$onWsMessage]) ctx[$onWsMessage](openMsg);
                     // ----------------------------------
                 },
                 message: async (ctx, ws, message: string | ArrayBuffer | Buffer) => {
@@ -686,9 +686,9 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
                         data: message,
                         size: size
                     };
-                    if ((ctx as any)[$wsMessages]) {
-                        (ctx as any)[$wsMessages].push(msg);
-                        if ((ctx as any)[$onWsMessage]) (ctx as any)[$onWsMessage](msg);
+                    if (ctx[$wsMessages]) {
+                        ctx[$wsMessages].push(msg);
+                        if (ctx[$onWsMessage]) ctx[$onWsMessage](msg);
                     }
                     // ----------------------------------
 
@@ -742,9 +742,9 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
                         code,
                         reason
                     };
-                    if ((ctx as any)[$wsMessages]) {
-                        (ctx as any)[$wsMessages].push(closeMsg);
-                        if ((ctx as any)[$onWsMessage]) (ctx as any)[$onWsMessage](closeMsg);
+                    if (ctx[$wsMessages]) {
+                        ctx[$wsMessages].push(closeMsg);
+                        if (ctx[$onWsMessage]) ctx[$onWsMessage](closeMsg);
                     }
                     // ----------------------------------
                 },
@@ -774,11 +774,11 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
             // Attach Spec metadata
             // We need to retrieve @Spec from the method if it exists
             const proto = Object.getPrototypeOf(instance);
-            const decoratedSpecs = (constructor as any)[$routeSpec] || (proto && (proto as any)[$routeSpec]);
+            const decoratedSpecs = (constructor as Record<symbol, any>)[$routeSpec] || (proto && (proto as Record<symbol, any>)[$routeSpec]);
             if (decoratedSpecs) {
                 const userSpec = decoratedSpecs.get(eh.methodName);
                 if (userSpec) {
-                    (trackingHandler as any).spec = userSpec;
+                    (trackingHandler as { spec?: any }).spec = userSpec;
                 }
             }
 
@@ -817,7 +817,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
                 routes.push({
                     method: route.method as Method,
                     path: fullPath,
-                    handler: route.handler
+                    handler: route.handler as ShokupanHandler<any>
                 });
             }
         }
@@ -835,7 +835,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
         method?: Method;
         headers?: HeadersInit;
         body?: any;
-    } | string): Promise<Response> {
+    } | string): Promise<Response | undefined> {
         const options = typeof arg === "string" ? { path: arg } : arg;
 
         let url = options.path;
@@ -851,7 +851,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
         const req = new ShokupanRequest({
             method: options.method || "GET",
             url,
-            headers: options.headers as any,
+            headers: (options.headers ? new Headers(options.headers) : new Headers()) as Headers,
             body: options.body ? JSON.stringify(options.body) : undefined
         });
 
@@ -884,7 +884,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
         const req = new ShokupanRequest({
             method: (options.method || "GET") as Method,
             url,
-            headers: options.headers as any,
+            headers: (options.headers ? new Headers(options.headers) : new Headers()) as Headers,
             body: options.body && typeof options.body === "object" ? JSON.stringify(options.body) : options.body
         });
 
@@ -946,9 +946,9 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
             this.ensureHooksInitialized();
         }
 
-        const hasStart = this.hookCache.get('onRequestStart')?.length > 0;
-        const hasEnd = this.hookCache.get('onRequestEnd')?.length > 0;
-        const hasError = this.hookCache.get('onError')?.length > 0;
+        const hasStart = (this.hookCache.get('onRequestStart')?.length ?? 0) > 0;
+        const hasEnd = (this.hookCache.get('onRequestEnd')?.length ?? 0) > 0;
+        const hasError = (this.hookCache.get('onError')?.length ?? 0) > 0;
 
         if (!hasStart && !hasEnd && !hasError) return handler;
 
@@ -962,8 +962,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
             let previousNode: string | undefined;
 
             if (debug) {
-                // @ts-ignore
-                debugId = originalHandler._debugId || originalHandler.name || 'handler';
+                debugId = (originalHandler as { _debugId?: string })._debugId || originalHandler.name || 'handler';
                 previousNode = debug.getCurrentNode();
                 debug.trackEdge(previousNode, debugId);
                 debug.setNode(debugId!);
@@ -986,7 +985,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
             }
         };
         // Preserve original handler reference for analysis if needed
-        (wrapped as any).originalHandler = (originalHandler as any).originalHandler ?? originalHandler;
+        wrapped.originalHandler = originalHandler.originalHandler ?? originalHandler;
         return wrapped;
     }
 
@@ -1046,9 +1045,9 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
         };
 
         // Copy metadata
-        (wrapped as any).originalHandler = (handler as any).originalHandler || handler;
-        (wrapped as any).metadata = (handler as any).metadata;
-        (wrapped as any)._route = (handler as any)._route;
+        wrapped.originalHandler = handler.originalHandler || handler;
+        wrapped.metadata = handler.metadata;
+        (wrapped as { _route?: ShokupanRoute })._route = (handler as { _route?: ShokupanRoute })._route;
 
         // Cache it
         this.wrappedHandlers.set(handler, wrapped);
@@ -1070,9 +1069,9 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
         // 1. Check local routes
         let result = this.trie.search(method, path);
         if (result) {
-            const route = (result.handler as any)._route;
+            const route = (result.handler as { _route?: ShokupanRoute })._route;
             // Wrap with router middleware if present (except for root application, which handles it globally)
-            if (!(this as any)[$isApplication]) {
+            if (!this[$isApplication]) {
                 result.handler = this.wrapHandlerWithMiddleware(result.handler);
             }
             return { ...result, route };
@@ -1082,8 +1081,8 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
         if (method === "HEAD") {
             result = this.trie.search("GET", path);
             if (result) {
-                const route = (result.handler as any)._route;
-                if (!(this as any)[$isApplication]) {
+                const route = (result.handler as { _route?: ShokupanRoute })._route;
+                if (!this[$isApplication]) {
                     result.handler = this.wrapHandlerWithMiddleware(result.handler);
                 }
                 return { ...result, route };
@@ -1209,7 +1208,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
             wrappedHandler = async (ctx: ShokupanContext<T>) => {
                 // 1. Timeout
                 if (effectiveTimeout && effectiveTimeout > 0 && ctx.server) {
-                    ctx.server.timeout(ctx.req as unknown as Request, effectiveTimeout / 1000);
+                    ctx.server.timeout(ctx.req as Request, effectiveTimeout / 1000);
                 }
 
                 // 2. Renderer
@@ -1251,7 +1250,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
                 // 4. Handler
                 return originalHandler(ctx);
             };
-            (wrappedHandler as any).originalHandler = (handler as any).originalHandler || handler;
+            wrappedHandler.originalHandler = handler.originalHandler || handler;
         }
 
         // --- Middleware Tracking Logic ---
@@ -1262,8 +1261,8 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
             file,
             line,
             name: handler.name || 'anonymous',
-            isBuiltin: (handler as any).isBuiltin,
-            pluginName: (handler as any).pluginName
+            isBuiltin: handler.isBuiltin,
+            pluginName: handler.pluginName
         });
 
         // Bake in Hooks if present (Optimization)
@@ -1273,16 +1272,16 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
         }
 
         // Store for OpenAPI (still use list)
-        const route = {
+        const route: ShokupanRoute = {
             method,
             path,
             regex: regex ?? new RegExp(''),
             keys: keys ?? [],
-            handler,
-            bakedHandler,
+            handler: handler as ShokupanHandler<any>,
+            bakedHandler: bakedHandler as ShokupanHandler<any>,
             handlerSpec: spec,
             group,
-            hooks: this.config?.hooks as any,
+            hooks: this.config?.hooks as ShokupanHooks<T> | undefined,
             requestTimeout,
             renderer,
             metadata: {
@@ -1296,7 +1295,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
         this[$routes].push(route);
 
         // Attach route reference to handler for retrieval in find()
-        (bakedHandler as any)._route = route;
+        (bakedHandler as { _route?: ShokupanRoute })._route = route;
 
         // Insert into Trie
         this.trie.insert(method, path, bakedHandler);
@@ -1310,7 +1309,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
      * @param path - URL path    
      * @param handlers - Route handler functions 
      */
-    public get<Path extends string>(path: Path, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
+    public get<Path extends string>(path: Path, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]): this;
     /**
      * Adds a GET route to the router.
      * 
@@ -1318,8 +1317,8 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public get<Path extends string>(path: Path, spec: MethodAPISpec, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
-    public get(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
+    public get<Path extends string>(path: Path, spec: MethodAPISpec, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]): this;
+    public get(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]): this {
         this.attachVerb("GET", path, ...args);
         return this;
     }
@@ -1330,7 +1329,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
      * @param path - URL path    
      * @param handlers - Route handler functions 
      */
-    public post<Path extends string>(path: Path, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
+    public post<Path extends string>(path: Path, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]): this;
     /**
      * Adds a POST route to the router.
      * 
@@ -1338,8 +1337,8 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public post<Path extends string>(path: Path, spec: MethodAPISpec, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
-    public post(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
+    public post<Path extends string>(path: Path, spec: MethodAPISpec, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]): this;
+    public post(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]): this {
         this.attachVerb("POST", path, ...args);
         return this;
     }
@@ -1350,7 +1349,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
      * @param path - URL path    
      * @param handlers - Route handler functions 
      */
-    public put<Path extends string>(path: Path, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
+    public put<Path extends string>(path: Path, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]): this;
     /**
      * Adds a PUT route to the router.
      * 
@@ -1358,8 +1357,8 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public put<Path extends string>(path: Path, spec: MethodAPISpec, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
-    public put(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
+    public put<Path extends string>(path: Path, spec: MethodAPISpec, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]): this;
+    public put(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]): this {
         this.attachVerb("PUT", path, ...args);
         return this;
     }
@@ -1370,7 +1369,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
      * @param path - URL path    
      * @param handlers - Route handler functions 
      */
-    public delete<Path extends string>(path: Path, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
+    public delete<Path extends string>(path: Path, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]): this;
     /**
      * Adds a DELETE route to the router.
      * 
@@ -1378,8 +1377,8 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public delete<Path extends string>(path: Path, spec: MethodAPISpec, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
-    public delete(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
+    public delete<Path extends string>(path: Path, spec: MethodAPISpec, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]): this;
+    public delete(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]): this {
         this.attachVerb("DELETE", path, ...args);
         return this;
     }
@@ -1390,7 +1389,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
      * @param path - URL path    
      * @param handlers - Route handler functions 
      */
-    public patch<Path extends string>(path: Path, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
+    public patch<Path extends string>(path: Path, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]): this;
     /**
      * Adds a PATCH route to the router.
      * 
@@ -1398,8 +1397,8 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public patch<Path extends string>(path: Path, spec: MethodAPISpec, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
-    public patch(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
+    public patch<Path extends string>(path: Path, spec: MethodAPISpec, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]): this;
+    public patch(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]): this {
         this.attachVerb("PATCH", path, ...args);
         return this;
     }
@@ -1410,7 +1409,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
      * @param path - URL path    
      * @param handlers - Route handler functions 
      */
-    public options<Path extends string>(path: Path, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
+    public options<Path extends string>(path: Path, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]): this;
     /**
      * Adds a OPTIONS route to the router.
      * 
@@ -1418,8 +1417,8 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public options<Path extends string>(path: Path, spec: MethodAPISpec, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
-    public options(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
+    public options<Path extends string>(path: Path, spec: MethodAPISpec, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]): this;
+    public options(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]): this {
         this.attachVerb("OPTIONS", path, ...args);
         return this;
     }
@@ -1430,7 +1429,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
      * @param path - URL path    
      * @param handlers - Route handler functions 
      */
-    public head<Path extends string>(path: Path, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
+    public head<Path extends string>(path: Path, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]): this;
     /**
      * Adds a HEAD route to the router.
      * 
@@ -1438,8 +1437,8 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
      * @param spec - OpenAPI specification for the route
      * @param handlers - Route handler functions 
      */
-    public head<Path extends string>(path: Path, spec: MethodAPISpec, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]);
-    public head(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]) {
+    public head<Path extends string>(path: Path, spec: MethodAPISpec, handler: ShokupanHandler<T, RouteParams<Path>>, ...handlers: ShokupanHandler<T, RouteParams<Path>>[]): this;
+    public head(path: string, ...args: (MethodAPISpec | ShokupanHandler<T>)[]): this {
         this.attachVerb("HEAD", path, ...args);
         return this;
     }
@@ -1475,18 +1474,18 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
         const { regex, keys } = this.parsePath(path);
 
         // Mark handler with a flag to prevent auto-upgrade
-        (handler as any).__isSocketRoute = true;
+        (handler as { __isSocketRoute?: boolean }).__isSocketRoute = true;
 
         const route: ShokupanRoute = {
             method: "GET",
             path,
             regex,
             keys,
-            handler,
-            bakedHandler: handler,
+            handler: handler as ShokupanHandler<any>,
+            bakedHandler: handler as ShokupanHandler<any>,
             handlerSpec: undefined,
             group: undefined,
-            hooks: this.config?.hooks as any,
+            hooks: this.config?.hooks as ShokupanHooks<T> | undefined,
             requestTimeout: this.requestTimeout,
             renderer: this.config?.renderer,
             metadata: getCallerInfo(),
@@ -1497,10 +1496,10 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
         this[$routes].push(route);
 
         // Attach route reference to handler for retrieval in find()
-        (handler as any)._route = route;
+        (handler as { _route?: ShokupanRoute })._route = route;
 
         // Insert into Trie with socket marker
-        this.trie.insert("GET", path, handler);
+        this.trie.insert("GET", path, handler as ShokupanHandler<any>);
 
         return this;
     }
@@ -1519,8 +1518,8 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
      * @param spec - OpenAPI specification for the guard
      * @param handler - Guard handler function 
      */
-    public guard(spec: GuardAPISpec, handler: ShokupanHandler<T>);
-    public guard(specOrHandler: GuardAPISpec | ShokupanHandler<T>, handler?: ShokupanHandler<T>) {
+    public guard(spec: GuardAPISpec, handler: ShokupanHandler<T>): void;
+    public guard(specOrHandler: GuardAPISpec | ShokupanHandler<T>, handler?: ShokupanHandler<T>): this {
         const spec = typeof specOrHandler === "function" ? undefined : specOrHandler as GuardAPISpec;
         const guardHandler = typeof specOrHandler === "function" ? specOrHandler as ShokupanHandler<T> : handler as ShokupanHandler<T>;
 
@@ -1637,7 +1636,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
             // Since handlers are [ctx, next?], they fit Strict Middleware signature.
             // compose takes Middleware[].
             // We assume ALL provided handlers are valid middleware/handlers.
-            const fn = compose(handlers as any);
+            const fn = compose(handlers as Middleware[]);
             finalHandler = (ctx) => fn(ctx);
         }
 
@@ -1686,7 +1685,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
                 const fns: Function[] = [];
                 for (let j = 0; j < hookList.length; j++) {
                     const h = hookList[j];
-                    if (h[type]) fns.push(h[type]!);
+                    if (h && h[type]) fns.push(h[type]!);
                 }
                 if (fns.length > 0) {
                     // console.log(`[Router] Found hook ${type} (${fns.length}) for router ${this.constructor.name}`);
@@ -1751,7 +1750,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
         }
     }
 
-    public async runOnStopHooks(app: Shokupan): Promise<void> {
+    public async runOnStopHooks(app: Shokupan<any>): Promise<void> {
         if (!this.hooksInitialized) {
             this.ensureHooksInitialized();
         }
@@ -1768,12 +1767,12 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
         for (let i = 0; i < this[$childControllers].length; i++) {
             const controller = this[$childControllers][i];
             const proto = Object.getPrototypeOf(controller);
-            const hooksMap = (controller as any)[$controllerHooks] || (proto && (proto as any)[$controllerHooks]);
+            const hooksMap = (controller as unknown as Record<symbol, any>)[$controllerHooks] || (proto && (proto as unknown as Record<symbol, any>)[$controllerHooks]);
 
             if (hooksMap && hooksMap.has('onStop')) {
                 const methods = hooksMap.get('onStop');
                 for (let j = 0; j < methods.length; j++) {
-                    await controller[methods[j]](app);
+                    await (controller as Record<string, any>)[methods[j]](app);
                 }
             }
         }

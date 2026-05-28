@@ -222,7 +222,7 @@ export class Dashboard implements ShokupanPlugin {
         pluginName: 'Dashboard'
     };
 
-    private [$appRoot]: Shokupan;
+    private [$appRoot]!: Shokupan;
 
     private router = new ShokupanRouter({ renderer: async (...args: any[]) => (await getRenderToString())(...args) });
     private metrics: RequestMetrics = {
@@ -246,9 +246,9 @@ export class Dashboard implements ShokupanPlugin {
     private startTime = Date.now();
     private instrumented = false;
     private mountPath = '/dashboard';
-    private metricsCollector: MetricsCollector;
+    private metricsCollector!: MetricsCollector;
     get db() {
-        return this[$appRoot].db;
+        return this[$appRoot].db!;
     }
 
     constructor(private readonly dashboardConfig: DashboardConfig = {}) { }
@@ -955,6 +955,9 @@ export class Dashboard implements ShokupanPlugin {
                                 headers: headers,
                                 body: body.body
                             });
+                            if (!result) {
+                                return ctx.json({ error: 'No response from internal request' }, 500);
+                            }
 
                             this[$appRoot]?.logger?.debug('Dashboard', 'Internal request completed', {
                                 status: result.status,
@@ -1461,7 +1464,7 @@ export class Dashboard implements ShokupanPlugin {
                             hasResponseBody: !!body
                         });
                     } catch (e) {
-                        this[$appRoot].logger?.error('Dashboard', 'Failed to record failed request summary', e);
+                        this[$appRoot].logger?.error('Dashboard', 'Failed to record failed request summary', e as any);
                     }
                 } else {
                     this.metrics.successfulRequests++;

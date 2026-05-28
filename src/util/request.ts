@@ -12,9 +12,9 @@ export type ShokupanRequestProps = {
  * It is used to make requests to the router.
  */
 class ShokupanRequestBase {
-    method: Method;
-    url: string;
-    headers: Headers;
+    method!: Method;
+    url!: string;
+    headers!: Headers;
     body: any;
 
     async json(): Promise<any> { return JSON.parse(this.body); }

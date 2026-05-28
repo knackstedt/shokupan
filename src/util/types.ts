@@ -3,7 +3,7 @@ import type { ShokupanContext } from '../context';
 import type { ServerAdapter } from './adapter';
 import type { FileSystemAdapter } from './adapter/filesystem';
 import type { Logger } from './logger';
-import { $isRouter } from "./symbol";
+import { $isRouter, $mountPath } from "./symbol";
 
 export type HeadersInit = Headers | Record<string, string> | [string, string][];
 
@@ -189,7 +189,7 @@ export interface AsyncAPISpec {
     };
 }
 
-export interface ShokupanHooks<T = any> {
+export interface ShokupanHooks<T extends Record<string, any> = any> {
     onError?: (ctx: ShokupanContext<T>, error: unknown) => void | Promise<void>;
     onRequestStart?: (ctx: ShokupanContext<T>) => void | Promise<void>;
     onRequestEnd?: (ctx: ShokupanContext<T>) => void | Promise<void>;
@@ -332,7 +332,12 @@ export type SSEStreamErrorHandler = (err: Error, stream: SSEStreamHelper) => voi
 export type ShokupanHandler<
     State extends Record<string, any> = Record<string, any>,
     Params extends Record<string, string> = Record<string, string>
-> = ((ctx: ShokupanContext<State, Params>, next?: NextFn) => Promise<any> | any) & { originalHandler?: ShokupanHandler<State, Params>; };
+> = ((ctx: ShokupanContext<State, Params>, next?: NextFn) => Promise<any> | any) & {
+    originalHandler?: ShokupanHandler<State, Params>;
+    metadata?: RouteMetadata;
+    isBuiltin?: boolean;
+    pluginName?: string;
+};
 export const HTTPMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "ALL"];
 export type Method = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "OPTIONS" | "HEAD" | "ALL";
 
@@ -373,6 +378,7 @@ export type Middleware = ((ctx: ShokupanContext<any>, next: NextFn) => Promise<a
     pluginName?: string;
     metadata?: RouteMetadata;
     order?: number;
+    _debugId?: string;
 };
 export type JSXRenderer = (element: any, args?: unknown) => string | Promise<string>;
 
@@ -655,6 +661,12 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      */
     enableAbortController?: boolean;
     /**
+     * Whether to disable automatic body parsing.
+     * When enabled, request bodies will not be parsed automatically.
+     * @default false
+     */
+    disableBodyParsing?: boolean;
+    /**
      * Whether to enable middleware and handler tracking.
      * When enabled, `ctx.handlerStack` will be populated with the handlers the request has passed through.
      * Also, `ctx.state` will be a Proxy that tracks changes made by each handler.
@@ -862,6 +874,8 @@ export interface ProcessResult {
 
 export type ShokupanController<T = any> = (new (...args: any[]) => T) & {
     [$isRouter]?: undefined;
+    [$mountPath]?: string;
+    metadata?: RouteMetadata;
 };
 
 export interface StaticServeHooks<T extends Record<string, any>> {

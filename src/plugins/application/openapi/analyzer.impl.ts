@@ -776,7 +776,7 @@ export class OpenAPIAnalyzer {
         emits?: { event: string; payload?: any; location?: { startLine: number; endLine: number; }; }[];
         highlights?: { startLine: number; endLine: number; type: 'emit' | 'return-success' | 'return-warning'; }[];
     } {
-        this.logger.debug('AST', 'analyzeHandler called', { method, isArrowFunction: ts.isArrowFunction(handler), isFunctionExpression: ts.isFunctionExpression(handler), file: sourceFile.fileName });
+        this.logger?.debug('AST', 'analyzeHandler called', { method, isArrowFunction: ts.isArrowFunction(handler), isFunctionExpression: ts.isFunctionExpression(handler), file: sourceFile.fileName });
         
         // Get TypeChecker for type resolution
         const typeChecker = this.program?.getTypeChecker();
@@ -884,11 +884,11 @@ export class OpenAPIAnalyzer {
         if (ts.isArrowFunction(handler) || ts.isFunctionExpression(handler) || ts.isMethodDeclaration(handler) || handler.kind === 175) {
             // TS method has .body which is FunctionBody (Block) or undefined
             body = (handler as any).body;
-            this.logger.debug('AST', "Handler has observed", { hasBody: !!body, isBlock: ts.isBlock(body) });
+            this.logger?.debug('AST', "Handler has observed", { hasBody: !!body, isBlock: body && ts.isBlock(body) });
 
             // Visit the handler body to find ctx usage
             const visit = (node: ts.Node) => {
-                this.logger.debug('AST', "Visiting node kind", { kind: node.kind, syntaxKind: ts.SyntaxKind[node.kind] });
+                this.logger?.debug('AST', "Visiting node kind", { kind: node.kind, syntaxKind: ts.SyntaxKind[node.kind] });
                 
                 // Track variable declarations
                 if (ts.isVariableDeclaration(node)) {
@@ -1173,10 +1173,10 @@ export class OpenAPIAnalyzer {
                             const objText = expr.expression.expression.getText(sourceFile);
                             const propText = expr.expression.name.getText(sourceFile);
                             
-                            this.logger.debug('AST', 'Found property access', { objText, propText, file: sourceFile.fileName });
+                            this.logger?.debug('AST', 'Found property access', { objText, propText, file: sourceFile.fileName });
 
                             if (((objText === 'ctx' || objText.endsWith('.ctx')) || (objText === 'this' || objText.endsWith('.this'))) && propText === 'emit') {
-                                this.logger.debug('AST', 'FOUND EMIT CALL', { file: sourceFile.fileName });
+                                this.logger?.debug('AST', 'FOUND EMIT CALL', { file: sourceFile.fileName });
                                 if (expr.arguments.length >= 1) {
                                     const eventNameArg = expr.arguments[0];
                                     if (ts.isStringLiteral(eventNameArg)) {
@@ -1216,16 +1216,16 @@ export class OpenAPIAnalyzer {
                 ts.forEachChild(node, visit);
             };
 
-            if (ts.isBlock(body)) {
+            if (body && ts.isBlock(body)) {
                 ts.forEachChild(body, visit);
             } else {
                 // Main handler is an implicit return: app.get('/', (ctx) => ctx.json(...))
-                analyzeReturnExpression(body);
+                analyzeReturnExpression(body as any);
                 // Also verify children (e.g. if body is a CallExpression, verify args??)
                 // analyzeReturnExpression analyzes the expression itself.
                 // But we ALSO want to visit children to find other usages (request types)
                 // or nested arrow functions in a call chain (e.g. chaining .then())
-                ts.forEachChild(body, visit);
+                body && ts.forEachChild(body, visit);
             }
         }
 
@@ -1590,14 +1590,14 @@ export class OpenAPIAnalyzer {
                 const typeRef = typeNode as ts.TypeReferenceNode;
                 const typeName = typeRef.typeName.getText(sourceFile);
 
-                if (typeName === 'Array' && typeRef.typeArguments?.length > 0) {
+                if (typeName === 'Array' && typeRef.typeArguments && typeRef.typeArguments.length > 0) {
                     return {
                         type: 'array',
                         items: this.convertTypeNodeToSchema(typeRef.typeArguments[0], sourceFile)
                     };
                 }
 
-                if (typeName === 'Promise' && typeRef.typeArguments?.length > 0) {
+                if (typeName === 'Promise' && typeRef.typeArguments && typeRef.typeArguments.length > 0) {
                     return this.convertTypeNodeToSchema(typeRef.typeArguments[0], sourceFile);
                 }
 

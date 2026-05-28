@@ -8,7 +8,7 @@ import { $childControllers, $childRouters, $isWebSocketRouter, $mountPath, $rout
 /**
  * WebSocket lifecycle handlers
  */
-export interface WebSocketHandlers<T = any> {
+export interface WebSocketHandlers<T extends Record<string, any> = any> {
     /**
      * Called when HTTP upgrade request is received (before WebSocket connection).
      * Return false to reject the upgrade.
@@ -51,7 +51,7 @@ export interface WebSocketHandlers<T = any> {
 /**
  * Event handler function
  */
-export type EventHandler<T = any> = (ctx: ShokupanContext<T>, data?: any) => void | Promise<void>;
+export type EventHandler<T extends Record<string, any> = any> = (ctx: ShokupanContext<T>, data?: any) => void | Promise<void>;
 
 /**
  * WebSocket Router for organizing WebSocket endpoints.
@@ -78,7 +78,7 @@ export type EventHandler<T = any> = (ctx: ShokupanContext<T>, data?: any) => voi
  * app.mount('/ws', wsRouter);
  * ```
  */
-export class ShokupanWebsocketRouter<T = any> {
+export class ShokupanWebsocketRouter<T extends Record<string, any> = any> {
     private [$isWebSocketRouter]: true = true;
     private handlers: WebSocketHandlers<T> = {};
     public middleware: any[] = [];
@@ -167,7 +167,7 @@ export class ShokupanWebsocketRouter<T = any> {
     public event(name: string, handler: EventHandler<T>): this {
         const info = getCallerInfo(2);
         if (info) {
-            (handler as any).source = {
+            (handler as { source?: { file: string; line: number } }).source = {
                 file: info.file,
                 line: info.line
             };
@@ -269,7 +269,7 @@ export class ShokupanWebsocketRouter<T = any> {
         
         // Mark the child router as mounted
         if (router && typeof router === 'object') {
-            (router as any)[$mountPath] = normalizedPrefix;
+            (router as Record<symbol, string>)[$mountPath] = normalizedPrefix;
         }
         
         this.childRouters.push({ prefix: normalizedPrefix, router });
@@ -315,7 +315,7 @@ export class ShokupanWebsocketRouter<T = any> {
                 type: 'event',
                 name,
                 handlerName: handler.name,
-                metadata: (handler as any).source ? { file: (handler as any).source.file, line: (handler as any).source.line } : undefined,
+                metadata: (handler as { source?: { file: string; line: number } }).source ? { file: (handler as { source?: { file: string; line: number } }).source!.file, line: (handler as { source?: { file: string; line: number } }).source!.line } : undefined,
                 _fn: handler
             });
         });
@@ -462,7 +462,7 @@ export class ShokupanWebsocketRouter<T = any> {
      * Execute onStop hooks recursively.
      * @internal
      */
-    public async runOnStopHooks(app: Shokupan): Promise<void> {
+    public async runOnStopHooks(app: Shokupan<any>): Promise<void> {
         if (this.handlers.onStop) {
             await this.handlers.onStop(app);
         }

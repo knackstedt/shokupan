@@ -13,7 +13,7 @@ export interface SurrealAdapterOptions {
 
 export class SurrealAdapter implements DatastoreAdapter {
     name = 'surrealdb';
-    private db: Surreal;
+    private db!: Surreal;
     private logger = createLogger();
     private options: SurrealAdapterOptions;
 
@@ -117,18 +117,18 @@ export class SurrealAdapter implements DatastoreAdapter {
 
     async create<T>(table: string, id: string, data: T): Promise<T> {
         await this.connect();
-        return this.retry(() => this.db.create(new RecordId(table, id)).content(data as any)) as any;
+        return this.retry(() => this.db.create(new RecordId(table, id)).content(data as {})) as Promise<T>;
     }
 
     async update<T>(table: string, id: string, data: Partial<T>): Promise<T> {
         await this.connect();
-        return this.retry(() => this.db.update(new RecordId(table, id)).merge(data as any)) as any;
+        return this.retry(() => this.db.update(new RecordId(table, id)).merge(data as {})) as Promise<T>;
     }
 
     async upsert<T>(table: string, id: string, data: T): Promise<T> {
         await this.connect();
         // SurrealDB .upsert() replaces content. If we want merge-like upsert behavior we might need logic,
-        return this.retry(() => this.db.upsert(new RecordId(table, id)).content(data as any)) as any;
+        return this.retry(() => this.db.upsert(new RecordId(table, id)).content(data as {})) as Promise<T>;
     }
 
     async delete(table: string, id: string): Promise<void> {
@@ -141,7 +141,7 @@ export class SurrealAdapter implements DatastoreAdapter {
         const q = this.buildQuery(table, query, true);
         const res = await this.db.query<[{ count: number; }]>(q.statement, q.vars);
 
-        const result = res as any; // Cast to inspect
+        const result = res as unknown;
 
         // Defensive coding:
         if (Array.isArray(result) && result.length > 0) {
@@ -181,13 +181,13 @@ export class SurrealAdapter implements DatastoreAdapter {
             let result: any = res;
             if (Array.isArray(res) && res.length > 0) {
                 if (Array.isArray(res[0])) result = res[0];
-                else if ((res[0] as any).result && Array.isArray((res[0] as any).result)) result = (res[0] as any).result;
+                else if ((res[0] as { result?: any }).result && Array.isArray((res[0] as { result?: any }).result)) result = (res[0] as { result?: any }).result;
                 else result = res[0] || [];
             }
 
             return (Array.isArray(result) ? result : []) as T[];
         } catch (e) {
-            this.logger.error('SurrealAdapter', `findMany ${table} failed`, e);
+            this.logger.error('SurrealAdapter', `findMany ${table} failed`, e as Error);
             throw e;
         }
     }

@@ -141,7 +141,7 @@ export class MetricsCollector {
             try {
                 this.collect();
             } catch (e) {
-                this.logger?.error('MetricsCollector', 'Critical error in collect loop', e);
+                this.logger?.error('MetricsCollector', 'Critical error in collect loop', e as any);
             }
         }, 1000); // Check every second for better precision
     }

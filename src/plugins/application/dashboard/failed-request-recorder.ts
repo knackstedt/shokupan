@@ -24,7 +24,7 @@ export function FailedRequestRecorder(options: FailedRequestRecorderOptions = {}
         // Capture stacktrace to identify where this request originated from
         let stackTrace = new Error().stack;
 
-        const lines = stackTrace.split('\n');
+        const lines = (stackTrace ?? '').split('\n');
         let linesToSkip = 0;
         for (let i = 2; i < lines.length; i++) {
             // Should skip node_modules and native Promise messages that don't help anything
@@ -99,7 +99,7 @@ async function recordFailedRequest(ctx: ShokupanContext, error: any, maxCapacity
             // Use random ID since timestamp provides enough uniqueness scope usually
             const id = `${timestamp}-${Math.random().toString(36).slice(2, 8)}`;
 
-            await ctx.app.db.upsert('failed_requests', id, {
+            await ctx.app!.db!.upsert('failed_requests', id, {
                 id,
                 ...data
             });
@@ -123,16 +123,16 @@ async function cleanup(ctx: ShokupanContext, maxCapacity: number, ttl: number) {
     const cutoff = Date.now() - ttl;
 
     // Delete expired
-    await ctx.app.db.deleteMany('failed_requests', {
+    await ctx.app!.db!.deleteMany('failed_requests', {
         lt: { timestamp: cutoff }
     });
 
     // Check capacity
-    const count = await ctx.app.db.count('failed_requests');
+    const count = await ctx.app!.db!.count('failed_requests');
 
     if (count > maxCapacity) {
         const toDelete = count - maxCapacity;
-        await ctx.app.db.deleteMany('failed_requests', {
+        await ctx.app!.db!.deleteMany('failed_requests', {
             sort: { timestamp: 'asc' },
             limit: toDelete
         });

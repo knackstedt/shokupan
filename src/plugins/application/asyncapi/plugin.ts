@@ -115,7 +115,7 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
                     this.broadcastSpecUpdate();
                 }
             } catch (err) {
-                app.logger?.warn('AsyncApiPlugin', 'Could not hook into AST analyzer:', err);
+                app.logger?.warn('AsyncApiPlugin', 'Could not hook into AST analyzer:', err as any);
             }
         }
     }
