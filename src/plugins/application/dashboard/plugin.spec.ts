@@ -38,6 +38,8 @@ describe('Debug Dashboard Plugin', () => {
         expect(data.metrics.failedRequests).toBeGreaterThanOrEqual(0);
         expect(data.metrics.activeRequests).toBeGreaterThanOrEqual(0); // Router hooks cause different counting
         expect(data.uptime).toBeDefined();
+
+        await app.stop();
     });
 
     afterAll(() => {
@@ -88,6 +90,8 @@ describe('Debug Dashboard Plugin', () => {
         expect(urls).not.toContain('/callback-ignored');
         expect(urls).not.toContain('/teapot');
         expect(urls).not.toContain('/delete');
+
+        await app.stop();
     });
 
     it('should disable replay endpoint when configured', async () => {
@@ -101,5 +105,7 @@ describe('Debug Dashboard Plugin', () => {
         const request = tap(server.url.toString());
 
         await request.post('/admin/replay').send({}).expect(404);
+
+        await app.stop();
     });
 });

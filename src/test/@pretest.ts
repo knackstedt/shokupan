@@ -1,4 +1,4 @@
-import { beforeAll } from "bun:test";
+import { afterAll, beforeAll } from "bun:test";
 import { useExpress } from '../plugins/middleware/express';
 import { Shokupan } from '../shokupan';
 
@@ -65,5 +65,14 @@ beforeAll(async () => {
     (global as any).port = server.port;
 
     (global as any).app = app;
+});
+
+afterAll(async () => {
+    const app = (global as any).app as Shokupan | undefined;
+    if (app) {
+        await app.stop();
+        (global as any).app = undefined;
+        (global as any).port = undefined;
+    }
 });
 

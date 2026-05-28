@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -20,6 +20,13 @@ describe('Static Middleware with Fallthrough', () => {
     afterAll(async () => {
         // Cleanup
         await rm(testDir, { recursive: true, force: true });
+    });
+
+    afterEach(async () => {
+        if (app) {
+            await app.stop();
+            app = undefined as any;
+        }
     });
 
     it('should serve existing static files', async () => {
