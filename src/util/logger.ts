@@ -181,7 +181,7 @@ export class ConsoleLogger implements Logger {
         this.palette = THEMES[getTheme()];
     }
 
-    private write(level: string, module: string, msg: string, props: Record<string, any>) {
+    private write(level: string, module: string, msg: string, props?: Record<string, any>) {
         const color = (this.palette as any)[level];
         const timestamp = new Date().toTimeString().slice(0, 8);
         process.stdout.write(`${this.palette.time}${timestamp} ${color}${bold}${level.toUpperCase().padEnd(5)}${reset} ${this.palette.gray}[${this.palette.module}${module}${this.palette.gray}] ${reset}${msg}\n`);
@@ -261,7 +261,7 @@ export function createHTTPLogger(): Middleware {
     };
 
     if (process.env.NODE_ENV === 'production') {
-        return async (ctx, next) => {
+        return async (ctx: any, next: () => any) => {
             const status = ctx.response.status ?? 200;
             const d = performance.now();
             const result = await next();
@@ -288,18 +288,19 @@ export function createHTTPLogger(): Middleware {
         };
     }
 
-    return async (ctx, next) => {
+    return async (ctx: any, next: () => any) => {
         const d = performance.now();
         const result = await next();
 
-        const methodColor = {
-            GET: '\x1b[32m',      // Green
-            POST: '\x1b[36m',     // Cyan
-            PUT: '\x1b[33m',      // Yellow
-            DELETE: '\x1b[31m',   // Red
-            PATCH: '\x1b[35m',    // Magenta
-            default: '\x1b[37m'   // White
-        }[ctx.method] || '\x1b[37m';
+        const methodColorMap = {
+            GET: '\x1b[32m',
+            POST: '\x1b[36m',
+            PUT: '\x1b[33m',
+            DELETE: '\x1b[31m',
+            PATCH: '\x1b[35m',
+            default: '\x1b[37m'
+        };
+        const methodColor = (methodColorMap as Record<string, string>)[ctx.method] || methodColorMap.default;
 
         const status = ctx.response.status ?? 200;
         let statusColor = '\x1b[37m'; // Default white

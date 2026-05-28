@@ -29,7 +29,7 @@ export const compose = (middleware: Middleware[]) => {
             const fn = middleware[i];
 
             if (typeof fn !== 'function') {
-                const name = (fn as any)?.constructor?.name;
+                const name = (fn as Function)?.constructor?.name;
                 context.app?.logger?.error('Middleware', `Item at index ${i} is not a function! It is: ${typeof fn} (${name})`, fn);
                 throw new TypeError(`Middleware at index ${i} must be a function, got ${name}`);
             }
@@ -58,7 +58,7 @@ export const compose = (middleware: Middleware[]) => {
             let debugStart = 0;
 
             if (debug) {
-                debugId = (fn as any)._debugId || fn.name || 'anonymous';
+                debugId = fn._debugId || fn.name || 'anonymous';
                 previousNode = debug.getCurrentNode();
                 debug.trackEdge(previousNode, debugId);
                 debug.setNode(debugId!);

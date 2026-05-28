@@ -32,7 +32,7 @@ export interface GraphQLPluginOptions {
  * Enables serving GraphQL APIs using Apollo Server 4.
  */
 export class GraphQLApolloPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
-    private apolloServer: ApolloServer<any>; // Use generic any or verify type
+    private apolloServer!: ApolloServer<any>; // Use generic any or verify type
 
     constructor(private pluginOptions: GraphQLPluginOptions) {
         super();

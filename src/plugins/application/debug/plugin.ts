@@ -136,7 +136,7 @@ export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
                         this.broadcastSpecUpdate();
                     }
                 } catch (err) {
-                    app.logger?.warn('DebugPlugin', 'Could not hook into AST analyzer:', err);
+                    app.logger?.warn('DebugPlugin', 'Could not hook into AST analyzer:', err as any);
                 }
             }
         }

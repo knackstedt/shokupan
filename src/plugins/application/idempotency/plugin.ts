@@ -40,7 +40,7 @@ export function Idempotency(options: IdempotencyOptions = {}): Middleware {
         }
 
         try {
-            const stored = await ctx.app.db.get<StoredResponse>('idempotency', key);
+            const stored = await ctx.app!.db!.get<StoredResponse>('idempotency', key);
             if (stored) {
                 const responseHeaders = new Headers(stored.headers);
                 responseHeaders.set('X-Idempotency-Hit', 'true');
@@ -51,7 +51,7 @@ export function Idempotency(options: IdempotencyOptions = {}): Middleware {
                 });
             }
         } catch (e) {
-            ctx.app?.logger?.error('Idempotency', 'Read error', e);
+            ctx.app?.logger?.error('Idempotency', 'Read error', e as any);
         }
 
 
@@ -98,9 +98,9 @@ export function Idempotency(options: IdempotencyOptions = {}): Middleware {
             // Fire and forget storage? Or await?
             // Await to ensure persistence before returning to client (safer for "guarantee")
             try {
-                await ctx.app.db.upsert('idempotency', key, toStore);
+                await ctx.app!.db!.upsert('idempotency', key, toStore);
             } catch (e) {
-                ctx.app?.logger?.error('Idempotency', 'Write error', e);
+                ctx.app?.logger?.error('Idempotency', 'Write error', e as any);
             }
 
             return response;

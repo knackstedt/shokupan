@@ -265,7 +265,7 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                 // Use synchronous analyzer (old behavior)
                 const { OpenAPIAnalyzer } = await import('./analyzer');
                 const entrypoint = rootRouter.metadata?.file;
-                const analyzer = new OpenAPIAnalyzer(process.cwd(), this.logger, entrypoint);
+                const analyzer = new OpenAPIAnalyzer(process.cwd(), (rootRouter as any)[$appRoot]?.logger, entrypoint);
                 const analysisResult = await analyzer.analyze();
                 applications = analysisResult.applications;
                 astStatus = 'completed';
@@ -297,7 +297,7 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
             options.warnings.push({
                 type: 'ast-analysis-failed',
                 message: 'AST Analysis failed or skipped',
-                detail: e.message
+                detail: (e as any).message
             });
         }
     }
@@ -648,7 +648,7 @@ export async function generateOpenApi<T extends Record<string, any>>(rootRouter:
                 const existingParams = operation.parameters || [];
                 const mergedParams = [...existingParams];
 
-                pathParams.forEach(p => {
+                pathParams.forEach((p: any) => {
                     const idx = mergedParams.findIndex(ep => ep.in === 'path' && ep.name === p.name);
                     if (idx === -1) {
                         mergedParams.push(p);

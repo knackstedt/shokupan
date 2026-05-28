@@ -1,13 +1,13 @@
 import type { Method, ShokupanHandler } from './types';
 
-export interface RouteMatch<T = any> {
+export interface RouteMatch<T extends Record<string, any> = any> {
     handler: ShokupanHandler<T>;
     params: Record<string, string>;
     // Reference to the baked handler if strictly needed, 
     // but typically we insert the optimal handler (baked) into the trie.
 }
 
-interface Node<T> {
+interface Node<T extends Record<string, any> = any> {
     // Static path segments
     children: Record<string, Node<T>>;
 
@@ -22,13 +22,13 @@ interface Node<T> {
     recursiveChild?: Node<T>;
 
     // Handlers stored at this node
-    handlers?: Record<string, ShokupanHandler<T>>;
+    handlers?: Record<string, ShokupanHandler<T> | undefined>;
 
     // Optional: Keep track of path pattern for debugging
     pathPattern?: string;
 }
 
-export class RouterTrie<T = any> {
+export class RouterTrie<T extends Record<string, any> = any> {
     private root: Node<T>;
 
     constructor() {

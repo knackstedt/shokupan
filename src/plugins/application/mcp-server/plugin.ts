@@ -33,7 +33,8 @@ export interface MCPServerPluginOptions {
  */
 export class MCPServerPlugin implements ShokupanPlugin {
     private router = new ShokupanRouter();
-    private analyzer: OpenAPIAnalyzer;
+    private [$appRoot]!: Shokupan;
+    private analyzer!: OpenAPIAnalyzer;
 
     constructor(private options: MCPServerPluginOptions = {}) {
         options.allowIntrospection ??= true;
@@ -49,7 +50,7 @@ export class MCPServerPlugin implements ShokupanPlugin {
         this[$appRoot] = app;
 
         // Initialize Analyzer
-        this.analyzer = new OpenAPIAnalyzer(this.options.rootDir, app.logger);
+        this.analyzer = new OpenAPIAnalyzer(this.options.rootDir!, app.logger);
 
         // Register Tools
         if (this.options.allowIntrospection) {
@@ -61,7 +62,7 @@ export class MCPServerPlugin implements ShokupanPlugin {
         // Register async startup hook
         app.onStart(async () => {
             // Mount the router
-            app.mount(this.options.path, this.router);
+            app.mount(this.options.path!, this.router);
 
             // Merge App/Router tools into this local router? 
             // The request says "This should also utilize with the previous work we've done".
@@ -214,7 +215,7 @@ export class MCPServerPlugin implements ShokupanPlugin {
                 },
                 required: ["method", "path"]
             },
-            async ({ method, path }) => {
+            async ({ method, path }: any) => {
                 ensureExecutionAllowed();
                 const { applications } = await this.analyzer.analyze();
                 const route = applications.flatMap(app => app.routes)
@@ -245,7 +246,7 @@ export class MCPServerPlugin implements ShokupanPlugin {
                 name: "openapi-spec",
                 mimeType: "application/json"
             },
-            async (uri) => {
+            async (uri: any) => {
                 const { applications } = await this.analyzer.analyze();
                 const endpoints = applications.flatMap(app =>
                     app.routes.map(r => ({
@@ -274,7 +275,7 @@ export class MCPServerPlugin implements ShokupanPlugin {
                 name: "route-source",
                 mimeType: "text/typescript"
             },
-            async (uri) => {
+            async (uri: any) => {
                 // Parse URI manually for now (simplified)
                 // uri: mcp://api/routes/GET/users/source
                 // Format: mcp://api/routes/<METHOD>/<PATH>/source
@@ -298,7 +299,7 @@ export class MCPServerPlugin implements ShokupanPlugin {
                 { name: "method", required: true },
                 { name: "path", required: true }
             ],
-            async ({ method, path }) => {
+            async ({ method, path }: any) => {
                 const { applications } = await this.analyzer.analyze();
                 const route = applications.flatMap(app => app.routes)
                     .find(r => r.method.toUpperCase() === method.toUpperCase() && r.path === path);

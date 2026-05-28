@@ -20,7 +20,7 @@ export interface OpenTelemetryOptions {
 }
 
 export class OpenTelemetryPlugin implements ShokupanPlugin {
-    private api: typeof import("@opentelemetry/api");
+    private api!: typeof import("@opentelemetry/api");
     private sdk: any;
 
     constructor(private options: OpenTelemetryOptions = {}) { }
@@ -86,7 +86,7 @@ export class OpenTelemetryPlugin implements ShokupanPlugin {
  * Wraps a middleware function with an OpenTelemetry span.
  */
 export function traceMiddleware(fn: Middleware, name?: string): Middleware {
-    let api: typeof import("@opentelemetry/api");
+    let api: typeof import("@opentelemetry/api") | undefined;
     try { api = require('@opentelemetry/api'); } catch { }
 
     if (!api) return fn;
@@ -122,7 +122,7 @@ export function traceMiddleware(fn: Middleware, name?: string): Middleware {
  * Wraps a route handler with an OpenTelemetry span.
  */
 export function traceHandler(fn: ShokupanHandler | ((...args: any[]) => any), name: string): ShokupanHandler {
-    let api: typeof import("@opentelemetry/api");
+    let api: typeof import("@opentelemetry/api") | undefined;
     try { api = require('@opentelemetry/api'); } catch { }
 
     if (!api) return fn as ShokupanHandler;

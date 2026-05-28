@@ -92,7 +92,7 @@ export function openApiValidator(): Middleware {
             }
             const valid = validators.body(body);
             if (!valid && validators.body.errors) {
-                errors.push(...validators.body.errors.map(e => ({ ...e, location: 'body' })));
+                errors.push(...validators.body.errors.map((e: any) => ({ ...e, location: 'body' })));
             }
         }
 
@@ -101,7 +101,7 @@ export function openApiValidator(): Middleware {
             const query = Object.fromEntries(new URL(ctx.req.url).searchParams.entries());
             const valid = validators.query(query);
             if (!valid && validators.query.errors) {
-                errors.push(...validators.query.errors.map(e => ({ ...e, location: 'query' })));
+                errors.push(...validators.query.errors.map((e: any) => ({ ...e, location: 'query' })));
             }
         }
 
@@ -113,7 +113,7 @@ export function openApiValidator(): Middleware {
 
             const valid = validators.params(params);
             if (!valid && validators.params.errors) {
-                errors.push(...validators.params.errors.map(e => ({ ...e, location: 'path' })));
+                errors.push(...validators.params.errors.map((e: any) => ({ ...e, location: 'path' })));
             }
         }
 
@@ -124,7 +124,7 @@ export function openApiValidator(): Middleware {
             // Typically headers schema property names are lowercased.
             const valid = validators.headers(headers);
             if (!valid && validators.headers.errors) {
-                errors.push(...validators.headers.errors.map(e => ({ ...e, location: 'header' })));
+                errors.push(...validators.headers.errors.map((e: any) => ({ ...e, location: 'header' })));
             }
         }
 

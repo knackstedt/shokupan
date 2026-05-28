@@ -57,7 +57,7 @@ export class SystemCpuMonitor {
             let type: keyof typeof cpu.times;
             for (type in cpu.times) {
                 const ticks = cpu.times[type];
-                const prevTicks = prev.times[type];
+                const prevTicks = (prev.times as Record<string, number>)[type];
                 const diff = ticks - prevTicks;
                 total += diff;
                 if (type === 'idle') {

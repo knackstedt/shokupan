@@ -87,7 +87,7 @@ export function RateLimitMiddleware(options: RateLimitOptions = {}): Middleware 
 
         if (xForwardedFor && trustedProxies.length > 0) {
             // Parse X-Forwarded-For from right to left (most recent proxy first)
-            const ips = xForwardedFor.split(',').map(ip => ip.trim());
+            const ips = xForwardedFor.split(',').map((ip: string) => ip.trim());
 
             // Get the rightmost IP that is not in trusted proxies
             for (let i = ips.length - 1; i >= 0; i--) {
