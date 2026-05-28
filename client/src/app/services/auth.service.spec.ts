@@ -55,17 +55,9 @@ describe('AuthService', () => {
         service = TestBed.inject(AuthService);
         httpMock.expectOne('/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
 
-        const originalLocation = window.location;
-        Object.defineProperty(window, 'location', {
-            writable: true,
-            value: { href: '' }
-        });
+        spyOn(window, 'open');
         service.login('github');
-        expect(window.location.href).toBe('/auth/github/login');
-        Object.defineProperty(window, 'location', {
-            writable: true,
-            value: originalLocation
-        });
+        expect(window.open).toHaveBeenCalledWith('/auth/github/login', '_self');
     });
 
     it('logout() calls /auth/logout and clears user', async () => {
