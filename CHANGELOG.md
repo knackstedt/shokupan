@@ -1,9 +1,18 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [1.0.0-beta.2](https://github.com/knackstedt/shokupan/compare/v1.0.0-beta.1...v1.0.0-beta.2) (2026-05-28)
+
+
+### Features
+
+* update docs prepping for v1.0 release ([739721e](https://github.com/knackstedt/shokupan/commit/739721e929e25022181f8c794c7ea3ec837322de))
+
+
+### Bug Fixes
+
+* **types:** improve type safety and remove type assertions across codebase ([8bcdea6](https://github.com/knackstedt/shokupan/commit/8bcdea65290c245132b901f5ce69a9aa90920250))
 
 ## [1.0.0-beta.1] - 2026-05-18
 
@@ -114,4 +123,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Decorator-based controllers.
 - Express middleware compatibility.
 - Local HTTPS with auto-generated certificates.
-
