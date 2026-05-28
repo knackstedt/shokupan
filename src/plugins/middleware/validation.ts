@@ -244,7 +244,7 @@ export function validate(config: ValidationConfig): Middleware {
         }
 
         // Call beforeValidate Hook
-        await ctx.app.runHooks('beforeValidate', ctx, dataToValidate);
+        await ctx.app?.runHooks('beforeValidate', ctx, dataToValidate);
 
         // Validate Params
         if (validators.params) {
@@ -305,7 +305,7 @@ export function validate(config: ValidationConfig): Middleware {
         if (config.headers) validatedData.headers = validHeaders;
         if (config.body) validatedData.body = validBody;
 
-        await ctx.app.runHooks('afterValidate', ctx, validatedData);
+        await ctx.app?.runHooks('afterValidate', ctx, validatedData);
 
         return next();
     };

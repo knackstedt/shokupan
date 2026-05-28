@@ -55,14 +55,14 @@ export function attachSocketIOBridge(io: Server, app: Shokupan) {
                     if (app.applicationConfig['websocketErrorHandler']) {
                         await app.applicationConfig['websocketErrorHandler'](e, ctx);
                     } else {
-                        app.logger?.error('Socket.IO', `Error in event ${event}`, e);
+                        app.logger?.error('Socket.IO', `Error in event ${event}`, e as any);
                     }
                 }
             }
         });
 
         // 2. HTTP Bridge
-        if (app.applicationConfig['enableHttpBridge']) {
+        if (app.applicationConfig['enableHTTPBridge']) {
             socket.on("shokupan:request", async (payload: any, callback: any) => {
                 // ... same logic
                 try {
@@ -77,6 +77,7 @@ export function attachSocketIOBridge(io: Server, app: Shokupan) {
                     });
 
                     const res = await app.fetch(req);
+                    if (!res) return;
 
                     let resBody: any = await res.text();
                     try { resBody = JSON.parse(resBody); } catch { }

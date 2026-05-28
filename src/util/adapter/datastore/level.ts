@@ -122,7 +122,7 @@ export class LevelAdapter implements DatastoreAdapter {
     async deleteMany(table: string, query?: QueryOptions): Promise<void> {
         const items = await this.scan(table, query);
         // Batch delete
-        const ops = items.map(item => ({ type: 'del' as const, key: this.getKey(table, (item as any).id || (item as any)._id) }));
+        const ops = items.map(item => ({ type: 'del' as const, key: this.getKey(table, (item as Record<string, any>)['id'] || (item as Record<string, any>)['_id']) }));
         // Wait, we need the ID. 
         // If stored data has ID, good. If not, we need to return keys from scan.
         // Let's make scan return keys?
@@ -219,12 +219,12 @@ export class LevelAdapter implements DatastoreAdapter {
         }
         if (query.lt) {
             for (const [k, v] of Object.entries(query.lt)) {
-                if (!(data[k] < (v as any))) return false;
+                if (!(data[k] < (v as string | number))) return false;
             }
         }
         if (query.gt) {
             for (const [k, v] of Object.entries(query.gt)) {
-                if (!(data[k] > (v as any))) return false;
+                if (!(data[k] > (v as string | number))) return false;
             }
         }
         return true;
@@ -236,8 +236,8 @@ export class LevelAdapter implements DatastoreAdapter {
         if (query.sort) {
             items.sort((a, b) => {
                 for (const [k, dir] of Object.entries(query.sort!)) {
-                    const av = (a.data as any)[k];
-                    const bv = (b.data as any)[k];
+                    const av = (a.data as Record<string, any>)[k];
+                    const bv = (b.data as Record<string, any>)[k];
                     if (av < bv) return dir === 'asc' ? -1 : 1;
                     if (av > bv) return dir === 'asc' ? 1 : -1;
                 }

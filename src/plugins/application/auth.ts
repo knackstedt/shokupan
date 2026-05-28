@@ -175,13 +175,13 @@ export class AuthPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
                     p.clientId,
                     p.teamId!,
                     p.keyId!,
-                    p.privateKey!,
+                    new TextEncoder().encode(p.privateKey!),
                     p.redirectUri
                 );
             case 'auth0':
                 return new Auth0(p.domain!, p.clientId, p.clientSecret, p.redirectUri);
             case 'okta':
-                return new Okta(p.domain!, p.authUrl, p.clientId, p.clientSecret, p.redirectUri);
+                return new Okta(p.domain!, p.authUrl ?? null, p.clientId, p.clientSecret, p.redirectUri);
             case 'oauth2':
                 return new OAuth2Client(p.clientId, p.clientSecret, p.redirectUri);
             default:

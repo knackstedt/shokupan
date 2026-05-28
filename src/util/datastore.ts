@@ -92,7 +92,7 @@ export class SurrealDatastore {
     /**
      * Create a relationship between two records.
      */
-    async relate(fromId, edgeId, toId, data?: Record<string, any>) {
+    async relate(fromId: any, edgeId: any, toId: any, data?: Record<string, any>) {
         return this.db.relate(fromId, edgeId, toId, data).catch((err: any) => {
             if (err.message.includes('This transaction can be retried')) {
                 return this.db.relate(fromId, edgeId, toId, data);

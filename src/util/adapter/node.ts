@@ -16,27 +16,31 @@ export class NodeAdapter implements ServerAdapter {
             const url = new URL(req.url!, `http://${req.headers.host}`);
             const request = new Request(url.toString(), {
                 method: req.method,
-                headers: req.headers as any,
+                headers: req.headers as Record<string, string>,
                 body: ['GET', 'HEAD'].includes(req.method!) ? undefined : new ReadableStream({
                     start(controller) {
                         req.on('data', chunk => controller.enqueue(chunk));
                         req.on('end', () => controller.close());
                         req.on('error', err => controller.error(err));
                     }
-                }) as any,
+                }) as BodyInit,
                 // Required for Node.js undici when sending a body
-                // @ts-ignore
                 duplex: 'half'
-            } as any);
+            } as RequestInit & { duplex: 'half' });
 
             // Create faux server inside handler or borrow from outside
             const response = await app.fetch(request, fauxServer);
+            if (!response) {
+                res.statusCode = 204;
+                res.end();
+                return;
+            }
 
             res.statusCode = response.status;
             response.headers.forEach((v, k) => res.setHeader(k, v));
 
             // Optimized Stream Handling
-            const nodeStream = (response as any).nodeStream;
+            const nodeStream = (response as { nodeStream?: any }).nodeStream;
             if (nodeStream) {
                 if (typeof nodeStream.pipe === 'function') {
                     nodeStream.pipe(res);
@@ -49,7 +53,6 @@ export class NodeAdapter implements ServerAdapter {
 
             if (response.body) {
                 if (response.body instanceof ReadableStream) {
-                    // @ts-ignore - Readable.fromWeb exists in Node 18+
                     const { Readable } = await import('node:stream');
                     Readable.fromWeb(response.body as any).pipe(res);
                 } else {
@@ -77,11 +80,11 @@ export class NodeAdapter implements ServerAdapter {
                 nodeServer.close();
                 return Promise.resolve();
             },
-            upgrade(req, options) {
+            upgrade(req: any, options: any) {
                 return false;
             },
-            reload(options) {
-                return fauxServer as any;
+            reload(options: any) {
+                return fauxServer;
             },
             get port() {
                 const addr = nodeServer.address();
@@ -93,12 +96,11 @@ export class NodeAdapter implements ServerAdapter {
             hostname: app.applicationConfig.hostname || 'localhost',
             development: app.applicationConfig.development || false,
             pendingRequests: 0,
-            requestIP: (req) => null,
+            requestIP: (req: any) => null,
             publish: () => 0,
             subscriberCount: () => 0,
             url: new URL(`http://${app.applicationConfig.hostname || 'localhost'}:${port}`),
             // Expose the raw Node.js server
-            // @ts-ignore
             nodeServer: nodeServer
         } as unknown as Server<any>;
 

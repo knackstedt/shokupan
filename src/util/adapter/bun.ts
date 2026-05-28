@@ -1,5 +1,5 @@
 
-import type { Server } from "bun";
+import type { Server, ServerWebSocket } from "bun";
 import { ShokupanContext } from "../../context";
 import { compose } from "../../middleware";
 import type { Shokupan } from "../../shokupan";
@@ -11,7 +11,6 @@ export class BunAdapter implements ServerAdapter {
     private server?: Server<any>;
 
     async listen(port: number, app: Shokupan, tls?: { key: string; cert: string; }): Promise<Server<any>> {
-        // @ts-ignore
         if (typeof Bun === "undefined") {
             throw new Error("BunAdapter requires the Bun runtime.");
         }
@@ -24,21 +23,18 @@ export class BunAdapter implements ServerAdapter {
             reusePort: app.applicationConfig.reusePort,
             idleTimeout: app.applicationConfig.readTimeout ? app.applicationConfig.readTimeout / 1000 : undefined,
             websocket: {
-                // @ts-ignore
-                open(ws) {
+                open(ws: ServerWebSocket<any>) {
                     ws.data?.handler?.open?.(ws);
                 },
-                // @ts-ignore
-                async message(ws, message) {
+                async message(ws: ServerWebSocket<any>, message: string | ArrayBuffer | Uint8Array) {
                     // Buffer vs Uint8Array handling for cross-platform compatibility
                     let msgString: string = "";
                     if (typeof message === "string") {
                         msgString = message;
                     } else if (message instanceof Uint8Array || message instanceof ArrayBuffer) {
                         msgString = new TextDecoder().decode(message);
-                    } else if (typeof Buffer !== "undefined" && message instanceof Buffer) {
-                        // @ts-ignore
-                        msgString = message.toString();
+                    } else if (typeof Buffer !== "undefined" && Buffer.isBuffer(message)) {
+                        msgString = (message as Buffer).toString();
                     }
 
                     let payload: any;
@@ -52,7 +48,7 @@ export class BunAdapter implements ServerAdapter {
 
                     const self = app;
                     // HTTP Bridge - Check BEFORE custom handler
-                    if (isJSONPayload && self.applicationConfig['enableHttpBridge'] && payload.type === 'HTTP') {
+                    if (isJSONPayload && self.applicationConfig['enableHTTPBridge'] && payload.type === 'HTTP') {
                         // Security: HTTP Bridge allows arbitrary HTTP execution over WebSocket.
                         // In production, require a shared secret in the payload headers.
                         const bridgeSecret = process.env['SHOKUPAN_HTTP_BRIDGE_SECRET'];
@@ -76,6 +72,7 @@ export class BunAdapter implements ServerAdapter {
                         });
 
                         const res = await self.fetch(req);
+                        if (!res) return;
 
                         const resBody: any = await res.json()
                             .catch(err => res.text());
@@ -116,28 +113,26 @@ export class BunAdapter implements ServerAdapter {
                                 });
 
                                 const ctx = new ShokupanContext(
-                                    // @ts-ignore
                                     req,
-                                    // @ts-ignore
-                                    self.server,
+                                    self.server as Server<any>,
                                     {},
                                     self,
-                                    null,
+                                    undefined,
                                     self.applicationConfig.enableMiddlewareTracking,
                                     payload.id
                                 );
                                 // Expose socket on context for reply
-                                (ctx as any)[$ws] = ws;
+                                ctx[$ws] = ws;
 
                                 // Link context to socket for disconnect hooks
-                                ws.data ??= {} as any;
+                                ws.data ??= {} as Record<string, any>;
                                 ws.data['ctx'] = ctx;
 
                                 try {
-                                    await handler(ctx as any);
+                                    await handler(ctx);
                                 } catch (err) {
                                     if (self.applicationConfig['websocketErrorHandler']) {
-                                        await self.applicationConfig['websocketErrorHandler'](err, ctx as any);
+                                        await self.applicationConfig['websocketErrorHandler'](err, ctx);
                                     } else {
                                         app.logger?.error('BunAdapter', `Error in event ${eventName}:`, { error: err });
                                     }
@@ -146,12 +141,10 @@ export class BunAdapter implements ServerAdapter {
                         }
                     }
                 },
-                // @ts-ignore
-                drain(ws) {
+                drain(ws: ServerWebSocket<any>) {
                     ws.data?.handler?.drain?.(ws);
                 },
-                // @ts-ignore
-                close(ws, code, reason) {
+                close(ws: ServerWebSocket<any>, code: number, reason: string) {
                     ws.data?.handler?.close?.(ws, code, reason);
                     // Shokupan Disconnect Hooks
                     const ctx: any = ws.data?.['ctx'];
@@ -168,10 +161,9 @@ export class BunAdapter implements ServerAdapter {
         };
 
         if (tls) {
-            (serveOptions as any).tls = tls;
+            (serveOptions as { tls?: typeof tls }).tls = tls;
         }
 
-        // @ts-ignore
         this.server = Bun.serve(serveOptions);
         return this.server!;
     }

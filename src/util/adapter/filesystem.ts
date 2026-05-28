@@ -11,10 +11,8 @@ let fs: typeof import("node:fs/promises") | undefined;
  */
 export class DefaultFileSystemAdapter implements FileSystemAdapter {
     async readFile(path: string): Promise<Uint8Array | string | ReadableStream> {
-        // @ts-ignore
         if (typeof Bun !== "undefined") {
-            // @ts-ignore
-            return Bun.file(path);
+            return Bun.file(path).stream();
         } else {
             // Dynamic import for Node.js compatibility without top-level import
             fs ??= await import('node:fs/promises');
@@ -23,9 +21,7 @@ export class DefaultFileSystemAdapter implements FileSystemAdapter {
     }
 
     async stat(path: string): Promise<{ size: number; mtime: Date; }> {
-        // @ts-ignore
         if (typeof Bun !== "undefined") {
-            // @ts-ignore
             const file = Bun.file(path);
             return {
                 size: file.size,
