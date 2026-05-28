@@ -53,7 +53,7 @@ export class AuthService {
      * The server handles the full OAuth flow and sets the auth_token cookie.
      */
     login(provider: OAuthProvider): void {
-        window.location.href = `/auth/${provider}/login`;
+        window.open(`/auth/${provider}/login`, '_self');
     }
 
     /**
