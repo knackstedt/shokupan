@@ -29,6 +29,7 @@ describe('VitePlugin', () => {
         await app.register(plugin);
         await app.start();
         expect(plugin).toBeDefined();
+        await app.stop();
     });
 
     it('should serve index.html from explicit outDir in production', async () => {
