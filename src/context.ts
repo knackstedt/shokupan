@@ -575,7 +575,7 @@ export class ShokupanContext<
                 // Inject wrappedHandlers into data.handler for BunAdapter
                 wsOptions = {
                     data: {
-                        ...((options as { data?: any }).data || {}),
+                        ...((options as { data?: any }).data),
                         ctx: this,
                         createdAt: Date.now(),
                         ...this.state,

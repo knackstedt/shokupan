@@ -1228,17 +1228,13 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
                             return Promise.resolve();
                         };
 
-                        try {
-                            const result = await guard.handler(ctx, next);
-                            if (result === true || nextCalled) {
-                                guardPassed = true;
-                            } else if (result !== undefined && result !== null && result !== false) {
-                                return result;
-                            } else {
-                                return ctx.json({ error: 'Forbidden' }, 403);
-                            }
-                        } catch (error) {
-                            throw error;
+                        const result = await guard.handler(ctx, next);
+                        if (result === true || nextCalled) {
+                            guardPassed = true;
+                        } else if (result !== undefined && result !== null && result !== false) {
+                            return result;
+                        } else {
+                            return ctx.json({ error: 'Forbidden' }, 403);
                         }
 
                         if (!guardPassed) {

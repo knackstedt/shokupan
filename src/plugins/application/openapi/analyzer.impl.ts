@@ -735,8 +735,6 @@ export class OpenAPIAnalyzer {
                         metadata.tags = val.elements
                             .filter(e => ts.isStringLiteral(e))
                             .map(e => (e as ts.StringLiteral).text);
-                    } else if (name === 'operationId' && ts.isStringLiteral(val)) {
-                        metadata.operationId = val.text;
                     }
                 }
             }

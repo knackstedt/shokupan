@@ -146,7 +146,7 @@ const StackTrace = ({ frames, focusFrame }: StackTraceProps) => {
         const fileLink = generateEditorLink(frame.file, frame.line, frame.column);
 
         return (
-            <li class={classes}>
+            <li key={frame.file + ':' + frame.line} class={classes}>
                 <a href={fileLink} style="text-decoration:none; color:inherit; display:block">
                     <div class="stack-method">
                         {frame.method === '<anonymous>' ? 'Anonymous' : frame.method}
@@ -207,7 +207,7 @@ const KeyValueTable = ({ data }: KeyValueTableProps) => {
         }
 
         return (
-            <tr>
+            <tr key={k}>
                 <td class="kv-key">{k}</td>
                 <td class={`kv-val ${valClass}`}>{displayVal}</td>
             </tr>
@@ -237,7 +237,7 @@ const ContextData = ({ errorId, errorTimestamp, errorScope, ctx }: ContextDataPr
                 <KeyValueTable data={{
                     id: errorId,
                     timestamp: errorTimestamp,
-                    ...(errorScope || {})
+                    ...errorScope
                 }} />
             </div>
             <div class="data-block">

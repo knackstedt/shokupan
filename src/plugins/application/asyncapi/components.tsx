@@ -286,7 +286,7 @@ export function buildNavTree(spec: any) {
         // Ensure Tag Group Exists
         if (!root.children[tag]) root.children[tag] = { children: {} };
 
-        const parts = name.split(/[\.\/]/);
+        const parts = name.split(/[./]/);
         let current = root.children[tag];
 
         parts.forEach((part, i) => {

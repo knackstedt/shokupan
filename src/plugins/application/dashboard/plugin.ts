@@ -891,6 +891,7 @@ export class Dashboard implements ShokupanPlugin {
                             const res = await fetch(body.url, {
                                 method: body.method,
                                 headers: body.headers,
+                                // oxlint-disable-next-line eslint-plugin-unicorn/no-invalid-fetch-options
                                 body: body.body ? (typeof body.body === 'object' ? JSON.stringify(body.body) : body.body) : undefined
                             });
 
@@ -1032,13 +1033,12 @@ export class Dashboard implements ShokupanPlugin {
             const getRequestHeadersSource = this.dashboardConfig.getRequestHeaders ? this.dashboardConfig.getRequestHeaders.toString() : "undefined";
 
 
-            const ignorePaths = [
+            const ignorePaths =
                 // Add default ignores for integrations
-                ...Object.values(integrations).filter(p => !!p && p !== '/' && p.startsWith('/')).flatMap(p => {
+                Object.values(integrations).filter(p => !!p && p !== '/' && p.startsWith('/')).flatMap(p => {
                     const clean = p!.endsWith('/') ? p!.slice(0, -1) : p!;
                     return [clean, `${clean}/**`];
-                })
-            ];
+                });
 
             try {
                 await loadJsxComponent();
