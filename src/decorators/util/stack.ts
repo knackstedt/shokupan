@@ -27,11 +27,11 @@ export function getCallerInfo(skipFrames = 1): { file: string; line: number; } {
             if (l.includes('bun:main')) continue;
             if (l.includes('bun:wrap')) continue;
             // Ignore framework internals by basename (works when packaged too)
-            if (/[\/\\]stack\.(ts|js|mjs|cts|cjs)/.test(l)) continue; // Ignore self
-            if (/[\/\\]router\.(ts|js|mjs|cts|cjs)/.test(l)) continue; // Ignore router internals
-            if (/[\/\\]http\.(ts|js|mjs|cts|cjs)/.test(l)) continue; // Ignore decorators
-            if (/[\/\\]shokupan\.(ts|js|mjs|cts|cjs)/.test(l)) continue; // Ignore framework internals
-            if (/[\/\\]openapi\.(ts|js|mjs|cts|cjs)/.test(l)) continue; // Ignore openapi internals
+            if (/[/\\]stack\.(ts|js|mjs|cts|cjs)/.test(l)) continue; // Ignore self
+            if (/[/\\]router\.(ts|js|mjs|cts|cjs)/.test(l)) continue; // Ignore router internals
+            if (/[/\\]http\.(ts|js|mjs|cts|cjs)/.test(l)) continue; // Ignore decorators
+            if (/[/\\]shokupan\.(ts|js|mjs|cts|cjs)/.test(l)) continue; // Ignore framework internals
+            if (/[/\\]openapi\.(ts|js|mjs|cts|cjs)/.test(l)) continue; // Ignore openapi internals
 
             found++;
             if (found >= skipFrames) {

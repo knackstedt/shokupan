@@ -1022,11 +1022,12 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
                 if (span) span.setStatus({ code: 2 }); // Error
 
                 // Check for registered error handlers
+                let currentErr = err;
                 for (let i = 0; i < this.errorHandlers.length; i++) {
                     const { type, handler } = this.errorHandlers[i];
-                    if (err instanceof type) {
+                    if (currentErr instanceof type) {
                         try {
-                            const result = await handler(err, ctx);
+                            const result = await handler(currentErr, ctx);
                             // Response Start Hook - About to send response
                             if (this.hasOnResponseStartHook) await this.runHooks('onResponseStart', ctx, result);
                             return result;
@@ -1034,30 +1035,29 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
                             // If the error handler itself fails, fall through to default handling
                             // but log the new error
                             if (process.env.NODE_ENV !== 'test') this.logger?.error("Shokupan", "Error in error handler:", { error: handlerErr });
-                            err = handlerErr;
+                            currentErr = handlerErr;
                             break; // Avoid infinite loops if handlerErr is same type
                         }
                     }
                 }
-
                 // Extract status from error object (supports both .status and .statusCode)
-                let status = getErrorStatus(err);
+                let status = getErrorStatus(currentErr);
 
                 // Handle JSON Parse errors specifically
-                if (err instanceof SyntaxError && err.message.includes('JSON')) {
+                if (currentErr instanceof SyntaxError && currentErr.message.includes('JSON')) {
                     status = 400;
                 }
 
                 // Mask error details in production
                 const isDev = this.applicationConfig.development !== false;
-                const message = isDev ? (err.message || "Internal Server Error") : "Internal Server Error";
+                const message = isDev ? (currentErr.message || "Internal Server Error") : "Internal Server Error";
 
                 const body: any = { error: message };
-                if (isDev && err.errors) body.errors = err.errors;
-                if (isDev && err.stack) body.stack = err.stack;
+                if (isDev && currentErr.errors) body.errors = currentErr.errors;
+                if (isDev && currentErr.stack) body.stack = currentErr.stack;
 
                 // Error Hook
-                if (this.hasOnErrorHook) await this.runHooks('onError', ctx, err);
+                if (this.hasOnErrorHook) await this.runHooks('onError', ctx, currentErr);
 
                 return ctx.json(body, status);
             }

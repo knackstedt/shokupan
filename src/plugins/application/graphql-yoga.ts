@@ -60,6 +60,7 @@ export class GraphQLYogaPlugin extends ShokupanRouter<any> implements ShokupanPl
                 new Request(ctx.req.url, {
                     method: ctx.req.method,
                     headers: ctx.req.headers as any,
+                    // oxlint-disable-next-line eslint-plugin-unicorn/no-invalid-fetch-options
                     body,
                 }),
                 {

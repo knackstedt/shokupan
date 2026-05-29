@@ -166,6 +166,7 @@ export function Proxy(options: ProxyOptions): Middleware {
         const proxyReq = new Request(url.toString(), {
             method: req.method,
             headers: headers,
+            // oxlint-disable-next-line eslint-plugin-unicorn/no-invalid-fetch-options
             body: req.body,
             // @ts-ignore - duplex is needed for some node/bun versions for streaming bodies
             duplex: "half"

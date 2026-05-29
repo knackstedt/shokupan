@@ -251,7 +251,7 @@ export class MemoryStore extends EventEmitter implements Store {
 function sign(val: string, secret: string) {
     if (typeof val !== 'string') throw new TypeError("Cookie value must be provided as a string.");
     if (typeof secret !== 'string') throw new TypeError("Secret string must be provided.");
-    return val + '.' + createHmac('sha256', secret).update(val).digest('base64').replace(/\=+$/, '');
+    return val + '.' + createHmac('sha256', secret).update(val).digest('base64').replace(/=+$/, '');
 }
 
 function unsign(input: string, secret: string) {
@@ -505,7 +505,7 @@ export function Session(options: SessionOptions): Middleware {
             shouldSave = true;
         } else if (isNew && saveUninitialized) {
             shouldSave = true;
-        } else if (!isNew && resave && isModified) {
+        } else if (!isNew && resave) {
             shouldSave = true;
         }
 

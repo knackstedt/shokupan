@@ -216,7 +216,7 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                     } : undefined;
 
                     const message = {
-                        ...(userSpec?.message || {})
+                        ...userSpec?.message
                     };
                     let inferenceFailed = false;
 

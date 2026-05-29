@@ -1,10 +1,15 @@
 {
     "rules": {
-        "no-console": "error"
+        "no-console": ["error", { "allow": ["warn", "error"] }],
+        "no-unused-vars": "off",
+        "no-wrapper-object-types": "off",
+        "no-this-alias": "off",
+        "prefer-as-const": "off"
     },
     "ignorePatterns": [
         "src/cli/**/*",
         "src/test/**/*",
-        "src/**/*.spec.ts"
+        "src/**/*.spec.ts",
+        "src/plugins/**/static/**/*"
     ]
 }
