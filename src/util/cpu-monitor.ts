@@ -1,4 +1,6 @@
 // import * as os from 'node:os';
+import { isNode } from './env';
+
 type CpuInfo = { times: { user: number; nice: number; sys: number; idle: number; irq: number; }; };
 
 export class SystemCpuMonitor {
@@ -14,7 +16,7 @@ export class SystemCpuMonitor {
     private async init() {
         try {
             // @ts-ignore
-            if (typeof process !== "undefined" && process.versions && process.versions.node) {
+            if (isNode() && process.versions && process.versions.node) {
                 this.osStub = await import('node:os');
             }
         } catch (e) {

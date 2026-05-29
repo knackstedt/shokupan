@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import type { DebugCollector } from "../../../context";
 import { ShokupanRouter } from "../../../router";
 import type { Shokupan } from '../../../shokupan';
+import { getProcess } from '../../../util/env';
 import { getEditorLinkPattern } from '../../../util/ide';
 import { $appRoot, $childRouters, $debug, $mountPath, $onWsMessage, $wsMessages } from "../../../util/symbol";
 import type { ShokupanHooks, ShokupanPlugin } from "../../../util/types";
@@ -1051,7 +1052,7 @@ export class Dashboard implements ShokupanPlugin {
             const html = (await getRenderToString())(DashboardApp({
                 metrics: this.metrics,
                 uptime,
-                rootPath: process.cwd(),
+                rootPath: getProcess()?.cwd() || '',
                 linkPattern,
                 integrations,
                 base: mountPath,

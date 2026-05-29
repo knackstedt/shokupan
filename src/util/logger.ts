@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { getProcess, getProcessEnv } from './env';
 import type { Middleware } from './types';
 
 export interface Logger {
@@ -47,10 +48,13 @@ export class JsonLogger implements Logger {
             ...props
         }) + '\n';
 
-        if (level === 'error' || level === 'fatal') {
-            process.stderr.write(output);
-        } else {
-            process.stdout.write(output);
+        const p = getProcess();
+        if (p) {
+            if (level === 'error' || level === 'fatal') {
+                p.stderr.write(output);
+            } else {
+                p.stdout.write(output);
+            }
         }
     }
 
@@ -98,7 +102,7 @@ function getTheme(): 'light' | 'dark' {
     if (_theme) return _theme;
 
     // 1. COLORFGBG
-    const colorfgbg = process.env['COLORFGBG'];
+    const colorfgbg = getProcessEnv('COLORFGBG');
     if (colorfgbg) {
         const parts = colorfgbg.split(';');
         if (parts.length > 1) {
@@ -111,7 +115,8 @@ function getTheme(): 'light' | 'dark' {
 
     // 2. OSC 11 (Query Background Color)
     // This is best-effort. If we can't do it synchronously and safely, we move on.
-    if (process.stdout.isTTY) {
+    const p = getProcess();
+    if (p?.stdout?.isTTY) {
         try {
             // We use a small shell script to probe OSC 11 and read the response.
             // This is safer than trying to manage raw TTY state in JS synchronously.
@@ -142,7 +147,7 @@ function getTheme(): 'light' | 'dark' {
     }
 
     // 3. AppleInterfaceStyle
-    if (process.platform === 'darwin') {
+    if (p?.platform === 'darwin') {
         try {
             const style = execSync('defaults read -g AppleInterfaceStyle', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
             if (style === 'Dark') return _theme = 'dark';
@@ -153,7 +158,7 @@ function getTheme(): 'light' | 'dark' {
     }
 
     // 4. Linux - GSettings (GNOME/Cinnamon/etc.)
-    else if (process.platform === 'linux') {
+    else if (p?.platform === 'linux') {
         try {
             const style = execSync('gsettings get org.gnome.desktop.interface color-scheme', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim().replace(/'/g, '');
             if (style === 'prefer-dark' || style.includes('dark')) return _theme = 'dark';
@@ -184,7 +189,8 @@ export class ConsoleLogger implements Logger {
     private write(level: string, module: string, msg: string, props?: Record<string, any>) {
         const color = (this.palette as any)[level];
         const timestamp = new Date().toTimeString().slice(0, 8);
-        process.stdout.write(`${this.palette.time}${timestamp} ${color}${bold}${level.toUpperCase().padEnd(5)}${reset} ${this.palette.gray}[${this.palette.module}${module}${this.palette.gray}] ${reset}${msg}\n`);
+        const p = getProcess();
+        p?.stdout?.write(`${this.palette.time}${timestamp} ${color}${bold}${level.toUpperCase().padEnd(5)}${reset} ${this.palette.gray}[${this.palette.module}${module}${this.palette.gray}] ${reset}${msg}\n`);
     }
 
     trace(module: string, msg: string, props?: Record<string, any>) {
@@ -217,7 +223,7 @@ export class ConsoleLogger implements Logger {
  * @param level the minimum level of messages to log
  * @returns logger instance
  */
-export function createLogger(level: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal' = process.env.NODE_ENV == 'test' ? 'warn' : 'info'): Logger {
+export function createLogger(level: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal' = getProcessEnv('NODE_ENV') == 'test' ? 'warn' : 'info'): Logger {
 
     const levelInt = {
         'trace': 1,
@@ -228,7 +234,7 @@ export function createLogger(level: 'trace' | 'debug' | 'info' | 'warn' | 'error
         'fatal': 6
     }[level];
 
-    if (process.env.NODE_ENV === 'production') {
+    if (getProcessEnv('NODE_ENV') === 'production') {
         return new JsonLogger(levelInt);
     }
     return new ConsoleLogger(levelInt);
@@ -260,7 +266,7 @@ export function createHTTPLogger(): Middleware {
         return result;
     };
 
-    if (process.env.NODE_ENV === 'production') {
+    if (getProcessEnv('NODE_ENV') === 'production') {
         return async (ctx: any, next: () => any) => {
             const status = ctx.response.status ?? 200;
             const d = performance.now();

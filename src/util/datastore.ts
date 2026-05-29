@@ -1,11 +1,12 @@
 import { RecordId, Surreal, type RecordIdRange, type Table } from 'surrealdb';
+import { getProcess } from './env';
 
 
 export class SurrealDatastore {
     constructor(
         private readonly db: Surreal
     ) {
-        process.on("exit", async () => {
+        getProcess()?.on("exit", async () => {
             await this.disconnect();
         });
     }

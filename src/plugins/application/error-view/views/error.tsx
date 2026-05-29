@@ -6,6 +6,7 @@ async function getRenderToString() {
     return renderToString;
 }
 import type { ShokupanContext } from '../../../../context';
+import { getProcess } from '../../../../util/env';
 import { escapeHtml } from '../../../../util/html';
 import { generateEditorLink } from '../../../../util/ide';
 import { readSourceContext } from '../util/source-reader';
@@ -426,7 +427,7 @@ const ErrorPage = ({
 
 export async function renderErrorView(ctx: ShokupanContext, error: any, options: { hideCode?: boolean, hideStacktrace?: boolean; } = {}) {
     const frames: StackFrame[] = [];
-    const cwd = process.cwd();
+    const cwd = getProcess()?.cwd() || '';
 
     // Safety check for error object
     const errorName = error?.name || 'Error';

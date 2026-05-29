@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import type { Shokupan } from '../../../shokupan';
 import { asyncContext } from '../../../util/async-hooks';
+import { getProcessEnv } from '../../../util/env';
 import { getErrorStatus } from '../../../util/http-error';
 import type { Middleware, ShokupanPlugin } from '../../../util/types';
 import { applyMonkeyPatch } from './monkeypatch';
@@ -124,7 +125,7 @@ export class ErrorView implements ShokupanPlugin {
                 }
 
                 const status = getErrorStatus(err);
-                const isDev = process.env.NODE_ENV === 'development';
+                const isDev = getProcessEnv('NODE_ENV') === 'development';
 
                 const showDetailedConfig = this.config.developmentErrorView !== false;
                 const showStatusConfig = this.config.productionStatusView !== false;

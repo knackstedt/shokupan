@@ -1,6 +1,7 @@
 import { createHmac, randomUUID, timingSafeEqual } from "crypto";
 import { EventEmitter } from "events";
 import { ShokupanContext } from "../../context";
+import { getProcessEnv } from "../../util/env";
 import type { Middleware } from "../../util/types";
 
 // Symbols used internally by the session Proxy to track dirty state.
@@ -308,7 +309,7 @@ declare module "../../context" {
  */
 export function Session(options: SessionOptions): Middleware {
     const store = options.store || new MemoryStore();
-    if (store instanceof MemoryStore && process.env.NODE_ENV === 'production') {
+    if (store instanceof MemoryStore && getProcessEnv('NODE_ENV') === 'production') {
         console.warn(
             '[Session] MemoryStore is not suitable for production environments. ' +
             'Sessions will be lost on restart and will not scale across instances. ' +

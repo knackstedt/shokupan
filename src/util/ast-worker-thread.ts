@@ -1,4 +1,5 @@
 import { parentPort, workerData } from 'worker_threads';
+import { getProcess } from './env';
 
 /**
  * Worker thread script for AST analysis.
@@ -38,7 +39,7 @@ async function runAnalysis() {
                 name: error.name
             }
         });
-        process.exit(1);
+        getProcess()?.exit(1);
     }
 }
 

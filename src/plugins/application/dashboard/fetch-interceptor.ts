@@ -1,6 +1,7 @@
 import type { IncomingMessage } from 'node:http';
 import { createRequire } from 'node:module';
 import { URL } from 'node:url';
+import { getProcess, getProcessEnv } from '../../../util/env';
 import { createLogger, type Logger } from '../../../util/logger';
 
 const require = createRequire(import.meta.url);
@@ -126,8 +127,8 @@ export class FetchInterceptor {
                 // Assuming standard behavior:
                 // We use process.stderr directly for this static warning since we don't have an instance logger context easily available
                 // and we want to avoid console object.
-                if (process.env.NODE_ENV !== 'test') {
-                    process.stderr.write('[FetchInterceptor] Global fetch is already patched! Cannot capture original.\n');
+                if (getProcessEnv('NODE_ENV') !== 'test') {
+                    getProcess()?.stderr?.write('[FetchInterceptor] Global fetch is already patched! Cannot capture original.\n');
                 }
             } else {
                 FetchInterceptor.originalFetch = global.fetch;
@@ -186,8 +187,8 @@ export class FetchInterceptor {
         FetchInterceptor.originalHttpGet = undefined;
         FetchInterceptor.originalHttpsGet = undefined;
 
-        if (process.env.NODE_ENV !== 'test') {
-            process.stdout.write('[FetchInterceptor] Network layer restored (static).\n');
+        if (getProcessEnv('NODE_ENV') !== 'test') {
+            getProcess()?.stdout?.write('[FetchInterceptor] Network layer restored (static).\n');
         }
     }
 
