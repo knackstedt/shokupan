@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.0.0](https://github.com/knackstedt/shokupan/compare/v1.0.0-beta.2...v1.0.0) (2026-05-29)
+
+
+### Features
+
+* add oxlint lint step to CI ([26e1b0c](https://github.com/knackstedt/shokupan/commit/26e1b0c75e28c703945ed5a0ca579c40188154a5))
+* make release depend on tests ([ae5aa53](https://github.com/knackstedt/shokupan/commit/ae5aa5355e29d512afcfa7d54069b4d5d09a2a7a))
+
+
+### Bug Fixes
+
+* add security hardening for cookie domains, redirects, SSRF, and path traversal ([74d5e9f](https://github.com/knackstedt/shokupan/commit/74d5e9f089641ef648841cc3eda909553247c769))
+* client build ([1071a1d](https://github.com/knackstedt/shokupan/commit/1071a1da2d6378bd0f41fc477b8c99fc5cf4966a))
+* client test failing ([e1dda72](https://github.com/knackstedt/shokupan/commit/e1dda72a74602d8ccaaa0f359f706b7c821b521f))
+* mock window.location ([bb74a66](https://github.com/knackstedt/shokupan/commit/bb74a6678a882644f90c358da1cd6b00f8b959ec))
+
 ## [1.0.0-beta.2](https://github.com/knackstedt/shokupan/compare/v1.0.0-beta.1...v1.0.0-beta.2) (2026-05-28)
 
 
