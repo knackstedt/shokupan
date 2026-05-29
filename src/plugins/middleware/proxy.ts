@@ -141,6 +141,9 @@ export function Proxy(options: ProxyOptions): Middleware {
         if (options.allowedHosts && !options.allowedHosts.includes(url.hostname)) {
             return ctx.text('Proxied hostname not in allowlist', 403);
         }
+        if (!options.allowPrivateIPs && isPrivateIP(url.hostname)) {
+            return ctx.text('Proxied target is a private IP address', 403);
+        }
 
         const headers = new Headers(req.headers);
         if (options.changeOrigin) {

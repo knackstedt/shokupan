@@ -38,13 +38,14 @@ export class MCPServerPlugin implements ShokupanPlugin {
     private analyzer!: OpenAPIAnalyzer;
 
     constructor(private options: MCPServerPluginOptions = {}) {
-        options.allowIntrospection ??= true;
-        options.allowToolExecution ??= true;
-        options.path ??= '/mcp';
-        if (!options.path.startsWith('/')) {
-            options.path = '/' + options.path;
+        this.options = { ...options };
+        this.options.allowIntrospection ??= true;
+        this.options.allowToolExecution ??= true;
+        this.options.path ??= '/mcp';
+        if (!this.options.path.startsWith('/')) {
+            this.options.path = '/' + this.options.path;
         }
-        options.rootDir ??= getProcess()?.cwd() || '.';
+        this.options.rootDir ??= getProcess()?.cwd() || '.';
     }
 
     public onInit(app: Shokupan) {

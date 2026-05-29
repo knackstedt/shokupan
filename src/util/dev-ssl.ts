@@ -1,5 +1,5 @@
+import { execFileSync } from 'child_process';
 import * as forge from 'node-forge';
-import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getProcess } from './env';
@@ -174,11 +174,11 @@ function installCaCertificate(caCertPath: string) {
     try {
         if (getProcess()?.platform === 'win32') {
             logger.info('SSL', 'Attempting to install Local CA to Windows trust store. Please accept any UAC prompts.');
-            execSync(`certutil -addstore -user root "${caCertPath}"`, { stdio: 'ignore' });
+            execFileSync('certutil', ['-addstore', '-user', 'root', caCertPath], { stdio: 'ignore' });
             logger.info('SSL', 'Local CA installed successfully.');
         } else if (getProcess()?.platform === 'darwin') {
             logger.info('SSL', 'Attempting to install Local CA to macOS keychain. Please accept any password prompts.');
-            execSync(`sudo security add-trusted-cert -d -r trustRoot -k "/Library/Keychains/System.keychain" "${caCertPath}"`, { stdio: 'inherit' });
+            execFileSync('sudo', ['security', 'add-trusted-cert', '-d', '-r', 'trustRoot', '-k', '/Library/Keychains/System.keychain', caCertPath], { stdio: 'inherit' });
             logger.info('SSL', 'Local CA installed successfully.');
         } else if (getProcess()?.platform === 'linux') {
             // Very difficult to automate reliably on linux without knowing the distro or browser structure

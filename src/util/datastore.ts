@@ -3,12 +3,15 @@ import { getProcess } from './env';
 
 
 export class SurrealDatastore {
+    private exitHandler?: () => void;
+
     constructor(
         private readonly db: Surreal
     ) {
-        getProcess()?.on("exit", async () => {
-            await this.disconnect();
-        });
+        this.exitHandler = () => {
+            this.disconnect().catch(() => {});
+        };
+        getProcess()?.once("exit", this.exitHandler);
     }
 
     createSchema() {
@@ -104,6 +107,11 @@ export class SurrealDatastore {
 
 
     disconnect() {
+        const p = getProcess();
+        if (this.exitHandler) {
+            p?.removeListener("exit", this.exitHandler);
+            this.exitHandler = undefined;
+        }
         return this.db.close();
     }
 }

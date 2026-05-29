@@ -8,6 +8,7 @@ export class SqliteAdapter implements DatastoreAdapter {
     private db!: Database;
     private logger = createLogger();
     private tables = new Set<string>();
+    private exitHandler?: () => void;
 
     constructor(
         private options: { filename?: string; } = {}
@@ -20,13 +21,24 @@ export class SqliteAdapter implements DatastoreAdapter {
         }
         const { Database } = await import('bun:sqlite');
         this.db = new Database(this.options.filename || ':memory:');
-        p?.on("exit", async () => {
+
+        if (this.exitHandler) {
+            p?.removeListener("exit", this.exitHandler);
+        }
+
+        this.exitHandler = () => {
             if (this.db) this.db.close();
-        });
+        };
+        p?.on("exit", this.exitHandler);
     }
 
     async disconnect(): Promise<void> {
         if (this.db) this.db.close();
+        const p = getProcess();
+        if (this.exitHandler) {
+            p?.removeListener("exit", this.exitHandler);
+            this.exitHandler = undefined;
+        }
     }
 
     async setupSchema(): Promise<void> {

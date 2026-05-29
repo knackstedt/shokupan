@@ -380,6 +380,9 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
             this.middleware.push(this.applicationConfig.enableMiddlewareTracking ? wrapped : middleware);
         }
 
+        // Invalidate composed middleware cache so the next request picks up the new middleware
+        this.composedMiddleware = undefined;
+
         return this;
     }
 
@@ -839,6 +842,10 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
                     // Start body parsing early for applicable HTTP methods to overlap with route lookup
                     let bodyParsing: Promise<void> | undefined;
                     if (req.method !== 'GET' && req.method !== 'HEAD') {
+                        // Security: reject chunked requests that bypass Content-Length size checks
+                        if (req.headers.get('transfer-encoding')?.includes('chunked') && !this.applicationConfig.allowChunkedBody) {
+                            throw Object.assign(new Error("Chunked Transfer-Encoding Not Allowed"), { status: 411 });
+                        }
                         // For POST/PUT/PATCH/DELETE, start parsing
                         bodyParsing = ctx.parseBody();
                     }
@@ -1053,7 +1060,7 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
                 }
 
                 // Mask error details in production
-                const isDev = this.applicationConfig.development !== false;
+                const isDev = this.applicationConfig.development === true;
                 const message = isDev ? (currentErr.message || "Internal Server Error") : "Internal Server Error";
 
                 const body: any = { error: message };

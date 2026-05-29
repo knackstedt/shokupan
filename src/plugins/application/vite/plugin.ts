@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import type { InlineConfig, ViteDevServer } from 'vite';
 import type { Shokupan } from '../../../shokupan';
+import { getProcess } from '../../../util/env';
 import { NotFoundError } from '../../../util/http-error';
 import type { ShokupanPlugin } from '../../../util/types';
 import { Proxy } from '../../middleware/proxy';
@@ -84,7 +85,7 @@ export class VitePlugin implements ShokupanPlugin {
 
         let configFile = this.configFile;
         if (!configFile) {
-            const cwd = this.root || process.cwd();
+            const cwd = this.root || getProcess()?.cwd() || '.';
             const candidates = ['vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs'];
             for (let i = 0; i < candidates.length; i++) {
                 const candidate = path.join(cwd, candidates[i]);
@@ -104,10 +105,10 @@ export class VitePlugin implements ShokupanPlugin {
             const loaded = await loadConfigFromFile({ command: 'serve', mode: 'development' }, configFile, this.root);
 
             if (!loaded) {
-                return { configFile, outDir: path.resolve(process.cwd(), 'dist') };
+                return { configFile, outDir: path.resolve(getProcess()?.cwd() || '.', 'dist') };
             }
 
-            const root = loaded.config.root || process.cwd();
+            const root = loaded.config.root || getProcess()?.cwd() || '.';
             const outDir = loaded.config.build?.outDir || 'dist';
             return { configFile, outDir: path.resolve(root, outDir) };
         } catch (err: any) {
@@ -186,7 +187,7 @@ export class VitePlugin implements ShokupanPlugin {
         const fs = await import('node:fs');
         const path = await import('node:path');
 
-        const outDir = this.outDir || viteConfig?.outDir || path.resolve(process.cwd(), 'dist');
+        const outDir = this.outDir || viteConfig?.outDir || path.resolve(getProcess()?.cwd() || '.', 'dist');
 
         if (!fs.existsSync(outDir)) {
             app.logger?.warn('VitePlugin', `Production build directory not found: ${outDir}. Run your Vite build first.`);
@@ -197,6 +198,13 @@ export class VitePlugin implements ShokupanPlugin {
         const serveStatic = async (ctx: any) => {
             const subPath = new URL(ctx.request.url).pathname.replace(this.mountPath, '') || '/';
             let filePath = join(outDir, subPath);
+
+            // Security: prevent path traversal outside outDir
+            const resolvedFile = path.resolve(filePath);
+            const resolvedOutDir = path.resolve(outDir);
+            if (!resolvedFile.startsWith(resolvedOutDir + path.sep) && resolvedFile !== resolvedOutDir) {
+                return ctx.text('Forbidden', 403);
+            }
 
             if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
                 filePath = join(outDir, 'index.html');
@@ -236,6 +244,11 @@ export class VitePlugin implements ShokupanPlugin {
                 // Try to serve an explicit static file if the path has a known extension
                 if (ext && staticExts.has(ext)) {
                     const filePath = join(outDir, pathname);
+                    const resolvedFile = path.resolve(filePath);
+                    const resolvedOutDir = path.resolve(outDir);
+                    if (!resolvedFile.startsWith(resolvedOutDir + path.sep) && resolvedFile !== resolvedOutDir) {
+                        throw err;
+                    }
                     if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
                         const file = Bun.file(filePath);
                         return new Response(file, {

@@ -734,6 +734,13 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
      * @default 10485760 (10MB)
      */
     maxBodySize?: number;
+    /**
+     * Whether to allow chunked transfer-encoding request bodies.
+     * When false (default), chunked requests are rejected to prevent
+     * size-limit bypasses since Content-Length is absent.
+     * @default false
+     */
+    allowChunkedBody?: boolean;
 
     /**
      * Timeout for processing the request (milliseconds).

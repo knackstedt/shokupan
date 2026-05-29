@@ -37,6 +37,9 @@ function isValidCookieDomain(domain: string, currentHost: string): boolean {
     // Check if domain is a parent domain (starts with .)
     if (domain.startsWith('.')) {
         const domainWithoutDot = domain.slice(1);
+        // Security: reject overly broad domains (TLDs, public suffixes)
+        // A valid parent domain must contain at least one dot (e.g. .example.com)
+        if (!domainWithoutDot.includes('.')) return false;
         // Current host must end with the domain
         return hostWithoutPort.endsWith(domainWithoutDot);
     }
@@ -210,10 +213,7 @@ export class ShokupanContext<
 
     private [$requestId]: string;
     get requestId() {
-        if (!this[$requestId]) {
-            this[$requestId] = this.app?.applicationConfig?.idGenerator?.() ?? nanoid();
-        }
-        return this[$requestId];
+        return this[$requestId] ??= (this.app?.applicationConfig?.idGenerator?.() ?? nanoid());
     }
 
     [
@@ -575,7 +575,7 @@ export class ShokupanContext<
                 // Inject wrappedHandlers into data.handler for BunAdapter
                 wsOptions = {
                     data: {
-                        ...((options as { data?: any }).data),
+                        ...((options as { data?: any }).data || {}),
                         ctx: this,
                         createdAt: Date.now(),
                         ...this.state,
@@ -971,8 +971,11 @@ export class ShokupanContext<
 
         // Block dangerous pseudo-protocols
         const lowerUrl = targetUrl.toLowerCase();
-        if (lowerUrl.startsWith('javascript:') || lowerUrl.startsWith('data:') || lowerUrl.startsWith('vbscript:')) {
-            throw new Error(`Invalid redirect: Unsafe protocol '${targetUrl.split(':')[0]}'`);
+        const blockedProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'ftp:', 'chrome-extension:', 'moz-extension:', 'ms-appx:', 'blob:'];
+        for (const proto of blockedProtocols) {
+            if (lowerUrl.startsWith(proto)) {
+                throw new Error(`Invalid redirect: Unsafe protocol '${targetUrl.split(':')[0]}'`);
+            }
         }
 
         finalHeaders.set('Location', targetUrl);

@@ -252,26 +252,28 @@ export class MemoryStore extends EventEmitter implements Store {
 function sign(val: string, secret: string) {
     if (typeof val !== 'string') throw new TypeError("Cookie value must be provided as a string.");
     if (typeof secret !== 'string') throw new TypeError("Secret string must be provided.");
-    return val + '.' + createHmac('sha256', secret).update(val).digest('base64').replace(/=+$/, '');
+    // Security: use HMAC-SHA256 so the signature length is fixed regardless of input length,
+    // enabling safe constant-time comparison without padding tricks.
+    const sig = createHmac('sha256', secret).update(val).digest('base64').replace(/=+$/, '');
+    return val + '.' + sig;
 }
 
 function unsign(input: string, secret: string) {
     if (typeof input !== 'string') throw new TypeError("Signed cookie string must be provided.");
     if (typeof secret !== 'string') throw new TypeError("Secret string must be provided.");
-    const tentValue = input.slice(0, input.lastIndexOf('.'));
+    const lastDot = input.lastIndexOf('.');
+    if (lastDot === -1) return false;
+    const tentValue = input.slice(0, lastDot);
     const expectedInput = sign(tentValue, secret);
 
-    // Security: Use constant-time comparison with padding to prevent timing attacks
-    // Pad both buffers to the same length to avoid length-based timing leaks
-    const maxLength = Math.max(expectedInput.length, input.length);
-    const paddedExpected = Buffer.alloc(maxLength);
-    const paddedInput = Buffer.alloc(maxLength);
-
-    Buffer.from(expectedInput).copy(paddedExpected);
-    Buffer.from(input).copy(paddedInput);
+    // Security: timingSafeEqual requires equal-length buffers.
+    // Because HMAC-SHA256 produces a fixed-length digest, both strings are always the same length.
+    const expectedBuf = Buffer.from(expectedInput);
+    const inputBuf = Buffer.from(input);
+    if (expectedBuf.length !== inputBuf.length) return false;
 
     try {
-        const valid = timingSafeEqual(paddedExpected, paddedInput);
+        const valid = timingSafeEqual(expectedBuf, inputBuf);
         return valid ? tentValue : false;
     } catch {
         return false;
