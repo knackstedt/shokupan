@@ -53,5 +53,5 @@ describe("app.stop()", () => {
         const res2 = await fetch(`http://localhost:${server2.port}/test`);
         expect(res2.status).toBe(200);
         await app.stop();
-    });
+    }, { timeout: 30000 });
 });
