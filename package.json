@@ -32,6 +32,7 @@
         "docs": "cd docs && bun run dev",
         "build": "vite build",
         "bench": "cd benchmarking && bun runner.ts",
+        "lint": "oxlint src/",
         "bench:advanced": "cd benchmarking && bun advanced-runner.ts",
         "retag": "VERSION=$(jq -r '.version' package.json) && git push origin :refs/tags/v${VERSION} 2>/dev/null || true && git tag -d v${VERSION} 2>/dev/null || true && git tag v${VERSION} && git push origin v${VERSION} --force"
     },
@@ -179,6 +180,7 @@
         "jose": "^6.1.3",
         "js-yaml": "^4.1.1",
         "memory-level": "^3.1.0",
+        "oxlint": "^0.15.0",
         "parse-json": "^8.3.0",
         "playwright": "^1.60.0",
         "preact": "^10.28.2",
