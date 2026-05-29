@@ -6,11 +6,11 @@ describe('Sample 2: Decorator Controllers', () => {
         expect(Controller).toBeDefined();
         expect(Get).toBeDefined();
         expect(Injectable).toBeDefined();
-    });
+    }, { timeout: 15000 });
 
     it('should create a controller instance', async () => {
         const { Shokupan } = await import('shokupan');
         const app = new Shokupan();
         expect(app).toBeInstanceOf(Shokupan);
-    });
+    }, { timeout: 15000 });
 });

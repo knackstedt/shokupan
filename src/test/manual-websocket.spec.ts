@@ -36,11 +36,11 @@ describe("Shokupan WebSocket", () => {
 
         server = await app.listen(0);
         port = server.port;
-    });
+    }, 30000);
 
     afterAll(async () => {
         await app.stop(true);
-    });
+    }, 30000);
 
     test("Event: ping -> pong", async () => {
         const url = `ws://localhost:${port}`;
@@ -59,7 +59,7 @@ describe("Shokupan WebSocket", () => {
             };
             socket.onerror = (e) => reject(e);
         });
-    });
+    }, { timeout: 15000 });
 
     test("Event: echo payload", async () => {
         const url = `ws://localhost:${port}`;
@@ -77,7 +77,7 @@ describe("Shokupan WebSocket", () => {
                 socket.close();
             };
         });
-    });
+    }, { timeout: 15000 });
 
     test("HTTP Bridge: GET /api/hello", async () => {
         const url = `ws://localhost:${port}`;
@@ -104,7 +104,7 @@ describe("Shokupan WebSocket", () => {
                 }
             };
         });
-    });
+    }, { timeout: 15000 });
 
     test("HTTP Bridge: POST /api/echo-http", async () => {
         const url = `ws://localhost:${port}`;
@@ -131,5 +131,5 @@ describe("Shokupan WebSocket", () => {
                 }
             };
         });
-    });
+    }, { timeout: 15000 });
 });

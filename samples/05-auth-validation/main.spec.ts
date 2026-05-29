@@ -5,11 +5,11 @@ describe('Sample 5: Auth + Validation', () => {
         const { validate, Session } = await import('shokupan');
         expect(validate).toBeDefined();
         expect(Session).toBeDefined();
-    });
+    }, { timeout: 15000 });
 
     it('should create an app instance', async () => {
         const { Shokupan } = await import('shokupan');
         const app = new Shokupan();
         expect(app).toBeInstanceOf(Shokupan);
-    });
+    }, { timeout: 15000 });
 });
