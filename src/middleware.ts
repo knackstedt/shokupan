@@ -2,6 +2,10 @@ import type { ShokupanContext } from "./context";
 import { $debug } from './util/symbol';
 import type { Middleware, NextFn } from './util/types';
 
+// Backpressure guard for middleware tracking DB writes
+let pendingTrackingWrites = 0;
+const MAX_PENDING_TRACKING_WRITES = 100;
+
 /**
  * Composes a list of middleware into a single function.
  * This is the onion model (Koa-style).
@@ -75,30 +79,35 @@ export const compose = (middleware: Middleware[]) => {
                     const stackItem = context.handlerStack[context.handlerStack.length - 1];
                     if (stackItem) stackItem.duration = duration;
 
-                    Promise.resolve().then(async () => {
-                        try {
-                            const db = context.app?.db;
-                            if (!db) return;
+                    if (pendingTrackingWrites < MAX_PENDING_TRACKING_WRITES) {
+                        pendingTrackingWrites++;
+                        Promise.resolve().then(async () => {
+                            try {
+                                const db = context.app?.db;
+                                if (!db) return;
 
-                            const timestamp = Date.now();
-                            const id = `${timestamp}:${meta.name}`;
+                                const timestamp = Date.now();
+                                const id = `${timestamp}:${meta.name}`;
 
-                            await db.upsert('middleware_tracking', id, {
-                                id,
-                                name: meta.name,
-                                path: context.path,
-                                timestamp,
-                                duration,
-                                file: meta.file,
-                                line: meta.line,
-                                error: undefined,
-                                metadata: {
-                                    isBuiltin: meta.isBuiltin,
-                                    pluginName: meta.pluginName
-                                }
-                            });
-                        } catch (e) { }
-                    });
+                                await db.upsert('middleware_tracking', id, {
+                                    id,
+                                    name: meta.name,
+                                    path: context.path,
+                                    timestamp,
+                                    duration,
+                                    file: meta.file,
+                                    line: meta.line,
+                                    error: undefined,
+                                    metadata: {
+                                        isBuiltin: meta.isBuiltin,
+                                        pluginName: meta.pluginName
+                                    }
+                                });
+                            } catch (e) { } finally {
+                                pendingTrackingWrites--;
+                            }
+                        });
+                    }
                 }
 
                 // --- Debug Success ---
@@ -115,29 +124,34 @@ export const compose = (middleware: Middleware[]) => {
                     const stackItem = context.handlerStack[context.handlerStack.length - 1];
                     if (stackItem) stackItem.duration = duration;
 
-                    Promise.resolve().then(async () => {
-                        try {
-                            const db = context.app?.db;
-                            if (!db) return;
+                    if (pendingTrackingWrites < MAX_PENDING_TRACKING_WRITES) {
+                        pendingTrackingWrites++;
+                        Promise.resolve().then(async () => {
+                            try {
+                                const db = context.app?.db;
+                                if (!db) return;
 
-                            const timestamp = Date.now();
-                            const id = `${timestamp}:${meta.name}`;
+                                const timestamp = Date.now();
+                                const id = `${timestamp}:${meta.name}`;
 
-                            await db.upsert('middleware_tracking', id, {
-                                name: meta.name,
-                                path: context.path,
-                                timestamp,
-                                duration,
-                                file: meta.file,
-                                line: meta.line,
-                                error: String(err),
-                                metadata: {
-                                    isBuiltin: meta.isBuiltin,
-                                    pluginName: meta.pluginName
-                                }
-                            });
-                        } catch (e) { }
-                    });
+                                await db.upsert('middleware_tracking', id, {
+                                    name: meta.name,
+                                    path: context.path,
+                                    timestamp,
+                                    duration,
+                                    file: meta.file,
+                                    line: meta.line,
+                                    error: String(err),
+                                    metadata: {
+                                        isBuiltin: meta.isBuiltin,
+                                        pluginName: meta.pluginName
+                                    }
+                                });
+                            } catch (e) { } finally {
+                                pendingTrackingWrites--;
+                            }
+                        });
+                    }
                 }
 
                 // --- Debug Error ---

@@ -105,32 +105,42 @@ export class ASTAnalyzerWorker extends EventEmitter {
         this.emit('started');
         this.emit('progress', 'Starting AST analysis...');
 
-        const timeoutId = setTimeout(() => {
-            this.state = 'failed';
-            this.error = new Error(`AST analysis timed out after ${this.timeout}ms`);
-            this.emit('failed', this.error);
-        }, this.timeout);
+        return new Promise<ASTAnalyzerResult>((resolve, reject) => {
+            const timeoutId = setTimeout(() => {
+                this.state = 'failed';
+                this.error = new Error(`AST analysis timed out after ${this.timeout}ms`);
+                this.emit('failed', this.error);
+                reject(this.error);
+            }, this.timeout);
 
-        try {
-            this.emit('progress', 'Initializing TypeScript compiler...');
-            const { OpenAPIAnalyzer } = await import('../plugins/application/openapi/analyzer');
-            this.emit('progress', 'Analyzing source files...');
-            const analyzer = new OpenAPIAnalyzer(this.rootDir, undefined, this.entrypoint);
-            const result = await analyzer.analyze();
-            this.emit('progress', 'Analysis complete!');
+            (async () => {
+                try {
+                    this.emit('progress', 'Initializing TypeScript compiler...');
+                    const { OpenAPIAnalyzer } = await import('../plugins/application/openapi/analyzer');
+                    this.emit('progress', 'Analyzing source files...');
+                    const analyzer = new OpenAPIAnalyzer(this.rootDir, undefined, this.entrypoint);
+                    const result = await analyzer.analyze();
 
-            clearTimeout(timeoutId);
-            this.state = 'completed';
-            this.result = result;
-            this.emit('completed', result);
-            return result;
-        } catch (error: any) {
-            clearTimeout(timeoutId);
-            this.state = 'failed';
-            this.error = error;
-            this.emit('failed', error);
-            throw error;
-        }
+                    clearTimeout(timeoutId);
+
+                    if (this.state === 'analyzing') {
+                        this.emit('progress', 'Analysis complete!');
+                        this.state = 'completed';
+                        this.result = result;
+                        this.emit('completed', result);
+                        resolve(result);
+                    }
+                } catch (error: any) {
+                    clearTimeout(timeoutId);
+                    if (this.state === 'analyzing') {
+                        this.state = 'failed';
+                        this.error = error;
+                        this.emit('failed', error);
+                        reject(error);
+                    }
+                }
+            })();
+        });
     }
 
     /**
@@ -157,7 +167,9 @@ export class ASTAnalyzerWorker extends EventEmitter {
         // Bun's worker_threads has stability issues that can cause segfaults.
         // Run analysis inline when in Bun to avoid memory leaks and crashes.
         if (typeof Bun !== 'undefined') {
-            this.analysisPromise = this.runInlineAnalysis();
+            this.analysisPromise = this.runInlineAnalysis().finally(() => {
+                this.analysisPromise = null;
+            });
             return this.analysisPromise;
         }
 
@@ -235,6 +247,8 @@ export class ASTAnalyzerWorker extends EventEmitter {
                     reject(exitError);
                 }
             });
+        }).finally(() => {
+            this.analysisPromise = null;
         });
 
         return this.analysisPromise;

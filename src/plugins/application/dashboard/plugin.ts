@@ -1703,7 +1703,28 @@ export class Dashboard implements ShokupanPlugin {
             if (blockedProtocols.includes(urlObj.protocol)) {
                 return { error: 'Invalid protocol' };
             }
-            const hostname = urlObj.hostname;
+            const hostname = urlObj.hostname.replace(/^\[|\]$/g, '');
+
+            // Security: block numeric IP representations that bypass naive string checks
+            // e.g. 0x7f000001, 0177.0.0.1, 2130706433 (decimal)
+            const isNumericIP = /^\d+$/.test(hostname) || /^0x[0-9a-fA-F]+$/.test(hostname) || /^0\d+\.\d+\.\d+\.\d+$/.test(hostname);
+            if (isNumericIP) {
+                return { error: 'Numeric IP addresses are not allowed' };
+            }
+
+            // Security: block IPv6 loopback and private addresses
+            const ipv6PrivatePatterns = [
+                /^::1$/i,
+                /^::ffff:127\./i,
+                /^fe80:/i,
+                /^fc00:/i,
+                /^fd00:/i
+            ];
+            for (const pattern of ipv6PrivatePatterns) {
+                if (pattern.test(hostname)) {
+                    return { error: 'Cannot replay to internal addresses' };
+                }
+            }
 
             // Check custom allowlist first
             if (allowedReplayHosts) {
