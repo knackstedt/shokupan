@@ -12,7 +12,10 @@ describe('ShokupanServer Lifecycle', () => {
 
     it('should start and listen on a port', async () => {
         app = new Shokupan({
-            port: 0 // Random port
+            port: 0, // Random port
+            development: false,
+            enableOpenApiGen: false,
+            enableAsyncApiGen: false
         });
 
         app.get('/ping', (ctx) => ctx.text('pong'));
@@ -36,7 +39,12 @@ describe('ShokupanServer Lifecycle', () => {
     });
 
     it('should allow start() separate from listen()', async () => {
-        const app2 = new Shokupan({ port: 0 });
+        const app2 = new Shokupan({ 
+            port: 0,
+            development: false,
+            enableOpenApiGen: false,
+            enableAsyncApiGen: false
+        });
         let hookRun = false;
         app2.onStart(() => { hookRun = true; });
 

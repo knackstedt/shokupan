@@ -210,7 +210,10 @@ export class ShokupanContext<
 
     private [$requestId]: string;
     get requestId() {
-        return this[$requestId] ??= (this.app?.applicationConfig?.idGenerator?.() ?? nanoid());
+        if (!this[$requestId]) {
+            this[$requestId] = this.app?.applicationConfig?.idGenerator?.() ?? nanoid();
+        }
+        return this[$requestId];
     }
 
     [

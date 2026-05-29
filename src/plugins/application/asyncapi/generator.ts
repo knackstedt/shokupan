@@ -108,7 +108,7 @@ export async function generateAsyncApi<T extends Record<string, any>>(rootRouter
                 // Use synchronous analyzer (old behavior)
                 const { OpenAPIAnalyzer } = await import('../openapi/analyzer');
                 const entrypoint = (globalThis as any).Bun?.main || require.main?.filename || process.argv[1];
-                const analyzer = new OpenAPIAnalyzer(process.cwd(), entrypoint);
+                const analyzer = new OpenAPIAnalyzer(process.cwd(), undefined, entrypoint);
                 const analysisResult = await analyzer.analyze();
                 applications = analysisResult.applications;
                 astStatus = 'completed';

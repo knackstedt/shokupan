@@ -50,7 +50,7 @@ describe("Security: Static File & Input Validation", () => {
 
         test("should allow legitimate file access", async () => {
             const app = new Shokupan();
-            app.get("/static/*", serveStatic({ root: "./src/test" }, "/static"));
+            app.get("/static/*", serveStatic({ root: "./src/test/security" }, "/static"));
 
             const res = await app.testRequest({
                 path: "/static/static-file-security.spec.ts"

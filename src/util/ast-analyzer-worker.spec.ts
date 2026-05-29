@@ -9,7 +9,10 @@ describe('ASTAnalyzerWorker', () => {
 
     beforeEach(async () => {
         // Reset global analyzer before each test
-        resetGlobalAnalyzer();
+        await resetGlobalAnalyzer();
+
+        // Small delay to allow Bun to fully clean up worker threads
+        await new Promise(r => setTimeout(r, 50));
 
         // Create temp directory for each test
         tempDir = await mkdtemp(join(tmpdir(), 'ast-test-'));
@@ -62,7 +65,7 @@ describe('ASTAnalyzerWorker', () => {
             expect(analyzer.getState()).toBe('failed');
         }
 
-        analyzer.terminate();
+        await analyzer.terminate();
     }, 10000); // Increased timeout for AST analysis
 
     it('should return cached result on subsequent calls', async () => {
@@ -79,7 +82,7 @@ describe('ASTAnalyzerWorker', () => {
             expect(analyzer.getState()).toBe('failed');
         }
 
-        analyzer.terminate();
+        await analyzer.terminate();
     }, 10000);
 
     it('should use global singleton analyzer', () => {
@@ -97,15 +100,15 @@ describe('ASTAnalyzerWorker', () => {
             await analyzer.analyze();
         } catch (err) {
             // Should timeout
-            expect(err.message).toContain('timed out');
+            expect((err as Error).message).toContain('timed out');
         }
 
-        analyzer.terminate();
+        await analyzer.terminate();
     }, 5000);
 
     // Cleanup after each test
     afterEach(async () => {
-        resetGlobalAnalyzer();
+        await resetGlobalAnalyzer();
 
         try {
             await rm(tempDir, { recursive: true, force: true });

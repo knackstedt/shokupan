@@ -24,7 +24,7 @@ describe("Shokupan WebSocket", () => {
 
     beforeAll(async () => {
         app = new Shokupan({
-            enableHttpBridge: true
+            enableHTTPBridge: true
         });
 
         // Register controller

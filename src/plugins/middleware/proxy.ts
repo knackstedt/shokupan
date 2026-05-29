@@ -103,8 +103,7 @@ export function Proxy(options: ProxyOptions): Middleware {
                 upgradeHeaders["Sec-WebSocket-Protocol"] = protocol;
             }
 
-            const success = ctx.upgrade({
-                headers: upgradeHeaders,
+            const upgradeOptions: any = {
                 data: {
                     handler: {
                         open: (ws: ServerWebSocket) => handleWSOpen(ws, ctx, options, targetUrl),
@@ -113,7 +112,12 @@ export function Proxy(options: ProxyOptions): Middleware {
                         drain: (ws: ServerWebSocket) => handleWSDrain(ws)
                     }
                 }
-            });
+            };
+            if (Object.keys(upgradeHeaders).length > 0) {
+                upgradeOptions.headers = upgradeHeaders;
+            }
+
+            const success = ctx.upgrade(upgradeOptions);
 
             if (success) {
                 // Return undefined to stop the middleware chain, as the connection is upgraded

@@ -62,6 +62,13 @@ export class VitePlugin implements ShokupanPlugin {
         if (options?.path) this.mountPath = options.path;
 
         const isDev = app.applicationConfig.development;
+
+        // In production, if outDir is explicitly provided, we don't need to resolve vite config
+        if (!isDev && this.outDir) {
+            await this.initProd(app, { configFile: this.configFile || '', outDir: this.outDir });
+            return;
+        }
+
         const viteConfig = await this.resolveViteConfig();
 
         if (isDev) {
@@ -77,7 +84,7 @@ export class VitePlugin implements ShokupanPlugin {
 
         let configFile = this.configFile;
         if (!configFile) {
-            const cwd = process.cwd();
+            const cwd = this.root || process.cwd();
             const candidates = ['vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs'];
             for (let i = 0; i < candidates.length; i++) {
                 const candidate = path.join(cwd, candidates[i]);
