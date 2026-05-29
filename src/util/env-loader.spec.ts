@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { promises as fs } from 'node:fs';
+import { promises as fs, watch } from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { EnvLoader } from './env-loader';
@@ -13,9 +13,22 @@ class TestEnv extends EnvLoader {
     readonly k8sSecret = '';
 }
 
+async function fsWatchSupported(dir: string): Promise<boolean> {
+    try {
+        const watcher = watch(dir, () => {});
+        watcher.close();
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 describe('EnvLoader', () => {
+    let watchSupported = false;
+
     beforeAll(async () => {
         await fs.mkdir(TEMP_DIR, { recursive: true });
+        watchSupported = await fsWatchSupported(TEMP_DIR);
     });
 
     afterAll(async () => {
@@ -53,6 +66,11 @@ describe('EnvLoader', () => {
     });
 
     it('should react to file changes with fs watcher', async () => {
+        if (!watchSupported) {
+            console.log('Skipping fs.watch test: environment does not support file watchers');
+            return;
+        }
+
         const secretPath = path.join(TEMP_DIR, 'WATCH_SECRET');
         await fs.writeFile(secretPath, 'initial');
 
@@ -78,6 +96,11 @@ describe('EnvLoader', () => {
     });
 
     it('should auto-update mapped properties on file change if subject is active', async () => {
+        if (!watchSupported) {
+            console.log('Skipping fs.watch test: environment does not support file watchers');
+            return;
+        }
+
         const secretPath = path.join(TEMP_DIR, 'AUTO_UPDATE');
         await fs.writeFile(secretPath, 'initial');
 
@@ -119,6 +142,11 @@ describe('EnvLoader', () => {
     });
 
     it('should load and watch config maps', async () => {
+        if (!watchSupported) {
+            console.log('Skipping fs.watch test: environment does not support file watchers');
+            return;
+        }
+
         const configPath = path.join(TEMP_DIR, 'CONFIG_MAP');
         await fs.writeFile(configPath, 'initial_config');
 

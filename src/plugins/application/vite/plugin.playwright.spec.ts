@@ -1,11 +1,24 @@
-import { describe, expect, it, beforeAll, afterAll } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { Shokupan } from '../../../shokupan';
 import { VitePlugin } from './plugin';
 
+let browserAvailable = false;
+try {
+    await chromium.launch({ headless: true });
+    browserAvailable = true;
+} catch {
+    // Browser not installed, skip Playwright tests
+}
+
 describe('VitePlugin Playwright E2E', () => {
+    if (!browserAvailable) {
+        it.skip('Playwright browser not installed', () => {});
+        return;
+    }
+
     let tmpDir: string;
     let app: Shokupan;
     let serverPort: number;

@@ -25,10 +25,13 @@ describe('VitePlugin', () => {
 
     it('should register without crashing when no vite config exists', async () => {
         const app = new Shokupan({ development: true });
-        const plugin = new VitePlugin();
+        const plugin = new VitePlugin({ root: tmpDir });
         await app.register(plugin);
         await app.start();
         expect(plugin).toBeDefined();
+        if ((plugin as any).viteServer) {
+            await (plugin as any).viteServer.close();
+        }
         await app.stop();
     });
 

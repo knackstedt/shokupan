@@ -98,6 +98,40 @@ export class ASTAnalyzerWorker extends EventEmitter {
         return Date.now() - this.startTime;
     }
 
+    private async runInlineAnalysis(): Promise<ASTAnalyzerResult> {
+        this.state = 'analyzing';
+        this.startTime = Date.now();
+        this.emit('started');
+        this.emit('progress', 'Starting AST analysis...');
+
+        const timeoutId = setTimeout(() => {
+            this.state = 'failed';
+            this.error = new Error(`AST analysis timed out after ${this.timeout}ms`);
+            this.emit('failed', this.error);
+        }, this.timeout);
+
+        try {
+            this.emit('progress', 'Initializing TypeScript compiler...');
+            const { OpenAPIAnalyzer } = await import('../plugins/application/openapi/analyzer');
+            this.emit('progress', 'Analyzing source files...');
+            const analyzer = new OpenAPIAnalyzer(this.rootDir, undefined, this.entrypoint);
+            const result = await analyzer.analyze();
+            this.emit('progress', 'Analysis complete!');
+
+            clearTimeout(timeoutId);
+            this.state = 'completed';
+            this.result = result;
+            this.emit('completed', result);
+            return result;
+        } catch (error: any) {
+            clearTimeout(timeoutId);
+            this.state = 'failed';
+            this.error = error;
+            this.emit('failed', error);
+            throw error;
+        }
+    }
+
     /**
      * Start AST analysis in a worker thread.
      * Returns immediately and emits events as analysis progresses.
@@ -117,6 +151,13 @@ export class ASTAnalyzerWorker extends EventEmitter {
         if (this.state === 'failed') {
             this.state = 'idle';
             this.error = null;
+        }
+
+        // Bun's worker_threads has stability issues that can cause segfaults.
+        // Run analysis inline when in Bun to avoid memory leaks and crashes.
+        if (typeof Bun !== 'undefined') {
+            this.analysisPromise = this.runInlineAnalysis();
+            return this.analysisPromise;
         }
 
         this.analysisPromise = new Promise<ASTAnalyzerResult>((resolve, reject) => {
@@ -183,8 +224,9 @@ export class ASTAnalyzerWorker extends EventEmitter {
 
             // Handle worker exit
             this.worker.on('exit', (code) => {
+                clearTimeout(timeoutId);
+                this.worker = null;
                 if (code !== 0 && this.state === 'analyzing') {
-                    clearTimeout(timeoutId);
                     const exitError = new Error(`Worker exited with code ${code}`);
                     this.state = 'failed';
                     this.error = exitError;
@@ -220,9 +262,9 @@ export class ASTAnalyzerWorker extends EventEmitter {
     /**
      * Terminate the worker thread if running.
      */
-    public terminate(): void {
+    public async terminate(): Promise<void> {
         if (this.worker) {
-            this.worker.terminate();
+            await this.worker.terminate();
             this.worker = null;
         }
         if (this.state === 'analyzing') {
@@ -252,9 +294,9 @@ export function getGlobalAnalyzer(rootDir?: string, entrypoint?: string, timeout
 /**
  * Reset the global analyzer instance (useful for testing).
  */
-export function resetGlobalAnalyzer(): void {
+export async function resetGlobalAnalyzer(): Promise<void> {
     if (globalAnalyzer) {
-        globalAnalyzer.terminate();
+        await globalAnalyzer.terminate();
         globalAnalyzer = null;
     }
 }

@@ -3,6 +3,8 @@ import { FetchInterceptor } from "../../plugins/application/dashboard/fetch-inte
 
 describe("Security: FetchInterceptor Cleanup", () => {
     test("clears __isPatched flag after restore", () => {
+        const realFetch = global.fetch;
+
         FetchInterceptor.restore();
         (FetchInterceptor as any).originalFetch = undefined;
 
@@ -26,5 +28,8 @@ describe("Security: FetchInterceptor Cleanup", () => {
 
         interceptor2.unpatch();
         FetchInterceptor.restore();
+
+        // Restore the real global.fetch to prevent leaking the mock to other tests
+        global.fetch = realFetch;
     });
 });

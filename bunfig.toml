@@ -3,7 +3,8 @@
 preload = ["./src/test/@pretest.ts"]
 timeout = 30000                                                            # 30 seconds
 coverageReporter = ["text", "lcov"]
-coveragePathIgnorePatterns = ["dist/**", "node_modules/**", "src/test/**"]
+coveragePathIgnorePatterns = ["dist/**", "client/**", "node_modules/**", "src/test/**"]
+pathIgnorePatterns = ["client/**"]
 
 [install]
 optional = true

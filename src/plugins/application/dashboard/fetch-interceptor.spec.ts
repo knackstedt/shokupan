@@ -1,28 +1,35 @@
 
-import { describe, expect, it, mock } from "bun:test";
+import { afterEach, describe, expect, it, mock } from "bun:test";
 import { FetchInterceptor } from "./fetch-interceptor";
 
 describe("Fetch Interceptor", () => {
+    const realFetch = global.fetch;
+
+    afterEach(() => {
+        // Always restore the real global.fetch to prevent leaking mocks to other tests
+        global.fetch = realFetch;
+    });
+
     it("should intercept fetch calls", async () => {
         FetchInterceptor.restore(); // Clear previous state
         (FetchInterceptor as any).originalFetch = undefined; // Force recapture
-        const originalFetch = mock(async () => new Response("ok"));
-        global.fetch = originalFetch;
+        const testFetch = mock(async () => new Response("ok")) as any;
+        global.fetch = testFetch;
 
         const interceptor = new FetchInterceptor();
         interceptor.patch();
 
         await fetch("http://example.com");
 
-        expect(originalFetch).toHaveBeenCalled();
+        expect(testFetch).toHaveBeenCalled();
         FetchInterceptor.restore();
     });
 
     it("should track outgoing requests", async () => {
         FetchInterceptor.restore();
         (FetchInterceptor as any).originalFetch = undefined;
-        const originalFetch = mock(async () => new Response("ok"));
-        global.fetch = originalFetch;
+        const testFetch = mock(async () => new Response("ok")) as any;
+        global.fetch = testFetch;
 
         const interceptor = new FetchInterceptor();
         interceptor.patch();
@@ -31,7 +38,7 @@ describe("Fetch Interceptor", () => {
 
         // In a real env, we'd check if it logged to DB, but unit test might not have DB setup easily.
         // We verify it wraps fetch without breaking it.
-        expect(originalFetch).toHaveBeenCalled();
+        expect(testFetch).toHaveBeenCalled();
         FetchInterceptor.restore();
     });
 });

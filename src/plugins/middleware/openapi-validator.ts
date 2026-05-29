@@ -8,7 +8,7 @@ async function getAjv() {
         const formatsModule = await import("ajv-formats");
         Ajv = ajvModule.default;
         addFormats = formatsModule.default;
-        ajv = new Ajv({ coerceTypes: false, allErrors: true });
+        ajv = new Ajv({ coerceTypes: true, allErrors: true });
         addFormats(ajv);
     }
     return ajv;

@@ -178,6 +178,14 @@ export class FetchInterceptor {
         if (FetchInterceptor.originalHttpsGet) {
             https.get = FetchInterceptor.originalHttpsGet;
         }
+
+        // Clear static cached originals so future instances can re-capture the true originals
+        FetchInterceptor.originalFetch = undefined;
+        FetchInterceptor.originalHttpRequest = undefined;
+        FetchInterceptor.originalHttpsRequest = undefined;
+        FetchInterceptor.originalHttpGet = undefined;
+        FetchInterceptor.originalHttpsGet = undefined;
+
         if (process.env.NODE_ENV !== 'test') {
             process.stdout.write('[FetchInterceptor] Network layer restored (static).\n');
         }

@@ -10,14 +10,28 @@ describe("Idempotency Plugin", async () => {
     app.use(Idempotency());
     await app.dbPromise;
 
+    // Create a mock datastore since app.db is undefined without datastore config
+    (app as any).datastore = {
+        get: async (table: string, id: string) => {
+            if (table !== 'idempotency') return null;
+            return (store[id] || null);
+        },
+        upsert: async (table: string, id: string, value: any) => {
+            if (table === 'idempotency') {
+                store[id] = value;
+            }
+            return {};
+        }
+    };
+
     beforeAll(() => {
         // Mock datastore methods
-        getSpy = spyOn(app.db, 'get').mockImplementation(async (table, id) => {
+        getSpy = spyOn(app.db!, 'get').mockImplementation(async (table, id) => {
             if (table !== 'idempotency') return null as any;
             return (store[id] || null) as any;
         });
 
-        setSpy = spyOn(app.db, 'upsert').mockImplementation(async (table, id, value) => {
+        setSpy = spyOn(app.db!, 'upsert').mockImplementation(async (table, id, value) => {
             if (table === 'idempotency') {
                 store[id] = value;
             }
