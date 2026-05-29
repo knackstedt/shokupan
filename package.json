@@ -1,6 +1,6 @@
 {
     "name": "shokupan",
-    "version": "1.0.0-beta.2",
+    "version": "1.0.0",
     "description": "Shokupan is a low-lift modern web framework for Bun.",
     "author": "Andrew G. Knackstedt",
     "publishConfig": {
