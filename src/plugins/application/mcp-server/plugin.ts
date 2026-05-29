@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { ShokupanRouter } from "../../../router";
 import type { Shokupan } from '../../../shokupan';
+import { getProcess } from "../../../util/env";
 import type { McpSession } from "../../../util/mcp-protocol";
 import { $appRoot, $childRouters } from "../../../util/symbol";
 import type { ShokupanPlugin } from "../../../util/types";
@@ -43,7 +44,7 @@ export class MCPServerPlugin implements ShokupanPlugin {
         if (!options.path.startsWith('/')) {
             options.path = '/' + options.path;
         }
-        options.rootDir ??= process.cwd();
+        options.rootDir ??= getProcess()?.cwd() || '.';
     }
 
     public onInit(app: Shokupan) {

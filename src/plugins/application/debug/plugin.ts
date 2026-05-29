@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { ShokupanRouter } from '../../../router';
 import type { Shokupan } from '../../../shokupan';
 import { deepMerge } from '../../../util/deep-merge';
+import { getProcess, getProcessEnv } from '../../../util/env';
 import { getEditorLinkPattern } from '../../../util/ide';
 import { $isMounted } from '../../../util/symbol';
 import type { DeepPartial, ShokupanPlugin, ShokupanPluginOptions } from '../../../util/types';
@@ -105,7 +106,7 @@ export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
 
         if (this.pluginOptions.asyncApi?.enabled !== false) {
             const astFileName = app.applicationConfig.astFilePath || 'shokupan-ast.json';
-            const specPath = join(process.cwd(), astFileName);
+            const specPath = join(getProcess()?.cwd() || '.', astFileName);
 
             if (!existsSync(specPath)) {
                 app.applicationConfig.enableAsyncApiGen = true;
@@ -197,7 +198,7 @@ export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
             this.get('/explorer/theme.css', ctx => serveFile(ctx, 'theme.css', 'text/css', 'api-explorer'));
             this.get('/explorer/explorer-client.mjs', ctx => serveFile(ctx, 'explorer-client.mjs', 'application/javascript', 'api-explorer'));
 
-            const isProduction = process.env.NODE_ENV === 'production';
+            const isProduction = getProcessEnv('NODE_ENV') === 'production';
             const sourceViewEnabled = this.pluginOptions.apiExplorer?.enableSourceView ?? !isProduction;
             
             if (sourceViewEnabled) {
@@ -210,7 +211,7 @@ export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
                     if (!file) return ctx.text('Missing file parameter', 400);
 
                     const { resolve } = await import('node:path');
-                    const cwd = process.cwd();
+                    const cwd = getProcess()?.cwd() || '';
                     const resolvedPath = resolve(cwd, file);
 
                     if (!resolvedPath.startsWith(cwd + '/') && resolvedPath !== cwd) {

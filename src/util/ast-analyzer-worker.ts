@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { Worker } from 'worker_threads';
+import { getProcess } from './env';
 
 export type ASTAnalyzerState = 'idle' | 'analyzing' | 'completed' | 'failed';
 
@@ -283,7 +284,7 @@ let globalAnalyzer: ASTAnalyzerWorker | null = null;
 export function getGlobalAnalyzer(rootDir?: string, entrypoint?: string, timeout?: number): ASTAnalyzerWorker {
     if (!globalAnalyzer) {
         globalAnalyzer = new ASTAnalyzerWorker(
-            rootDir || process.cwd(),
+            rootDir || getProcess()?.cwd() || '.',
             entrypoint,
             timeout
         );

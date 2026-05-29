@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { getProcess } from '../../env';
 import { createLogger } from '../../logger';
 import type { DatastoreAdapter, QueryOptions } from '../datastore';
 
@@ -13,12 +14,13 @@ export class SqliteAdapter implements DatastoreAdapter {
     ) { }
 
     async connect(): Promise<void> {
-        if (typeof process !== 'undefined' && process.versions && process.versions.node && !process.versions.bun) {
+        const p = getProcess();
+        if (p && p.versions && p.versions.node && !p.versions.bun) {
             throw new Error("SqliteAdapter uses bun:sqlite and is not supported in Node.js. Please use SurrealAdapter or another datastore for Node.js environments.");
         }
         const { Database } = await import('bun:sqlite');
         this.db = new Database(this.options.filename || ':memory:');
-        process.on("exit", async () => {
+        p?.on("exit", async () => {
             if (this.db) this.db.close();
         });
     }

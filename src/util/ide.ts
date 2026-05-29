@@ -4,6 +4,7 @@
  */
 
 import { execSync } from 'node:child_process';
+import { getProcess, getProcessEnv } from './env';
 
 let configuredIde: string | undefined;
 
@@ -12,7 +13,7 @@ export function configureIde(config: { ide?: string; }) {
 }
 
 function getIdeSetting(): string {
-    return (configuredIde || process.env['IDE'] || 'vscode').toLowerCase();
+    return (configuredIde || getProcessEnv('IDE') || 'vscode').toLowerCase();
 }
 
 function getGitRemote(): string | undefined {
@@ -47,7 +48,8 @@ export function getEditorLinkPattern(): string {
     // Note: Patterns are often used client-side where we can't exec git.
     // Ideally the server resolves the pattern once.
     if (ide === 'autodetect-vscode.dev' || ide === 'autodetect-repo') {
-        const remote = process.env['REPO_URL'] ||= getGitRemote();
+        let remote = getProcessEnv('REPO_URL');
+        if (!remote) remote = getGitRemote();
         if (remote) {
             const baseUrl = getWebBaseUrl(remote);
             if (baseUrl) {
@@ -110,16 +112,17 @@ export function generateEditorLink(filePath: string, line: number = 1, column: n
 
     // Helper for web links
     const resolveWebLink = (forcedMode?: string) => {
-        const remote = process.env['REPO_URL'] ||= getGitRemote();
+        let remote = getProcessEnv('REPO_URL');
+        if (!remote) remote = getGitRemote();
         if (!remote) return null;
 
         const baseUrl = getWebBaseUrl(remote);
         if (!baseUrl) return null;
 
         // Ensure strictly relative path
-        const cwd = process.cwd();
+        const cwd = getProcess()?.cwd() || '';
         const relativePath = filePath.startsWith(cwd) ? filePath.slice(cwd.length + 1) : filePath;
-        const branch = process.env['GIT_BRANCH'] || 'main'; // Could also allow detected branch
+        const branch = getProcessEnv('GIT_BRANCH') || 'main'; // Could also allow detected branch
 
         if (forcedMode === 'vscode.dev') {
             if (baseUrl.includes('github.com')) {
@@ -163,11 +166,11 @@ export function generateEditorLink(filePath: string, line: number = 1, column: n
         const link = resolveWebLink();
         if (link) return link;
 
-        const repoUrl = process.env['REPO_URL'];
+        const repoUrl = getProcessEnv('REPO_URL');
         if (repoUrl) {
-            const cwd = process.cwd();
+            const cwd = getProcess()?.cwd() || '';
             const relativePath = filePath.startsWith(cwd) ? filePath.slice(cwd.length + 1) : filePath;
-            const branch = process.env['GIT_BRANCH'] || 'main';
+            const branch = getProcessEnv('GIT_BRANCH') || 'main';
             const base = repoUrl.endsWith('/') ? repoUrl.slice(0, -1) : repoUrl;
 
             if (ide.includes('github')) return `${base}/blob/${branch}/${relativePath}#L${line}`;

@@ -103,9 +103,43 @@ describe("Centralized Error Handling", () => {
         // Should fall back to default 500
         const res = await app.testRequest({ path: '/handler-error' });
         expect(res.status).toBe(500);
-        // The original error "Trigger" might be lost or obscured by "Error inside handler", 
-        // but our implementation logs the inner error and continues with the NEW error? 
-        // Actually code says: err = handlerErr; break; so it falls through with new error.
         expect(res.data.error).toBe('Error inside handler');
+    });
+
+    it("should cascade to next handler when an error handler throws a different error type", async () => {
+        const app = new Shokupan();
+
+        app.onStrictError(CustomError, (err, ctx) => {
+            throw new AnotherError('Transformed by CustomError handler');
+        });
+
+        app.onStrictError(AnotherError, (err, ctx) => {
+            return ctx.json({ error: 'Caught AnotherError', message: err.message }, 418);
+        });
+
+        app.get('/cascade', () => {
+            throw new CustomError('Trigger');
+        });
+
+        const res = await app.testRequest({ path: '/cascade' });
+        expect(res.status).toBe(418);
+        expect(res.data.error).toBe('Caught AnotherError');
+        expect(res.data.message).toBe('Transformed by CustomError handler');
+    });
+
+    it("should not infinite loop when an error handler throws the same type it handles", async () => {
+        const app = new Shokupan();
+
+        app.onStrictError(CustomError, (err, ctx) => {
+            throw new CustomError('Same type again');
+        });
+
+        app.get('/infinite-loop', () => {
+            throw new CustomError('Trigger');
+        });
+
+        const res = await app.testRequest({ path: '/infinite-loop' });
+        expect(res.status).toBe(500);
+        expect(res.data.error).toBe('Same type again');
     });
 });

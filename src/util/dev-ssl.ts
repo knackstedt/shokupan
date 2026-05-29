@@ -2,6 +2,7 @@ import * as forge from 'node-forge';
 import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { getProcess } from './env';
 import { createLogger } from './logger';
 
 const logger = createLogger();
@@ -19,7 +20,7 @@ const CA_ORG = 'Shokupan Framework';
  * Generates it and attempts to install it to the system trust store if it doesn't.
  * @returns { key: string, cert: string } for TLS options.
  */
-export function ensureLocalSslCertificates(cacheDir = join(process.cwd(), 'node_modules', '.cache', 'shokupan')): TLSCertOptions {
+export function ensureLocalSslCertificates(cacheDir = join(getProcess()?.cwd() || '.', 'node_modules', '.cache', 'shokupan')): TLSCertOptions {
     const keyPath = join(cacheDir, 'dev-key.pem');
     const certPath = join(cacheDir, 'dev-cert.pem');
     const caKeyPath = join(cacheDir, 'ca-key.pem');
@@ -171,15 +172,15 @@ export function ensureLocalSslCertificates(cacheDir = join(process.cwd(), 'node_
 
 function installCaCertificate(caCertPath: string) {
     try {
-        if (process.platform === 'win32') {
+        if (getProcess()?.platform === 'win32') {
             logger.info('SSL', 'Attempting to install Local CA to Windows trust store. Please accept any UAC prompts.');
             execSync(`certutil -addstore -user root "${caCertPath}"`, { stdio: 'ignore' });
             logger.info('SSL', 'Local CA installed successfully.');
-        } else if (process.platform === 'darwin') {
+        } else if (getProcess()?.platform === 'darwin') {
             logger.info('SSL', 'Attempting to install Local CA to macOS keychain. Please accept any password prompts.');
             execSync(`sudo security add-trusted-cert -d -r trustRoot -k "/Library/Keychains/System.keychain" "${caCertPath}"`, { stdio: 'inherit' });
             logger.info('SSL', 'Local CA installed successfully.');
-        } else if (process.platform === 'linux') {
+        } else if (getProcess()?.platform === 'linux') {
             // Very difficult to automate reliably on linux without knowing the distro or browser structure
             logger.warn('SSL', `Automatic CA installation is not robust on Linux. You may need to manually install ${caCertPath} into your browser's trust store or use 'update-ca-certificates'.`);
         }

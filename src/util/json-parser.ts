@@ -1,3 +1,5 @@
+import { getProcess, getProcessEnv } from './env';
+
 /**
  * JSON parser utilities for Shokupan
  * Supports multiple JSON parsing libraries with different performance characteristics
@@ -22,7 +24,7 @@ export function getJSONParser(parserType: 'native' | 'parse-json' | 'secure-json
                     // parse-json exports a default function
                     parseJsonLib = lib.default || lib;
                 } catch (e) {
-                    if (process.env.NODE_ENV !== 'test') process.stderr.write('parse-json not installed, falling back to native JSON.parse. Install with: bun add parse-json\n');
+                    if (getProcessEnv('NODE_ENV') !== 'test') getProcess()?.stderr?.write('parse-json not installed, falling back to native JSON.parse. Install with: bun add parse-json\n');
                     return JSON.parse;
                 }
             }
@@ -34,7 +36,7 @@ export function getJSONParser(parserType: 'native' | 'parse-json' | 'secure-json
                     const lib = require('secure-json-parse');
                     secureJsonParseLib = lib.parse || lib.default?.parse || lib;
                 } catch (e) {
-                    if (process.env.NODE_ENV !== 'test') process.stderr.write('secure-json-parse not installed, falling back to native JSON.parse. Install with: bun add secure-json-parse\n');
+                    if (getProcessEnv('NODE_ENV') !== 'test') getProcess()?.stderr?.write('secure-json-parse not installed, falling back to native JSON.parse. Install with: bun add secure-json-parse\n');
                     return JSON.parse;
                 }
             }

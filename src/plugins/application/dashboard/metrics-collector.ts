@@ -1,6 +1,7 @@
 import * as os from 'node:os';
 import { monitorEventLoopDelay, PerformanceObserver } from 'node:perf_hooks';
 import type { DatastoreAdapter } from '../../../util/adapter/datastore';
+import { getProcess } from '../../../util/env';
 import type { Logger } from '../../../util/logger';
 
 interface AggregatedMetric {
@@ -88,7 +89,7 @@ export class MetricsCollector {
     private gcObserver: PerformanceObserver | null = null;
 
     private timer: NodeJS.Timeout | null = null;
-    private cpuUsageStart = process.cpuUsage();
+    private cpuUsageStart = getProcess()?.cpuUsage?.() || { user: 0, system: 0 };
     private cpuTimeStart = Date.now();
 
     public db?: DatastoreAdapter;
@@ -192,7 +193,7 @@ export class MetricsCollector {
         this.pendingThirdPartyDetails[label] = [];
 
         // CPU Usage Calc since last flush
-        const cpuUsageEnd = process.cpuUsage();
+        const cpuUsageEnd = getProcess()?.cpuUsage?.() || { user: 0, system: 0 };
         const cpuTimeEnd = Date.now();
         const elapsedCpuTime = cpuTimeEnd - this.cpuTimeStart;
         const userUsage = (cpuUsageEnd.user - this.cpuUsageStart.user) / 1000;
@@ -274,10 +275,10 @@ export class MetricsCollector {
             },
             load: os.loadavg(),
             memory: {
-                used: process.memoryUsage().rss,
+                used: getProcess()?.memoryUsage?.().rss || 0,
                 total: os.totalmem(),
-                heapUsed: process.memoryUsage().heapUsed,
-                heapTotal: process.memoryUsage().heapTotal,
+                heapUsed: getProcess()?.memoryUsage?.().heapUsed || 0,
+                heapTotal: getProcess()?.memoryUsage?.().heapTotal || 0,
             },
             eventLoopLatency: eventLoopStats,
             gcLatency: gcStats,

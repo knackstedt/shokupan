@@ -13,6 +13,7 @@ import type { DatastoreAdapter } from './util/adapter/datastore';
 import { DefaultFileSystemAdapter } from './util/adapter/filesystem';
 import { asyncContext, RequestContextStore } from "./util/async-hooks";
 import { SystemCpuMonitor } from "./util/cpu-monitor";
+import { getProcess, getProcessEnv } from './util/env';
 import { getErrorStatus, NotFoundError } from "./util/http-error";
 import { HTTP_STATUS } from "./util/http-status";
 import { configureIde } from './util/ide';
@@ -32,7 +33,7 @@ import type { ErrorHandler, GlobalShokupanState, Method, Middleware, ProcessResu
 const defaults: ShokupanConfig = {
     port: 3000,
     hostname: "localhost",
-    development: process.env.NODE_ENV !== "production",
+    development: getProcessEnv('NODE_ENV') !== "production",
     enableAsyncLocalStorage: false,
     enableHTTPBridge: false,
     enableOpenApiGen: true,
@@ -238,7 +239,7 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
             // We use process.prependListener if available to try to catch it before others, 
             // or just on() 
             // Note: In Bun, unhandledRejection might behave slightly differently than Node.
-            const processRef = typeof process !== 'undefined' ? process : undefined;
+            const processRef = getProcess();
             if (processRef && processRef.on) {
                 processRef.on('unhandledRejection', (reason: any, promise: any) => {
                     const ctx = promise?.[kContext];
@@ -1022,21 +1023,24 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
                 if (span) span.setStatus({ code: 2 }); // Error
 
                 // Check for registered error handlers
+                const seenHandlers = new Set<number>();
                 let currentErr = err;
                 for (let i = 0; i < this.errorHandlers.length; i++) {
+                    if (seenHandlers.has(i)) continue;
                     const { type, handler } = this.errorHandlers[i];
                     if (currentErr instanceof type) {
+                        seenHandlers.add(i);
                         try {
                             const result = await handler(currentErr, ctx);
                             // Response Start Hook - About to send response
                             if (this.hasOnResponseStartHook) await this.runHooks('onResponseStart', ctx, result);
                             return result;
                         } catch (handlerErr) {
-                            // If the error handler itself fails, fall through to default handling
-                            // but log the new error
-                            if (process.env.NODE_ENV !== 'test') this.logger?.error("Shokupan", "Error in error handler:", { error: handlerErr });
+                            // If the error handler itself fails, try subsequent handlers with the new error,
+                            // but track seen handlers to prevent infinite loops.
+                            if (getProcessEnv('NODE_ENV') !== 'test') this.logger?.error("Shokupan", "Error in error handler:", { error: handlerErr });
                             currentErr = handlerErr;
-                            break; // Avoid infinite loops if handlerErr is same type
+                            i = -1; // Restart loop from beginning to find a handler for the new error
                         }
                     }
                 }

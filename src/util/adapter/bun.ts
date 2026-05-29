@@ -3,6 +3,7 @@ import type { Server, ServerWebSocket } from "bun";
 import { ShokupanContext } from "../../context";
 import { compose } from "../../middleware";
 import type { Shokupan } from "../../shokupan";
+import { getProcessEnv } from "../env";
 import { ShokupanRequest } from "../request";
 import { $ws } from "../symbol";
 import type { ServerAdapter } from "./interface";
@@ -51,7 +52,7 @@ export class BunAdapter implements ServerAdapter {
                     if (isJSONPayload && self.applicationConfig['enableHTTPBridge'] && payload.type === 'HTTP') {
                         // Security: HTTP Bridge allows arbitrary HTTP execution over WebSocket.
                         // In production, require a shared secret in the payload headers.
-                        const bridgeSecret = process.env['SHOKUPAN_HTTP_BRIDGE_SECRET'];
+                        const bridgeSecret = getProcessEnv('SHOKUPAN_HTTP_BRIDGE_SECRET');
                         const isDev = self.applicationConfig.development;
                         const authHeader = payload.headers?.['Authorization'] || payload.headers?.['authorization'];
                         const providedSecret = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : undefined;

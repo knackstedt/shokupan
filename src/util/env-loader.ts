@@ -1,5 +1,6 @@
 import { existsSync, promises as fs, watch } from 'node:fs';
 import * as path from 'node:path';
+import { getProcessEnv } from './env';
 import { createLogger, type Logger } from './logger';
 
 export type EnvLoaderOptions = {
@@ -171,7 +172,7 @@ export abstract class EnvLoader {
         if (this[$secretsCache].has(key)) {
             return this[$secretsCache].get(key);
         }
-        return process.env[key];
+        return getProcessEnv(key);
     }
 
     private [$getOrCreateSubject](key: string, initialValue: string | undefined): EmitterSubject<string | undefined> {

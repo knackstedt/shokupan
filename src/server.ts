@@ -1,6 +1,7 @@
 import type { Shokupan } from './shokupan';
 import { BunAdapter, NodeAdapter, type ServerAdapter } from './util/adapter';
 import { ensureLocalSslCertificates, type TLSCertOptions } from './util/dev-ssl';
+import { getProcessEnv } from './util/env';
 
 /**
  * Shokupan Server
@@ -61,7 +62,7 @@ export class ShokupanServer {
 
         // Handle Dev SSL
         let tlsOptions: TLSCertOptions | undefined = config.tls;
-        if (!tlsOptions && config.development && process.env.NODE_ENV !== 'test') {
+        if (!tlsOptions && config.development && getProcessEnv('NODE_ENV') !== 'test') {
             tlsOptions = ensureLocalSslCertificates();
         }
 
