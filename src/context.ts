@@ -211,7 +211,7 @@ export class ShokupanContext<
         this.renderer = renderer;
     }
 
-    private [$requestId]: string;
+    private [$requestId]: string | undefined;
     get requestId() {
         return this[$requestId] ??= (this.app?.applicationConfig?.idGenerator?.() ?? nanoid());
     }
@@ -247,7 +247,7 @@ export class ShokupanContext<
         requestId?: string
     ) {
         this.state = state || {} as State;
-        this[$requestId] = requestId ?? '';
+        this[$requestId] = requestId;
 
         if (enableMiddlewareTracking) {
             const self = this;
