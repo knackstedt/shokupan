@@ -25,7 +25,7 @@ import { MiddlewareTracker } from './util/middleware-tracker';
 import { enablePromisePatch, kContext } from './util/promise';
 import { ShokupanRequest } from './util/request';
 import { type ResponseTransformer, ResponseTransformerRegistry } from './util/response-transformer';
-import { $appRoot, $childRouters, $dispatch, $finalResponse, $isApplication, $mountPath, $routeMatched, $routes } from './util/symbol';
+import { $appRoot, $childRouters, $dispatch, $finalResponse, $handlerResult, $isApplication, $mountPath, $routeMatched, $routes } from './util/symbol';
 import { RouterTrie } from './util/trie';
 import type { ErrorHandler, GlobalShokupanState, Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig, ShokupanHooks, ShokupanPlugin, ShokupanRoute } from './util/types';
 
@@ -881,6 +881,7 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
 
                                 try {
                                     const res = await handler(ctx);
+                                    (ctx as any)[$handlerResult] = res;
 
                                     const duration = performance.now() - trackingStartTime;
                                     const stackItem = ctx.handlerStack[ctx.handlerStack.length - 1];
@@ -946,7 +947,9 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
                             }
                         }
 
-                        return match.handler(ctx);
+                        const handlerResult = await match.handler(ctx);
+                        (ctx as any)[$handlerResult] = handlerResult;
+                        return handlerResult;
                     }
 
                     // No fallback auto-upgrade - WebSocket routes must be explicitly defined
@@ -992,14 +995,26 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
                         return undefined;
                     }
                     else if (ctx[$routeMatched]) {
-                        // A route WAS matched but returned nothing.
-                        // Default to 204 No Content (unless user set status manually via ctx.response.status)
-                        let status = ctx.response.status;
-                        if (status === HTTP_STATUS.OK) {
-                            status = HTTP_STATUS.NO_CONTENT;
+                        // A route WAS matched. Check if handler produced a result
+                        // that was lost because middleware didn't return next().
+                        const handlerResult = (ctx as any)[$handlerResult];
+                        if (handlerResult instanceof Response) {
+                            response = handlerResult;
+                        } else if (handlerResult !== null && handlerResult !== undefined) {
+                            if (typeof handlerResult === 'object') {
+                                response = await ctx.json(handlerResult);
+                            } else {
+                                response = await ctx.text(String(handlerResult));
+                            }
+                        } else {
+                            // Default to 204 No Content (unless user set status manually via ctx.response.status)
+                            let status = ctx.response.status;
+                            if (status === HTTP_STATUS.OK) {
+                                status = HTTP_STATUS.NO_CONTENT;
+                            }
+                            // We send an empty response with the determined status
+                            response = ctx.send(undefined, { status, headers: ctx.response.headers });
                         }
-                        // We send an empty response with the determined status
-                        response = ctx.send(undefined, { status, headers: ctx.response.headers });
                     } else {
                         // Should have been thrown inside the middleware chain
                         throw new NotFoundError();
