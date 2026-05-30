@@ -3,7 +3,7 @@ title: Example Applications
 description: Sample applications demonstrating Shokupan features
 ---
 
-The Shokupan repository includes sample applications that demonstrate real-world usage patterns. These are tested against every beta release.
+The Shokupan repository includes sample applications that demonstrate real-world usage patterns. These are tested against every release.
 
 ## Sample Applications
 
