@@ -5,9 +5,6 @@
 **Built for Developer Experience**
 Shokupan is designed to make building APIs delightful again. With zero-config defaults, instant startup times, and full type safety out of the box, you can focus on building your product, not configuring your framework.
 
-> [!CAUTION]
-> Shokupan is still in beta and is not guaranteed to be stable. Please use with caution. We will be adding more features and APIs in the future. Please file an issue if you find any bugs or have suggestions for improvement.
-
 📚 **[Full documentation available at https://shokupan.dev](https://shokupan.dev)**
 
 ## ✨ Features
