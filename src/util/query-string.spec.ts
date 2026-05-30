@@ -46,4 +46,17 @@ describe('Fast Querystring Parser', () => {
     it('simple mode overwrites duplicates', () => {
         expect(parseQuery('a=1&a=2', 'simple')).toEqual({ a: '2' });
     });
+
+    it('returns empty object for URLs without query string', () => {
+        expect(parseQuery('http://example.com/path')).toEqual({});
+        expect(parseQuery('https://localhost:8765/dynamic/a/b/c')).toEqual({});
+    });
+
+    it('returns empty object for empty string', () => {
+        expect(parseQuery('')).toEqual({});
+    });
+
+    it('returns empty object for query string with only ?', () => {
+        expect(parseQuery('http://example.com/path?')).toEqual({});
+    });
 });

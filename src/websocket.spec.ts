@@ -620,6 +620,42 @@ describe('WebSocket API - Context Helpers', () => {
         expect(routes.length).toBeGreaterThan(0);
     });
 
+    test('ctx.broadcast() - publishes to broadcast topic', async () => {
+        const app = new Shokupan({ enableWebSocketTracking: true });
+        const wsRouter = new ShokupanWebsocketRouter();
+        let published = false;
+
+        wsRouter.event('chat.message', (ctx) => {
+            ctx.broadcast('chat.broadcast', { message: 'hello' });
+        });
+
+        app.mount('/ws', wsRouter);
+
+        // Mock server with publish tracking
+        const mockServer = {
+            upgrade: (req: any, options: any) => {
+                const ws = {
+                    send: (msg: any) => { },
+                    publish: (topic: string, data: any) => {
+                        expect(topic).toBe('shokupan:broadcast');
+                        expect(data).toContain('chat.broadcast');
+                        published = true;
+                    },
+                    subscribe: (topic: string) => { },
+                    data: {}
+                };
+                options.data.handler.open(ws);
+                // Simulate incoming message to trigger event handler
+                options.data.handler.message(ws, JSON.stringify({ event: 'chat.message', data: {} }));
+                return true;
+            }
+        } as any;
+
+        // Trigger upgrade
+        await app.fetch(new Request('http://localhost/ws', { headers: { upgrade: 'websocket' } }), mockServer);
+        expect(published).toBe(true);
+    });
+
     test('ctx.upgrade() - throws on non-GET method', async () => {
         const app = new Shokupan();
 

@@ -497,6 +497,8 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
             return ctx.upgrade({
                 open: async (ctx, ws) => {
                     ctx[$ws] = ws;
+                    // Subscribe to broadcast topic for ctx.broadcast() support
+                    ws.subscribe('shokupan:broadcast');
                     // Call onOpen and set return value to ws.data and ctx.state
                     if (handlers.onOpen) {
                         const sessionData = await handlers.onOpen(ctx, ws);
@@ -644,6 +646,8 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
             return ctx.upgrade({
                 open: async (ctx, ws) => {
                     ctx[$ws] = ws;
+                    // Subscribe to broadcast topic for ctx.broadcast() support
+                    ws.subscribe('shokupan:broadcast');
                     // Call onOpen (if defined)
                     if (openMethodName) {
                         const openMethod = instance[openMethodName as string];

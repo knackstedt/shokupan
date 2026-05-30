@@ -860,6 +860,19 @@ export class ShokupanContext<
     }
 
     /**
+     * Broadcast an event to all connected WebSocket clients
+     * @param event Event name
+     * @param data Event data (Must be JSON serializable)
+     */
+    broadcast(event: string, data?: any) {
+        if (this[$ws]) {
+            this[$ws].publish('shokupan:broadcast', JSON.stringify({ event, data }));
+        } else if (this[$socket]) {
+            this[$socket].broadcast.emit(event, data);
+        }
+    }
+
+    /**
      * Respond with a JSON object
      */
     async json(data: object | Promise<object>, status?: number, headers?: HeadersInit) {
