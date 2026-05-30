@@ -378,6 +378,25 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
     }
 
     /**
+     * Register an event handler.
+     */
+    public event(name: string, handler: ShokupanHandler<T>): this {
+        const info = getCallerInfo(2);
+        if (info) {
+            (handler as { source?: { file: string; line: number } }).source = {
+                file: info.file,
+                line: info.line
+            };
+        }
+        if (this.eventHandlers.has(name)) {
+            this.eventHandlers.get(name)!.push(handler);
+        } else {
+            this.eventHandlers.set(name, [handler]);
+        }
+        return this;
+    }
+
+    /**
      * Finds an event handler(s) by name.
      */
     public findEvent(name: string): ShokupanHandler<T>[] | null {
