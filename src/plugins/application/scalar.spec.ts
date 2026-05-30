@@ -9,7 +9,7 @@ describe('Scalar Plugin Warning Fix', () => {
 
         // Mount Scalar Plugin
         const plugin = new ScalarPlugin();
-        app.register(plugin);
+        await app.register(plugin);
 
         // Generate Spec
         const spec = await app.generateApiSpec();
