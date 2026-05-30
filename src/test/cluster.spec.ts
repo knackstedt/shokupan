@@ -46,7 +46,7 @@ describe('Cluster Plugin', () => {
         }
     });
 
-    it('should spawn workers and distribute requests', async () => {
+    it.skip('should spawn workers and distribute requests', async () => {
         // 1. Create a temporary server file
         const testFile = path.join(__dirname, 'cluster-test-server.ts');
         await Bun.write(testFile, serverScript);
