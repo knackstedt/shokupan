@@ -32,6 +32,7 @@ export const $bodyType = Symbol.for("Shokupan.ctx.bodyType");
 export const $bodyParsed = Symbol.for("Shokupan.ctx.bodyParsed");
 export const $bodyParseError = Symbol.for("Shokupan.ctx.bodyParseError");
 export const $routeMatched = Symbol.for("Shokupan.ctx.routeMatched");
+export const $handlerResult = Symbol.for("Shokupan.ctx.handlerResult");
 export const $cachedHostname = Symbol.for("Shokupan.ctx.cachedHostname");
 export const $cachedProtocol = Symbol.for("Shokupan.ctx.cachedProtocol");
 export const $cachedHost = Symbol.for("Shokupan.ctx.cachedHost");
