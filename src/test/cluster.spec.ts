@@ -71,15 +71,20 @@ describe('Cluster Plugin', () => {
                     }
                 });
 
-                serverProcess.on('error', reject);
+                serverProcess.on('error', (err) => {
+                    if (!started) reject(err);
+                });
                 serverProcess.on('exit', (code) => {
                     if (!started) reject(new Error(`Server exited early with code ${code}`));
                 });
 
-                // Timeout after 20s
+                // Timeout must be less than test timeout (15s) to avoid hang
                 setTimeout(() => {
-                    if (!started) reject(new Error('Server start timeout'));
-                }, 20000);
+                    if (!started) {
+                        serverProcess.kill();
+                        reject(new Error('Server start timeout'));
+                    }
+                }, 10000);
             });
 
             // 4. Make concurrent requests with retry logic
