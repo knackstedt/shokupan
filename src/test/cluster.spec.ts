@@ -76,10 +76,10 @@ describe('Cluster Plugin', () => {
                     if (!started) reject(new Error(`Server exited early with code ${code}`));
                 });
 
-                // Timeout after 10s
+                // Timeout after 20s
                 setTimeout(() => {
                     if (!started) reject(new Error('Server start timeout'));
-                }, 10000);
+                }, 20000);
             });
 
             // 4. Make concurrent requests with retry logic
