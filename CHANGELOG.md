@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.1.0-next.0](https://github.com/knackstedt/shokupan/compare/v1.0.1...v1.1.0-next.0) (2026-07-29)
+
+
+### Features
+
+* fix cross-runtime support for Node.js and Deno ([94b37b8](https://github.com/knackstedt/shokupan/commit/94b37b82b0f74ec1a2ada513fab9f674dea05049))
+
+
+### Bug Fixes
+
+* group spec files with tsx ([26f9d1b](https://github.com/knackstedt/shokupan/commit/26f9d1b23a754a4133f33195717abded1b17cfab))
+
 ### [1.0.1](https://github.com/knackstedt/shokupan/compare/v1.0.1-next.1...v1.0.1) (2026-07-29)
 
 ## [1.0.0](https://github.com/knackstedt/shokupan/compare/v1.0.0-beta.2...v1.0.0) (2026-05-29)
