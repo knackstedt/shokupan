@@ -792,10 +792,10 @@ export type ShokupanConfig<T extends Record<string, any> = Record<string, any>> 
     validateStatusCodes: boolean;
 
     datastore?: {
-        adapter: 'surreal' | 'sqlite' | 'level';
+        adapter: 'surrealdb' | 'sqlite' | 'level';
         /**
          * Options for the specific adapter.
-         * - For 'surreal', this matches SurrealAdapterOptions
+         * - For 'surrealdb', this matches SurrealAdapterOptions
          * - For 'sqlite', this matches SqliteAdapterOptions
          * - For 'level', this matches LevelAdapterOptions
          */

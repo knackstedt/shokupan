@@ -166,8 +166,13 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
 
         // Register hooks if provided in config
         if (hooks) {
-            for (const [name, fn] of Object.entries(hooks) as [keyof ShokupanHooks<T>, any][]) {
-                this.hook(name, fn);
+            const hooksArray = Array.isArray(hooks) ? hooks : [hooks];
+            for (const hookObj of hooksArray) {
+                for (const [name, fn] of Object.entries(hookObj) as [keyof ShokupanHooks<T>, any][]) {
+                    if (typeof fn === 'function') {
+                        this.hook(name, fn);
+                    }
+                }
             }
         }
 

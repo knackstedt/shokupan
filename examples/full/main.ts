@@ -77,7 +77,7 @@ const app = new Shokupan<AppState>({
 
     enableAsyncApiGen: true,
 
-    enableHttpBridge: true,
+    enableHTTPBridge: true,
 
     // Enable Middleware Tracking for Demo
     enableMiddlewareTracking: true,
@@ -90,8 +90,9 @@ const app = new Shokupan<AppState>({
         appLevelHooks
     ],
 
-    surreal: {
-        url: 'mem://'
+    datastore: {
+        adapter: 'surrealdb',
+        options: { url: 'mem://' }
     }
 });
 
