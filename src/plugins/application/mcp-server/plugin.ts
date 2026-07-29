@@ -3,6 +3,7 @@ import { ShokupanRouter } from "../../../router";
 import type { Shokupan } from '../../../shokupan';
 import { getProcess } from "../../../util/env";
 import type { McpSession } from "../../../util/mcp-protocol";
+import { getMetaFile } from "../../../util/runtime-types";
 import { $appRoot, $childRouters } from "../../../util/symbol";
 import type { ShokupanPlugin } from "../../../util/types";
 import { OpenAPIAnalyzer } from "../openapi/analyzer.impl";
@@ -88,7 +89,7 @@ export class MCPServerPlugin implements ShokupanPlugin {
 
             // Metadata
             this.router.metadata = {
-                file: import.meta.file,
+                file: getMetaFile(import.meta.url),
                 line: 1,
                 name: 'MCPServerPlugin',
                 pluginName: 'MCP Server'

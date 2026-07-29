@@ -5,6 +5,7 @@ export * from "./router";
 export * from "./shokupan";
 export * from "./util/request";
 export * from "./util/response";
+export * from "./util/runtime-types";
 export * from "./util/symbol";
 export * from "./util/types";
 export * from "./websocket";

@@ -2,6 +2,8 @@ import { EventEmitter } from 'events';
 import { Worker } from 'worker_threads';
 import { getProcess } from './env';
 
+declare const Bun: any;
+
 export type ASTAnalyzerState = 'idle' | 'analyzing' | 'completed' | 'failed';
 
 export interface ASTAnalyzerResult {

@@ -1,4 +1,6 @@
 
+declare const Bun: any;
+
 export interface FileSystemAdapter {
     readFile(path: string): Promise<Uint8Array | string | ReadableStream>;
     stat?(path: string): Promise<{ size: number; mtime: Date; }>;

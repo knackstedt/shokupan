@@ -1,4 +1,3 @@
-import type { Server } from 'bun';
 import { nanoid } from 'nanoid';
 import { ShokupanContext } from "./context";
 import { compose } from "./middleware";
@@ -18,6 +17,7 @@ import { getErrorStatus, NotFoundError } from "./util/http-error";
 import { HTTP_STATUS } from "./util/http-status";
 import { configureIde } from './util/ide';
 import { createHTTPLogger, createLogger } from './util/logger';
+import type { ServerServer as Server } from './util/runtime-types';
 
 import { Container } from './decorators';
 import { getCallerInfo } from './decorators/util/stack';
@@ -29,6 +29,7 @@ import { $appRoot, $childRouters, $dispatch, $finalResponse, $handlerResult, $is
 import { RouterTrie } from './util/trie';
 import type { ErrorHandler, GlobalShokupanState, Method, Middleware, ProcessResult, RequestOptions, ShokupanConfig, ShokupanHooks, ShokupanPlugin, ShokupanRoute } from './util/types';
 
+declare const Bun: any;
 
 const defaults: ShokupanConfig = {
     port: 3000,
@@ -533,7 +534,12 @@ export class Shokupan<T extends Record<string, any> = GlobalShokupanState> exten
                     const config = this.applicationConfig.aiPlugin || {};
                     let pkg: any = {};
                     try {
-                        pkg = await Bun.file("package.json").json();
+                        if (typeof Bun !== "undefined") {
+                            pkg = await Bun.file("package.json").json();
+                        } else {
+                            const { readFile } = await import('node:fs/promises');
+                            pkg = JSON.parse(await readFile("package.json", "utf-8"));
+                        }
                     } catch (e) { }
 
                     const manifest = {

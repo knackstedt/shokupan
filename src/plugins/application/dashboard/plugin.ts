@@ -1,5 +1,3 @@
-import type { ServerWebSocket } from 'bun';
-import { Glob } from 'bun';
 import { nanoid } from 'nanoid';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -9,6 +7,7 @@ import { ShokupanRouter } from "../../../router";
 import type { Shokupan } from '../../../shokupan';
 import { getProcess } from '../../../util/env';
 import { getEditorLinkPattern } from '../../../util/ide';
+import { getMetaFile, Glob, type ServerWebSocket } from '../../../util/runtime-types';
 import { $appRoot, $childRouters, $debug, $mountPath, $onWsMessage, $wsMessages } from "../../../util/symbol";
 import type { ShokupanHooks, ShokupanPlugin } from "../../../util/types";
 import { FetchInterceptor, type OutboundRequestLog } from './fetch-interceptor';
@@ -384,7 +383,7 @@ export class Dashboard implements ShokupanPlugin {
 
         // Metadata for registry
         this.router.metadata = {
-            file: import.meta.file,
+            file: getMetaFile(import.meta.url),
             line: 1,
             name: 'DashboardPlugin',
             pluginName: 'Dashboard'

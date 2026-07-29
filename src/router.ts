@@ -1231,7 +1231,7 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
             wrappedHandler = async (ctx: ShokupanContext<T>) => {
                 // 1. Timeout
                 if (effectiveTimeout && effectiveTimeout > 0 && ctx.server) {
-                    ctx.server.timeout(ctx.req as Request, effectiveTimeout / 1000);
+                    ctx.server['timeout'](ctx.req as Request, effectiveTimeout / 1000);
                 }
 
                 // 2. Renderer

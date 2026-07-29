@@ -167,8 +167,9 @@ export class ErrorView implements ShokupanPlugin {
         Object.defineProperty(errorViewMiddleware, 'name', { value: 'ErrorViewMiddleware' });
 
         // Register asset routes
-        const { join } = await import('path');
-        const assetDir = join(import.meta.dir, 'assets');
+        const { join } = await import('node:path');
+        const { fileURLToPath } = await import('node:url');
+        const assetDir = join(import.meta.dirname ?? fileURLToPath(new URL('.', import.meta.url)), 'assets');
 
         if (existsSync(assetDir)) {
 

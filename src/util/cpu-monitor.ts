@@ -4,7 +4,7 @@ import { isNode } from './env';
 type CpuInfo = { times: { user: number; nice: number; sys: number; idle: number; irq: number; }; };
 
 export class SystemCpuMonitor {
-    private interval: Timer | null = null;
+    private interval: ReturnType<typeof setInterval> | null = null;
     private lastCpus: CpuInfo[] = [];
     private currentUsage: number = 0;
     private osStub: any = null;

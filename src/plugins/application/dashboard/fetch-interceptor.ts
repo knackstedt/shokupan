@@ -5,6 +5,8 @@ import { getProcess, getProcessEnv } from '../../../util/env';
 import { createLogger, type Logger } from '../../../util/logger';
 
 const require = createRequire(import.meta.url);
+
+declare const Bun: any;
 const http = require('node:http');
 const https = require('node:https');
 

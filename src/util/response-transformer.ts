@@ -1,4 +1,4 @@
-import type { BodyInit } from "bun";
+import type { BodyInit } from "./runtime-types";
 
 /**
  * Response transformer function

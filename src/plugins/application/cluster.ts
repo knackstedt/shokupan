@@ -4,6 +4,8 @@ import os from 'node:os';
 import type { Shokupan } from '../../shokupan';
 import type { ShokupanPlugin } from '../../util/types';
 
+declare const Bun: any;
+
 export interface ClusterOptions {
     /**
      * Number of workers to spawn.
@@ -78,7 +80,7 @@ export class ClusterPlugin implements ShokupanPlugin {
             Bun.spawn([process.argv0, ...process.argv.slice(1)], {
                 env: { ...process.env, SHOKUPAN_WORKER_ID: id },
                 stdio: ['inherit', 'inherit', 'inherit'],
-                onExit(proc, exitCode, signalCode, error) {
+                onExit(proc: any, exitCode: any, signalCode: any, error: any) {
                     app.logger?.info('Cluster', `Worker ${id} died (code: ${exitCode}). Restarting...`);
                     spawnWorker(id);
                 }

@@ -1,3 +1,5 @@
+import { lookup as mimeLookup } from 'mrmime';
+import { access, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { InlineConfig, ViteDevServer } from 'vite';
 import type { Shokupan } from '../../../shokupan';
@@ -80,7 +82,6 @@ export class VitePlugin implements ShokupanPlugin {
     }
 
     private async resolveViteConfig(): Promise<{ configFile: string; outDir: string } | null> {
-        const fs = await import('node:fs');
         const path = await import('node:path');
 
         let configFile = this.configFile;
@@ -89,14 +90,22 @@ export class VitePlugin implements ShokupanPlugin {
             const candidates = ['vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs'];
             for (let i = 0; i < candidates.length; i++) {
                 const candidate = path.join(cwd, candidates[i]);
-                if (fs.existsSync(candidate)) {
+                try {
+                    await access(candidate);
                     configFile = candidate;
                     break;
+                } catch {
+                    // continue to next candidate
                 }
             }
         }
 
-        if (!configFile || !fs.existsSync(configFile)) {
+        if (!configFile) {
+            return null;
+        }
+        try {
+            await access(configFile);
+        } catch {
             return null;
         }
 
@@ -184,12 +193,13 @@ export class VitePlugin implements ShokupanPlugin {
     }
 
     private async initProd(app: Shokupan, viteConfig: { configFile: string; outDir: string } | null) {
-        const fs = await import('node:fs');
         const path = await import('node:path');
 
         const outDir = this.outDir || viteConfig?.outDir || path.resolve(getProcess()?.cwd() || '.', 'dist');
 
-        if (!fs.existsSync(outDir)) {
+        try {
+            await access(outDir);
+        } catch {
             app.logger?.warn('VitePlugin', `Production build directory not found: ${outDir}. Run your Vite build first.`);
             return;
         }
@@ -206,18 +216,30 @@ export class VitePlugin implements ShokupanPlugin {
                 return ctx.text('Forbidden', 403);
             }
 
-            if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+            let fileExists = true;
+            try {
+                const stats = await stat(filePath);
+                if (stats.isDirectory()) fileExists = false;
+            } catch {
+                fileExists = false;
+            }
+
+            if (!fileExists) {
                 filePath = join(outDir, 'index.html');
             }
 
-            if (!fs.existsSync(filePath)) {
+            try {
+                await access(filePath);
+            } catch {
                 return ctx.text('Not found', 404);
             }
 
-            const file = Bun.file(filePath);
-            return new Response(file, {
+            const content = await readFile(filePath);
+            const ext = filePath.split('.').pop() || '';
+            const mimeType = mimeLookup(ext) || 'application/octet-stream';
+            return new Response(content, {
                 headers: {
-                    'Content-Type': file.type || 'application/octet-stream',
+                    'Content-Type': mimeType,
                     'Cache-Control': filePath.endsWith('index.html') ? 'no-cache' : 'max-age=31536000'
                 }
             });
@@ -249,11 +271,20 @@ export class VitePlugin implements ShokupanPlugin {
                     if (!resolvedFile.startsWith(resolvedOutDir + path.sep) && resolvedFile !== resolvedOutDir) {
                         throw err;
                     }
-                    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-                        const file = Bun.file(filePath);
-                        return new Response(file, {
+                    let isFile = false;
+                    try {
+                        const stats = await stat(filePath);
+                        isFile = stats.isFile();
+                    } catch {
+                        // not found
+                    }
+                    if (isFile) {
+                        const content = await readFile(filePath);
+                        const ext = filePath.split('.').pop() || '';
+                        const mimeType = mimeLookup(ext) || 'application/octet-stream';
+                        return new Response(content, {
                             headers: {
-                                'Content-Type': file.type || 'application/octet-stream',
+                                'Content-Type': mimeType,
                                 'Cache-Control': 'max-age=31536000'
                             }
                         });
@@ -266,14 +297,17 @@ export class VitePlugin implements ShokupanPlugin {
                 const isRoot = pathname === '/' || pathname === '';
                 if (isRoot || accept.includes('text/html')) {
                     const indexPath = join(outDir, 'index.html');
-                    if (fs.existsSync(indexPath)) {
-                        const file = Bun.file(indexPath);
-                        return new Response(file, {
+                    try {
+                        await access(indexPath);
+                        const content = await readFile(indexPath);
+                        return new Response(content, {
                             headers: {
                                 'Content-Type': 'text/html',
                                 'Cache-Control': 'no-cache'
                             }
                         });
+                    } catch {
+                        // index.html not found
                     }
                 }
 

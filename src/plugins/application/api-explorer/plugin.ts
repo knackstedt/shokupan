@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ShokupanRouter } from '../../../router';
 import type { Shokupan } from '../../../shokupan.ts';
+import { getMetaFile } from '../../../util/runtime-types';
 import { $isMounted } from '../../../util/symbol';
 import type { ShokupanPlugin, ShokupanPluginOptions } from '../../../util/types.ts';
 let renderToString: any;
@@ -44,7 +45,7 @@ export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin 
 
         // Metadata
         this.metadata = {
-            file: import.meta.file,
+            file: getMetaFile(import.meta.url),
             line: 1,
             name: 'ApiExplorerPlugin',
             pluginName: 'ApiExplorer'
@@ -106,7 +107,7 @@ export class ApiExplorerPlugin extends ShokupanRouter implements ShokupanPlugin 
 
         // Security: This endpoint reads source files from the project root.
         // Disable in production to prevent inadvertent exposure of secrets/env files.
-        const isProduction = process.env.NODE_ENV === 'production';
+        const isProduction = process.env['NODE_ENV'] === 'production';
         const sourceViewEnabled = this.pluginOptions.enableSourceView ?? !isProduction;
         if (sourceViewEnabled) {
             this.get('/_source', async (ctx) => {

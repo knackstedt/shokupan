@@ -5,6 +5,8 @@ import { join, resolve } from 'path';
 import type { ShokupanContext } from '../../context';
 import type { Middleware, StaticServeOptions } from '../../util/types';
 
+declare const Bun: any;
+
 let eta: any;
 async function getEta() {
     if (!eta) {

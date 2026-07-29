@@ -1,12 +1,14 @@
 
-import type { Server, ServerWebSocket } from "bun";
 import { ShokupanContext } from "../../context";
 import { compose } from "../../middleware";
 import type { Shokupan } from "../../shokupan";
 import { getProcessEnv } from "../env";
 import { ShokupanRequest } from "../request";
+import type { ServerServer as Server, ServerWebSocket } from "../runtime-types";
 import { $ws } from "../symbol";
 import type { ServerAdapter } from "./interface";
+
+declare const Bun: any;
 
 export class BunAdapter implements ServerAdapter {
     private server?: Server<any>;
@@ -165,7 +167,7 @@ export class BunAdapter implements ServerAdapter {
             (serveOptions as { tls?: typeof tls }).tls = tls;
         }
 
-        this.server = Bun.serve(serveOptions);
+        this.server = Bun.serve(serveOptions) as unknown as Server<any>;
         return this.server!;
     }
 

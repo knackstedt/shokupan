@@ -1,11 +1,12 @@
 import type { OpenAPI } from '@scalar/openapi-types';
 import type { ApiReferenceConfiguration } from '@scalar/types/api-reference';
 import type { Eta } from 'eta';
-import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ShokupanRouter } from '../../router';
 import type { Shokupan } from '../../shokupan';
 import { deepMerge } from '../../util/deep-merge';
+import { getMetaFile } from '../../util/runtime-types';
 import { $isMounted } from '../../util/symbol';
 import type { DeepPartial, ShokupanPlugin, ShokupanPluginOptions } from '../../util/types';
 import { OpenAPIAnalyzer } from './openapi/analyzer';
@@ -53,7 +54,7 @@ export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin 
 
         // Metadata
         this.metadata = {
-            file: import.meta.file,
+            file: getMetaFile(import.meta.url),
             line: 1,
             name: 'ScalarPlugin',
             pluginName: 'Scalar'
@@ -160,7 +161,7 @@ export class ScalarPlugin extends ShokupanRouter<any> implements ShokupanPlugin 
             try {
                 // Try src location
                 try {
-                    themeCss = readFileSync(join(process.cwd(), 'src/theme.css'), 'utf-8');
+                    themeCss = await readFile(join(process.cwd(), 'src/theme.css'), 'utf-8');
                 } catch {
                     // Try adjacent to main/dist? For now, we rely on src
                 }

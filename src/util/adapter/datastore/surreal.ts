@@ -34,7 +34,7 @@ export class SurrealAdapter implements DatastoreAdapter {
             let url = this.options.url;
             if (!url) {
                 // Default behavior equivalent to old initDatastore
-                if (process.env.NODE_ENV === 'test') {
+                if (process.env['NODE_ENV'] === 'test') {
                     url = 'mem://';
                 } else {
                     url = 'surrealkv://database';

@@ -1,4 +1,3 @@
-import type { BodyInit, Server, ServerWebSocket } from 'bun';
 import { nanoid } from 'nanoid';
 import { readFile } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
@@ -11,8 +10,11 @@ import { VALID_HTTP_STATUSES, VALID_REDIRECT_STATUSES } from './util/http-status
 import { parseQuery } from './util/query-string';
 import type { ShokupanRequest } from './util/request';
 import { ShokupanResponse } from './util/response';
+import type { BodyInit, ServerServer as Server, ServerWebSocket } from './util/runtime-types';
 import { $bodyParsed, $bodyParseError, $bodyType, $cachedBody, $cachedCookies, $cachedHost, $cachedHostname, $cachedOrigin, $cachedProtocol, $cachedQuery, $debug, $finalResponse, $io, $onWsMessage, $rawBody, $requestId, $routeMatched, $socket, $url, $ws, $wsMessages } from './util/symbol';
 import type { CookieOptions, GlobalShokupanState, HeadersInit, JSXRenderer, ShokupanRoute, SSEMessage, SSEStreamErrorHandler, SSEStreamHelper, StreamErrorHandler, StreamHelper, TextStreamErrorHandler, TextStreamHelper } from './util/types';
+
+declare const Bun: any;
 
 /**
  * Inline WebSocket handlers for ctx.upgrade()

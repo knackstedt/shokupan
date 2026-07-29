@@ -39,9 +39,9 @@ export class LevelAdapter implements DatastoreAdapter {
     async setupSchema(): Promise<void> {
         // Ensure fresh state for tests that might reuse instances (though we try not to)
         // Ensure fresh state for tests that might reuse instances (though we try not to)
-        if (process.env.NODE_ENV !== 'test') this.logger.debug('LevelAdapter', "Clearing DB");
+        if (process.env['NODE_ENV'] !== 'test') this.logger.debug('LevelAdapter', "Clearing DB");
         await this.db.clear();
-        if (process.env.NODE_ENV !== 'test') this.logger.debug('LevelAdapter', "DB cleared");
+        if (process.env['NODE_ENV'] !== 'test') this.logger.debug('LevelAdapter', "DB cleared");
     }
 
     private getKey(table: string, id: string) {

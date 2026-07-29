@@ -5,6 +5,8 @@ import path from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import { OpenAPIAnalyzer } from '../plugins/application/openapi/analyzer';
 
+declare const Bun: any;
+
 const templates = {
     controller: (name: string) => `import { Controller, Get, Ctx } from 'shokupan';
 import { ShokupanContext } from 'shokupan';
@@ -485,15 +487,27 @@ async function dev() {
             && !a.startsWith('--entry=') && !a.startsWith('--port=') && !a.startsWith('--hostname=');
     });
 
-    // @ts-ignore - Bun.spawn is available in the Bun runtime
-    const proc = Bun.spawn(['bun', '--watch', entry, ...forwardedArgs], {
-        stdio: ['inherit', 'inherit', 'inherit'],
-        env
-    });
-
-    // @ts-ignore
-    const exitCode = await proc.exited;
-    process.exit(exitCode);
+    if (typeof Bun !== "undefined") {
+        // @ts-ignore - Bun.spawn is available in the Bun runtime
+        const proc = Bun.spawn(['bun', '--watch', entry, ...forwardedArgs], {
+            stdio: ['inherit', 'inherit', 'inherit'],
+            env
+        });
+        // @ts-ignore
+        const exitCode = await proc.exited;
+        process.exit(exitCode);
+    } else {
+        // Node.js fallback using child_process
+        const { spawn } = await import('node:child_process');
+        const isTsx = process.argv0.includes('tsx') || process.argv0.includes('npx');
+        const cmd = isTsx ? process.argv0 : 'npx';
+        const args2 = isTsx ? ['--watch', entry, ...forwardedArgs] : ['tsx', '--watch', entry, ...forwardedArgs];
+        const child = spawn(cmd, args2, {
+            stdio: ['inherit', 'inherit', 'inherit'],
+            env
+        });
+        child.on('exit', (code) => process.exit(code ?? 0));
+    }
 }
 
 async function main() {

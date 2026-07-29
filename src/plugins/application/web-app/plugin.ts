@@ -1,4 +1,7 @@
+import { lookup as mimeLookup } from 'mrmime';
+import { access, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Shokupan } from '../../../shokupan';
 import { $childRouters, $mountPath } from '../../../util/symbol';
 import type { ShokupanPlugin } from '../../../util/types';
@@ -39,8 +42,9 @@ export class WebAppPlugin implements ShokupanPlugin {
         this.mountPath = opts.path ?? '/_app';
         this.devPort = process.env['ANGULAR_DEV_PORT'];
         // Default to <repo-root>/client/dist/browser
+        const dir = import.meta.dirname ?? fileURLToPath(new URL('.', import.meta.url));
         this.distDir = opts.distDir ??
-            resolve(import.meta.dirname, '../../../../client/dist/browser');
+            resolve(dir, '../../../../client/dist/browser');
     }
 
     async onInit(app: Shokupan, options?: WebAppPluginOptions) {
@@ -129,20 +133,28 @@ export class WebAppPlugin implements ShokupanPlugin {
 
             // Try to serve as a static file first
             let filePath = join(this.distDir, sub);
-            let file = Bun.file(filePath);
 
-            if (!(await file.exists()) || (await file.stat()).isDirectory()) {
-                // SPA fallback: serve index.html
-                filePath = join(this.distDir, 'index.html');
-                file = Bun.file(filePath);
+            let fileExists = true;
+            try {
+                const stats = await stat(filePath);
+                if (stats.isDirectory()) fileExists = false;
+            } catch {
+                fileExists = false;
             }
 
-            if (!(await file.exists())) {
+            if (!fileExists) {
+                // SPA fallback: serve index.html
+                filePath = join(this.distDir, 'index.html');
+            }
+
+            try {
+                await access(filePath);
+            } catch {
                 return ctx.text('Not found', 404);
             }
 
-            const content = await file.arrayBuffer();
-            let body: ArrayBuffer = content;
+            const content = await readFile(filePath);
+            let body: BodyInit = content;
 
             // Inject SHOKUPAN_BASE into index.html
             if (filePath.endsWith('index.html')) {
@@ -151,10 +163,11 @@ export class WebAppPlugin implements ShokupanPlugin {
                     '<head>',
                     `<head><script>window.SHOKUPAN_BASE="${this.mountPath}";</script>`,
                 );
-                body = new TextEncoder().encode(injected).buffer;
+                body = new TextEncoder().encode(injected).buffer as ArrayBuffer;
             }
 
-            const mimeType = file.type || 'application/octet-stream';
+            const ext = filePath.split('.').pop() || '';
+            const mimeType = mimeLookup(ext) || 'application/octet-stream';
             return new Response(body, {
                 headers: {
                     'Content-Type': mimeType,

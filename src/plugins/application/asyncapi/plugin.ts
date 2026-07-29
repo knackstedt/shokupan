@@ -1,4 +1,3 @@
-import type { ServerWebSocket } from 'bun';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -7,6 +6,7 @@ import { ShokupanRouter } from '../../../router';
 import type { Shokupan } from '../../../shokupan';
 import { deepMerge } from '../../../util/deep-merge';
 import { getEditorLinkPattern } from '../../../util/ide';
+import { getMetaFile, type ServerWebSocket } from '../../../util/runtime-types';
 import { $isMounted } from '../../../util/symbol';
 import type { DeepPartial, ShokupanPlugin, ShokupanPluginOptions } from '../../../util/types';
 import { generateAsyncApi } from './generator';
@@ -63,7 +63,7 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
 
         // Metadata
         this.metadata = {
-            file: import.meta.file,
+            file: getMetaFile(import.meta.url),
             line: 1,
             name: 'AsyncApiPlugin',
             pluginName: 'AsyncAPI'

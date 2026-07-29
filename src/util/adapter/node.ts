@@ -1,8 +1,8 @@
 
-import type { Server } from "bun";
 import * as http from "node:http";
 import * as https from "node:https";
 import type { Shokupan } from "../../shokupan";
+import type { ServerServer as Server } from "../runtime-types";
 import type { ServerAdapter } from "./interface";
 
 export class NodeAdapter implements ServerAdapter {

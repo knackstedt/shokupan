@@ -1,5 +1,5 @@
-import type { ServerWebSocket } from "bun";
 import type { ShokupanContext } from "../../context";
+import type { ServerWebSocket } from "../../util/runtime-types";
 import type { Middleware, NextFn } from "../../util/types";
 
 export interface ProxyOptions {

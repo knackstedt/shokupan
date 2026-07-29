@@ -1,11 +1,18 @@
-import type { Database } from 'bun:sqlite';
 import { getProcess } from '../../env';
 import { createLogger } from '../../logger';
 import type { DatastoreAdapter, QueryOptions } from '../datastore';
 
+/** Minimal type for bun:sqlite Database (used only in Bun runtime) */
+interface BunSqliteDatabase {
+    query(sql: string): { all(...params: any[]): any[]; run(...params: any[]): any; get(...params: any[]): any };
+    exec(sql: string): void;
+    close(): void;
+    [key: string]: any;
+}
+
 export class SqliteAdapter implements DatastoreAdapter {
     name = 'sqlite';
-    private db!: Database;
+    private db!: BunSqliteDatabase;
     private logger = createLogger();
     private tables = new Set<string>();
     private exitHandler?: () => void;
@@ -16,11 +23,12 @@ export class SqliteAdapter implements DatastoreAdapter {
 
     async connect(): Promise<void> {
         const p = getProcess();
-        if (p && p.versions && p.versions.node && !p.versions.bun) {
+        if (p && p.versions && p.versions.node && !p.versions['bun']) {
             throw new Error("SqliteAdapter uses bun:sqlite and is not supported in Node.js. Please use SurrealAdapter or another datastore for Node.js environments.");
         }
+        // @ts-ignore - bun:sqlite is only available in the Bun runtime
         const { Database } = await import('bun:sqlite');
-        this.db = new Database(this.options.filename || ':memory:');
+        this.db = new Database(this.options.filename || ':memory:') as BunSqliteDatabase;
 
         if (this.exitHandler) {
             p?.removeListener("exit", this.exitHandler);
@@ -64,7 +72,7 @@ export class SqliteAdapter implements DatastoreAdapter {
     private ensureTable(table: string) {
         if (this.tables.has(table)) return;
 
-        this.db.run(`CREATE TABLE IF NOT EXISTS "${table}" (
+        this.db['run'](`CREATE TABLE IF NOT EXISTS "${table}" (
             id TEXT PRIMARY KEY,
             data JSON,
             created_at INTEGER,
@@ -76,7 +84,7 @@ export class SqliteAdapter implements DatastoreAdapter {
 
     async get<T>(table: string, id: string): Promise<T | null> {
         this.ensureTable(table);
-        const stmt = this.db.prepare(`SELECT data FROM "${table}" WHERE id = ?`);
+        const stmt = this.db['prepare'](`SELECT data FROM "${table}" WHERE id = ?`);
         const res = stmt.get(id) as { data: string; } | null;
         if (!res || !res.data) return null;
 
@@ -95,7 +103,7 @@ export class SqliteAdapter implements DatastoreAdapter {
         const serialized = JSON.stringify(data);
 
         try {
-            this.db.run(
+            this.db['run'](
                 `INSERT INTO "${table}" (id, data, created_at, updated_at) VALUES (?, ?, ?, ?)`,
                 [id, serialized, now, now]
             );
@@ -124,7 +132,7 @@ export class SqliteAdapter implements DatastoreAdapter {
         const serialized = JSON.stringify(updated);
         const now = Date.now();
 
-        this.db.run(
+        this.db['run'](
             `UPDATE "${table}" SET data = ?, updated_at = ? WHERE id = ?`,
             [serialized, now, id]
         );
@@ -138,7 +146,7 @@ export class SqliteAdapter implements DatastoreAdapter {
         const serialized = JSON.stringify(data);
 
         // SQLite UPSERT syntax
-        this.db.run(
+        this.db['run'](
             `INSERT INTO "${table}" (id, data, created_at, updated_at) VALUES (?, ?, ?, ?)
              ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`,
             [id, serialized, now, now]
@@ -149,13 +157,13 @@ export class SqliteAdapter implements DatastoreAdapter {
 
     async delete(table: string, id: string): Promise<void> {
         this.ensureTable(table);
-        this.db.run(`DELETE FROM "${table}" WHERE id = ?`, [id]);
+        this.db['run'](`DELETE FROM "${table}" WHERE id = ?`, [id]);
     }
 
     async count(table: string, query?: QueryOptions): Promise<number> {
         this.ensureTable(table);
         const { sql, params } = this.buildWhere(query);
-        const res = this.db.prepare(`SELECT COUNT(*) as count FROM "${table}" ${sql}`).get(...params) as { count: number; };
+        const res = this.db['prepare'](`SELECT COUNT(*) as count FROM "${table}" ${sql}`).get(...params) as { count: number; };
         return res.count;
     }
 
@@ -181,16 +189,16 @@ export class SqliteAdapter implements DatastoreAdapter {
             let limitSql = '';
             if (query.limit) limitSql = ` LIMIT ${query.limit}`;
 
-            const rows = this.db.prepare(`SELECT id FROM "${table}" ${selectQ.sql} ${orderSql} ${limitSql}`).all(...selectQ.params) as { id: string; }[];
+            const rows = this.db['prepare'](`SELECT id FROM "${table}" ${selectQ.sql} ${orderSql} ${limitSql}`).all(...selectQ.params) as { id: string; }[];
 
             if (rows.length === 0) return;
 
             const ids = rows.map(r => r.id);
             // Batch delete
             const placeholders = ids.map(() => '?').join(',');
-            this.db.run(`DELETE FROM "${table}" WHERE id IN (${placeholders})`, ids);
+            this.db['run'](`DELETE FROM "${table}" WHERE id IN (${placeholders})`, ids);
         } else {
-            this.db.run(`DELETE FROM "${table}" ${sql}`, params);
+            this.db['run'](`DELETE FROM "${table}" ${sql}`, params);
         }
     }
 
@@ -211,7 +219,7 @@ export class SqliteAdapter implements DatastoreAdapter {
         if (query?.limit) limitSql = ` LIMIT ${query.limit}`;
         if (query?.offset) limitSql += ` OFFSET ${query.offset}`;
 
-        const rows = this.db.prepare(`SELECT data FROM "${table}" ${sql} ${orderSql} ${limitSql}`).all(...params) as { data: string; }[];
+        const rows = this.db['prepare'](`SELECT data FROM "${table}" ${sql} ${orderSql} ${limitSql}`).all(...params) as { data: string; }[];
         return rows.map(r => JSON.parse(r.data));
     }
 

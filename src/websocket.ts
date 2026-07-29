@@ -1,8 +1,8 @@
-import type { ServerWebSocket } from 'bun';
 import type { ShokupanContext } from './context';
 import { getCallerInfo } from './decorators/util/stack';
 import { getEventHandlers, isWebSocketController } from './decorators/websocket';
 import type { Shokupan } from './shokupan';
+import type { ServerWebSocket } from './util/runtime-types';
 import { $childControllers, $childRouters, $isWebSocketRouter, $mountPath, $routes } from './util/symbol';
 
 /**

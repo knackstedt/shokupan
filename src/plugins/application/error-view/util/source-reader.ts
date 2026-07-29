@@ -1,4 +1,4 @@
-import { file } from 'bun';
+import { access, readFile } from 'node:fs/promises';
 
 export interface SourceContext {
     lines: {
@@ -19,10 +19,13 @@ export async function readSourceContext(filePath: string | undefined, line: numb
     const path = filePath.startsWith('file://') ? filePath.slice(7) : filePath;
 
     try {
-        const f = file(path);
-        if (!await f.exists()) return null;
+        await access(path);
+    } catch {
+        return null;
+    }
 
-        const content = await f.text();
+    try {
+        const content = await readFile(path, 'utf-8');
         const allLines = content.split('\n');
 
         // Line is 1-indexed in stack trace, but 0-indexed in array

@@ -4,6 +4,8 @@ import type { ShokupanContext } from "../../context";
 import { $finalResponse, $rawBody } from '../../util/symbol';
 import type { Middleware, NextFn } from "../../util/types";
 
+declare const Bun: any;
+
 export interface CompressionOptions {
     /**
      * Minimum byte size to compress responses
