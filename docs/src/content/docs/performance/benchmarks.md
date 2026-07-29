@@ -51,7 +51,10 @@ The basic benchmark suite tests fundamental request handling capabilities across
 
 ### Interactive Results
 
-<iframe id="basic-report" src="/report.html" style="width: 100%; height: 100vh; border: 0; border-radius: 4px;"></iframe>
+<div style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+IN PROGRESS
+<!-- <iframe id="basic-report" src="/report.html" style="width: 100%; height: 100vh; border: 0; border-radius: 4px;"></iframe> -->
+</div>
 
 <script>
 const iframe = document.getElementById('basic-report');
@@ -135,7 +138,10 @@ Failed scenarios are marked as "FAILED" in the report with error details.
 
 ### Interactive Results
 
-<iframe id="advanced-report" src="/advanced-report.html" style="width: 100%; height: 100vh; border: 0; border-radius: 4px;"></iframe>
+<!-- <iframe id="advanced-report" src="/advanced-report.html" style="width: 100%; height: 100vh; border: 0; border-radius: 4px;"></iframe> -->
+<div style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+IN PROGRESS
+</div>
 
 <script>
 const iframe2 = document.getElementById('advanced-report');
