@@ -19,7 +19,7 @@
     "explorer.fileNesting.expand": false,
     "explorer.fileNesting.patterns": {
         "*.ts": "${capture}.js, ${capture}.spec.ts, ${capture}.*.spec.ts, ${capture}.test.ts",
-        "*.tsx": "${capture}.spec.ts, ${capture}.*.spec.ts, ${capture}.test.ts",
+        "*.tsx": "${capture}.spec.tsx, ${capture}.*.spec.tsx, ${capture}.test.tsx",
         "*.js": "${capture}.js.map, ${capture}.min.js, ${capture}.d.ts, ${capture}.wasm, ${capture}.wasm.map, ${capture}.wat",
         "*.jsx": "${capture}.js",
         "tsconfig.json": "tsconfig.*.json",
