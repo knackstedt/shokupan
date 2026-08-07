@@ -344,9 +344,10 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
     /**
      * Registers an MCP Tool.
      */
-    public tool(name: string, schema: any, handler: Function) {
+    public tool(name: string, schema: any, handler: Function, description?: string) {
         this.mcpProtocol.addTool({
             name,
+            description,
             inputSchema: schema,
             handler: handler as (...args: any[]) => any
         });
@@ -356,9 +357,10 @@ export class ShokupanRouter<T extends Record<string, any> = GlobalShokupanState>
     /**
      * Registers an MCP Prompt.
      */
-    public prompt(name: string, args: McpPrompt['arguments'], handler: Function) {
+    public prompt(name: string, args: McpPrompt['arguments'], handler: Function, description?: string) {
         this.mcpProtocol.addPrompt({
             name,
+            description,
             arguments: args,
             handler: handler as (...args: any[]) => any
         });

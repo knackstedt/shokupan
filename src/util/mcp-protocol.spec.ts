@@ -110,6 +110,47 @@ describe("MCP Core Integration", () => {
         const response = await session.handleMessage(resourceRequest as any);
         expect(response?.result).toEqual({ content: "Resource content" });
     });
+
+    it("should resolve URI-template resources against concrete URIs", async () => {
+        const app = new Shokupan();
+        // Register a template resource and confirm a concrete URI matches.
+        app.mcpProtocol.addResource({
+            uri: "test://items/{category}/{id}",
+            name: "item",
+            handler: (uri: string) => ({ content: `item at ${uri}` })
+        });
+
+        const session = app.mcpProtocol.createSession("test-template-session");
+        const response = await session.handleMessage({
+            jsonrpc: "2.0",
+            id: 5,
+            method: "resources/read",
+            params: { uri: "test://items/books/42" }
+        } as any);
+
+        expect(response?.result).toEqual({ content: "item at test://items/books/42" });
+    });
+
+    it("should return Resource not found for unmatched concrete URIs", async () => {
+        const app = new Shokupan();
+        app.mcpProtocol.addResource({
+            uri: "test://items/{category}/{id}",
+            name: "item",
+            handler: (uri: string) => ({ content: uri })
+        });
+
+        const session = app.mcpProtocol.createSession("test-miss-session");
+        const response = await session.handleMessage({
+            jsonrpc: "2.0",
+            id: 6,
+            method: "resources/read",
+            params: { uri: "test://nope" }
+        } as any);
+
+        expect(response?.error?.code).toBe(-32603);
+        expect(response?.error?.message).toBe("Internal Error");
+        expect(response?.error?.data).toContain("Resource not found");
+    });
 });
 
 describe("MCP Advanced Features", () => {

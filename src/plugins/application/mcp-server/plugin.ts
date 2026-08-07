@@ -1,4 +1,6 @@
 import { randomUUID } from "crypto";
+import { readFileSync } from "node:fs";
+import { isAbsolute, resolve as resolvePath } from "node:path";
 import { ShokupanRouter } from "../../../router";
 import type { Shokupan } from '../../../shokupan';
 import { getProcess } from "../../../util/env";
@@ -205,7 +207,8 @@ export class MCPServerPlugin implements ShokupanPlugin {
                         text: JSON.stringify(endpoints, null, 2)
                     }]
                 };
-            }
+            },
+            "List all HTTP endpoints discovered in the application by analyzing its source. Returns each endpoint's HTTP method, path, handler name, and OpenAPI summary."
         );
 
         this.router.tool(
@@ -237,7 +240,8 @@ export class MCPServerPlugin implements ShokupanPlugin {
                         text: JSON.stringify(route, null, 2)
                     }]
                 };
-            }
+            },
+            "Get detailed information about a single endpoint, including its handler source, inferred request types (body/query/params/headers), inferred response type and JSON schema, emitted events, and source location. Provide the HTTP method (e.g. GET) and the route path as it appears in list_endpoints (e.g. /todos/{id})."
         );
     }
 
@@ -247,6 +251,7 @@ export class MCPServerPlugin implements ShokupanPlugin {
             "mcp://api/openapi.json",
             {
                 name: "openapi-spec",
+                description: "The full OpenAPI-style endpoint catalog for the application, including methods, paths, handler names, summaries, inferred request types, and response types.",
                 mimeType: "application/json"
             },
             async (uri: any) => {
@@ -276,21 +281,53 @@ export class MCPServerPlugin implements ShokupanPlugin {
             "mcp://api/routes/{method}/{path}/source",
             {
                 name: "route-source",
+                description: "Read the TypeScript source code of a specific route handler. Use the method and path as they appear in list_endpoints (path uses {param} form, e.g. mcp://api/routes/GET/todos/{id}/source).",
                 mimeType: "text/typescript"
             },
             async (uri: any) => {
-                // Parse URI manually for now (simplified)
-                // uri: mcp://api/routes/GET/users/source
+                // uri: mcp://api/routes/GET/todos/{id}/source
                 // Format: mcp://api/routes/<METHOD>/<PATH>/source
-                // PATH can contain slashes.
+                // PATH can contain slashes and {param} placeholders.
                 const match = uri.match(/^mcp:\/\/api\/routes\/([^/]+)\/(.+)\/source$/);
                 if (!match) {
-                    throw new Error("Invalid MCP resource URI format");
+                    throw new Error("Invalid MCP resource URI format. Expected mcp://api/routes/<METHOD>/<PATH>/source");
                 }
                 const method = match[1];
-                const routePath = match[2];
+                const routePath = '/' + match[2];
 
-                throw new Error("Dynamic resource reading not fully implemented in lightweight version yet.");
+                const { applications } = await this.analyzer.analyze();
+                const route = applications.flatMap(app => app.routes)
+                    .find(r => r.method.toUpperCase() === method.toUpperCase() && r.path === routePath);
+
+                if (!route) {
+                    throw new Error(`Endpoint ${method} ${routePath} not found.`);
+                }
+
+                const ctx = route.sourceContext;
+                if (!ctx || !ctx.file) {
+                    throw new Error(`No source location available for ${method} ${routePath}.`);
+                }
+
+                const filePath = isAbsolute(ctx.file) ? ctx.file : resolvePath(this.options.rootDir!, ctx.file);
+                let source: string;
+                try {
+                    source = readFileSync(filePath, 'utf-8');
+                } catch (e: any) {
+                    throw new Error(`Could not read source file ${filePath}: ${e.message}`);
+                }
+
+                const lines = source.split(/\r?\n/);
+                const start = Math.max(1, ctx.startLine);
+                const end = Math.min(lines.length, ctx.endLine);
+                const snippet = lines.slice(start - 1, end).join('\n');
+
+                return {
+                    contents: [{
+                        uri: uri,
+                        mimeType: "text/typescript",
+                        text: `// ${ctx.file}:${start}-${end}\n${snippet}`
+                    }]
+                };
             }
         );
     }
@@ -335,7 +372,8 @@ Use fetch or axios. Ensure proper typing.`
                         }
                     }]
                 };
-            }
+            },
+            "Generate a typed TypeScript client function for a specific endpoint. Provide the HTTP method (e.g. GET) and the route path as it appears in list_endpoints (e.g. /todos/{id}). Returns a prompt pre-filled with the endpoint's inferred request and response types."
         );
 
         // ... (Other prompts omitted for brevity/simplicity, logic is identical)

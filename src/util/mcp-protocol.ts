@@ -368,8 +368,37 @@ export class McpProtocol {
     }
 
     public async readResource(uri: string, context: McpContext) {
-        const resource = this.resources.get(uri);
-        if (!resource) throw new Error(`Resource not found: ${uri}`);
-        return await resource.handler(uri, context);
+        // Exact match first (concrete URIs).
+        const exact = this.resources.get(uri);
+        if (exact) return await exact.handler(uri, context);
+
+        // Template match: resources registered with {var} placeholders.
+        // e.g. "mcp://api/routes/{method}/{path}/source" matches a concrete
+        // URI like "mcp://api/routes/GET/todos/{id}/source".
+        for (const resource of this.resources.values()) {
+            if (!resource.uri.includes('{')) continue;
+            const regex = templateToRegex(resource.uri);
+            if (regex.test(uri)) {
+                return await resource.handler(uri, context);
+            }
+        }
+
+        throw new Error(`Resource not found: ${uri}`);
     }
+}
+
+/**
+ * Converts an MCP URI template (RFC 6570 level-1 style, e.g.
+ * `mcp://api/routes/{method}/{path}/source`) into an anchored RegExp.
+ * Each `{name}` becomes a non-greedy capture group `(.+?)` so multi-segment
+ * values (e.g. `todos/{id}`) are matched while the literal suffix anchors it.
+ */
+function templateToRegex(template: string): RegExp {
+    const escapeLiteral = (s: string) => s.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
+    const parts = template.split(/(\{[^}]+\})/g);
+    const pattern = parts
+        .filter(p => p.length > 0)
+        .map(p => p.startsWith('{') && p.endsWith('}') ? '(.+?)' : escapeLiteral(p))
+        .join('');
+    return new RegExp('^' + pattern + '$');
 }
