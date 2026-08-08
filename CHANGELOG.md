@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.3.0](https://github.com/knackstedt/shokupan/compare/v1.2.0...v1.3.0) (2026-08-08)
+
+
+### Features
+
+* add comprehensive security hardening across dashboard, error views, and middleware ([1c912d9](https://github.com/knackstedt/shokupan/commit/1c912d93d18d6990284f8a315087537d5e2d4c34))
+
 ## [1.2.0](https://github.com/knackstedt/shokupan/compare/v1.1.0...v1.2.0) (2026-08-08)
 
 ## [1.1.0](https://github.com/knackstedt/shokupan/compare/v1.1.0-next.1...v1.1.0) (2026-08-08)
