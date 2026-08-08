@@ -1,4 +1,4 @@
-import { Shokupan, escapeHtml } from 'shokupan';
+import { Shokupan, escapeHtml } from '../../src/index';
 
 /**
  * Sample 9: HTMX Fullstack Application
