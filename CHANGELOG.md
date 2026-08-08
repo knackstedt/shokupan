@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.1.0-next.1](https://github.com/knackstedt/shokupan/compare/v1.1.0-next.0...v1.1.0-next.1) (2026-08-08)
+
+
+### Features
+
+* add centralized security guards for source-view endpoints to prevent credential leaks ([1b25202](https://github.com/knackstedt/shokupan/commit/1b25202faadeb7d5cff586e20fdd0ae987ba1c90))
+* add MCP resource URI template matching and improve tool/prompt descriptions ([37586f3](https://github.com/knackstedt/shokupan/commit/37586f38722cba8b9a305c782e4d34f471c5f221))
+* add scoped idempotency keys to prevent cross-user cache leakage ([e401d37](https://github.com/knackstedt/shokupan/commit/e401d3759a07543f92f90f151661b00f0eadb7e0))
+* strengthen SSRF protection in dashboard replay URL validation ([0e88eb1](https://github.com/knackstedt/shokupan/commit/0e88eb1d5eedbfebcc3828a222b1380213d38e6a))
+
+
+### Bug Fixes
+
+* add authentication check to /permissions/roles endpoint ([0e3ebd3](https://github.com/knackstedt/shokupan/commit/0e3ebd3ce518ccc5c08e04146cda3e9303efe791))
+* add HTML escaping to prevent XSS in HTMX fullstack sample ([31b7af1](https://github.com/knackstedt/shokupan/commit/31b7af14b14e44493d78b9ebae5b993520a93227))
+* correct admin route middleware pattern from wildcard to exact match ([99fd776](https://github.com/knackstedt/shokupan/commit/99fd7769b8fd183592ff714c052fb1c96c2410b7))
+
 ## [1.1.0-next.0](https://github.com/knackstedt/shokupan/compare/v1.0.1...v1.1.0-next.0) (2026-07-29)
 
 
