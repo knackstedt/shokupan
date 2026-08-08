@@ -351,9 +351,16 @@ export function Session(options: SessionOptions): Middleware {
                         break;
                     }
                 }
-            } else {
+            } else if (secrets.length === 0) {
+                // No signing configured — accept the raw cookie value.
                 reqSessionId = rawCookie;
             }
+            // Security: when signing is configured (secrets.length > 0), an
+            // unsigned cookie is rejected. Treating an unsigned value as a
+            // trusted session ID would let an attacker who learns an ID
+            // (e.g. from logs or any endpoint echoing ctx.sessionID) forge a
+            // cookie and bypass HMAC verification entirely. Fall through to
+            // generate a fresh session ID instead.
         }
 
         // 2. Generate new ID if none

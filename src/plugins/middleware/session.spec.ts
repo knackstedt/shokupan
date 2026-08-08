@@ -292,4 +292,48 @@ describe("Session Middleware", () => {
 
         server.stop();
     });
+
+    it("should reject an unsigned (forged) cookie when signing is configured", async () => {
+        const app = new Shokupan({ port: 0 });
+        app.use(session({ secret: 'secret', resave: false, saveUninitialized: true }));
+
+        app.get('/set', (ctx) => {
+            ctx.session['user'] = "test-user";
+            return "ok";
+        });
+
+        app.get('/me', (ctx) => {
+            return { id: ctx.sessionID, user: ctx.session['user'] };
+        });
+
+        const server = await app.listen();
+        const baseUrl = `http://localhost:${server.port}`;
+
+        // 1. Establish a real signed session.
+        const res1 = await fetch(`${baseUrl}/set`);
+        const signedCookie = res1.headers.get("set-cookie")!;
+        expect(signedCookie).toContain("connect.sid=s%3A");
+
+        // Extract the raw session id from the signed cookie (value after s: and before .).
+        const rawValue = decodeURIComponent(signedCookie.split(";")[0].split("=")[1]);
+        const rawId = rawValue.slice(2).split(".")[0];
+        expect(rawId).toBeTruthy();
+
+        // 2. Send a forged UNSIGNED cookie carrying the same id (no s: prefix, no signature).
+        const forgedCookie = `connect.sid=${rawId}`;
+        const res2 = await fetch(`${baseUrl}/me`, { headers: { "Cookie": forgedCookie } });
+        const data2 = await res2.json() as any;
+
+        // The forged cookie must NOT be trusted: a fresh session id is generated
+        // and the attacker does not inherit the victim's session data.
+        expect(data2.id).not.toBe(rawId);
+        expect(data2.user).toBeUndefined();
+
+        // 3. The legitimate signed cookie still works.
+        const res3 = await fetch(`${baseUrl}/me`, { headers: { "Cookie": signedCookie } });
+        const data3 = await res3.json() as any;
+        expect(data3.user).toBe("test-user");
+
+        server.stop();
+    });
 });
