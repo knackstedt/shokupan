@@ -7,7 +7,7 @@ import { getProcess } from "../../../util/env";
 import type { McpSession } from "../../../util/mcp-protocol";
 import { getMetaFile } from "../../../util/runtime-types";
 import { $appRoot, $childRouters } from "../../../util/symbol";
-import type { ShokupanPlugin } from "../../../util/types";
+import type { Middleware, ShokupanPlugin } from "../../../util/types";
 import { OpenAPIAnalyzer } from "../openapi/analyzer.impl";
 
 export interface MCPServerPluginOptions {
@@ -27,6 +27,29 @@ export interface MCPServerPluginOptions {
      * Whether to allow tool execution.
      */
     allowToolExecution?: boolean;
+    /**
+     * Authentication middleware to protect all MCP server endpoints.
+     *
+     * The MCP server exposes source code, OpenAPI specs, and endpoint
+     * introspection. Without auth, anyone who can reach the MCP port can
+     * read this data. Provide a middleware that validates credentials
+     * (e.g. checks a bearer token, API key, or session) and returns a
+     * 401/403 response if unauthenticated.
+     *
+     * @example
+     * ```typescript
+     * new MCPServerPlugin({
+     *   auth: (ctx, next) => {
+     *     const token = ctx.headers.get('authorization');
+     *     if (token !== `Bearer ${process.env.MCP_TOKEN}`) {
+     *       return ctx.text('Unauthorized', 401);
+     *     }
+     *     return next();
+     *   }
+     * })
+     * ```
+     */
+    auth?: Middleware;
 }
 
 /**
@@ -113,6 +136,13 @@ export class MCPServerPlugin implements ShokupanPlugin {
     private sessions = new Map<string, McpSession>();
 
     private setupRoutes() {
+        // Security: apply auth middleware to all MCP routes if configured.
+        // The MCP server exposes source code, OpenAPI specs, and endpoint
+        // introspection. Without auth, anyone reaching the port can read it.
+        if (this.options.auth) {
+            this.router.use(this.options.auth);
+        }
+
         // SSE Endpoint (GET)
         this.router.get('', (ctx) => {
             const sessionId = randomUUID();

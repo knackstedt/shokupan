@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { URL } from 'node:url';
 import { getProcess, getProcessEnv } from '../../../util/env';
 import { createLogger, type Logger } from '../../../util/logger';
+import { redactHeaders } from './header-redaction';
 
 const require = createRequire(import.meta.url);
 
@@ -261,6 +262,9 @@ export class FetchInterceptor {
                 }
             } catch (e) { }
 
+            // Security: redact sensitive headers before logging
+            requestHeaders = redactHeaders(requestHeaders);
+
             try {
                 const response = await self.originalFetch.apply(global, [input, init]);
 
@@ -397,9 +401,9 @@ export class FetchInterceptor {
                     self.notify({
                         method,
                         url,
-                        requestHeaders: getReqHeaders(),
+                        requestHeaders: redactHeaders(getReqHeaders()),
                         status: res.statusCode || 0,
-                        responseHeaders: resHeaders,
+                        responseHeaders: redactHeaders(resHeaders),
                         startTime: timestamp,
                         duration,
                         callStack,
@@ -413,7 +417,7 @@ export class FetchInterceptor {
                     self.notify({
                         method,
                         url,
-                        requestHeaders: getReqHeaders(),
+                        requestHeaders: redactHeaders(getReqHeaders()),
                         status: 0,
                         responseHeaders: {},
                         responseBody: `Error: ${err.message}`, // Capture error
@@ -501,9 +505,9 @@ export class FetchInterceptor {
                     self.notify({
                         method,
                         url,
-                        requestHeaders: getReqHeaders(),
+                        requestHeaders: redactHeaders(getReqHeaders()),
                         status: res.statusCode || 0,
-                        responseHeaders: resHeaders,
+                        responseHeaders: redactHeaders(resHeaders),
                         startTime: timestamp,
                         duration,
                         callStack,
@@ -517,7 +521,7 @@ export class FetchInterceptor {
                     self.notify({
                         method,
                         url,
-                        requestHeaders: getReqHeaders(),
+                        requestHeaders: redactHeaders(getReqHeaders()),
                         status: 0,
                         responseHeaders: {},
                         responseBody: `Error: ${err.message}`,
@@ -637,7 +641,7 @@ export class FetchInterceptor {
 
         this.notify({
             ...meta,
-            responseHeaders,
+            responseHeaders: redactHeaders(responseHeaders),
             responseBody,
             responseSize,
             transferred

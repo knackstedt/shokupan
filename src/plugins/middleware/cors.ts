@@ -131,11 +131,19 @@ export function Cors(options: CorsOptions = {}): Middleware {
                 const h = Array.isArray(opts.allowedHeaders) ? opts.allowedHeaders.join(",") : opts.allowedHeaders;
                 set("Access-Control-Allow-Headers", h);
             } else {
-                // Reflect request headers if not specified
+                // Reflect request headers if not specified, but validate the
+                // value to prevent header injection. Only allow standard header
+                // name characters (alphanumeric, hyphen, comma, space).
                 const reqHeaders = ctx.headers.get("access-control-request-headers");
                 if (reqHeaders) {
-                    set("Access-Control-Allow-Headers", reqHeaders);
-                    append("Vary", "Access-Control-Request-Headers");
+                    // Security: validate reflected header value to prevent injection.
+                    // Header names are tokens per RFC 7230: alphanumeric + limited
+                    // punctuation. Reject anything containing CRLF or other
+                    // control characters that could break the response header.
+                    if (/^[a-zA-Z0-9\-_,\s]+$/.test(reqHeaders)) {
+                        set("Access-Control-Allow-Headers", reqHeaders);
+                        append("Vary", "Access-Control-Request-Headers");
+                    }
                 }
             }
 

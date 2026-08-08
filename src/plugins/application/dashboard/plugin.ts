@@ -9,8 +9,9 @@ import { getProcess } from '../../../util/env';
 import { getEditorLinkPattern } from '../../../util/ide';
 import { getMetaFile, Glob, type ServerWebSocket } from '../../../util/runtime-types';
 import { $appRoot, $childRouters, $debug, $mountPath, $onWsMessage, $wsMessages } from "../../../util/symbol";
-import type { ShokupanHooks, ShokupanPlugin } from "../../../util/types";
+import type { Middleware, ShokupanHooks, ShokupanPlugin } from "../../../util/types";
 import { FetchInterceptor, type OutboundRequestLog } from './fetch-interceptor';
+import { redactHeaders } from './header-redaction';
 import { MetricsCollector } from './metrics-collector';
 let renderToString: any;
 async function getRenderToString() {
@@ -122,6 +123,28 @@ export interface RequestLog {
 export interface DashboardConfig {
     getRequestHeaders?: () => HeadersInit;
     path?: string;
+    /**
+     * Authentication middleware to protect all dashboard endpoints.
+     *
+     * The dashboard exposes sensitive data: request/response bodies (which may
+     * contain passwords, tokens, or cookies), metrics, and a replay endpoint.
+     * Without an auth middleware, anyone who can reach the dashboard port can
+     * read this data.
+     *
+     * Provide a middleware that validates credentials (e.g. checks a session
+     * cookie, JWT, or API key) and returns a 401/403 response if unauthenticated.
+     *
+     * @example
+     * ```typescript
+     * new Dashboard({
+     *   auth: (ctx, next) => {
+     *     if (!ctx.session?.user?.isAdmin) return ctx.text('Forbidden', 403);
+     *     return next();
+     *   }
+     * })
+     * ```
+     */
+    auth?: Middleware;
     /**
      * patterns to ignore in the request list.
      * Can be a glob pattern (string), regex, or a custom callback function.
@@ -388,6 +411,13 @@ export class Dashboard implements ShokupanPlugin {
             name: 'DashboardPlugin',
             pluginName: 'Dashboard'
         };
+
+        // Security: apply auth middleware to all dashboard routes if configured.
+        // The dashboard exposes sensitive data (request/response bodies, metrics,
+        // replay). Without auth, anyone reaching the dashboard port can read it.
+        if (this.dashboardConfig.auth) {
+            this.router.use(this.dashboardConfig.auth);
+        }
 
         // Set up all routes on the internal router
         this.setupRoutes();
@@ -1390,6 +1420,12 @@ export class Dashboard implements ShokupanPlugin {
                     });
                 }
 
+                // Security: redact sensitive headers before storing in the dashboard
+                // database. Request/response bodies may contain credentials that
+                // would be retrievable via the unauthenticated payload endpoint.
+                const redactedHeaders = redactHeaders(headers);
+                const redactedResHeaders = redactHeaders(resHeaders);
+
                 const responseHeadersSize = Object.entries(resHeaders).reduce((acc, [k, v]) => acc + k.length + String(v).length + 2, 0);
 
                 let body = (ctx as any).responseBody;
@@ -1455,11 +1491,11 @@ export class Dashboard implements ShokupanPlugin {
                             id,
                             method: ctx.method,
                             url: ctx.url.toString(),
-                            headers, // Re-use already extracted headers
+                            headers: redactedHeaders, // Re-use already extracted headers
                             status: response.status,
                             timestamp: Date.now(),
                             state: ctx.state,
-                            responseHeaders: resHeaders,
+                            responseHeaders: redactedResHeaders,
                             hasRequestBody: !!(ctx.requestBody || (ctx as any).bodyData),
                             hasResponseBody: !!body
                         });
@@ -1495,8 +1531,8 @@ export class Dashboard implements ShokupanPlugin {
                     cookies: cookiesCount,
                     transferred: responseSize + responseHeadersSize,
                     remoteIP,
-                    requestHeaders: headers,
-                    responseHeaders: resHeaders,
+                    requestHeaders: redactedHeaders,
+                    responseHeaders: redactedResHeaders,
                     wsMessages: (ctx as any)[$wsMessages],
                     hasRequestBody: !!(ctx.requestBody || (ctx as any).bodyData),
                     hasResponseBody: !!body,

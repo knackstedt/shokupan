@@ -1,6 +1,6 @@
 import { lookup as mimeLookup } from 'mrmime';
 import { access, readFile, stat } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Shokupan } from '../../../shokupan';
 import { $childRouters, $mountPath } from '../../../util/symbol';
@@ -133,6 +133,16 @@ export class WebAppPlugin implements ShokupanPlugin {
 
             // Try to serve as a static file first
             let filePath = join(this.distDir, sub);
+
+            // Security: prevent path traversal outside distDir.
+            // The URL constructor does not normalize ".." dot-segments, so a
+            // request like `/_app/../../etc/passwd` would escape distDir without
+            // this check. Resolve and verify the path stays within distDir.
+            const resolvedDist = resolve(this.distDir);
+            const resolvedFile = resolve(filePath);
+            if (!resolvedFile.startsWith(resolvedDist + sep) && resolvedFile !== resolvedDist) {
+                return ctx.text('Forbidden', 403);
+            }
 
             let fileExists = true;
             try {

@@ -2,6 +2,47 @@ import type { ShokupanRequest } from "./request";
 import type { ShokupanConfig } from "./types";
 
 /**
+ * Keys that can pollute the prototype chain if assigned to an object.
+ * Used to strip dangerous keys from JSON.parse results.
+ */
+const PROTOTYPE_POLLUTION_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * Recursively strip `__proto__`, `constructor`, and `prototype` keys from a
+ * parsed JSON value. This prevents prototype pollution when the parsed object
+ * is later merged into other objects via Object.assign, spread, or deep merge.
+ *
+ * `JSON.parse` preserves `__proto__` as an own property on the result object.
+ * While this alone doesn't pollute the prototype, the property becomes a
+ * pollution vector if the object is passed to an unsafe merge function.
+ */
+function stripPrototypePollutionKeys(value: any): any {
+    if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i++) {
+            const item = value[i];
+            if (item && typeof item === 'object') {
+                value[i] = stripPrototypePollutionKeys(item);
+            }
+        }
+        return value;
+    }
+    if (value && typeof value === 'object') {
+        for (const key of Object.keys(value)) {
+            if (PROTOTYPE_POLLUTION_KEYS.has(key)) {
+                delete value[key];
+            } else {
+                const child = value[key];
+                if (child && typeof child === 'object') {
+                    value[key] = stripPrototypePollutionKeys(child);
+                }
+            }
+        }
+        return value;
+    }
+    return value;
+}
+
+/**
  * Utility class for parsing request bodies.
  * Handles size limits, parsing, and caching logic detached from the Context.
  */
@@ -45,7 +86,11 @@ export class BodyParser {
         if (parserType === 'native') {
             // Handle empty body definition
             if (!rawText) return {};
-            return JSON.parse(rawText);
+            // Security: strip __proto__/constructor/prototype keys from the
+            // parsed result to prevent prototype pollution when the body is
+            // later merged into other objects. secure-json-parse does this
+            // automatically, but the native parser does not.
+            return stripPrototypePollutionKeys(JSON.parse(rawText));
         } else {
             const { getJSONParser } = await import('./json-parser');
             const parser = getJSONParser(parserType);

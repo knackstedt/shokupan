@@ -11,6 +11,34 @@ import { escapeHtml } from '../../../../util/html';
 import { generateEditorLink } from '../../../../util/ide';
 import { readSourceContext } from '../util/source-reader';
 
+/**
+ * Headers that are redacted from error pages to prevent credential leakage.
+ * Error pages may be shared or accessible by unauthorized users; displaying
+ * raw Authorization/Cookie values would leak credentials.
+ */
+const SENSITIVE_HEADERS = new Set([
+    'authorization',
+    'proxy-authorization',
+    'cookie',
+    'set-cookie',
+    'x-api-key',
+    'api-key',
+    'x-auth-token',
+    'x-secret',
+    'x-csrf-token',
+]);
+
+/**
+ * Convert a Headers object into a plain record with sensitive values redacted.
+ */
+function redactSensitiveHeaders(headers: Headers): Record<string, string> {
+    const result: Record<string, string> = {};
+    headers.forEach((v, k) => {
+        result[k] = SENSITIVE_HEADERS.has(k.toLowerCase()) ? '[REDACTED]' : v;
+    });
+    return result;
+}
+
 interface StackFrame {
     method: string;
     file: string;
@@ -243,7 +271,7 @@ const ContextData = ({ errorId, errorTimestamp, errorScope, ctx }: ContextDataPr
             </div>
             <div class="data-block">
                 <h3>Headers</h3>
-                <KeyValueTable data={Object.fromEntries(ctx.headers)} />
+                <KeyValueTable data={redactSensitiveHeaders(ctx.headers)} />
             </div>
             <div class="data-block">
                 <h3>Query & Params</h3>
