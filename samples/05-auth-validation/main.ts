@@ -96,7 +96,7 @@ app.post('/auth/logout', (ctx) => {
 });
 
 // Protected middleware
-app.use('/admin/*', async (ctx, next) => {
+app.use('/admin', async (ctx, next) => {
     if (!ctx.session.user) {
         return ctx.json({ error: 'Unauthorized' }, 401);
     }
