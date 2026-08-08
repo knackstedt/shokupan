@@ -74,6 +74,11 @@ export class PermissionPlugin extends ShokupanRouter<any> implements ShokupanPlu
 
     private init() {
         this.get('/permissions/roles', async (ctx) => {
+            const user = (ctx as any).user;
+            if (!user) {
+                return ctx.json({ error: 'Unauthenticated' }, 401);
+            }
+
             const roles = Array.from(this.roles.values()).map(role => ({
                 name: role.name,
                 description: role.description,
