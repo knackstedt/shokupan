@@ -3,6 +3,7 @@ export * from "./decorators";
 export * from "./middleware";
 export * from "./router";
 export * from "./shokupan";
+export * from "./util/html";
 export * from "./util/request";
 export * from "./util/response";
 export * from "./util/runtime-types";

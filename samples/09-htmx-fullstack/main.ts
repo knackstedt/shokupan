@@ -1,4 +1,4 @@
-import { Shokupan, HtmxPlugin } from 'shokupan';
+import { Shokupan, escapeHtml } from 'shokupan';
 
 /**
  * Sample 9: HTMX Fullstack Application
@@ -20,6 +20,8 @@ const todos: Todo[] = [
     { id: 2, text: 'Walk the dog', done: true }
 ];
 let nextId = 3;
+
+export { app, todoListPartial, todos };
 
 // Layout wrapper
 const layout = (content: string) => `<!DOCTYPE html>
@@ -60,7 +62,7 @@ const todoListPartial = () => {
                 hx-post="/todos/${todo.id}/toggle"
                 hx-target="#todo-${todo.id}"
                 hx-swap="outerHTML">
-            <span>${todo.text}</span>
+            <span>${escapeHtml(todo.text)}</span>
             <button hx-delete="/todos/${todo.id}"
                 hx-target="#todo-${todo.id}"
                 hx-swap="outerHTML"
@@ -123,7 +125,7 @@ app.post('/todos/:id/toggle', (ctx) => {
                 hx-post="/todos/${todo.id}/toggle"
                 hx-target="#todo-${todo.id}"
                 hx-swap="outerHTML">
-            <span>${todo.text}</span>
+            <span>${escapeHtml(todo.text)}</span>
             <button hx-delete="/todos/${todo.id}"
                 hx-target="#todo-${todo.id}"
                 hx-swap="outerHTML"
@@ -146,6 +148,8 @@ app.delete('/todos/:id', (ctx) => {
 // Health check
 app.get('/health', () => ({ status: 'ok', service: 'htmx-fullstack' }));
 
-await app.listen();
-console.log('HTMX Fullstack App running on http://localhost:3009');
-console.log('Open http://localhost:3009 in your browser');
+if (import.meta.main) {
+    await app.listen();
+    console.log('HTMX Fullstack App running on http://localhost:3009');
+    console.log('Open http://localhost:3009 in your browser');
+}
