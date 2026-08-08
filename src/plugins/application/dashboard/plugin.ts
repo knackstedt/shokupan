@@ -1698,8 +1698,9 @@ export class Dashboard implements ShokupanPlugin {
     public static validateReplayUrl(url: string, mountPath: string, allowedReplayHosts?: string[] | ((hostname: string) => boolean)): { error?: string } {
         try {
             const urlObj = new URL(url);
-            const blockedProtocols = ['file:', 'ftp:', 'gopher:', 'data:', 'javascript:', 'vbscript:'];
-            if (blockedProtocols.includes(urlObj.protocol)) {
+            // Security: only allow http/https protocols (deny-list alone misses schemes
+            // like ldap:, smb:, etc. that fetch may reject but should never reach).
+            if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
                 return { error: 'Invalid protocol' };
             }
             const hostname = urlObj.hostname.replace(/^\[|\]$/g, '');
@@ -1711,10 +1712,19 @@ export class Dashboard implements ShokupanPlugin {
                 return { error: 'Numeric IP addresses are not allowed' };
             }
 
+            // Security: always block cloud metadata endpoints and the link-local range
+            // 169.254.0.0/16, even when an allowlist is configured. This prevents SSRF
+            // to AWS/GCP/Azure IMDS (169.254.169.254) and other link-local services.
+            if (Dashboard.isMetadataOrLinkLocalHost(hostname)) {
+                return { error: 'Cannot replay to internal addresses' };
+            }
+
             // Security: block IPv6 loopback and private addresses
             const ipv6PrivatePatterns = [
                 /^::1$/i,
                 /^::ffff:127\./i,
+                /^::ffff:169\.254\./i,
+                /^::ffff:0\./i,
                 /^fe80:/i,
                 /^fc00:/i,
                 /^fd00:/i
@@ -1741,7 +1751,10 @@ export class Dashboard implements ShokupanPlugin {
                 // Default private IP blocking
                 const isPrivateIP = hostname === 'localhost' || hostname === '127.0.0.1' ||
                     hostname.startsWith('10.') || hostname.startsWith('192.168.') ||
-                    /^172\.(1[6-9]|2\d|3[01])\./.test(hostname);
+                    /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+                    hostname.startsWith('169.254.') ||
+                    hostname === '0.0.0.0' || /^0\.\d+\.\d+\.\d+$/.test(hostname) ||
+                    /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(hostname);
                 if (isPrivateIP) {
                     return { error: 'Cannot replay to internal addresses' };
                 }
@@ -1754,6 +1767,23 @@ export class Dashboard implements ShokupanPlugin {
         } catch {
             return { error: 'Invalid URL' };
         }
+    }
+
+    /**
+     * Returns true for cloud metadata endpoints and the link-local range that must
+     * always be blocked to prevent SSRF, regardless of any configured allowlist.
+     */
+    private static isMetadataOrLinkLocalHost(hostname: string): boolean {
+        const h = hostname.toLowerCase();
+        // Cloud metadata service hostnames (GCP/Azure resolve internally)
+        if (h === 'metadata.google.internal' || h === 'metadata' || h === 'metadata.azure.com') {
+            return true;
+        }
+        // Link-local range 169.254.0.0/16 (covers AWS/GCP/Azure IMDS at 169.254.169.254)
+        if (h.startsWith('169.254.')) {
+            return true;
+        }
+        return false;
     }
 }
 function unknownError(ctx: any): any {
