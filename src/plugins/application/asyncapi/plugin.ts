@@ -7,6 +7,7 @@ import type { Shokupan } from '../../../shokupan';
 import { deepMerge } from '../../../util/deep-merge';
 import { getEditorLinkPattern } from '../../../util/ide';
 import { getMetaFile, type ServerWebSocket } from '../../../util/runtime-types';
+import { isSourceViewEnabled, resolveSourceFile } from '../../../util/source-file-guard';
 import { $isMounted } from '../../../util/symbol';
 import type { DeepPartial, ShokupanPlugin, ShokupanPluginOptions } from '../../../util/types';
 import { generateAsyncApi } from './generator';
@@ -160,6 +161,12 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
             return ctx.send(content);
         };
 
+        // Source view is a development convenience. The arbitrary-file-read
+        // endpoint is only registered when source view is enabled (i.e. not in
+        // production and not explicitly disabled). The same flag drives the UI
+        // so the "View Source" links stay in sync with the endpoint.
+        const sourceViewEnabled = isSourceViewEnabled(this.pluginOptions.disableSourceView);
+
         this.get('/style.css', ctx => serveFile(ctx, 'style.css', 'text/css'));
         this.get('/theme.css', ctx => serveFile(ctx, 'theme.css', 'text/css'));
         this.get('/asyncapi-client.mjs', ctx => serveFile(ctx, 'asyncapi-client.mjs', 'application/javascript'));
@@ -179,7 +186,7 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
             const serverUrl = this.pluginOptions.serverUrl || `${ctx.hostname}:${ctx.app?.applicationConfig.port}`;
             const base = this.pluginOptions.path!;
 
-            const disableSourceView = this.pluginOptions.disableSourceView;
+            const disableSourceView = !sourceViewEnabled;
 
             // Build navigation tree from spec
             try {
@@ -213,31 +220,24 @@ export class AsyncApiPlugin extends ShokupanRouter<any> implements ShokupanPlugi
             });
         });
 
-        this.get('/_code', async ctx => {
-            if (!this.checkPermission(ctx)) {
-                return ctx.text('Forbidden', 403);
-            }
-            const file = ctx.query['file'];
-            if (!file || typeof file !== 'string') {
-                return ctx.text('Missing file parameter', 400);
-            }
+        if (sourceViewEnabled) {
+            this.get('/_code', async ctx => {
+                if (!this.checkPermission(ctx)) {
+                    return ctx.text('Forbidden', 403);
+                }
+                const result = resolveSourceFile(ctx.query['file']);
+                if (!result.ok) {
+                    return ctx.text(result.message!, result.status!);
+                }
 
-            // Security: Validate path is within project root
-            const { resolve } = await import('node:path');
-            const cwd = process.cwd();
-            const resolvedPath = resolve(cwd, file);
-
-            if (!resolvedPath.startsWith(cwd + '/') && resolvedPath !== cwd) {
-                return ctx.text('Forbidden: File must be within project root', 403);
-            }
-
-            try {
-                const content = await readFile(resolvedPath, 'utf8');
-                return ctx.text(content);
-            } catch (e: any) {
-                return ctx.text('File not found: ' + e.message, 404);
-            }
-        });
+                try {
+                    const content = await readFile(result.path!, 'utf8');
+                    return ctx.text(content);
+                } catch (e: any) {
+                    return ctx.text('File not found: ' + e.message, 404);
+                }
+            });
+        }
 
         // WebSocket endpoint for spec updates
         this.get('/ws', ctx => {

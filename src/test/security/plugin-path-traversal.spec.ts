@@ -42,4 +42,28 @@ describe("Security: Plugin Path Traversal", () => {
         const res = await fetch(`http://localhost:${server!.port}/debug/asyncapi/_code?file=package.json`);
         expect(res.status).not.toBe(403);
     });
+
+    test("DebugPlugin /asyncapi/_code refuses to serve .env files", async () => {
+        for (const file of ['.env', '.env.local', '.env.production']) {
+            const res = await fetch(`http://localhost:${server!.port}/debug/asyncapi/_code?file=${encodeURIComponent(file)}`);
+            expect(res.status).toBe(403);
+        }
+    });
+
+    test("DebugPlugin /asyncapi/_code refuses to serve private keys / certs", async () => {
+        for (const file of ['server.pem', 'tls/key.pem', 'cert.key', 'server.p12']) {
+            const res = await fetch(`http://localhost:${server!.port}/debug/asyncapi/_code?file=${encodeURIComponent(file)}`);
+            expect(res.status).toBe(403);
+        }
+    });
+
+    test("DebugPlugin /explorer/_source refuses to serve .env files", async () => {
+        const res = await fetch(`http://localhost:${server!.port}/debug/explorer/_source?file=${encodeURIComponent('.env')}`);
+        expect(res.status).toBe(403);
+    });
+
+    test("AsyncApiPlugin /_code refuses to serve .env files", async () => {
+        const res = await fetch(`http://localhost:${server!.port}/asyncapi/_code?file=${encodeURIComponent('.env')}`);
+        expect(res.status).toBe(403);
+    });
 });

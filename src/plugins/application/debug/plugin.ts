@@ -8,6 +8,7 @@ import { deepMerge } from '../../../util/deep-merge';
 import { getProcess, getProcessEnv } from '../../../util/env';
 import { getEditorLinkPattern } from '../../../util/ide';
 import { getMetaFile, type ServerWebSocket } from '../../../util/runtime-types';
+import { isSourceViewEnabled, resolveSourceFile } from '../../../util/source-file-guard';
 import { $isMounted } from '../../../util/symbol';
 import type { DeepPartial, ShokupanPlugin, ShokupanPluginOptions } from '../../../util/types';
 import { generateAsyncApi } from '../asyncapi/generator';
@@ -207,19 +208,13 @@ export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
                         return ctx.text('Forbidden', 403);
                     }
 
-                    const file = ctx.query['file'];
-                    if (!file) return ctx.text('Missing file parameter', 400);
-
-                    const { resolve } = await import('node:path');
-                    const cwd = getProcess()?.cwd() || '';
-                    const resolvedPath = resolve(cwd, file);
-
-                    if (!resolvedPath.startsWith(cwd + '/') && resolvedPath !== cwd) {
-                        return ctx.text('Forbidden: File must be within project root', 403);
+                    const result = resolveSourceFile(ctx.query['file']);
+                    if (!result.ok) {
+                        return ctx.text(result.message!, result.status!);
                     }
 
                     try {
-                        const content = await readFile(resolvedPath, 'utf-8');
+                        const content = await readFile(result.path!, 'utf-8');
                         return ctx.text(content);
                     } catch (err) {
                         return ctx.text('File not found', 404);
@@ -264,6 +259,12 @@ export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
         }
 
         if (this.pluginOptions.asyncApi?.enabled !== false) {
+            // Source view is a development convenience. The arbitrary-file-read
+            // endpoint is only registered when source view is enabled (i.e. not
+            // in production and not explicitly disabled). The same flag drives
+            // the UI so the "View Source" links stay in sync with the endpoint.
+            const asyncApiSourceViewEnabled = isSourceViewEnabled(this.pluginOptions.asyncApi?.disableSourceView);
+
             this.get('/asyncapi/style.css', ctx => serveFile(ctx, 'style.css', 'text/css', 'asyncapi'));
             this.get('/asyncapi/theme.css', ctx => serveFile(ctx, 'theme.css', 'text/css', 'asyncapi'));
             this.get('/asyncapi/asyncapi-client.mjs', ctx => serveFile(ctx, 'asyncapi-client.mjs', 'application/javascript', 'asyncapi'));
@@ -284,7 +285,7 @@ export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
                 const serverUrl = this.pluginOptions.asyncApi?.serverUrl || `${ctx.hostname}:${ctx.app?.applicationConfig.port}`;
                 const base = `${this.pluginOptions.path}/asyncapi`;
 
-                const disableSourceView = this.pluginOptions.asyncApi?.disableSourceView;
+                const disableSourceView = !asyncApiSourceViewEnabled;
 
                 try {
                     await loadJsxComponents();
@@ -316,31 +317,25 @@ export class DebugPlugin extends ShokupanRouter<any> implements ShokupanPlugin {
                 });
             });
 
-            this.get('/asyncapi/_code', async ctx => {
-                if (!this.checkPermission(ctx, this.pluginOptions.asyncApi)) {
-                    return ctx.text('Forbidden', 403);
-                }
+            if (asyncApiSourceViewEnabled) {
+                this.get('/asyncapi/_code', async ctx => {
+                    if (!this.checkPermission(ctx, this.pluginOptions.asyncApi)) {
+                        return ctx.text('Forbidden', 403);
+                    }
 
-                const file = ctx.query['file'];
-                if (!file || typeof file !== 'string') {
-                    return ctx.text('Missing file parameter', 400);
-                }
+                    const result = resolveSourceFile(ctx.query['file']);
+                    if (!result.ok) {
+                        return ctx.text(result.message!, result.status!);
+                    }
 
-                const { resolve } = await import('node:path');
-                const cwd = process.cwd();
-                const resolvedPath = resolve(cwd, file);
-
-                if (!resolvedPath.startsWith(cwd + '/') && resolvedPath !== cwd) {
-                    return ctx.text('Forbidden: File must be within project root', 403);
-                }
-
-                try {
-                    const content = await readFile(resolvedPath, 'utf8');
-                    return ctx.text(content);
-                } catch (e: any) {
-                    return ctx.text('File not found: ' + e.message, 404);
-                }
-            });
+                    try {
+                        const content = await readFile(result.path!, 'utf8');
+                        return ctx.text(content);
+                    } catch (e: any) {
+                        return ctx.text('File not found: ' + e.message, 404);
+                    }
+                });
+            }
 
             this.get('/asyncapi/ws', ctx => {
                 if (!this.checkPermission(ctx, this.pluginOptions.asyncApi)) {
